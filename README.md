@@ -1,1 +1,1 @@
-# tidy_asset_pricing
+Hosts our bookdown files for "Tidy Finance"
