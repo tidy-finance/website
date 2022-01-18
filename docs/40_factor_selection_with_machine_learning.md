@@ -283,19 +283,13 @@ tmp_data
 
 ```
 ## # A tibble: 130 x 126
-##    factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
-##           <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
-##  1        -1.92               0.644        0.298           0.947      0.371 
-##  2        -1.88               1.27         0.387           0.607      0.527 
-##  3        -1.88               0.341        1.43            0.836      1.12  
-##  4        -1.88              -1.80        -0.0411         -0.963     -0.0921
-##  5        -1.88              -1.29        -0.627          -1.73      -0.850 
-##  6        -1.88               1.41         0.00517        -0.240      0.0440
-##  7        -1.88              -1.12        -0.978          -0.801     -1.25  
-##  8        -1.88               1.97         1.15           -1.21       1.13  
-##  9        -1.88               0.747        0.304          -0.979      0.109 
-## 10        -1.88               0.0387       1.09           -0.436      1.04  
-## # ... with 120 more rows, and 121 more variables: factor_q_ia <dbl>,
+##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
+##          <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
+## 1        -1.92                0.644        0.298          0.947      0.371 
+## 2        -1.88                1.27         0.387          0.607      0.527 
+## 3        -1.88                0.341        1.43           0.836      1.12  
+## 4        -1.88               -1.80        -0.0411        -0.963     -0.0921
+## # ... with 126 more rows, and 121 more variables: factor_q_ia <dbl>,
 ## #   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
 ## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
 ## #   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
@@ -524,7 +518,10 @@ autoplot(lm_tune) +
        subtitle = "Lasso (1.0), Ridge (0.0) and Elastic net (0.5) with different levels of regularization.")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/cvplot-1.png" width="768" style="display: block; margin: auto;" />
+<div class="figure" style="text-align: center">
+<img src="40_factor_selection_with_machine_learning_files/figure-html/cvplot-1.png" alt="Root mean-squared prediction errors." width="768" />
+<p class="caption">(\#fig:cvplot)Root mean-squared prediction errors.</p>
+</div>
 The figure shows that the cross-validated mean squared prediction error drops for both, Lasso and the Elastic Net and spike afterwards. For Ridge regression, the MSPE simply increases above a certain threshold. Recall, that the larger the regularization, the more restricted the model becomes. Thus, we would chooose the model with the lowest MSPE which happens to exhibit some intermediate level of regularization.
 
 ### Parallelized Workflow

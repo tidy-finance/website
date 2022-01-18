@@ -4,8 +4,6 @@ The main aim of this chapter is to familiarize yourself with the `tidyverse`. We
 
 ## Download and work with stock market data {#stock_market_data}
 
-
-
 To download price data you can use the convenient `tidyquant`package. 
 If you have trouble using `tidyquant`, check out the [documentation](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ01-core-functions-in-tidyquant.html#yahoo-finance). Start the session by loading the `tidyverse` and the `tidyquant` package as shown below. 
 
@@ -53,7 +51,7 @@ prices %>% # Simple visualization of the downloaded price time series
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-4-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 Next, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. 
 
 ```r
@@ -103,7 +101,7 @@ returns %>% # create a histogram for daily returns
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 
 Here, `bins = 100` determines the number of bins and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
 A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest. 
@@ -291,7 +289,7 @@ index_prices %>%
   theme(legend.position = "none")
 ```
 
-<img src="10_introduction_files/figure-html/fig:prices-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/fig:prices-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` is able to return a tibble for several symbols as well. All we need to do to illustrate all tickers instead of only one is to include `color = symbol` in the `ggplot` aesthetics. In this way, we can generate a separate line for each ticker.
 
@@ -543,7 +541,7 @@ volume %>% # Plot the time series of aggregate trading volume
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below:
 
@@ -566,7 +564,7 @@ volume %>%
 ## Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).
 ` comes from and what it means? Pure eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.  
@@ -617,7 +615,7 @@ c(t(wmvp) %*% mu, sqrt(t(wmvp) %*% sigma %*% wmvp)) # Expected return and volati
 ```
 
 ```
-## [1] 0.008493932 0.031390401
+## [1] 0.008493936 0.031390398
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude than the *daily* standard deviation of the individual components. Thus, the diversification benefits are tremendous!
@@ -682,5 +680,5 @@ res %>%
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-17-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
 The black efficient frontier indicates the set of portfolio a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).

@@ -44,19 +44,13 @@ crsp_monthly
 
 ```
 ## # A tibble: 3,225,253 x 5
-##    permno month      ret_excess mkt_excess mktcap_lag
-##     <dbl> <date>          <dbl>      <dbl>      <dbl>
-##  1  10043 1989-06-01   -0.0071     -0.0135       31.0
-##  2  10043 1989-07-01    0.0269      0.072        31.0
-##  3  10043 1989-08-01   -0.0238      0.0144       32.1
-##  4  10043 1989-09-01   -0.0648     -0.0076       31.6
-##  5  10043 1989-10-01    0.00205    -0.0367       29.8
-##  6  10043 1989-11-01   -0.130       0.0103       30.1
-##  7  10043 1989-12-01    0.0239      0.0116       26.4
-##  8  10043 1990-01-01   -0.112      -0.0785       27.3
-##  9  10043 1990-02-01   -0.0927      0.0111       24.4
-## 10  10043 1990-03-01    0.0807      0.0183       22.2
-## # ... with 3,225,243 more rows
+##   permno month      ret_excess mkt_excess mktcap_lag
+##    <dbl> <date>          <dbl>      <dbl>      <dbl>
+## 1  10043 1989-06-01    -0.0071    -0.0135       31.0
+## 2  10000 1986-02-01    -0.262      0.0713       16.1
+## 3  10000 1986-03-01     0.359      0.0488       12.0
+## 4  10000 1986-04-01    -0.104     -0.0131       16.3
+## # ... with 3,225,249 more rows
 ```
 Next, we want to add our sorting variable to the return data: estimated market betas. We actually want to use *lagged* betas as a sorting variable to ensure that we use information that is available when we form the portfolios and before the month where the return realizes. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month $t$ information is available in month $t+1$. (You may be tempted to simply use a call such as `crsp_monthly %>% group_by(permno) %>% mutate(beta_lag = lag(beta)))` instead. This procedure, however, does not work if there are non-explicit missing values in the time-series).
 

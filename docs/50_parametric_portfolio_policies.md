@@ -204,19 +204,13 @@ evaluate_portfolio(weights_crsp)
 
 ```
 ## # A tibble: 11 x 3
-##    measure                            benchmark      tilt
-##    <chr>                                  <dbl>     <dbl>
-##  1 Expected utility                  -0.249     -0.261   
-##  2 Average return                     6.86      -0.0509  
-##  3 SD return                         15.3       20.2     
-##  4 Sharpe ratio                       0.129     -0.000726
-##  5 CAPM alpha                         0.000104  -0.00515 
-##  6 Market beta                        0.992      0.904   
-##  7 Absolute weight                    0.0247     0.0610  
-##  8 Max. weight                        3.52       3.65    
-##  9 Min. weight                        0.0000278 -0.139   
-## 10 Avg. sum of negative weights       0         72.9     
-## 11 Avg. fraction of negative weights  0         49.4
+##   measure          benchmark      tilt
+##   <chr>                <dbl>     <dbl>
+## 1 Expected utility    -0.249 -0.261   
+## 2 Average return       6.86  -0.0509  
+## 3 SD return           15.3   20.2     
+## 4 Sharpe ratio         0.129 -0.000726
+## # ... with 7 more rows
 ```
 The value weighted portfolio delivers an annualized return of above 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
 

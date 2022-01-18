@@ -119,7 +119,7 @@ crsp_monthly %>%
 ## 2 NASDAQ    8036. 74663.  4.65e0 2.46e1 1.30e2 4.73e2  2092. 19065. 2.26e6  2300
 ## 3 NYSE     16390. 43085.  5.35e0 1.54e2 9.10e2 3.33e3 11966. 74635. 4.14e5  1247
 ## 4 Other    10061.    NA   1.01e4 1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## 5 Overall  10545. 64142.  4.65e0 2.95e1 1.82e2 8.59e2  4168. 36811. 2.26e6  3696
+## # ... with 1 more row
 ```
 
 ## Univariate Size Portfolios
@@ -221,19 +221,13 @@ p_hacking_setup
 
 ```
 ## # A tibble: 48 x 4
-##    n_portfolios exchanges        value_weighted data      
-##           <dbl> <chr>            <lgl>          <list>    
-##  1            2 NYSE             TRUE           <sym>     
-##  2            2 NYSE             TRUE           <language>
-##  3            2 NYSE             TRUE           <language>
-##  4            2 NYSE             TRUE           <language>
-##  5            2 NYSE             FALSE          <sym>     
-##  6            2 NYSE             FALSE          <language>
-##  7            2 NYSE             FALSE          <language>
-##  8            2 NYSE             FALSE          <language>
-##  9            2 NYSE|NASDAQ|AMEX TRUE           <sym>     
-## 10            2 NYSE|NASDAQ|AMEX TRUE           <language>
-## # ... with 38 more rows
+##   n_portfolios exchanges value_weighted data      
+##          <dbl> <chr>     <lgl>          <list>    
+## 1            2 NYSE      TRUE           <sym>     
+## 2            2 NYSE      TRUE           <language>
+## 3            2 NYSE      TRUE           <language>
+## 4            2 NYSE      TRUE           <language>
+## # ... with 44 more rows
 ```
 
 ```r
@@ -256,19 +250,13 @@ p_hacking_setup %>%
 
 ```
 ## # A tibble: 48 x 5
-##    n_portfolios exchanges        value_weighted data                size_premium
-##           <dbl> <chr>            <lgl>          <chr>                      <dbl>
-##  1           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.0184 
-##  2           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.0180 
-##  3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"           0.0162 
-##  4           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.0139 
-##  5           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.0114 
-##  6           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.0109 
-##  7           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly"           0.0103 
-##  8           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.00964
-##  9            5 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.00914
-## 10            5 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.00883
-## # ... with 38 more rows
+##   n_portfolios exchanges        value_weighted data                 size_premium
+##          <dbl> <chr>            <lgl>          <chr>                       <dbl>
+## 1           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0184
+## 2           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0180
+## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"             0.0162
+## 4           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0139
+## # ... with 44 more rows
 ```
 
 Additionally, we provide a graph that shows the different premiums. This plot also shows the relation to the Fama-French SMB (small minus big) premium used in the literature. 

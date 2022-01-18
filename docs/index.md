@@ -3,7 +3,7 @@ title: "Tidy Finance"
 author: "Christoph Scheuch, Patrick Weiss and Stefan Voigt"
 date: "2022-01-18"
 site: bookdown::bookdown_site
-output: bookdown::gitbook
+output: bookdown::bs4_book
 documentclass: book
 bibliography: [book.bib]
 biblio-style: apalike
