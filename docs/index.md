@@ -1,9 +1,9 @@
 --- 
 title: "Tidy Finance"
 author: "Christoph Scheuch, Patrick Weiss and Stefan Voigt"
-date: "`r Sys.Date()`"
+date: "2022-01-18"
 site: bookdown::bookdown_site
-output: bookdown::bs4_book
+output: bookdown::gitbook
 documentclass: book
 bibliography: [book.bib]
 biblio-style: apalike
