@@ -46,10 +46,11 @@
 <li><a class="active" href="univariate-sorts.html"><span class="header-section-number">5</span> Univariate Sorts</a></li>
 <li><a class="" href="univariate-sorts-firm-size.html"><span class="header-section-number">6</span> Univariate Sorts: Firm Size</a></li>
 <li><a class="" href="bivariate-sorts-value.html"><span class="header-section-number">7</span> Bivariate Sorts: Value</a></li>
-<li><a class="" href="factor-selection-via-machine-learning.html"><span class="header-section-number">8</span> Factor selection via machine learning</a></li>
-<li><a class="" href="option-pricing-via-machine-learning-methods.html"><span class="header-section-number">9</span> Option Pricing via Machine learning methods</a></li>
-<li><a class="" href="parametric-portfolio-policies.html"><span class="header-section-number">10</span> Parametric Portfolio Policies</a></li>
-<li><a class="" href="constraint-optimization-and-portfolio-backtesting.html"><span class="header-section-number">11</span> Constraint Optimization and Portfolio Backtesting</a></li>
+<li><a class="" href="bivariate-sorts-replication-of-fama-french-factors.html"><span class="header-section-number">8</span> Bivariate Sorts: Replication of Fama &amp; French Factors</a></li>
+<li><a class="" href="factor-selection-via-machine-learning.html"><span class="header-section-number">9</span> Factor selection via machine learning</a></li>
+<li><a class="" href="option-pricing-via-machine-learning-methods.html"><span class="header-section-number">10</span> Option Pricing via Machine learning methods</a></li>
+<li><a class="" href="parametric-portfolio-policies.html"><span class="header-section-number">11</span> Parametric Portfolio Policies</a></li>
+<li><a class="" href="constraint-optimization-and-portfolio-backtesting.html"><span class="header-section-number">12</span> Constraint Optimization and Portfolio Backtesting</a></li>
 </ul>
 
         <div class="book-extra">
@@ -65,6 +66,10 @@
 We start by introducing univariate portfolio sorts (which means sorting based on only one characteristic), the most basic type of portfolio analysis. In the subsequent section we tackle bivariate sorting.</p>
 <p>A univariate portfolio sort considers only one sort variable <span class="math inline">\(x_{t-1,i}\)</span>. Here, <span class="math inline">\(i\)</span> denotes the stock and <span class="math inline">\(t-1\)</span> indicates that the characteristic is known at point in time <span class="math inline">\(t\)</span>.<br>
 The objective is to asses the cross-sectional relation between <span class="math inline">\(x_{t-1,i}\)</span> and, typically, stock returns <span class="math inline">\(r_{t,i}\)</span> at time <span class="math inline">\(t\)</span> as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas, which we computed in the previous section, as our sorting variable.</p>
+<div id="data-preparation" class="section level2" number="5.1">
+<h2>
+<span class="header-section-number">5.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation"><i class="fas fa-link"></i></a>
+</h2>
 <p>The current section relies on the following set of packages.</p>
 <div class="sourceCode" id="cb83"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span>
@@ -92,13 +97,24 @@ The objective is to asses the cross-sectional relation between <span class="math
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span><span class="va">permno</span>, <span class="va">month</span>, <span class="va">ret_excess</span>, <span class="va">mkt_excess</span>, <span class="va">mktcap_lag</span><span class="op">)</span>
 <span class="va">crsp_monthly</span></code></pre></div>
 <pre><code>## # A tibble: 3,225,253 x 5
-##   permno month      ret_excess mkt_excess mktcap_lag
-##    &lt;dbl&gt; &lt;date&gt;          &lt;dbl&gt;      &lt;dbl&gt;      &lt;dbl&gt;
-## 1  10043 1989-06-01    -0.0071    -0.0135       31.0
-## 2  10000 1986-02-01    -0.262      0.0713       16.1
-## 3  10000 1986-03-01     0.359      0.0488       12.0
-## 4  10000 1986-04-01    -0.104     -0.0131       16.3
-## # ... with 3,225,249 more rows</code></pre>
+##    permno month      ret_excess mkt_excess mktcap_lag
+##     &lt;dbl&gt; &lt;date&gt;          &lt;dbl&gt;      &lt;dbl&gt;      &lt;dbl&gt;
+##  1  10043 1989-06-01    -0.0071    -0.0135      31.0 
+##  2  10000 1986-02-01    -0.262      0.0713      16.1 
+##  3  10000 1986-03-01     0.359      0.0488      12.0 
+##  4  10000 1986-04-01    -0.104     -0.0131      16.3 
+##  5  10000 1986-05-01    -0.228      0.0462      15.2 
+##  6  10000 1986-06-01    -0.0102     0.0103      11.8 
+##  7  10000 1986-07-01    -0.0860    -0.0645      11.7 
+##  8  10000 1986-08-01    -0.620      0.0607      10.8 
+##  9  10000 1986-09-01    -0.0616    -0.086        4.15
+## 10  10000 1986-10-01    -0.247      0.0466       3.91
+## # ... with 3,225,243 more rows</code></pre>
+</div>
+<div id="simple-sorts-by-market-beta" class="section level2" number="5.2">
+<h2>
+<span class="header-section-number">5.2</span> Simple sorts by market beta<a class="anchor" aria-label="anchor" href="#simple-sorts-by-market-beta"><i class="fas fa-link"></i></a>
+</h2>
 <p>Next, we want to add our sorting variable to the return data: estimated market betas. We actually want to use <em>lagged</em> betas as a sorting variable to ensure that we use information that is available when we form the portfolios and before the month where the return realizes. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month <span class="math inline">\(t\)</span> information is available in month <span class="math inline">\(t+1\)</span>. (You may be tempted to simply use a call such as <code>crsp_monthly %&gt;% group_by(permno) %&gt;% mutate(beta_lag = lag(beta)))</code> instead. This procedure, however, does not work if there are non-explicit missing values in the time-series).</p>
 <div class="sourceCode" id="cb87"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">beta_lag</span> <span class="op">&lt;-</span> <span class="va">beta</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span>
@@ -145,7 +161,12 @@ Using the two portfolios, we can easily construct a long-short strategy: buy the
 ## 
 ##               Estimate Std. Error t value Pr(&gt;|t|)
 ## (Intercept) -0.0001684  0.0010050 -0.1676    0.867</code></pre>
-<p>The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimicks an investment strategy that finances high beta stocks by shorting low beta stocks. One should therefore expect that the average excess returns yield a risk adjusted return that is above the risk-free rate.</p>
+<p>The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. One should therefore expect that the average excess returns yield a risk adjusted return that is above the risk-free rate.</p>
+</div>
+<div id="functional-programming-for-portfolio-sorts" class="section level2" number="5.3">
+<h2>
+<span class="header-section-number">5.3</span> Functional programming for portfolio sorts<a class="anchor" aria-label="anchor" href="#functional-programming-for-portfolio-sorts"><i class="fas fa-link"></i></a>
+</h2>
 <p>Let us take the portfolio construction to the next level. We now want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming becomes very handy: we employ the <a href="https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-">curly-curly</a> operator to give us flexibility with respect to which variable to use for the sorting, denoted by <code>var</code>. We use <code><a href="https://rdrr.io/r/stats/quantile.html">quantile()</a></code> to compute breakpoints for <code>n_portfolios</code>. We then assign portfolios to stocks using the <code><a href="https://rdrr.io/r/base/findInterval.html">findInterval()</a></code> function. The output of the following function is hence a new column that contains the number of the portfolio in which a stock ends up.</p>
 <div class="sourceCode" id="cb93"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">assign_portfolio</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">var</span>, <span class="va">n_portfolios</span><span class="op">)</span> <span class="op">{</span>
@@ -171,6 +192,11 @@ Using the two portfolios, we can easily construct a long-short strategy: buy the
          portfolio <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">as.factor</a></span><span class="op">(</span><span class="va">portfolio</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">portfolio</span>, <span class="va">month</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span> 
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span>ret <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html">weighted.mean</a></span><span class="op">(</span><span class="va">ret_excess</span>, <span class="va">mktcap_lag</span><span class="op">)</span>, .groups <span class="op">=</span> <span class="st">"drop"</span><span class="op">)</span></code></pre></div>
+</div>
+<div id="performance-evaluation" class="section level2" number="5.4">
+<h2>
+<span class="header-section-number">5.4</span> Performance evaluation<a class="anchor" aria-label="anchor" href="#performance-evaluation"><i class="fas fa-link"></i></a>
+</h2>
 <p>In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.</p>
 <div class="sourceCode" id="cb95"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">beta_portfolios_summary</span> <span class="op">&lt;-</span> <span class="va">beta_portfolios</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span>
@@ -258,12 +284,19 @@ To provide more evidence against the CAPM predictions, we again form a long-shor
 Overall, this section shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next section, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis.</div>
 
 </div>
+</div>
   <div class="chapter-nav">
 <div class="prev"><a href="estimating-beta.html"><span class="header-section-number">4</span> Estimating Beta</a></div>
 <div class="next"><a href="univariate-sorts-firm-size.html"><span class="header-section-number">6</span> Univariate Sorts: Firm Size</a></div>
 </div></main><div class="col-md-3 col-lg-2 d-none d-md-block sidebar sidebar-chapter">
     <nav id="toc" data-toggle="toc" aria-label="On this page"><h2>On this page</h2>
-      <ul class="nav navbar-nav"><li><a class="nav-link" href="#univariate-sorts"><span class="header-section-number">5</span> Univariate Sorts</a></li></ul>
+      <ul class="nav navbar-nav">
+<li><a class="nav-link" href="#univariate-sorts"><span class="header-section-number">5</span> Univariate Sorts</a></li>
+<li><a class="nav-link" href="#data-preparation"><span class="header-section-number">5.1</span> Data preparation</a></li>
+<li><a class="nav-link" href="#simple-sorts-by-market-beta"><span class="header-section-number">5.2</span> Simple sorts by market beta</a></li>
+<li><a class="nav-link" href="#functional-programming-for-portfolio-sorts"><span class="header-section-number">5.3</span> Functional programming for portfolio sorts</a></li>
+<li><a class="nav-link" href="#performance-evaluation"><span class="header-section-number">5.4</span> Performance evaluation</a></li>
+</ul>
 
       <div class="book-extra">
         <ul class="list-unstyled">
@@ -279,7 +312,7 @@ Overall, this section shows how functional programming can be leveraged to form 
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance</strong>" was written by Christoph Scheuch, Patrick Weiss and Stefan Voigt. It was last built on 2022-01-18.</p>
+    <p>"<strong>Tidy Finance</strong>" was written by Christoph Scheuch, Patrick Weiss and Stefan Voigt. It was last built on 2022-01-20.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

@@ -8,6 +8,8 @@ We start by introducing univariate portfolio sorts (which means sorting based on
 A univariate portfolio sort considers only one sort variable $x_{t-1,i}$. Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is known at point in time $t$.  
 The objective is to asses the cross-sectional relation between $x_{t-1,i}$ and, typically, stock returns $r_{t,i}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas, which we computed in the previous section, as our sorting variable.
 
+## Data preparation
+
 The current section relies on the following set of packages. 
 
 ```r
@@ -44,14 +46,22 @@ crsp_monthly
 
 ```
 ## # A tibble: 3,225,253 x 5
-##   permno month      ret_excess mkt_excess mktcap_lag
-##    <dbl> <date>          <dbl>      <dbl>      <dbl>
-## 1  10043 1989-06-01    -0.0071    -0.0135       31.0
-## 2  10000 1986-02-01    -0.262      0.0713       16.1
-## 3  10000 1986-03-01     0.359      0.0488       12.0
-## 4  10000 1986-04-01    -0.104     -0.0131       16.3
-## # ... with 3,225,249 more rows
+##    permno month      ret_excess mkt_excess mktcap_lag
+##     <dbl> <date>          <dbl>      <dbl>      <dbl>
+##  1  10043 1989-06-01    -0.0071    -0.0135      31.0 
+##  2  10000 1986-02-01    -0.262      0.0713      16.1 
+##  3  10000 1986-03-01     0.359      0.0488      12.0 
+##  4  10000 1986-04-01    -0.104     -0.0131      16.3 
+##  5  10000 1986-05-01    -0.228      0.0462      15.2 
+##  6  10000 1986-06-01    -0.0102     0.0103      11.8 
+##  7  10000 1986-07-01    -0.0860    -0.0645      11.7 
+##  8  10000 1986-08-01    -0.620      0.0607      10.8 
+##  9  10000 1986-09-01    -0.0616    -0.086        4.15
+## 10  10000 1986-10-01    -0.247      0.0466       3.91
+## # ... with 3,225,243 more rows
 ```
+
+## Simple sorts by market beta
 Next, we want to add our sorting variable to the return data: estimated market betas. We actually want to use *lagged* betas as a sorting variable to ensure that we use information that is available when we form the portfolios and before the month where the return realizes. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month $t$ information is available in month $t+1$. (You may be tempted to simply use a call such as `crsp_monthly %>% group_by(permno) %>% mutate(beta_lag = lag(beta)))` instead. This procedure, however, does not work if there are non-explicit missing values in the time-series).
 
 ```r
@@ -111,7 +121,9 @@ coeftest(fit, vcov = NeweyWest, lag = 6)
 ##               Estimate Std. Error t value Pr(>|t|)
 ## (Intercept) -0.0001684  0.0010050 -0.1676    0.867
 ```
-The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimicks an investment strategy that finances high beta stocks by shorting low beta stocks. One should therefore expect that the average excess returns yield a risk adjusted return that is above the risk-free rate.
+The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. One should therefore expect that the average excess returns yield a risk adjusted return that is above the risk-free rate.
+
+## Functional programming for portfolio sorts
 
 Let us take the portfolio construction to the next level. We now want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming becomes very handy: we employ the [curly-curly](https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-) operator to give us flexibility with respect to which variable to use for the sorting, denoted by `var`. We use `quantile()` to compute breakpoints for `n_portfolios`. We then assign portfolios to stocks using the `findInterval()` function. The output of the following function is hence a new column that contains the number of the portfolio in which a stock ends up.
 
@@ -144,6 +156,9 @@ beta_portfolios <- data_beta %>%
   group_by(portfolio, month) %>% 
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
+
+## Performance evaluation
+
 In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns. 
 
 ```r

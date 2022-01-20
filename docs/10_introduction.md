@@ -4,7 +4,9 @@ The main aim of this chapter is to familiarize yourself with the `tidyverse`. We
 
 ## Download and work with stock market data {#stock_market_data}
 
-To download price data you can use the convenient `tidyquant`package. 
+
+
+To download price data, you can use the convenient `tidyquant`package. 
 If you have trouble using `tidyquant`, check out the [documentation](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ01-core-functions-in-tidyquant.html#yahoo-finance). Start the session by loading the `tidyverse` and the `tidyquant` package as shown below. 
 
 
@@ -15,12 +17,12 @@ library(tidyverse)
 library(tidyquant)
 ```
 
-We start and download daily prices for one stock market ticker, e.g. *AAPL*, directly from data provider Yahoo!Finance. To download the data you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommended to take a look in the examples section in the documentation. 
+We first download daily prices for one stock market ticker, e.g. *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the documentation's examples section. 
 
 
 ```r
 prices <- tq_get("AAPL", get = "stock.prices")
-prices %>% head() # Take a glimpse on the data
+prices %>% head() # Take a glimpse at the data
 ```
 
 ```
@@ -34,7 +36,7 @@ prices %>% head() # Take a glimpse on the data
 ## # ... with 2 more rows
 ```
 
-`tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with 8 quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of shares) and the *adjusted* price in USD which factors in anything that might affect the stock price after the market closes, e.g. stock splits, repurchases and dividends.  
+`tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of shares), and the *adjusted* price in USD, which factors in anything that might affect the stock price after the market closes, e.g. stock splits, repurchases and dividends.  
 
 Next, we use `ggplot` to visualize the time series of adjusted prices. 
 
@@ -51,13 +53,13 @@ prices %>% # Simple visualization of the downloaded price time series
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-4-1.png" width="768" style="display: block; margin: auto;" />
 Next, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. 
 
 ```r
 returns <- prices %>%
   arrange(date) %>%
-  mutate(ret = adjusted / lag(adjusted) - 1) %>%
+  mutate(ret = (adjusted / lag(adjusted) - 1)) %>%
   select(symbol, date, ret)
 returns %>% head()
 ```
@@ -73,7 +75,7 @@ returns %>% head()
 ## # ... with 2 more rows
 ```
 
-The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no leading price. Note also that the computations require that the time series is ordered by date - otherwise, `lag` would be meaningless.
+The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Note also that the computations require that the time series is ordered by date - otherwise, `lag` would be meaningless.
 For the upcoming examples we remove missing values as these would require careful treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and if you can simply get rid of these observations. 
 
 
@@ -95,13 +97,13 @@ returns %>% # create a histogram for daily returns
   ) +
   labs(
     x = NULL, y = NULL,
-    title = "Distribution of daily AAPL returns (in percent)",
+    title = "Distribution of daily AAPL returns",
     subtitle = "The dotted vertical line indicates the historical 5% quantile"
   ) +
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" />
 
 Here, `bins = 100` determines the number of bins and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
 A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest. 
@@ -152,7 +154,8 @@ returns %>%
       daily_sd = sd,
       daily_min = min,
       daily_max = max
-    )
+    ),
+    .names = "{.fn}"
   )) %>%
   kableExtra::kable(digits = 3)
 ```
@@ -161,10 +164,10 @@ returns %>%
  <thead>
   <tr>
    <th style="text-align:right;"> year </th>
-   <th style="text-align:right;"> ret_daily_mean </th>
-   <th style="text-align:right;"> ret_daily_sd </th>
-   <th style="text-align:right;"> ret_daily_min </th>
-   <th style="text-align:right;"> ret_daily_max </th>
+   <th style="text-align:right;"> daily_mean </th>
+   <th style="text-align:right;"> daily_sd </th>
+   <th style="text-align:right;"> daily_min </th>
+   <th style="text-align:right;"> daily_max </th>
   </tr>
  </thead>
 <tbody>
@@ -240,18 +243,19 @@ returns %>%
   </tr>
   <tr>
    <td style="text-align:right;"> 2022 </td>
-   <td style="text-align:right;"> -0.002 </td>
+   <td style="text-align:right;"> -0.005 </td>
    <td style="text-align:right;"> 0.016 </td>
    <td style="text-align:right;"> -0.027 </td>
    <td style="text-align:right;"> 0.025 </td>
   </tr>
 </tbody>
 </table>
+In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows to next to arbitrary column names which can be useful for reporting.
 
 ## Scale the analysis up: tidyverse-magic
-As a next step, we want to take the code from before and generalize it such that all the computations are performed for an arbitrary vector of tickers or even for all stocks that represent an index. Following tidy principles, it turns out to be actually quite easy to automate the download, generate the plot of the price time series and the table of summary statistics for an arbitrary number of assets.
+As a next step, we take the code from before and generalize it such that all the computations are performed for an arbitrary vector of tickers or even for all stocks that represent an index. Following tidy principles, it turns out to be quite easy to automate the download, generate the plot of the price time series and the table of summary statistics for an arbitrary number of assets.
 
-This is where the `tidyverse` magic starts: tidy data and a tidy workflow make it extremely easy to generalize the computations from before to as many assets you like. The following code takes any vector of tickers, e.g., `ticker <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. At the end, we create the table of summary statistics for an arbitrary number of assets. 
+This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets you like. The following code takes any vector of tickers, e.g., `ticker <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. At the end, we create the table of summary statistics for an arbitrary number of assets. 
 
 Figure @ref(fig:prices) illustrates the time series of downloaded *adjusted* prices for each of the 30 constituents of the Dow Jones index. Make sure you understand every single line of code! (What is the purpose of `%>%`? What are the arguments of `aes()`? Which alternative *geoms* could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
@@ -289,9 +293,12 @@ index_prices %>%
   theme(legend.position = "none")
 ```
 
-<img src="10_introduction_files/figure-html/fig:prices-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure" style="text-align: center">
+<img src="10_introduction_files/figure-html/prices-1.png" alt="DOW index stock prices." width="768" />
+<p class="caption">(\#fig:prices)DOW index stock prices.</p>
+</div>
 
-Do you notice the small differences relative to the code we used before? `tq_get(ticker)` is able to return a tibble for several symbols as well. All we need to do to illustrate all tickers instead of only one is to include `color = symbol` in the `ggplot` aesthetics. In this way, we can generate a separate line for each ticker.
+Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers instead of only one is to include `color = symbol` in the `ggplot` aesthetics. In this way, we can generate a separate line for each ticker.
 
 The same holds for returns as well. Before computing returns as before, we use `group_by(symbol)` such that the `mutate` command is performed for each symbol individually. Exactly the same logic applies for the computation of summary statistics: `group_by(symbol)` is the key to aggregate the time series into ticker-specific variables of interest. 
 
@@ -520,8 +527,10 @@ all_returns %>%
 </tbody>
 </table>
 
-Note that you are now also equipped with all tools to download price data for *each* ticker listed in the SP500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")` which provides you with a tibble that contains each symbol that is (currently) part of the SP500. However, don't try this if you are not prepared to wait for a couple of minutes.
+Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")` which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500. However, don't try this if you are not prepared to wait for a couple of minutes.
 
+
+## Other forms of data aggregation 
 Sometimes, aggregation across other variables than `symbol` makes sense as well. For instance, suppose you are interested in the question: are days with high aggregate trading volume followed by high aggregate trading volume days? To provide some initial analysis on this question we take the downloaded tibble with prices and compute aggregate daily trading volume for all Dow Jones constituents in USD. Recall that the column *volume* is denoted in the number of traded shares. We multiply the trading volume with the daily closing price to get a measure of the aggregate trading volume in USD. Scaling by `1e9` denotes daily trading volume in billion USD.  
 
 
@@ -541,7 +550,7 @@ volume %>% # Plot the time series of aggregate trading volume
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" />
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below:
 
@@ -564,7 +573,7 @@ volume %>%
 ## Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="768" style="display: block; margin: auto;" />
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).
 ` comes from and what it means? Pure eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.  
@@ -615,11 +624,11 @@ c(t(wmvp) %*% mu, sqrt(t(wmvp) %*% sigma %*% wmvp)) # Expected return and volati
 ```
 
 ```
-## [1] 0.008493936 0.031390398
+## [1] 0.008497552 0.031388366
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude than the *daily* standard deviation of the individual components. Thus, the diversification benefits are tremendous!
-Next we compute the efficient portfolio weights which achieves 3 times the expected return of the minimum variance portfolio. If you wonder where the solution $\omega_\text{eff}$ comes from: The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum desired expected return* $\bar{\mu}$ such that her objective function is to choose $\omega_\text{eff}$ as the solution to
+Next we compute the efficient portfolio weights which achieves 3 times the expected return of the minimum variance portfolio. If you wonder where the solution $\omega_\text{eff}$ comes from: The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum acceptable expected return* $\bar{\mu}$ such that her objective function is to choose $\omega_\text{eff}$ as the solution to
 $$\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
 The code below implements the analytic solution to this optimization problem, we encourage you to verify that it is correct. 
 
@@ -635,6 +644,8 @@ E <- as.numeric(t(mu) %*% solve(sigma) %*% mu)
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
 weff <- wmvp + lambda_tilde / 2 * (solve(sigma) %*% mu - D / C * solve(sigma) %*% iota)
 ```
+
+## The efficient frontier 
 
 The two mutual fund theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio and the efficient portfolio for another required level of expected returns like above), we can characterize the entire efficient frontier by combining these two portfolios. This is done in the code below. Make sure to familiarize yourself with the inner workings of the `for` loop!.
 
@@ -680,5 +691,13 @@ res %>%
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
-The black efficient frontier indicates the set of portfolio a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
+<img src="10_introduction_files/figure-html/unnamed-chunk-17-1.png" width="768" style="display: block; margin: auto;" />
+The black line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
+
+## Exercises
+
+1. Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `tq_get` from the `tidyquant` package. Plot the time series of adjusted closing prices.
+1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5% quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
+1. Take your code from before and generalize it such all the computations are performed for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series and create a table of return summary statistics for this arbitrary number of assets.
+1. Consider the research question Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
+1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. After computing the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields exactly the same historical volatility but achieves the highest possible average return.
