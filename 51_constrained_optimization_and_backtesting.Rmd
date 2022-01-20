@@ -9,7 +9,8 @@ knitr::opts_chunk$set(echo = TRUE,
                       fig.align = "center")
 ```
 
-In this section we conduct portfolio backtesting procedures in more realistic settings with transaction costs and investment constraints such as no-short selling rules. 
+In this section we conduct portfolio back testing in a more realistic setting with transaction costs and investment constraints such as no-short selling rules. 
+
 We start with *standard* mean-variance efficient portfolios and then introduce further constraints step-by-step. Numerical constrained optimization is done with the packages `quadprog` (for quadratic objective functions such as in typical mean-variance framework) and `alabama` (for more general, non-linear objectives and constraints).
 
 ```{r}
@@ -17,7 +18,10 @@ library(tidyverse)
 library(RSQLite)
 library(quadprog) # Optimization (mean-variance)
 library(alabama)  # Advanced optimization (non-linear objective or constraints)
+library(scales)
 ```
+
+## Data preparation
 
 We start by loading the required data. In our application we will restrict our investment universe to the monthly Fama-French industry portfolio returns.
 
@@ -34,59 +38,43 @@ industry_returns <- industry_returns %>%
 N <- ncol(industry_returns) # Number of assets
 ```
 
-First a brief recap. A common objective for portfolio optimization is to choose mean-variance efficient portfolio, that is the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio weights which are given by the solution to 
-$$\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1$$
+## Recap: Portfolio choice 
+First a brief recap. A common objective for portfolio optimization is to choose mean-variance efficient portfolio weights, that is the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio weights which are given by the solution to 
+$$w_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1$$
 where $\Sigma$ is the $(N \times N)$ variance covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In code, this is equivalent to the following:
 ```{r}
 Sigma <- cov(industry_returns)
-
 w_mvp <- solve(Sigma) %*% rep(1, ncol(Sigma))
 w_mvp <- as.vector(w_mvp / sum(w_mvp))
 ```
 
-Next, consider now an investor who aims to achieve minimum variance *given a minimum desired expected return* $\bar{\mu}$ such that she chooses
-$$\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
-The Lagrangian reads $$ \mathcal{L}(\omega) = w'\Sigma w - \lambda(w'\iota - 1) - \tilde{\lambda}(\omega'\mu - \bar{\mu}) $$. Solving the first order conditions yields
-$$
-\begin{aligned}
-2\Sigma w &= \lambda\iota + \tilde\lambda \mu\\
-\omega &= \frac{\lambda}{2}\Sigma^{-1}\iota + \frac{\tilde\lambda}{2}\Sigma^{-1}\mu
-\end{aligned}
-$$
-The constraints imply 
-$$
-\begin{aligned}
-1 &= \iota'\omega = \frac{\lambda}{2}\underbrace{\iota'\Sigma^{-1}\iota}_{C} + \frac{\tilde\lambda}{2}\underbrace{\iota'\Sigma^{-1}\mu}_D
-\Rightarrow \lambda = \frac{2 - \tilde\lambda D}{C}\\
-\bar\mu &= \frac{\lambda}{2}\underbrace{\mu'\Sigma^{-1}\iota}_{D} + \frac{\tilde\lambda}{2}\underbrace{\mu'\Sigma^{-1}\mu}_E = \frac{1}{2}\left(\frac{2 - \tilde\lambda D}{C}\right)D+\frac{\tilde\lambda}{2}E  \\&=\frac{D}{C}+\frac{\tilde\lambda}{2}\left(E - \frac{D^2}{C}\right)\\
-\Rightarrow \tilde\lambda &= 2\frac{\bar\mu - D/C}{E-D^2/C}\\
-\end{aligned}
-$$
-As a result, the efficient portfolio weight takes the form
-$$w_\text{eff} = \omega_\text{mvp} + \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$
-Note that $$\iota'\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right) = D - D = 0\text{ so }\iota'\omega_\text{eff} = \iota'\omega_\text{mvp} = 1$$ and $$\mu'\omega_\text{eff} = \frac{D}{C} + \bar\mu - \frac{D}{C} = \bar\mu$$. As a result, the efficient portfolio allocates wealth in the minimum variance portfolio $\omega_\text{mvp}$ and a levered (self-financing) portfolio to increase the expected return.
-
-You can rewrite the optimal portfolio weights as follows:
+Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* $\bar{\mu}$ such that she chooses
+$$w_\text{eff}({\bar{\mu}}) =\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
+It can be shown (see Exercises) that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor $\gamma$. The investor aims to choose portfolio weights such that
+$$\begin{aligned} w^*_\gamma = \arg\max w' \mu - \frac{\gamma}{2}w'\Sigma w\end{aligned}\quad s.t. w'\iota = 1.$$
+The solution to the optimal portfolio choice problem is:
 $$\begin{aligned}
- \omega^*_{t+1} & = \frac{1}{\gamma}\left(\Sigma_t^{-1} - \frac{1}{\iota' \Sigma_t^{-1}\iota }\Sigma_t^{-1}\iota\iota' \Sigma_t^{-1} \right) \mu_t  + \frac{1}{\iota' \Sigma_t^{-1} \iota }\Sigma_t^{-1} \iota
+ \omega^*_{\gamma} & = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.
  \end{aligned}$$
-Empirically this classical solution imposes many problems: Especially the estimates of $\mu_t$ are noisy over short horizons, the ($N \times N$) matrix $\Sigma_t$ contains $N(N-1)/2$ distinct elements and thus, estimation error is huge. Even worse, if the asset universe contains more assets ($N$) than available time periods ($T$), the sample variance covariance matrix is not longer positive definite such that the inverse $\Sigma^{-1}$ does not exist anymore. 
-The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plugin some sample estimates $\hat \mu_t$ and $\hat \Sigma_t$ can be summarised rather easily: Mean-variance optimization performs badly! The literature brought forward a lot of proposal to overcome these empirical issues, for instance, impose some form of regularization of $\Sigma$, to rely on Bayesian priors inspired by theoretical asset pricing models, to use high-frequency data to improve forecasting (which are not captured in this book). One unifying framework that works easily, effective (even for large dimensions) and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs: 
+Empirically this classical solution imposes many problems: Especially the estimates of $\mu_t$ are noisy over short horizons, the ($N \times N$) matrix $\Sigma_t$ contains $N(N-1)/2$ distinct elements and thus, estimation error is huge. Even worse, if the asset universe contains more assets than available time periods $(N > T)$, the sample variance covariance matrix is not longer positive definite such that the inverse $\Sigma^{-1}$ does not exist anymore. On top of the estimation uncertainty, *transaction costs* are a major concern. Rebalancing portfolios is costly and therefore the optimal choice should depend on the current holdings of the investor.
 
-Assume that returns are multivariate normal distributed such that: $p_t({r}_{t+1}|\mathcal{M})=N(\mu,\Sigma)$. Additionally we assume quadtratic transaction costs which penalize rebalancing such that $$\begin{aligned}
+## Estimation uncertainty and transaction costs
+
+The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plugin some sample estimates $\hat \mu_t$ and $\hat \Sigma_t$ can be summarised rather easily: Mean-variance optimization performs badly! The literature brought forward many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of $\Sigma$, rely on Bayesian priors inspired by theoretical asset pricing models, or use high-frequency data to improve forecasting. One unifying framework that works easily, effective (even for large dimensions) and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs [@Hautsch2019]. 
+
+Assume that returns are multivariate normal distributed such that: $p_t({r}_{t+1}|\mathcal{M})=N(\mu,\Sigma)$. Additionally we assume quadratic transaction costs which penalize rebalancing such that $$\begin{aligned}
 \nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) :=\nu_t\left(\omega_{t+1}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),
 \end{aligned}$$
 with cost parameter $\beta>0$ and $\omega_{t^+} := {\omega_t \circ  (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}$. Note: $\omega_{t^+}$ differs mechanically from $\omega_t$ due to the returns in the past period.  
-
 Then, the optimal portfolio choice is
 $$\begin{aligned}
 \omega_{t+1} ^* :=&  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \\
 =&\arg\max_{\omega\in\mathbb{R}^N,\text{ }  \iota'\omega=1}
-\omega'\color{red}{\mu^*} - \frac{\gamma}{2}\omega'\color{red}{\Sigma^*} \omega ,
+\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega ,
 \end{aligned}$$
 where
 $$\begin{aligned}
-\color{red}{\mu^*:=\mu+\beta \omega_{t^+}} \quad  \text{and} \quad \color{red}{\Sigma^*:=\Sigma + \frac{\beta}{\gamma} I_N}.
+\mu^*:=\mu+\beta \omega_{t^+} \quad  \text{and} \quad \Sigma^*:=\Sigma + \frac{\beta}{\gamma} I_N.
 \end{aligned}$$
 As a result, adjusting for transaction costs implies a standard mean-variance optimal portfolio choice with adjusted return parameters $\Sigma^*$ and $\mu^*$: $$\begin{aligned}
  \omega^*_{t+1} & = \frac{1}{\gamma}\left(\Sigma^{*-1} - \frac{1}{\iota' \Sigma^{*-1}\iota }\Sigma^{*-1}\iota\iota' \Sigma^{*-1} \right) \mu^*  + \frac{1}{\iota' \Sigma^{*-1} \iota }\Sigma^{*-1} \iota.
@@ -99,7 +87,10 @@ $$\begin{aligned}
 \end{aligned}$$
 The optimal weights correspond to a mean-variance portfolio where the vector of expected returns is such that assets that currently exhibit a higher weight are considered as delivering an higher expected return. 
 
-The function below implements the efficient portfolio weight in its general form which also allows to reflect transaction costs (conditional on the holdings *before* reallocation):
+## Optimal portfolio choice in R
+
+The function below implements the efficient portfolio weight in its general form which also allows to reflect transaction costs (conditional on the holdings *before* reallocation). For $\beta=0$, the computation resembles the standard mean-variance efficient framework. 
+
 ```{r}
 compute_efficient_weight <- function(Sigma,
                                      mu,
@@ -148,12 +139,12 @@ transaction_costs %>%
   theme_minimal() +
   theme(legend.position = "bottom")
 ```
-The figure illustrates: the higher the transaction costs parameter $\beta$, the smaller rebalancing from the initial portfolio (always set to the minimum variance portfolio weights in this example). Further, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.
+The figure show that the higher the transaction costs parameter $\beta$, the smaller rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). Further, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.
 
-Next we introduce constrained optimization. Very often, typical constraints such as no-short selling rules prevent analytical solutions for optimal portfolio weights. However, numerical optimization allows to compute the solutions to such constrained problems. For the purpose of mean-variance optimization we rely on `solve.QP` from `quadprog`. First, we start with an *unconstrained* problem to replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. 
+## Constrained optimization
+Next we introduce constrained optimization. Very often, typical constraints such as no-short selling rules prevent analytical solutions for optimal portfolio weights. However, numerical optimization allows to compute the solutions to such constrained problems. For the purpose of mean-variance optimization we rely on `solve.QP` from the package `quadprog`. First, we start with an *unconstrained* problem to replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. 
 
 ```{r}
-# (Constrained) optimization in R ----
 # To get started: replicate minimum variance portfolio as numerical solution
 w_mvp_numerical <- solve.QP(Dmat = Sigma,
                             dvec = rep(0, N), # no vector of expected returns for MVP 
@@ -177,9 +168,7 @@ The function `solve.QP` from package `quadprog` delivers numerical solution to q
 $$\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega >= b_0.$$
 The function takes one argument (`meq`) for the number of equality constraints. Therefore, above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of no-short selling, the matrix $A$ is of the form 
 $$\begin{aligned}A = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}\end{aligned}.$$
-For more complex optimization routines, [this link (optimization task view)](https://cran.r-project.org/web/views/Optimization.html) helps
-
-Next (here is where analytical solutions stop): we additionally impose no short-sale constraints which implies $N$ additional inequality constraints: $w_i >=0$. 
+For more complex optimization routines, [this link (optimization task view)](https://cran.r-project.org/web/views/Optimization.html) provides an overview over the wast optimization landscape in `R`. Next we approach problems where no analytical solutions exist. First, we additionally impose no short-sale constraints which implies $N$ additional inequality constraints: $w_i >=0$. 
 
 ```{r}
 A <- cbind(1, diag(N)) # Matrix of constraints t(A) >= bvec = c(1, rep(0, N))
@@ -193,7 +182,7 @@ w_no_short_sale <- solve.QP(Dmat = 2 * Sigma, # Efficient portfolio with risk av
 
 ```
 
-`solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. Often, however, optimization requires more flexibility. As one example, we show below how to compute optimal weights which are subject to the so-called regulation T-constraint which requires that the sum of all absolute portfolio weights is smaller than 1.5. This clearly is a non-linear objective function, thus we cannot longer rely on `solve.QP`. Instead, we rely on the package `alabama` which requires us to define the objective and constraint functions individually. 
+`solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. Often, however, optimization requires more flexibility. As one example, we show below how to compute optimal weights which are subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50%. This clearly is a non-linear objective function, thus we cannot longer rely on `solve.QP`. Instead, we rely on the package `alabama` which requires us to define the objective and constraint functions individually. 
 ```{r}
 fn <- function(w, gamma = 2) -t(w) %*% mu + gamma / 2 * t(w)%*%Sigma%*%w # Objective function which we minimize
 hin <- function(w, reg_t = 1.5) return(reg_t - sum(abs(w))) # inequality constraints such that reg_t > sum(abs(w))
@@ -217,17 +206,18 @@ tibble(`No short-sale` = w_no_short_sale,
   pivot_longer(-Industry, 
                names_to = "Strategy") %>% 
 ggplot(aes(fill = Strategy, 
-                 y = 100 * value, 
+                 y = value, 
                  x = Industry)) + 
   geom_bar(position="dodge", stat="identity") +
   coord_flip() + 
   theme_minimal() +
   labs(y = "Allocation weight (in percent)",
        title ="Optimal allocations for different investment rules") +
-  theme(legend.position = "bottom") 
+  theme(legend.position = "bottom") +
+  scale_y_continuous(labels = percent)
 ```
 
-Before moving on, we propose a final allocation strategy which reflects a somewhat more realistict structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for $L_1$ transaction costs $\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, thus we rely on non-linear optimization procedures (however, the interpretation of transaction costs as a form of shrinkage is still valid, see Hautsch and Voigt (2019)).
+Before moving on, we propose a final allocation strategy which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for $L_1$ transaction costs $\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, thus we rely on non-linear optimization procedures.
 ```{r}
 compute_efficient_weight_L1_TC <- function(mu,
                                           Sigma, 
@@ -247,7 +237,8 @@ compute_efficient_weight_L1_TC <- function(mu,
 }
 ```
 
-You may have noticed that, for the sake of keeping things easy, we committed one fundamental error in computing portfolio weights above: We used the full sample of the data to determine the optimal allocation. In other words, in order to implement this strategy in the beginning of the 2000's, you will need to know in advance how the returns will evolve until 2020. Instead, while interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We will do so next in a backtesting exercise. For the backtest we recompute optimal weights just based on past available data. 
+## Out-of-sample backtesting
+For the sake of keeping things easy, we committed one fundamental error in computing portfolio weights above: We used the full sample of the data to determine the optimal allocation. In other words, in order to implement this strategy in the beginning of the 2000's, you will need to know in advance how the returns will evolve until 2020. Instead, while interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We will do so next in a backtesting exercise. For the backtest we recompute optimal weights just based on past available data. 
 
 ```{r}
 window_length <- 120 # Estimation window (length of past available data)
@@ -345,5 +336,22 @@ performance %>%
             SD = sqrt(12) * sd(100 * net_return), # Annualized standard deviation
             Sharpe = if_else(Mean > 0, Mean/SD, NA_real_),
             Turnover = 100 * mean(turnover)) %>% 
-  knitr::kable(digits = 4)
+  knitr::kable(digits = 3)
 ``` 
+
+The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers expected return and variance of her portfolio. Effectively, The mean-variance portfolio generated a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the theoretical optimal portfolio. 
+
+## Exercises
+
+1. We argue that an investor with a quadratic utility function with certainty equivalent $$\max_w CE(w) = \omega'\mu - \frac{\gamma}{2} \omega'\Sigma \omega \text{ s.t. } \iota'\omega = 1$$
+faces an equivalent optimization problem to a framework where portfolio weights are chosen with the aim to minimize volatility given a pre-specified level or expected returns
+$$\min_w \omega'\Sigma \omega \text{ s.t. } \omega'\mu = \bar\mu \text{ and } \iota'\omega = 1. $$ Proof that there is an equivalence between the optimal portfolio weights in both cases. 
+1. Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter $\gamma$ 
+$$\begin{aligned}
+\omega_{t+1} ^* :=&  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \\
+\end{aligned}$$
+where $\Sigma$ and $\mu$ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing **and** proportional to stock illiquidity such that 
+$$\nu_t\left(\omega, \mathbf{\beta}\right) := \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right)$$ where $B = \text{diag}(ill_1, \ldots, ill_N)$ is a diagonal matrix where $ill_1, \ldots, ill_N$. Derive a closed-form solution for the mean-variance efficient portfolio $\omega_{t+1} ^*$ based on the transaction cost specification above. Discuss the effect of illiquidity $ill_i$ on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision. 
+1. Use the solution from the previous exercise to update the function `compute_efficient_weight` such that you can compute optimal weights conditional on a matrix $B$ with illiquidity measures. 
+1. Illustrate the evolution of the *optimal* weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.
+1. Is it always optimal to choose the same $\beta$ in the optimization problem than the value used in evaluating the portfolio performance? In other words: Can it be optimal to choose theoretically sub-optimal portfolios based on transaction costs considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed $\beta$ values.
