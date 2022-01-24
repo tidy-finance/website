@@ -4,7 +4,7 @@
 
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is familiar with storing data in the form of various data formats like CSV, XLS, XLSX or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different data sets (our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard .csv files, an .xlsx file stored in a public Google drive repositories and an SQL database connection). We store all the data in **one** database which makes it easy to retrieve and share data later on. 
+This chapter shows how to import different data sets (our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard .csv files, an .xlsx file stored in a public Google drive repositories, and an SQL database connection). We store all the data in **one** database which makes it easy to retrieve and share data later on. 
 
 First, we load the global packages that we use throughout this chapter. We load more more packages in the section where they are needed later on. 
 
@@ -169,12 +169,18 @@ factors_ff_monthly_db %>%
 ## # Source:   lazy query [?? x 2]
 ## # Database: sqlite 3.37.0
 ## #   [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
-##   month          rf
-##   <date>      <dbl>
-## 1 1960-01-01 0.0033
-## 2 1960-02-01 0.0029
-## 3 1960-03-01 0.0035
-## 4 1960-04-01 0.0019
+##    month          rf
+##    <date>      <dbl>
+##  1 1960-01-01 0.0033
+##  2 1960-02-01 0.0029
+##  3 1960-03-01 0.0035
+##  4 1960-04-01 0.0019
+##  5 1960-05-01 0.0027
+##  6 1960-06-01 0.0024
+##  7 1960-07-01 0.0013
+##  8 1960-08-01 0.0017
+##  9 1960-09-01 0.0016
+## 10 1960-10-01 0.0022
 ## # ... with more rows
 ```
 If we want to have the whole table in memory, then we need to `collect()` it.
@@ -187,13 +193,19 @@ factors_ff_monthly_db %>%
 
 ```
 ## # A tibble: 732 x 2
-##   month          rf
-##   <date>      <dbl>
-## 1 1960-01-01 0.0033
-## 2 1960-02-01 0.0029
-## 3 1960-03-01 0.0035
-## 4 1960-04-01 0.0019
-## # ... with 728 more rows
+##    month          rf
+##    <date>      <dbl>
+##  1 1960-01-01 0.0033
+##  2 1960-02-01 0.0029
+##  3 1960-03-01 0.0035
+##  4 1960-04-01 0.0019
+##  5 1960-05-01 0.0027
+##  6 1960-06-01 0.0024
+##  7 1960-07-01 0.0013
+##  8 1960-08-01 0.0017
+##  9 1960-09-01 0.0016
+## 10 1960-10-01 0.0022
+## # ... with 722 more rows
 ```
 The last couple of code chunks are really all there is to organize a simple database! You can also very easily share the SQLite database across devices and programming languages. 
 
@@ -256,12 +268,18 @@ msf_db
 ```
 ## # Source:   table<"crsp"."msf"> [?? x 21]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
-##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
-## 1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
-## 2 68391610  10000   7952  10396     3   3990 1986-01-31 -2.5  -4.44 -4.38  1771
-## 3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
-## 4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
+##    cusip   permno permco issuno hexcd hsiccd date        bidlo askhi   prc   vol
+##    <chr>    <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>      <dbl> <dbl> <dbl> <dbl>
+##  1 683916~  10000   7952  10396     3   3990 1985-12-31 NA     NA    NA       NA
+##  2 683916~  10000   7952  10396     3   3990 1986-01-31 -2.5   -4.44 -4.38  1771
+##  3 683916~  10000   7952  10396     3   3990 1986-02-28 -3.25  -4.38 -3.25   828
+##  4 683916~  10000   7952  10396     3   3990 1986-03-31 -3.25  -4.44 -4.44  1078
+##  5 683916~  10000   7952  10396     3   3990 1986-04-30 -4     -4.31 -4      957
+##  6 683916~  10000   7952  10396     3   3990 1986-05-30 -3.06  -4.22 -3.11  1074
+##  7 683916~  10000   7952  10396     3   3990 1986-06-30 -2.91  -3.30 -3.09  1069
+##  8 683916~  10000   7952  10396     3   3990 1986-07-31 -2.59  -3.44 -2.84  1163
+##  9 683916~  10000   7952  10396     3   3990 1986-08-29 -1.03  -2.62 -1.09  3049
+## 10 683916~  10000   7952  10396     3   3990 1986-09-30 -0.969 -1.28 -1.03  3551
 ## # ... with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
 ## #   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
 ## #   altprcdt <date>, retx <dbl>
@@ -276,12 +294,18 @@ msenames_db
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam  shrcls
-##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>   <chr> 
-## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT ~ <NA>  
+##    permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam shrcls
+##     <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>  <chr> 
+##  1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIM~ A     
+##  2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIM~ A     
+##  3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIM~ A     
+##  4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT~ <NA>  
+##  5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERG~ <NA>  
+##  6  10001 2004-06-10 2004-10-18    11      3  4920 29274A10 EWST   ENERG~ <NA>  
+##  7  10001 2004-10-19 2004-12-26    11      3  4920 29274A10 EWST   ENERG~ <NA>  
+##  8  10001 2004-12-27 2008-02-04    11      3  4920 29274A10 EWST   ENERG~ <NA>  
+##  9  10001 2008-02-05 2008-03-04    11      3  4920 29274A20 EWST   ENERG~ <NA>  
+## 10  10001 2008-03-05 2009-08-03    11      3  4920 29274A20 EWST   ENERG~ <NA>  
 ## # ... with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
 ## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
@@ -296,12 +320,18 @@ msedelist_db
 ```
 ## # Source:   table<"crsp"."msedelist"> [?? x 19]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
-##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
-## 1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
-## 2  10001 2017-08-03    233      0      0 NA         13.1   0.0116  0    
-## 3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
-## 4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
+##    permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt   dlretx   dlprc
+##     <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>    <dbl>   <dbl>
+##  1  10000 1987-06-11    560      0      0 1987-06-12  0.219  0        -0.219
+##  2  10001 2017-08-03    233      0      0 NA         13.1    0.0116    0    
+##  3  10002 2013-02-15    231  35263   1658 NA          3.01   0.0460    0    
+##  4  10003 1995-12-15    231  10569   8477 NA          5.45   0.0137    0    
+##  5  10005 1991-07-11    560      0      0 1991-07-12  0.141  0.125    -0.141
+##  6  10006 1984-06-28    233      0      0 NA         54.5    0.0356    0    
+##  7  10007 1990-10-16    560      0      0 1990-10-17  0.406 -0.133    -0.406
+##  8  10008 1988-11-21    551      0      0 1988-11-22 28      0.00901 -28    
+##  9  10009 2000-11-03    233      0  16060 NA         33.2    0.00567   0    
+## 10  10010 1995-08-28    231  23588   5398 NA          7.26  -0.113     0    
 ## # ... with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
 ## #   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
@@ -615,13 +645,19 @@ ccmxpf_linktable
 
 ```
 ## # A tibble: 30,159 x 4
-##   permno gvkey  linkdt     linkenddt 
-##    <dbl> <chr>  <date>     <date>    
-## 1  25881 001000 1970-11-13 1978-06-30
-## 2  10015 001001 1983-09-20 1986-07-31
-## 3  10023 001002 1972-12-14 1973-06-05
-## 4  10031 001003 1983-12-07 1989-08-16
-## # ... with 30,155 more rows
+##    permno gvkey  linkdt     linkenddt 
+##     <dbl> <chr>  <date>     <date>    
+##  1  25881 001000 1970-11-13 1978-06-30
+##  2  10015 001001 1983-09-20 1986-07-31
+##  3  10023 001002 1972-12-14 1973-06-05
+##  4  10031 001003 1983-12-07 1989-08-16
+##  5  54594 001004 1972-04-24 2022-01-24
+##  6  61903 001005 1973-01-31 1983-01-31
+##  7  10058 001007 1973-10-01 1979-01-30
+##  8  10058 001007 1979-01-31 1984-09-28
+##  9  10066 001008 1983-08-25 1987-10-30
+## 10  10074 001009 1982-01-18 1996-03-13
+## # ... with 30,149 more rows
 ```
 We use this link table to create a new table where we have a mapping between stock identifier, firm identifier and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 
 

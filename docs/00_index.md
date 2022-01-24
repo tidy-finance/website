@@ -1,22 +1,8 @@
---- 
-title: "Tidy Finance"
-author: "Christoph Scheuch, Patrick Weiss and Stefan Voigt"
-date: "2022-01-24"
-site: bookdown::bookdown_site
-output: bookdown::bs4_book
-documentclass: book
-bibliography: [book.bib]
-biblio-style: apalike
-link-citations: yes
-github-repo: voigtstefan/tidy_finance
-description: "Tidy Finance with R"
----
-
 # Welcome
 
 This is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release. We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us at [contact@tidy-finance.com](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or even if you have suggestions for additional chapters and sections. 
 
-## Motivation
+# Motivation
 
 Finance is an exciting area of economic research with a broad range of applied and academic empirical applications. As a undergrad student, you are typically exposed to different types of financial data, ranging from asset prices, accounting data, trading decisions to all kinds of other financial data. Despite the vast number of empirical studies of financial phenomenons, students quickly learn that the actual implementation of these studies is rather opaque. As graduate students, also we ourselves were surprised by the lack of public code for seminal papers or even textbooks on key insights of financial economics. The lack of transparent codes not only leads to numerous replication efforts (and their failures), but is also a waste of resources on problems that have already been solved by others. 
 
@@ -59,13 +45,13 @@ In addition to the data layer, there are also tidy coding principles outlined by
 
 In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html). The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing, wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc. 
 
-## License
+# License
 
 This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e. public domain](https://creativecommons.org/publicdomain/zero/1.0/).
 
-## Prerequisites
+# Prerequisites
 
 Before you work through the chapters, we recommend to perform the following couple of steps:
 

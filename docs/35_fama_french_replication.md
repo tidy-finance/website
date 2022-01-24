@@ -1,6 +1,4 @@
 # Bivariate Sorts: Replication of Fama & French Factors
-output: html_document
----
 
 
 
