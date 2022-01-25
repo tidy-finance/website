@@ -40,15 +40,15 @@ crsp_monthly
 ##    permno month      industry      ret_excess mkt_excess
 ##     <dbl> <date>     <chr>              <dbl>      <dbl>
 ##  1  10028 1995-03-01 Wholesale        0.0621      0.0219
-##  2  10000 1986-02-01 Manufacturing   -0.262       0.0713
-##  3  10043 1989-06-01 Services        -0.0071     -0.0135
-##  4  10043 1989-07-01 Services         0.0269      0.072 
-##  5  10043 1989-08-01 Services        -0.0238      0.0144
-##  6  10043 1989-09-01 Services        -0.0648     -0.0076
-##  7  10043 1989-10-01 Services         0.00205    -0.0367
-##  8  10043 1989-11-01 Services        -0.130       0.0103
-##  9  10028 1995-04-01 Wholesale       -0.192       0.0211
-## 10  10028 1995-05-01 Wholesale        0.148       0.029 
+##  2  10043 1989-06-01 Services        -0.0071     -0.0135
+##  3  10043 1989-07-01 Services         0.0269      0.072 
+##  4  10043 1989-08-01 Services        -0.0238      0.0144
+##  5  10043 1989-09-01 Services        -0.0648     -0.0076
+##  6  10043 1989-10-01 Services         0.00205    -0.0367
+##  7  10000 1986-02-01 Manufacturing   -0.262       0.0713
+##  8  10000 1986-03-01 Manufacturing    0.359       0.0488
+##  9  10000 1986-04-01 Manufacturing   -0.104      -0.0131
+## 10  10000 1986-05-01 Manufacturing   -0.228       0.0462
 ## # ... with 3,225,243 more rows
 ```
 
@@ -209,15 +209,15 @@ crsp_monthly_nested
 ##    permno industry      data              
 ##     <dbl> <chr>         <list>            
 ##  1  10028 Wholesale     <tibble [226 x 3]>
-##  2  10000 Manufacturing <tibble [16 x 3]> 
-##  3  10043 Services      <tibble [159 x 3]>
-##  4  10001 Utilities     <tibble [378 x 3]>
-##  5  10028 Retail        <tibble [112 x 3]>
+##  2  10043 Services      <tibble [159 x 3]>
+##  3  10000 Manufacturing <tibble [16 x 3]> 
+##  4  10014 Manufacturing <tibble [206 x 3]>
+##  5  10001 Utilities     <tibble [378 x 3]>
 ##  6  10044 Manufacturing <tibble [418 x 3]>
-##  7  10002 Finance       <tibble [324 x 3]>
-##  8  10029 Services      <tibble [53 x 3]> 
-##  9  10045 Retail        <tibble [13 x 3]> 
-## 10  10046 Services      <tibble [108 x 3]>
+##  7  10015 Retail        <tibble [33 x 3]> 
+##  8  10016 Manufacturing <tibble [183 x 3]>
+##  9  10002 Finance       <tibble [324 x 3]>
+## 10  10017 Manufacturing <tibble [31 x 3]> 
 ## # ... with 29,213 more rows
 ```
 First note that we could simply use `map()` across all the `permno`s and get the same results as above. 

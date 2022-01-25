@@ -1,7 +1,5 @@
 # Accessing & Managing Financial Data
 
-
-
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is familiar with storing data in the form of various data formats like CSV, XLS, XLSX or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
 This chapter shows how to import different data sets (our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard .csv files, an .xlsx file stored in a public Google drive repositories, and an SQL database connection). We store all the data in **one** database which makes it easy to retrieve and share data later on. 
@@ -480,7 +478,7 @@ crsp_monthly %>%
   theme_bw()
 ```
 
-<img src="20_data_files/figure-html/unnamed-chunk-36-1.png" width="768" style="display: block; margin: auto;" />
+<img src="20_data_files/figure-html/unnamed-chunk-35-1.png" width="672" style="display: block; margin: auto;" />
 Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. We use the already familiar `tidyquant` package to fetch consumer price index (CPI) data from the [Federal Reserve Economic Data (FRED)](https://fred.stlouisfed.org/series/CPIAUCNS).
 
 ```r
@@ -524,7 +522,7 @@ tbl(tidy_finance, "crsp_monthly") %>%
   theme_bw()
 ```
 
-<img src="20_data_files/figure-html/unnamed-chunk-39-1.png" width="768" style="display: block; margin: auto;" />
+<img src="20_data_files/figure-html/unnamed-chunk-38-1.png" width="672" style="display: block; margin: auto;" />
 Of course, performing the computation in the database is not really meaningful because we already have all the required data in memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. 
 
 Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks are apparently in Manufacturing albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to the the only category on the rise in recent years, even surpassing Manufacturing at the end of our sample period.
@@ -552,7 +550,7 @@ crsp_monthly_industry %>%
   theme_bw()
 ```
 
-<img src="20_data_files/figure-html/unnamed-chunk-40-1.png" width="768" style="display: block; margin: auto;" />
+<img src="20_data_files/figure-html/unnamed-chunk-39-1.png" width="672" style="display: block; margin: auto;" />
 We also compute the market value of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 dollars. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market value.
 
 ```r
@@ -568,7 +566,7 @@ crsp_monthly_industry %>%
   theme_bw()
 ```
 
-<img src="20_data_files/figure-html/unnamed-chunk-41-1.png" width="768" style="display: block; margin: auto;" />
+<img src="20_data_files/figure-html/unnamed-chunk-40-1.png" width="672" style="display: block; margin: auto;" />
 
 ## Accessing daily CRSP data
 Before we turn to Compustat data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fits easily into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can easily exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire dataset to your local database) and in our experience the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
@@ -765,7 +763,7 @@ crsp_monthly %>%
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="20_data_files/figure-html/unnamed-chunk-52-1.png" width="768" style="display: block; margin: auto;" />
+<img src="20_data_files/figure-html/unnamed-chunk-51-1.png" width="672" style="display: block; margin: auto;" />
 
 ## Managing SQLite Databases
 

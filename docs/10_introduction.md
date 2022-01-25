@@ -522,7 +522,7 @@ all_returns %>%
    <td style="text-align:right;"> 0.034 </td>
    <td style="text-align:right;"> 1.811 </td>
    <td style="text-align:right;"> -14.987 </td>
-   <td style="text-align:right;"> 16.636 </td>
+   <td style="text-align:right;"> 16.635 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> WMT </td>
@@ -643,7 +643,7 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008424544 0.031418319
+## [1] 0.008424549 0.031418319
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

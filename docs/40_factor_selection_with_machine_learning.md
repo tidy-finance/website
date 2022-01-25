@@ -1,7 +1,5 @@
 # Factor selection via machine learning
 
-
-
 The aim of this section is twofold: From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* ([@Cochrane2011]). In previous chapters, we illustrate that stock-characteristics such as size provide valuable pricing information in addition to the stock beta. Such findings question the usefulness of the Capital Asset Pricing Model. In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). Therefore, the challenge these days rather is: *Do we really believe in the relevance of 300+ risk factors?*. 
 
 We introduce Lasso and Ridge Regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with elastic net regularization as a popular example. We implement and showcase the entire cycle from model specification, training and forecast evaluation within the `tidymodels` universe. While the tools can in general be applied to an abundance of interesting asset pricing problems, we apply penalized regressions to identify macro-economic variables and asset pricing factors that help to explain a cross-section of industry portfolios.
@@ -407,7 +405,7 @@ predicted_values %>%
   theme(legend.position = "bottom")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/industrypremia-1.png" width="768" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/industrypremia-1.png" width="672" style="display: block; margin: auto;" />
 
 How do the estimated coefficients look like? To analyse these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth to compute the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$ which corresponds to $\rho$ in the notation above. Such details do not need consideration when using the `tidymodels` model API.
 
@@ -454,7 +452,7 @@ bind_rows(
   theme(legend.position = "none")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
 
 ::: {.rmdnote}
 One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. As a result the estimated coefficients for the special case with no regularization ($\lambda = 0$) can deviate from the standard OLS estimates.
@@ -525,7 +523,7 @@ autoplot(lm_tune) +
        subtitle = "Lasso (1.0), Ridge (0.0) and Elastic net (0.5) with different levels of regularization.")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/cvplot-1.png" width="768" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/cvplot-1.png" width="672" style="display: block; margin: auto;" />
 The figure shows that the cross-validated mean squared prediction error drops for both, Lasso and the Elastic Net and spike afterwards. For Ridge regression, the MSPE simply increases above a certain threshold. Recall, that the larger the regularization, the more restricted the model becomes. Thus, we would chooose the model with the lowest MSPE which happens to exhibit some intermediate level of regularization.
 
 ### Parallelized Workflow
@@ -630,7 +628,7 @@ selected_factors %>%
   )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-17-1.png" width="768" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
 
 The heat map conveys two main insights: First, we see a lot of white which simply means that a lot of the factors, macroeconomic variables and also the interaction terms are not relevant when it comes to explain the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), quite a number of factors are selected for, e.g., High-Tech and Energy but they do not coincide at all. In other words, there seems to be a clear picture that we do not need a lot of factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
 
