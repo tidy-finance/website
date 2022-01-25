@@ -4,8 +4,6 @@ The main aim of this chapter is to familiarize yourself with the `tidyverse`. We
 
 ## Download and work with stock market data {#stock_market_data}
 
-
-
 At the start of the session, we load the required packages. You can use the convenient `tidyquant` package to download price data. 
 If you have trouble using `tidyquant`, check out the [documentation](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ01-core-functions-in-tidyquant.html#yahoo-finance). We load the packages `tidyverse` and `tidyquant`, but also show the code to install the packages in case you do not have them yet.
 
@@ -55,7 +53,7 @@ prices %>% # Simple visualization of the downloaded price time series
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-4-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 
 Next, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. The function `lag` works well here, but can be trickier when applied to multiple assets at once. 
 
@@ -111,7 +109,7 @@ returns %>% # create a histogram for daily returns
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 
 Here, `bins = 100` determines the number of bins and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
 
@@ -210,7 +208,7 @@ returns %>%
    <td style="text-align:right;"> 0.002 </td>
    <td style="text-align:right;"> 1.684 </td>
    <td style="text-align:right;"> -6.116 </td>
-   <td style="text-align:right;"> 5.736 </td>
+   <td style="text-align:right;"> 5.735 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 2016 </td>
@@ -256,8 +254,8 @@ returns %>%
   </tr>
   <tr>
    <td style="text-align:right;"> 2022 </td>
-   <td style="text-align:right;"> -0.625 </td>
-   <td style="text-align:right;"> 1.512 </td>
+   <td style="text-align:right;"> -0.616 </td>
+   <td style="text-align:right;"> 1.458 </td>
    <td style="text-align:right;"> -2.660 </td>
    <td style="text-align:right;"> 2.500 </td>
   </tr>
@@ -309,7 +307,7 @@ index_prices %>%
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/prices-1.png" alt="DOW index stock prices." width="768" />
+<img src="10_introduction_files/figure-html/prices-1.png" alt="DOW index stock prices." width="672" />
 <p class="caption">(\#fig:prices)DOW index stock prices.</p>
 </div>
 
@@ -354,7 +352,7 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> AMGN </td>
    <td style="text-align:right;"> 0.047 </td>
-   <td style="text-align:right;"> 1.987 </td>
+   <td style="text-align:right;"> 1.986 </td>
    <td style="text-align:right;"> -13.412 </td>
    <td style="text-align:right;"> 15.102 </td>
   </tr>
@@ -367,8 +365,8 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> BA </td>
-   <td style="text-align:right;"> 0.062 </td>
-   <td style="text-align:right;"> 2.200 </td>
+   <td style="text-align:right;"> 0.061 </td>
+   <td style="text-align:right;"> 2.199 </td>
    <td style="text-align:right;"> -23.848 </td>
    <td style="text-align:right;"> 24.319 </td>
   </tr>
@@ -409,7 +407,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> HD </td>
-   <td style="text-align:right;"> 0.057 </td>
+   <td style="text-align:right;"> 0.058 </td>
    <td style="text-align:right;"> 1.935 </td>
    <td style="text-align:right;"> -28.736 </td>
    <td style="text-align:right;"> 14.067 </td>
@@ -423,7 +421,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> IBM </td>
-   <td style="text-align:right;"> 0.026 </td>
+   <td style="text-align:right;"> 0.025 </td>
    <td style="text-align:right;"> 1.659 </td>
    <td style="text-align:right;"> -15.542 </td>
    <td style="text-align:right;"> 12.023 </td>
@@ -437,7 +435,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> JNJ </td>
-   <td style="text-align:right;"> 0.041 </td>
+   <td style="text-align:right;"> 0.040 </td>
    <td style="text-align:right;"> 1.225 </td>
    <td style="text-align:right;"> -15.846 </td>
    <td style="text-align:right;"> 12.229 </td>
@@ -454,7 +452,7 @@ all_returns %>%
    <td style="text-align:right;"> 0.033 </td>
    <td style="text-align:right;"> 1.325 </td>
    <td style="text-align:right;"> -10.061 </td>
-   <td style="text-align:right;"> 13.879 </td>
+   <td style="text-align:right;"> 13.880 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MCD </td>
@@ -486,7 +484,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> NKE </td>
-   <td style="text-align:right;"> 0.079 </td>
+   <td style="text-align:right;"> 0.080 </td>
    <td style="text-align:right;"> 1.900 </td>
    <td style="text-align:right;"> -19.813 </td>
    <td style="text-align:right;"> 15.531 </td>
@@ -500,7 +498,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> TRV </td>
-   <td style="text-align:right;"> 0.056 </td>
+   <td style="text-align:right;"> 0.057 </td>
    <td style="text-align:right;"> 1.848 </td>
    <td style="text-align:right;"> -20.800 </td>
    <td style="text-align:right;"> 25.556 </td>
@@ -515,7 +513,7 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> VZ </td>
    <td style="text-align:right;"> 0.029 </td>
-   <td style="text-align:right;"> 1.514 </td>
+   <td style="text-align:right;"> 1.513 </td>
    <td style="text-align:right;"> -11.846 </td>
    <td style="text-align:right;"> 14.632 </td>
   </tr>
@@ -529,14 +527,14 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> WMT </td>
    <td style="text-align:right;"> 0.032 </td>
-   <td style="text-align:right;"> 1.492 </td>
+   <td style="text-align:right;"> 1.491 </td>
    <td style="text-align:right;"> -10.183 </td>
    <td style="text-align:right;"> 11.709 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> AAPL </td>
    <td style="text-align:right;"> 0.128 </td>
-   <td style="text-align:right;"> 2.522 </td>
+   <td style="text-align:right;"> 2.521 </td>
    <td style="text-align:right;"> -51.869 </td>
    <td style="text-align:right;"> 13.905 </td>
   </tr>
@@ -567,7 +565,7 @@ volume %>% # Plot the time series of aggregate trading volume
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
@@ -592,7 +590,7 @@ volume %>%
 ## Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely *eye-balling* (i.e., just looking at something), the figure reveals that days with high trading volume are often followed by similarly high trading volume days.
 
@@ -645,7 +643,7 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008434436 0.031410466
+## [1] 0.008424544 0.031418319
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
@@ -714,7 +712,7 @@ res %>%
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-17-1.png" width="768" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
 The black line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
 
 ## Exercises

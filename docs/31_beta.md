@@ -39,16 +39,16 @@ crsp_monthly
 ## # A tibble: 3,225,253 x 5
 ##    permno month      industry      ret_excess mkt_excess
 ##     <dbl> <date>     <chr>              <dbl>      <dbl>
-##  1  10000 1986-02-01 Manufacturing    -0.262      0.0713
-##  2  10000 1986-03-01 Manufacturing     0.359      0.0488
-##  3  10000 1986-04-01 Manufacturing    -0.104     -0.0131
-##  4  10000 1986-05-01 Manufacturing    -0.228      0.0462
-##  5  10000 1986-06-01 Manufacturing    -0.0102     0.0103
-##  6  10000 1986-07-01 Manufacturing    -0.0860    -0.0645
-##  7  10000 1986-08-01 Manufacturing    -0.620      0.0607
-##  8  10000 1986-09-01 Manufacturing    -0.0616    -0.086 
-##  9  10000 1986-10-01 Manufacturing    -0.247      0.0466
-## 10  10000 1986-11-01 Manufacturing     0.0561     0.0117
+##  1  10028 1995-03-01 Wholesale        0.0621      0.0219
+##  2  10000 1986-02-01 Manufacturing   -0.262       0.0713
+##  3  10043 1989-06-01 Services        -0.0071     -0.0135
+##  4  10043 1989-07-01 Services         0.0269      0.072 
+##  5  10043 1989-08-01 Services        -0.0238      0.0144
+##  6  10043 1989-09-01 Services        -0.0648     -0.0076
+##  7  10043 1989-10-01 Services         0.00205    -0.0367
+##  8  10043 1989-11-01 Services        -0.130       0.0103
+##  9  10028 1995-04-01 Wholesale       -0.192       0.0211
+## 10  10028 1995-05-01 Wholesale        0.148       0.029 
 ## # ... with 3,225,243 more rows
 ```
 
@@ -208,16 +208,16 @@ crsp_monthly_nested
 ## # A tibble: 29,223 x 3
 ##    permno industry      data              
 ##     <dbl> <chr>         <list>            
-##  1  10000 Manufacturing <tibble [16 x 3]> 
-##  2  10001 Utilities     <tibble [378 x 3]>
-##  3  10002 Finance       <tibble [324 x 3]>
-##  4  10003 Finance       <tibble [118 x 3]>
-##  5  10005 Mining        <tibble [65 x 3]> 
-##  6  10006 Manufacturing <tibble [292 x 3]>
-##  7  10007 Services      <tibble [41 x 3]> 
-##  8  10008 Manufacturing <tibble [33 x 3]> 
-##  9  10009 Finance       <tibble [177 x 3]>
-## 10  10010 Manufacturing <tibble [114 x 3]>
+##  1  10028 Wholesale     <tibble [226 x 3]>
+##  2  10000 Manufacturing <tibble [16 x 3]> 
+##  3  10043 Services      <tibble [159 x 3]>
+##  4  10001 Utilities     <tibble [378 x 3]>
+##  5  10028 Retail        <tibble [112 x 3]>
+##  6  10044 Manufacturing <tibble [418 x 3]>
+##  7  10002 Finance       <tibble [324 x 3]>
+##  8  10029 Services      <tibble [53 x 3]> 
+##  9  10045 Retail        <tibble [13 x 3]> 
+## 10  10046 Services      <tibble [108 x 3]>
 ## # ... with 29,213 more rows
 ```
 First note that we could simply use `map()` across all the `permno`s and get the same results as above. 
@@ -267,22 +267,22 @@ beta_monthly
 ## # A tibble: 2,070,653 x 3
 ##    permno month      beta_monthly
 ##     <dbl> <date>            <dbl>
-##  1  10001 1990-01-01       0.0974
-##  2  10001 1990-02-01       0.0967
-##  3  10001 1990-03-01       0.0962
-##  4  10001 1990-04-01       0.100 
-##  5  10001 1990-05-01       0.0810
-##  6  10001 1990-06-01       0.0811
-##  7  10001 1990-07-01       0.0793
-##  8  10001 1990-08-01       0.117 
-##  9  10001 1990-09-01       0.104 
-## 10  10001 1990-10-01       0.108 
+##  1  10028 1996-02-01     -0.889  
+##  2  10028 1996-03-01     -0.885  
+##  3  10028 1996-04-01     -0.883  
+##  4  10028 1996-05-01     -0.672  
+##  5  10028 1996-06-01     -0.478  
+##  6  10028 1996-07-01     -0.204  
+##  7  10028 1996-08-01     -0.311  
+##  8  10028 1996-09-01     -0.190  
+##  9  10028 1996-10-01     -0.191  
+## 10  10028 1996-11-01      0.00710
 ## # ... with 2,070,643 more rows
 ```
 
 Before we look at some descriptive statistics of our beta estimates, we implement the estimation for daily data as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. 
 
-# Estimating beta using daily returns
+## Estimating beta using daily returns
 
 First let us load daily CRSP data. Note that the sample is quite huge compared to the monthly data, so make sure to have enough memory available
 
@@ -387,7 +387,7 @@ beta_daily
 ## # ... with 3,231,778 more rows
 ```
 
-# Analysis and comparison of beta estimates
+## Analysis and comparison of beta estimates
 
 What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. The first figure below shows that typical business models across industries imply different exposure to the general market economy. However, there are barely firms that exhibit negative exposure to the market factor.   
 
@@ -400,6 +400,7 @@ crsp_monthly %>%
   ggplot(aes(x = reorder(industry, beta, FUN = median), y = beta)) +
   geom_boxplot() +
   coord_flip() +
+  theme_bw() +
   labs(
     x = NULL, y = NULL,
     title = "Average beta estimates by industry"
