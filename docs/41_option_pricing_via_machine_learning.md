@@ -1,7 +1,5 @@
 # Option Pricing via Machine learning methods
 
-
-
 Machine learning is seen as a part of artificial intelligence. 
 Machine learning algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
 While Machine learning can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in Option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for Call options. Then, we train different models to *learn* how to price Call options without prior knowledge of the theoretical underpinnings of the famous Option pricing equation. 
@@ -274,7 +272,7 @@ predictive_performance %>%
        title = "Prediction Errors: Call option prices") 
 ```
 
-<img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-15-1.png" width="768" style="display: block; margin: auto;" />
+<img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
 
 The results can be summarized as follow: i) All machine learning methods seem to be able to *price* Call options after observing the training test set. ii) The average prediction errors increase for far out-of-the money options, especially for the Single Layer neural network. ii) Random forest seems to perform consistently better in prediction option prices than the Single Layer network. iii) The deep neural network yields the best out-of-sample predictions.
 

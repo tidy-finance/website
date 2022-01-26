@@ -1,7 +1,5 @@
 # Univariate Sorts: Firm Size
 
-
-
 In this section, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor - the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, [@Fama1993] include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
 We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. Hence, we want to emphasize that these alternative specifications are supposed to be robustness tests.
@@ -70,7 +68,7 @@ crsp_monthly %>%
   theme_bw()
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="768" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (*NYSE*) was and still is the largest listing exchange in terms of market capitalization. More recently, Nasdaq has gained relevance as a listing exchange. Do you know what the small peak in Nasdaq's market cap around the year 2000 was about?
 
@@ -93,7 +91,7 @@ crsp_monthly %>%
   )
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-5-1.png" width="768" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" />
 
 Finally, we consider the distribution of firm size across listing exchanges by creating summary statistics. The pre-build function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each exchange. We also add a row with `add_row()` with the overall summary statistics.
 
@@ -329,4 +327,4 @@ p_hacking_setup %>%
   theme_bw()
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-11-1.png" width="768" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />

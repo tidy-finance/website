@@ -1,7 +1,5 @@
 # Beta Estimation
 
-
-
 In this section, we introduce you to an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM), cross-sectional variation in expected asset returns should be a function of the covariance between the return of the asset and the return on the market portfolio – the beta. This section proposes an estimation procedure for these so-called market betas. We do not go into details about the foundations of market beta, but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. More importantly, we provide details about all the functions that we use to compute the results. 
 
 We use the following packages throughout this section:
@@ -39,16 +37,16 @@ crsp_monthly
 ## # A tibble: 3,225,253 x 5
 ##    permno month      industry      ret_excess mkt_excess
 ##     <dbl> <date>     <chr>              <dbl>      <dbl>
-##  1  10028 1995-03-01 Wholesale        0.0621      0.0219
-##  2  10043 1989-06-01 Services        -0.0071     -0.0135
-##  3  10043 1989-07-01 Services         0.0269      0.072 
-##  4  10043 1989-08-01 Services        -0.0238      0.0144
-##  5  10043 1989-09-01 Services        -0.0648     -0.0076
-##  6  10043 1989-10-01 Services         0.00205    -0.0367
-##  7  10000 1986-02-01 Manufacturing   -0.262       0.0713
-##  8  10000 1986-03-01 Manufacturing    0.359       0.0488
-##  9  10000 1986-04-01 Manufacturing   -0.104      -0.0131
-## 10  10000 1986-05-01 Manufacturing   -0.228       0.0462
+##  1  10028 1995-03-01 Wholesale         0.0621     0.0219
+##  2  10043 1989-06-01 Services         -0.0071    -0.0135
+##  3  10043 1989-07-01 Services          0.0269     0.072 
+##  4  10000 1986-02-01 Manufacturing    -0.262      0.0713
+##  5  10000 1986-03-01 Manufacturing     0.359      0.0488
+##  6  10000 1986-04-01 Manufacturing    -0.104     -0.0131
+##  7  10000 1986-05-01 Manufacturing    -0.228      0.0462
+##  8  10000 1986-06-01 Manufacturing    -0.0102     0.0103
+##  9  10000 1986-07-01 Manufacturing    -0.0860    -0.0645
+## 10  10028 1995-04-01 Wholesale        -0.192      0.0211
 ## # ... with 3,225,243 more rows
 ```
 
@@ -193,7 +191,7 @@ beta_examples %>%
   theme_bw()
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-9-1.png" width="768" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" />
 Even though we could now just apply the function using `group_by()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling window estimations across different workers (or cores on your local machine). It turns out to be quite easy to implement with only a small addition to what we already have learned using `map()` functions. 
 
 First, we nest the data by `permno`. Nested data means that we now have a list of `permno`s with corresponding time series data. 
@@ -211,13 +209,13 @@ crsp_monthly_nested
 ##  1  10028 Wholesale     <tibble [226 x 3]>
 ##  2  10043 Services      <tibble [159 x 3]>
 ##  3  10000 Manufacturing <tibble [16 x 3]> 
-##  4  10014 Manufacturing <tibble [206 x 3]>
-##  5  10001 Utilities     <tibble [378 x 3]>
+##  4  10001 Utilities     <tibble [378 x 3]>
+##  5  10028 Retail        <tibble [112 x 3]>
 ##  6  10044 Manufacturing <tibble [418 x 3]>
-##  7  10015 Retail        <tibble [33 x 3]> 
-##  8  10016 Manufacturing <tibble [183 x 3]>
-##  9  10002 Finance       <tibble [324 x 3]>
-## 10  10017 Manufacturing <tibble [31 x 3]> 
+##  7  10002 Finance       <tibble [324 x 3]>
+##  8  10029 Services      <tibble [53 x 3]> 
+##  9  10045 Retail        <tibble [13 x 3]> 
+## 10  10046 Services      <tibble [108 x 3]>
 ## # ... with 29,213 more rows
 ```
 First note that we could simply use `map()` across all the `permno`s and get the same results as above. 
@@ -407,7 +405,7 @@ crsp_monthly %>%
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="768" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" />
 
 Next we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense during some periods there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and upper decile increases which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: Stocks with negative betas are an extremely rare exception.
 
@@ -432,7 +430,7 @@ beta_monthly %>%
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="768" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table and use the table to plot a comparison of beta estimates for our example stocks. 
 
@@ -458,7 +456,7 @@ beta %>%
 ## Warning: Removed 46 row(s) containing missing values (geom_path).
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-22-1.png" width="768" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
 The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
 Finally, we write the estimates to our database such that we can use them in later sections. 
@@ -488,7 +486,7 @@ beta_long %>%
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-24-1.png" width="768" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" />
 The figure above does not indicate any troubles, so let us move on to the next check. 
 
 We also encourage everyone to always look at the distributional summary statistics of your variables. You can easily spot outliers or weird distributions when you look at such tables. 

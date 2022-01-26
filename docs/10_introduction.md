@@ -142,7 +142,7 @@ returns %>%
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:right;"> 0.117 </td>
+   <td style="text-align:right;"> 0.116 </td>
    <td style="text-align:right;"> 1.785 </td>
    <td style="text-align:right;"> -12.865 </td>
    <td style="text-align:right;"> 11.981 </td>
@@ -254,8 +254,8 @@ returns %>%
   </tr>
   <tr>
    <td style="text-align:right;"> 2022 </td>
-   <td style="text-align:right;"> -0.616 </td>
-   <td style="text-align:right;"> 1.458 </td>
+   <td style="text-align:right;"> -0.648 </td>
+   <td style="text-align:right;"> 1.414 </td>
    <td style="text-align:right;"> -2.660 </td>
    <td style="text-align:right;"> 2.500 </td>
   </tr>
@@ -358,8 +358,8 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> AXP </td>
-   <td style="text-align:right;"> 0.054 </td>
-   <td style="text-align:right;"> 2.295 </td>
+   <td style="text-align:right;"> 0.056 </td>
+   <td style="text-align:right;"> 2.297 </td>
    <td style="text-align:right;"> -17.595 </td>
    <td style="text-align:right;"> 21.882 </td>
   </tr>
@@ -373,7 +373,7 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> CAT </td>
    <td style="text-align:right;"> 0.070 </td>
-   <td style="text-align:right;"> 2.036 </td>
+   <td style="text-align:right;"> 2.035 </td>
    <td style="text-align:right;"> -14.518 </td>
    <td style="text-align:right;"> 14.723 </td>
   </tr>
@@ -386,15 +386,15 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> CVX </td>
-   <td style="text-align:right;"> 0.050 </td>
-   <td style="text-align:right;"> 1.748 </td>
+   <td style="text-align:right;"> 0.051 </td>
+   <td style="text-align:right;"> 1.749 </td>
    <td style="text-align:right;"> -22.125 </td>
    <td style="text-align:right;"> 22.741 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> DIS </td>
    <td style="text-align:right;"> 0.051 </td>
-   <td style="text-align:right;"> 1.930 </td>
+   <td style="text-align:right;"> 1.929 </td>
    <td style="text-align:right;"> -18.363 </td>
    <td style="text-align:right;"> 15.972 </td>
   </tr>
@@ -421,8 +421,8 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> IBM </td>
-   <td style="text-align:right;"> 0.025 </td>
-   <td style="text-align:right;"> 1.659 </td>
+   <td style="text-align:right;"> 0.027 </td>
+   <td style="text-align:right;"> 1.660 </td>
    <td style="text-align:right;"> -15.542 </td>
    <td style="text-align:right;"> 12.023 </td>
   </tr>
@@ -435,7 +435,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> JNJ </td>
-   <td style="text-align:right;"> 0.040 </td>
+   <td style="text-align:right;"> 0.041 </td>
    <td style="text-align:right;"> 1.225 </td>
    <td style="text-align:right;"> -15.846 </td>
    <td style="text-align:right;"> 12.229 </td>
@@ -491,7 +491,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> PG </td>
-   <td style="text-align:right;"> 0.040 </td>
+   <td style="text-align:right;"> 0.039 </td>
    <td style="text-align:right;"> 1.337 </td>
    <td style="text-align:right;"> -30.236 </td>
    <td style="text-align:right;"> 12.009 </td>
@@ -522,18 +522,18 @@ all_returns %>%
    <td style="text-align:right;"> 0.034 </td>
    <td style="text-align:right;"> 1.811 </td>
    <td style="text-align:right;"> -14.987 </td>
-   <td style="text-align:right;"> 16.635 </td>
+   <td style="text-align:right;"> 16.636 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> WMT </td>
-   <td style="text-align:right;"> 0.032 </td>
-   <td style="text-align:right;"> 1.491 </td>
+   <td style="text-align:right;"> 0.031 </td>
+   <td style="text-align:right;"> 1.492 </td>
    <td style="text-align:right;"> -10.183 </td>
    <td style="text-align:right;"> 11.709 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> AAPL </td>
-   <td style="text-align:right;"> 0.128 </td>
+   <td style="text-align:right;"> 0.127 </td>
    <td style="text-align:right;"> 2.521 </td>
    <td style="text-align:right;"> -51.869 </td>
    <td style="text-align:right;"> 13.905 </td>
@@ -643,7 +643,7 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008424549 0.031418319
+## [1] 0.008346962 0.031451151
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

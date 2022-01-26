@@ -1,7 +1,5 @@
 # Parametric Portfolio Policies
 
-
-
 In this section, we introduce different portfolio performance measures to evaluate and compare different allocation strategies. For this purpose, we introduce a direct (and probably simplest) way to estimate optimal portfolio weights when stock characteristics are related to the stock’s expected return, variance, and covariance with other stocks: We parametrize weights as a function of the characteristics such that we maximize expected utility. The approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by [@Brandt2009] in their influential paper *Parametric Portfolio Policies: Exploiting Characteristics in the Cross Section of Equity Returns*. 
 
 ## Data preparation

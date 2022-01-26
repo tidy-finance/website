@@ -1,7 +1,5 @@
 # Constraint Optimization and Portfolio Backtesting
 
-
-
 In this section we conduct portfolio back testing in a more realistic setting with transaction costs and investment constraints such as no-short selling rules. 
 
 We start with *standard* mean-variance efficient portfolios and then introduce further constraints step-by-step. Numerical constrained optimization is done with the packages `quadprog` (for quadratic objective functions such as in typical mean-variance framework) and `alabama` (for more general, non-linear objectives and constraints).
@@ -143,7 +141,7 @@ transaction_costs %>%
   theme(legend.position = "bottom")
 ```
 
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-6-1.png" width="768" style="display: block; margin: auto;" />
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" />
 The figure show that the higher the transaction costs parameter $\beta$, the smaller rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). Further, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.
 
 ## Constrained optimization
@@ -255,7 +253,7 @@ ggplot(aes(fill = Strategy,
   scale_y_continuous(labels = percent)
 ```
 
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-10-1.png" width="768" style="display: block; margin: auto;" />
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 Before moving on, we propose a final allocation strategy which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for $L_1$ transaction costs $\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, thus we rely on non-linear optimization procedures.
 

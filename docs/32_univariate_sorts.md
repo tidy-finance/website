@@ -1,7 +1,5 @@
 # Univariate Sorts
 
-
-
 In this section, we dive into portfolio sorts - one of the most widely used statistical methodologies in empirical asset pricing. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios of stocks, where the stocks within each portfolio exhibit similar properties of a characteristic, such as firm size. The different portfolios then represent well-diversified investments that differ only in the level of the sorting variable. Differences in performance are then attributed to the sorting variable. 
 We start by introducing univariate portfolio sorts (which means sorting based on only one characteristic). Later, we tackle bivariate sorting. 
 
@@ -48,16 +46,16 @@ crsp_monthly
 ## # A tibble: 3,225,253 x 5
 ##    permno month      ret_excess mkt_excess mktcap_lag
 ##     <dbl> <date>          <dbl>      <dbl>      <dbl>
-##  1  10028 1995-03-01    0.0621      0.0219       10.9
-##  2  10043 1989-06-01   -0.0071     -0.0135       31.0
-##  3  10043 1989-07-01    0.0269      0.072        31.0
-##  4  10043 1989-08-01   -0.0238      0.0144       32.1
-##  5  10043 1989-09-01   -0.0648     -0.0076       31.6
-##  6  10043 1989-10-01    0.00205    -0.0367       29.8
-##  7  10000 1986-02-01   -0.262       0.0713       16.1
-##  8  10000 1986-03-01    0.359       0.0488       12.0
-##  9  10000 1986-04-01   -0.104      -0.0131       16.3
-## 10  10000 1986-05-01   -0.228       0.0462       15.2
+##  1  10028 1995-03-01     0.0621     0.0219       10.9
+##  2  10043 1989-06-01    -0.0071    -0.0135       31.0
+##  3  10043 1989-07-01     0.0269     0.072        31.0
+##  4  10000 1986-02-01    -0.262      0.0713       16.1
+##  5  10000 1986-03-01     0.359      0.0488       12.0
+##  6  10000 1986-04-01    -0.104     -0.0131       16.3
+##  7  10000 1986-05-01    -0.228      0.0462       15.2
+##  8  10000 1986-06-01    -0.0102     0.0103       11.8
+##  9  10000 1986-07-01    -0.0860    -0.0645       11.7
+## 10  10028 1995-04-01    -0.192      0.0211       11.7
 ## # ... with 3,225,243 more rows
 ```
 
@@ -98,7 +96,7 @@ beta_portfolios %>%
   theme(legend.position = "none")
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-7-1.png" width="768" style="display: block; margin: auto;" />
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 We can easily construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and at the same time short the low-beta portfolio. 
 
 ```r
@@ -183,7 +181,7 @@ beta_portfolios_summary %>%
   theme_bw()
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="768" style="display: block; margin: auto;" />
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
 
 The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.
@@ -203,7 +201,7 @@ beta_portfolios_summary %>%
        title = "Average portfolio excess returns and average beta estimates")
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-14-1.png" width="768" style="display: block; margin: auto;" />
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" />
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio. 
 
 ```r
@@ -263,5 +261,5 @@ beta_longshort %>%
        x = NULL, y = NULL)
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-18-1.png" width="768" style="display: block; margin: auto;" />
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-17-1.png" width="672" style="display: block; margin: auto;" />
 Overall, this section shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next section, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis. 
