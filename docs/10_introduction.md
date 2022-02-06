@@ -2,15 +2,13 @@
 
 The main aim of this chapter is to familiarize yourself with the `tidyverse`. We start by downloading and visualizing stock data before we move to a simple portfolio choice problem. These examples introduce you to our approach of *tidy finance*.
 
-## Download and work with stock market data {#stock_market_data}
+## Working with stock market data {#stock_market_data}
 
 At the start of the session, we load the required packages. You can use the convenient `tidyquant` package to download price data. 
 If you have trouble using `tidyquant`, check out the [documentation](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ01-core-functions-in-tidyquant.html#yahoo-finance). We load the packages `tidyverse` and `tidyquant`, but also show the code to install the packages in case you do not have them yet.
 
 
 ```r
-# install.packages("tidyverse")
-# install.packages("tidyquant")
 library(tidyverse)
 library(tidyquant)
 ```
@@ -20,19 +18,24 @@ We first download daily prices for one stock market ticker, e.g. *AAPL*, directl
 
 ```r
 prices <- tq_get("AAPL", get = "stock.prices")
-prices %>% head() # Take a glimpse at the data
+prices
 ```
 
 ```
-## # A tibble: 6 x 8
-##   symbol date        open  high   low close    volume adjusted
-##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
-## 2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.7
-## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
-## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
-## 5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
-## 6 AAPL   2012-01-10  15.2  15.2  15.1  15.1 258196400     13.0
+## # A tibble: 2,541 x 8
+##    symbol date        open  high   low close    volume adjusted
+##    <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
+##  1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
+##  2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
+##  3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
+##  4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
+##  5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
+##  6 AAPL   2012-01-10  15.2  15.2  15.1  15.1 258196400     12.9
+##  7 AAPL   2012-01-11  15.1  15.1  15.0  15.1 215084800     12.9
+##  8 AAPL   2012-01-12  15.1  15.1  15.0  15.0 212587200     12.9
+##  9 AAPL   2012-01-13  15.0  15.0  15.0  15.0 226021600     12.8
+## 10 AAPL   2012-01-17  15.2  15.2  15.1  15.2 242897200     13.0
+## # ... with 2,531 more rows
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of shares), and the *adjusted* price in USD. Notice that the adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions do affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -41,7 +44,7 @@ Next, we use `ggplot` to visualize the time series of adjusted prices.
 
 
 ```r
-prices %>% # Simple visualization of the downloaded price time series
+prices %>%
   ggplot(aes(x = date, y = adjusted)) +
   geom_line() +
   labs(
@@ -92,9 +95,9 @@ Next, we visualize the distribution of daily returns in a histogram. We also mul
 
 
 ```r
-quantile_05 <- quantile(returns %>% pull(ret) * 100, 0.05) # Compute the 5 % quantile of the returns
+quantile_05 <- quantile(returns %>% pull(ret) * 100, 0.05)
 
-returns %>% # create a histogram for daily returns
+returns %>%
   ggplot(aes(x = ret * 100)) +
   geom_histogram(bins = 100) +
   geom_vline(aes(xintercept = quantile_05),
@@ -142,8 +145,8 @@ returns %>%
  </thead>
 <tbody>
   <tr>
-   <td style="text-align:right;"> 0.116 </td>
-   <td style="text-align:right;"> 1.785 </td>
+   <td style="text-align:right;"> 0.119 </td>
+   <td style="text-align:right;"> 1.788 </td>
    <td style="text-align:right;"> -12.865 </td>
    <td style="text-align:right;"> 11.981 </td>
   </tr>
@@ -154,7 +157,6 @@ You can also compute these summary statistics for each year by imposing `group_b
 
 
 ```r
-# Alternatively: compute summary statistics for each year
 returns %>%
   mutate(ret = ret * 100) %>%
   group_by(year = year(date)) %>%
@@ -254,10 +256,10 @@ returns %>%
   </tr>
   <tr>
    <td style="text-align:right;"> 2022 </td>
-   <td style="text-align:right;"> -0.648 </td>
-   <td style="text-align:right;"> 1.414 </td>
+   <td style="text-align:right;"> -0.099 </td>
+   <td style="text-align:right;"> 2.037 </td>
    <td style="text-align:right;"> -2.660 </td>
-   <td style="text-align:right;"> 2.500 </td>
+   <td style="text-align:right;"> 6.978 </td>
   </tr>
 </tbody>
 </table>
@@ -265,29 +267,26 @@ returns %>%
 In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows to next to arbitrary column names which can be useful for reporting.
 
 
-## Scale the analysis up: tidyverse-magic
+## Scaling up the analysis
 
 As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of tickers (e.g., all index constituents). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
 
 This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets you like. The following code takes any vector of tickers, e.g., `ticker <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. 
+
+
+```r
+ticker <- tq_index("DOW") # constituents of the Dow Jones index
+index_prices <- tq_get(ticker,
+  get = "stock.prices",
+  from = "2000-01-01"
+) %>%
+  filter(symbol != "DOW") # Exclude the index itself
+```
+
 Figure @ref(fig:prices) illustrates the time series of downloaded *adjusted* prices for each of the 30 constituents of the Dow Jones Index. Make sure you understand every single line of code! (What is the purpose of `%>%`? What are the arguments of `aes()`? Which alternative *geoms* could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
-ticker <- tq_index("DOW") # tidyquant delivers all constituents of the Dow Jones index
-index_prices <- tq_get(ticker,
-  get = "stock.prices",
-  from = "2000-01-01"
-) %>% # Exactly the same code as in the first part
-  filter(symbol != "DOW") # Exclude the index itself
-
-index_prices <- index_prices %>% # Remove assets that did not trade since January 1st 2000
-  group_by(symbol) %>%
-  mutate(n = n()) %>%
-  ungroup() %>%
-  filter(n == max(n)) %>%
-  select(-n)
-
 index_prices %>%
   ggplot(aes(
     x = date,
@@ -306,10 +305,7 @@ index_prices %>%
   theme(legend.position = "none")
 ```
 
-<div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/prices-1.png" alt="DOW index stock prices." width="672" />
-<p class="caption">(\#fig:prices)DOW index stock prices.</p>
-</div>
+<img src="10_introduction_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we can generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
 
@@ -318,7 +314,7 @@ The same holds for returns as well. Before computing the returns, we use `group_
 
 ```r
 all_returns <- index_prices %>%
-  group_by(symbol) %>% # we perform the computations per symbol
+  group_by(symbol) %>%
   mutate(ret = adjusted / lag(adjusted) - 1) %>%
   select(symbol, date, ret) %>%
   drop_na(ret)
@@ -352,35 +348,42 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> AMGN </td>
    <td style="text-align:right;"> 0.047 </td>
-   <td style="text-align:right;"> 1.986 </td>
+   <td style="text-align:right;"> 1.985 </td>
    <td style="text-align:right;"> -13.412 </td>
    <td style="text-align:right;"> 15.102 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> AXP </td>
-   <td style="text-align:right;"> 0.056 </td>
+   <td style="text-align:right;"> 0.057 </td>
    <td style="text-align:right;"> 2.297 </td>
    <td style="text-align:right;"> -17.595 </td>
    <td style="text-align:right;"> 21.882 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> BA </td>
-   <td style="text-align:right;"> 0.061 </td>
-   <td style="text-align:right;"> 2.199 </td>
+   <td style="text-align:right;"> 0.062 </td>
+   <td style="text-align:right;"> 2.201 </td>
    <td style="text-align:right;"> -23.848 </td>
    <td style="text-align:right;"> 24.319 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> CAT </td>
-   <td style="text-align:right;"> 0.070 </td>
-   <td style="text-align:right;"> 2.035 </td>
+   <td style="text-align:right;"> 0.069 </td>
+   <td style="text-align:right;"> 2.036 </td>
    <td style="text-align:right;"> -14.518 </td>
    <td style="text-align:right;"> 14.723 </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> CRM </td>
+   <td style="text-align:right;"> 0.124 </td>
+   <td style="text-align:right;"> 2.681 </td>
+   <td style="text-align:right;"> -27.148 </td>
+   <td style="text-align:right;"> 26.045 </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> CSCO </td>
-   <td style="text-align:right;"> 0.035 </td>
-   <td style="text-align:right;"> 2.390 </td>
+   <td style="text-align:right;"> 0.034 </td>
+   <td style="text-align:right;"> 2.389 </td>
    <td style="text-align:right;"> -16.211 </td>
    <td style="text-align:right;"> 24.388 </td>
   </tr>
@@ -400,8 +403,8 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> GS </td>
-   <td style="text-align:right;"> 0.056 </td>
-   <td style="text-align:right;"> 2.333 </td>
+   <td style="text-align:right;"> 0.057 </td>
+   <td style="text-align:right;"> 2.332 </td>
    <td style="text-align:right;"> -18.960 </td>
    <td style="text-align:right;"> 26.468 </td>
   </tr>
@@ -414,22 +417,22 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> HON </td>
-   <td style="text-align:right;"> 0.052 </td>
-   <td style="text-align:right;"> 1.950 </td>
+   <td style="text-align:right;"> 0.051 </td>
+   <td style="text-align:right;"> 1.951 </td>
    <td style="text-align:right;"> -17.367 </td>
    <td style="text-align:right;"> 28.223 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> IBM </td>
    <td style="text-align:right;"> 0.027 </td>
-   <td style="text-align:right;"> 1.660 </td>
+   <td style="text-align:right;"> 1.659 </td>
    <td style="text-align:right;"> -15.542 </td>
    <td style="text-align:right;"> 12.023 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> INTC </td>
-   <td style="text-align:right;"> 0.040 </td>
-   <td style="text-align:right;"> 2.357 </td>
+   <td style="text-align:right;"> 0.039 </td>
+   <td style="text-align:right;"> 2.358 </td>
    <td style="text-align:right;"> -22.033 </td>
    <td style="text-align:right;"> 20.123 </td>
   </tr>
@@ -442,42 +445,42 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> JPM </td>
-   <td style="text-align:right;"> 0.061 </td>
-   <td style="text-align:right;"> 2.442 </td>
+   <td style="text-align:right;"> 0.062 </td>
+   <td style="text-align:right;"> 2.441 </td>
    <td style="text-align:right;"> -20.727 </td>
    <td style="text-align:right;"> 25.097 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> KO </td>
    <td style="text-align:right;"> 0.033 </td>
-   <td style="text-align:right;"> 1.325 </td>
+   <td style="text-align:right;"> 1.324 </td>
    <td style="text-align:right;"> -10.061 </td>
-   <td style="text-align:right;"> 13.880 </td>
+   <td style="text-align:right;"> 13.879 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MCD </td>
-   <td style="text-align:right;"> 0.054 </td>
+   <td style="text-align:right;"> 0.055 </td>
    <td style="text-align:right;"> 1.481 </td>
    <td style="text-align:right;"> -15.875 </td>
    <td style="text-align:right;"> 18.125 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MMM </td>
-   <td style="text-align:right;"> 0.045 </td>
-   <td style="text-align:right;"> 1.493 </td>
+   <td style="text-align:right;"> 0.043 </td>
+   <td style="text-align:right;"> 1.494 </td>
    <td style="text-align:right;"> -12.945 </td>
    <td style="text-align:right;"> 12.599 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MRK </td>
    <td style="text-align:right;"> 0.033 </td>
-   <td style="text-align:right;"> 1.694 </td>
+   <td style="text-align:right;"> 1.693 </td>
    <td style="text-align:right;"> -26.781 </td>
    <td style="text-align:right;"> 13.033 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MSFT </td>
-   <td style="text-align:right;"> 0.056 </td>
+   <td style="text-align:right;"> 0.057 </td>
    <td style="text-align:right;"> 1.925 </td>
    <td style="text-align:right;"> -15.598 </td>
    <td style="text-align:right;"> 19.565 </td>
@@ -485,13 +488,13 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> NKE </td>
    <td style="text-align:right;"> 0.080 </td>
-   <td style="text-align:right;"> 1.900 </td>
+   <td style="text-align:right;"> 1.899 </td>
    <td style="text-align:right;"> -19.813 </td>
    <td style="text-align:right;"> 15.531 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> PG </td>
-   <td style="text-align:right;"> 0.039 </td>
+   <td style="text-align:right;"> 0.040 </td>
    <td style="text-align:right;"> 1.337 </td>
    <td style="text-align:right;"> -30.236 </td>
    <td style="text-align:right;"> 12.009 </td>
@@ -499,27 +502,34 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> TRV </td>
    <td style="text-align:right;"> 0.057 </td>
-   <td style="text-align:right;"> 1.848 </td>
+   <td style="text-align:right;"> 1.847 </td>
    <td style="text-align:right;"> -20.800 </td>
    <td style="text-align:right;"> 25.556 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> UNH </td>
-   <td style="text-align:right;"> 0.099 </td>
-   <td style="text-align:right;"> 1.995 </td>
+   <td style="text-align:right;"> 0.100 </td>
+   <td style="text-align:right;"> 1.994 </td>
    <td style="text-align:right;"> -18.636 </td>
    <td style="text-align:right;"> 34.755 </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> V </td>
+   <td style="text-align:right;"> 0.100 </td>
+   <td style="text-align:right;"> 1.900 </td>
+   <td style="text-align:right;"> -13.643 </td>
+   <td style="text-align:right;"> 14.997 </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> VZ </td>
    <td style="text-align:right;"> 0.029 </td>
-   <td style="text-align:right;"> 1.513 </td>
+   <td style="text-align:right;"> 1.514 </td>
    <td style="text-align:right;"> -11.846 </td>
    <td style="text-align:right;"> 14.632 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> WBA </td>
-   <td style="text-align:right;"> 0.034 </td>
+   <td style="text-align:right;"> 0.033 </td>
    <td style="text-align:right;"> 1.811 </td>
    <td style="text-align:right;"> -14.987 </td>
    <td style="text-align:right;"> 16.636 </td>
@@ -527,13 +537,13 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> WMT </td>
    <td style="text-align:right;"> 0.031 </td>
-   <td style="text-align:right;"> 1.492 </td>
+   <td style="text-align:right;"> 1.491 </td>
    <td style="text-align:right;"> -10.183 </td>
    <td style="text-align:right;"> 11.709 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> AAPL </td>
-   <td style="text-align:right;"> 0.127 </td>
+   <td style="text-align:right;"> 0.129 </td>
    <td style="text-align:right;"> 2.521 </td>
    <td style="text-align:right;"> -51.869 </td>
    <td style="text-align:right;"> 13.905 </td>
@@ -555,7 +565,7 @@ volume <- index_prices %>%
   group_by(date) %>%
   summarise(volume = sum(volume_usd))
 
-volume %>% # Plot the time series of aggregate trading volume
+volume %>%
   ggplot(aes(x = date, y = volume)) +
   geom_line() +
   labs(
@@ -565,7 +575,7 @@ volume %>% # Plot the time series of aggregate trading volume
   theme_bw()
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
@@ -574,9 +584,10 @@ One way to illustrate the persistence of trading volume would be to plot volume 
 volume %>%
   ggplot(aes(x = lag(volume), y = volume)) +
   geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1), 
-              color = "red",
-              linetype = "dotted") +
+  geom_abline(aes(intercept = 0, slope = 1),
+    color = "red",
+    linetype = "dotted"
+  ) +
   labs(
     x = "Previous day aggregate trading volume (billion USD)",
     y = "Aggregate trading volume (billion USD)",
@@ -590,19 +601,26 @@ volume %>%
 ## Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/aggregate-volume-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely *eye-balling* (i.e., just looking at something), the figure reveals that days with high trading volume are often followed by similarly high trading volume days.
-
 
 ## Portfolio choice problems
 
 In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets. The standard framework for optimal portfolio selection considers investors that like higher returns but dislike return volatility (both should be forward-looking measures, i.e., expected return and volatility): the *mean-variance investor*. 
 
-An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same standard deviation of return (i.e., the risk). Let us compute and visualize the efficient frontier for several stocks. First, we use our dataset to compute each asset's *monthly* returns. 
+An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same standard deviation of return (i.e., the risk). Let us compute and visualize the efficient frontier for several stocks. 
+First, we use our dataset to compute each asset's *monthly* returns. In order to keep things simple we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
 
 
 ```r
+index_prices <- index_prices %>%
+  group_by(symbol) %>%
+  mutate(n = n()) %>%
+  ungroup() %>%
+  filter(n == max(n)) %>%
+  select(-n)
+
 returns <- index_prices %>%
   mutate(month = floor_date(date, "month")) %>%
   group_by(symbol, month) %>%
@@ -643,19 +661,18 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008346962 0.031451151
+## [1] 0.008410193 0.031367483
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
 
 Next, we set out to find the weights for a portfolio that achieves three times the expected return of the minimum variance portfolio. However, we are not interested in any portfolio that achieves the return, but the efficient portfolio in the mean-variance setting, i.e., the portfolio with the lowest standard deviation. If you wonder where the solution $\omega_\text{eff}$ comes from: The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum acceptable expected return* $\bar{\mu}$. Hence, their objective function is to choose $\omega_\text{eff}$ as the solution to
 $$\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
-The code below implements the analytic solution to this optimization problem, we encourage you to verify that it is correct. 
+The code below implements the analytic solution to this optimization problem for a benchmark return $\bar\mu$ which we set to 3 times the expected return of the minimum variance portfolio. We encourage you to verify that it is correct. 
 
 
 ```r
-# Compute efficient portfolio weights for given level of expected return
-mu_bar <- 3 * t(mvp_weights) %*% mu # some benchmark return: 3 times the minimum variance portfolio expected return
+mu_bar <- 3 * t(mvp_weights) %*% mu
 
 C <- as.numeric(t(iota) %*% solve(sigma) %*% iota)
 D <- as.numeric(t(iota) %*% solve(sigma) %*% mu)
@@ -665,45 +682,42 @@ lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
 efp_weights <- mvp_weights + lambda_tilde / 2 * (solve(sigma) %*% mu - D / C * solve(sigma) %*% iota)
 ```
 
-
 ## The efficient frontier 
 
 The two mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio and the efficient portfolio for another required level of expected returns like above), we can characterize the entire efficient frontier by combining these two portfolios. The code below implements the construction of the *efficient frontier*, which characterizes the highest expected return achievable at each level of risk. To understand the code better, make sure to familiarize yourself with the inner workings of the `for` loop.
 
 
 ```r
-c <- seq(from = -0.4, to = 1.9, by = 0.01) # Some values for a linear combination of two efficient portfolio weights
+c <- seq(from = -0.4, to = 1.9, by = 0.01)
 res <- tibble(
   c = c,
   mu = NA,
   sd = NA
 )
 
-for (i in seq_along(c)) { # A for loop
-  w <- (1 - c[i]) * mvp_weights + (c[i]) * efp_weights # A portfolio of minimum variance and efficient portfolio
-  res$mu[i] <- 12 * 100 * t(w) %*% mu # Portfolio expected return (annualized, in percent)
-  res$sd[i] <- 12 * 10 * sqrt(t(w) %*% sigma %*% w) # Portfolio volatility (annualized, in percent)
+for (i in seq_along(c)) {
+  w <- (1 - c[i]) * mvp_weights + (c[i]) * efp_weights
+  res$mu[i] <- 12 * 100 * t(w) %*% mu
+  res$sd[i] <- 12 * 10 * sqrt(t(w) %*% sigma %*% w)
 }
 ```
 
-Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. To show how easy this setup is, we also add the individual stocks in the same call.
-
+Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. To show how easy this setup is, we also add the individual stocks in the same call. 
 
 ```r
-# Visualize the efficient frontier
 res %>%
   ggplot(aes(x = sd, y = mu)) +
-  geom_point() + # Plot all sd/mu portfolio combinations
-  geom_point(
+  geom_point() +
+  geom_point( # locate the minimum variance and efficient portfolio
     data = res %>% filter(c %in% c(0, 1)),
     color = "red",
     size = 4
-  ) + # locate the minimum variance and efficient portfolio
-  geom_point(
+  ) +
+  geom_point( # locate the individual assets
     data = tibble(mu = 12 * 100 * mu, sd = 12 * 10 * sqrt(diag(sigma))),
     aes(y = mu, x = sd), color = "blue", size = 1
-  ) + # locate the individual assets
-  theme_bw() + # make the plot a bit nicer
+  ) +
+  theme_bw() +
   labs(
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
@@ -712,7 +726,7 @@ res %>%
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
+<img src="10_introduction_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 The black line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
 
 ## Exercises

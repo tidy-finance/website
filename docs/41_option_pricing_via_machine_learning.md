@@ -1,8 +1,8 @@
-# Option Pricing via Machine learning methods
+# Option pricing via ML
 
-Machine learning is seen as a part of artificial intelligence. 
-Machine learning algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
-While Machine learning can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in Option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for Call options. Then, we train different models to *learn* how to price Call options without prior knowledge of the theoretical underpinnings of the famous Option pricing equation. 
+Machine learning (ML) is seen as a part of artificial intelligence. 
+ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
+While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in Option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for Call options. Then, we train different models to *learn* how to price Call options without prior knowledge of the theoretical underpinnings of the famous Option pricing equation. 
 
 The roadmap is as follows: We first provide a very brief introduction into regression trees, random forests and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
 We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
@@ -22,7 +22,7 @@ library(hardhat)
 
 ## Regression trees and random forests
 
-Regression trees have become a popular machine learning approach for incorporating multiway predictor interactions. Trees are fully nonparametric and possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each. A tree “grows” in a sequence of steps. At each step, a new “branch” sorts the data which is left over from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into rectangular partitions, and approximates the unknown function $f(x)$ with the average value of the outcome variable within each partition
+Regression trees have become a popular ML approach for incorporating multiway predictor interactions. Trees are fully nonparametric and possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each. A tree “grows” in a sequence of steps. At each step, a new “branch” sorts the data which is left over from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into rectangular partitions, and approximates the unknown function $f(x)$ with the average value of the outcome variable within each partition
 
 We partition the  predictor space into $J$ non-overlapping regions, $R_1, R_2, \ldots, R_J$. For any predictor $x$ that falls within region $R_j$ we estimate $f(x)$ with the average of the training observations, $\hat y_i$, for which the associated predictor $x_i$ is also in $R_j$. Once we select a partition $\mathbf{x}$ to split in order to create the new partitions, we find a predictor $j$ and value $s$ that define two new partitions, which we will call $R_1(j,s)$ and $R_2(j,s)$, that split our observations in the current partition by asking if $x_j$ is bigger than $s$:
 $$
@@ -37,9 +37,9 @@ Note: Unlike for the sample variance, we don't scale by the number of elements $
 
 Single tree models suffer from high variance. Random forests address the shortcomings of decision trees. The goal is to improve prediction performance and reduce instability by averaging multiple decision trees (a forest of trees constructed with randomness). A forest basically implies to create many regression trees and average their predictions. To assure that the individual trees are not the same, we use the bootstrap to induce randomness. More specifically, we build $B$ decision trees $T_1, \ldots, T_B$ using the training sample. For that purpose we randomly select features to be included in the building of each tree. For each observation in the test set we then form a prediction $\hat{y} = \frac{1}{B}\sum\limits_{i=1}^B\hat{y}_{T_i}$.
 
-## Neural Networks
+## Neural networks
 
-Roughly speaking, neural networks propagate information from an input layer, through one or multiple hidden layers, to an output layer. While the number of units (neurons) in the input layer is equal to the dimension of the predictors, the output layer usually consists of one neuron (for regression) or multiple neurons for classification. The output layer predicts the future data, similar to the fitted value in a regression analysis. Neural networks have theoretical underpinnings as “universal approximators” for any smooth predictive association [@Hornik1991]. Their complexity, however, ranks neural networks among the least transparent, least interpretable, and most highly parameterized machine learning tools
+Roughly speaking, neural networks propagate information from an input layer, through one or multiple hidden layers, to an output layer. While the number of units (neurons) in the input layer is equal to the dimension of the predictors, the output layer usually consists of one neuron (for regression) or multiple neurons for classification. The output layer predicts the future data, similar to the fitted value in a regression analysis. Neural networks have theoretical underpinnings as “universal approximators” for any smooth predictive association [@Hornik1991]. Their complexity, however, ranks neural networks among the least transparent, least interpretable, and most highly parameterized ML tools
 
 Each neuron applies a nonlinear “activation function” $f$ to its aggregated signal before
 sending its output to the next layer
@@ -53,9 +53,9 @@ rate.
 Despite the computational challenges, implementation in R is not tedious at all because we
 can use the API to `tensorflow`. 
 
-## Option Pricing
+## Option pricing
 
-To apply Machine Learning methods in a relevant field of finance we focus on option pricing. In its most basic form, Call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price ([Black1971]) of a call option for a non-dividend-paying underlying stock is given by
+To apply ML methods in a relevant field of finance we focus on option pricing. In its most basic form, Call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price ([Black1971]) of a call option for a non-dividend-paying underlying stock is given by
 $$
 \begin{aligned}
   C(S, T) &= \Phi(d_1)S - \Phi(d_1 - \sigma\sqrt{T})Ke^{-r T} \\
@@ -77,7 +77,7 @@ black_scholes_price <- function(S = 50, K = 70, r = 0, T = 1, sigma = 0.2) {
 
 ## Learning Black-Scholes
 
-We illustrate the concept of machine learning by showing how machine learning methods *learn* the Black-Scholes equation after observing some different specifications and corresponding prices without us revealing the exact pricing equation. 
+We illustrate the concept of ML by showing how ML methods *learn* the Black-Scholes equation after observing some different specifications and corresponding prices without us revealing the exact pricing equation. 
 
 ### Data simulation
 To that end we start with simulated data. We compute option prices for Call options for a grid of different combinations of times to maturity (`T`), risk-free rate (`r`), volatility (`sigma`), strike prices (`K`) and current stock prices (`S`). In the code below we add an idiosyncratic error term to each observation such that the prices which are considered observed do not exactly reflect the values implied by the Black-Scholes equation.
@@ -108,7 +108,7 @@ set.seed(42809) # Ensure the analysis can be reproduced
 split <- initial_split(option_prices, prop = 1 / 100)
 ```
 
-We process the training dataset further before we fit the different Machine learning models. For that purpose we define a `recipe` which defines all processing steps. For our specific case we want to explain the observed price by the 5 variables that enter the Black-Scholes equation. The *true* price should obviously not be used to fit the model. The recipe also reflect that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
+We process the training dataset further before we fit the different ML models. For that purpose we define a `recipe` which defines all processing steps. For our specific case we want to explain the observed price by the 5 variables that enter the Black-Scholes equation. The *true* price should obviously not be used to fit the model. The recipe also reflect that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
 
 ```r
 rec <- recipe(observed_price ~ .,
@@ -230,7 +230,7 @@ lm_fit <- workflow() %>%
   fit(data = training(split))
 ```
 
-## Evaluating predictions
+## Prediction evaluation
 
 Finally, we collect all predictions to compare the *out-of-sample* prediction error. 
 Note, that for the evaluation we use, again, the call to `extract_mold` to ensure that we use the same pre-processing steps for the testing data across each model. We make also use of the somewhat advanced functionality in `hardhat::forge` which provides an easy, consistent, and robust pre-processor at prediction time. 
@@ -274,7 +274,7 @@ predictive_performance %>%
 
 <img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
 
-The results can be summarized as follow: i) All machine learning methods seem to be able to *price* Call options after observing the training test set. ii) The average prediction errors increase for far out-of-the money options, especially for the Single Layer neural network. ii) Random forest seems to perform consistently better in prediction option prices than the Single Layer network. iii) The deep neural network yields the best out-of-sample predictions.
+The results can be summarized as follow: i) All ML methods seem to be able to *price* Call options after observing the training test set. ii) The average prediction errors increase for far out-of-the money options, especially for the Single Layer neural network. ii) Random forest seems to perform consistently better in prediction option prices than the Single Layer network. iii) The deep neural network yields the best out-of-sample predictions.
 
 ## Exercises
 

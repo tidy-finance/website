@@ -1,4 +1,4 @@
-# Constraint Optimization and Portfolio Backtesting
+# Constrained optimization and backtesting
 
 In this section we conduct portfolio back testing in a more realistic setting with transaction costs and investment constraints such as no-short selling rules. 
 
@@ -31,7 +31,8 @@ industry_returns <- industry_returns %>%
 N <- ncol(industry_returns) # Number of assets
 ```
 
-## Recap: Portfolio choice 
+## Recap of portfolio choice 
+
 First a brief recap. A common objective for portfolio optimization is to choose mean-variance efficient portfolio weights, that is the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio weights which are given by the solution to 
 $$w_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1$$
 where $\Sigma$ is the $(N \times N)$ variance covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In code, this is equivalent to the following:
@@ -81,7 +82,7 @@ $$\begin{aligned}
 \end{aligned}$$
 The optimal weights correspond to a mean-variance portfolio where the vector of expected returns is such that assets that currently exhibit a higher weight are considered as delivering an higher expected return. 
 
-## Optimal portfolio choice in R
+## Optimal portfolio choice
 
 The function below implements the efficient portfolio weight in its general form which also allows to reflect transaction costs (conditional on the holdings *before* reallocation). For $\beta=0$, the computation resembles the standard mean-variance efficient framework. 
 
@@ -110,8 +111,8 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.4307987  0.2701363 -1.3024366  0.3742729  0.3093118 -0.1521964
-##  [7]  0.5378376  0.4712071 -0.1669907 -0.7719408
+##  [1]  1.4310531  0.2701734 -1.3024131  0.3742672  0.3093601 -0.1521489
+##  [7]  0.5374542  0.4712162 -0.1671074 -0.7718549
 ```
 
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyse the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$. 
@@ -145,6 +146,7 @@ transaction_costs %>%
 The figure show that the higher the transaction costs parameter $\beta$, the smaller rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). Further, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.
 
 ## Constrained optimization
+
 Next we introduce constrained optimization. Very often, typical constraints such as no-short selling rules prevent analytical solutions for optimal portfolio weights. However, numerical optimization allows to compute the solutions to such constrained problems. For the purpose of mean-variance optimization we rely on `solve.QP` from the package `quadprog`. First, we start with an *unconstrained* problem to replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. 
 
 
@@ -161,17 +163,17 @@ cbind(w_mvp, w_mvp_numerical$solution)
 ```
 
 ```
-##              w_mvp             
-##  [1,]  0.218217861  0.218217861
-##  [2,] -0.024598381 -0.024598381
-##  [3,]  0.132583584  0.132583584
-##  [4,]  0.061873595  0.061873595
-##  [5,]  0.009580795  0.009580795
-##  [6,]  0.247523928  0.247523928
-##  [7,]  0.090240088  0.090240088
-##  [8,]  0.145530839  0.145530839
-##  [9,]  0.493397247  0.493397247
-## [10,] -0.374349557 -0.374349557
+##             w_mvp            
+##  [1,]  0.21822161  0.21822161
+##  [2,] -0.02459562 -0.02459562
+##  [3,]  0.13257654  0.13257654
+##  [4,]  0.06187323  0.06187323
+##  [5,]  0.00958236  0.00958236
+##  [6,]  0.24752571  0.24752571
+##  [7,]  0.09023218  0.09023218
+##  [8,]  0.14553341  0.14553341
+##  [9,]  0.49339534  0.49339534
+## [10,] -0.37434477 -0.37434477
 ```
 
 ```r
@@ -186,16 +188,16 @@ cbind(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution)
 
 ```
 ##             [,1]       [,2]
-##  [1,]  1.4307987  1.4307987
-##  [2,]  0.2701363  0.2701363
-##  [3,] -1.3024366 -1.3024366
-##  [4,]  0.3742729  0.3742729
-##  [5,]  0.3093118  0.3093118
-##  [6,] -0.1521964 -0.1521964
-##  [7,]  0.5378376  0.5378376
-##  [8,]  0.4712071  0.4712071
-##  [9,] -0.1669907 -0.1669907
-## [10,] -0.7719408 -0.7719408
+##  [1,]  1.4310531  1.4310531
+##  [2,]  0.2701734  0.2701734
+##  [3,] -1.3024131 -1.3024131
+##  [4,]  0.3742672  0.3742672
+##  [5,]  0.3093601  0.3093601
+##  [6,] -0.1521489 -0.1521489
+##  [7,]  0.5374542  0.5374542
+##  [8,]  0.4712162  0.4712162
+##  [9,] -0.1671074 -0.1671074
+## [10,] -0.7718549 -0.7718549
 ```
 
 The function `solve.QP` from package `quadprog` delivers numerical solution to quadratic programming problem of the form 
@@ -277,6 +279,7 @@ compute_efficient_weight_L1_TC <- function(mu,
 ```
 
 ## Out-of-sample backtesting
+
 For the sake of keeping things easy, we committed one fundamental error in computing portfolio weights above: We used the full sample of the data to determine the optimal allocation. In other words, in order to implement this strategy in the beginning of the 2000's, you will need to know in advance how the returns will evolve until 2020. Instead, while interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We will do so next in a backtesting exercise. For the backtest we recompute optimal weights just based on past available data. 
 
 
@@ -385,8 +388,8 @@ performance %>%
 
 |strategy |   Mean|     SD| Sharpe| Turnover|
 |:--------|------:|------:|------:|--------:|
-|MV       | -0.636| 12.386|     NA|  214.231|
-|MV (TC)  | 12.105| 15.090|  0.802|    0.031|
+|MV       | -0.636| 12.386|     NA|  214.229|
+|MV (TC)  | 12.104| 15.090|  0.802|    0.032|
 |Naive    | 12.087| 15.093|  0.801|    0.229|
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers expected return and variance of her portfolio. Effectively, The mean-variance portfolio generated a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the theoretical optimal portfolio. 

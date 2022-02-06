@@ -1,12 +1,13 @@
-# Univariate Sorts: Firm Size
+# Firms size and portfolio building
 
-In this section, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor - the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, [@Fama1993] include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
+In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor - the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, [@Fama1993] include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. Hence, we want to emphasize that these alternative specifications are supposed to be robustness tests.
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. You will see that these choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. Hence, we want to emphasize that these alternative specifications are supposed to be robustness tests.
 
 ## Data preparation
 
-The section relies on the following set of packages. 
+The chapter relies on the following set of packages. 
+
 
 ```r
 library(tidyverse)
@@ -18,7 +19,8 @@ library(scales)
 library(furrr)
 ```
 
-First, we retrieve the relevant data from our database. Firm size is defined as market equity in most asset pricing applications which we retrieve from CRSP. 
+First, we retrieve the relevant data from our database. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. 
+
 
 ```r
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
@@ -32,7 +34,7 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 
 ## Size distribution
 
-Before we build our size portfolios, we investigate the distribution of the variable *firm size*. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms by setting the indicator's value to one. Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization. 
+Before we build our size portfolios, we investigate the distribution of the variable *firm size*. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows you the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms by setting the indicator's value to one. Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization. 
 
 The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The size distribution means that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
@@ -48,15 +50,15 @@ crsp_monthly %>%
     total_market_cap = sum(mktcap)
   ) %>%
   summarize(
-    `Largest 1% of Stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
-    `Largest 5% of Stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
-    `Largest 10% of Stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
-    `Largest 25% of Stocks` = sum(mktcap[top25 == 1]) / total_market_cap
+    `Largest 1% of stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
+    `Largest 5% of stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
+    `Largest 10% of stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
+    `Largest 25% of stocks` = sum(mktcap[top25 == 1]) / total_market_cap
   ) %>%
   pivot_longer(cols = -month) %>%
   mutate(name = factor(name, levels = c(
-    "Largest 1% of Stocks", "Largest 5% of Stocks",
-    "Largest 10% of Stocks", "Largest 25% of Stocks"
+    "Largest 1% of stocks", "Largest 5% of stocks",
+    "Largest 10% of stocks", "Largest 25% of stocks"
   ))) %>%
   ggplot(aes(x = month, y = value, color = name)) +
   geom_line() +
@@ -70,7 +72,7 @@ crsp_monthly %>%
 
 <img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 
-Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (*NYSE*) was and still is the largest listing exchange in terms of market capitalization. More recently, Nasdaq has gained relevance as a listing exchange. Do you know what the small peak in Nasdaq's market cap around the year 2000 was about?
+Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (*NYSE*) was and still is the largest listing exchange in terms of market capitalization. More recently, Nasdaq has gained relevance as a listing exchange. Do you know what the small peak in Nasdaq's market cap around the year 2000 was?
 
 
 ```r
@@ -130,16 +132,18 @@ crsp_monthly %>%
 ## # A tibble: 5 x 11
 ##   exchange   mean     sd     min    q05    q25    q50    q75    q95    max     n
 ##   <chr>     <dbl>  <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-## 1 AMEX       281.  1294.  6.04e0 1.01e1 3.06e1 6.57e1   157.   530. 1.51e4   148
-## 2 NASDAQ    8036. 74663.  4.65e0 2.46e1 1.30e2 4.73e2  2092. 19065. 2.26e6  2300
-## 3 NYSE     16390. 43085.  5.35e0 1.54e2 9.10e2 3.33e3 11966. 74635. 4.14e5  1247
+## 1 AMEX       283.  1298.  6.04e0 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
+## 2 NASDAQ    8041. 74386.  4.65e0 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
+## 3 NYSE     16416. 43115.  5.35e0 1.54e2 9.17e2 3.34e3 12022. 74826. 4.14e5  1245
 ## 4 Other    10061.    NA   1.01e4 1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## 5 Overall  10545. 64142.  4.65e0 2.95e1 1.82e2 8.59e2  4168. 36811. 2.26e6  3696
+## 5 Overall  10556. 63966.  4.65e0 3.10e1 1.85e2 8.74e2  4196. 37059. 2.23e6  3693
 ```
 
 ## Univariate size portfolios with flexible breakpoints
 
-In the previous section, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks. To replicate this decision, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(grepl(exchanges, exchange))`. The function `grepl()` is part of a family of functions on *regular expressions*, which provide various functionalities to work and manipulate character strings. Here, we replace the character string stored in the column `exchange` with a binary variable that indicates if the string matches the pattern specified in the argument `exchanges`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = 'NYSE|NASDAQ|AMEX'`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
+In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks. 
+
+To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(grepl(exchanges, exchange))`. The function `grepl()` is part of a family of functions on *regular expressions*, which provide various functionalities to work and manipulate character strings. Here, we replace the character string stored in the column `exchange` with a binary variable that indicates if the string matches the pattern specified in the argument `exchanges`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = 'NYSE|NASDAQ|AMEX'`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
 
 ```r
@@ -162,11 +166,11 @@ assign_portfolio <- function(n_portfolios,
 }
 ```
 
-## Value and equal portfolio weighting
+## Weighting schemes for portfolios
 
 Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock's return the same weight, i.e., a simple average of the constituents' returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.
 
-We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in the previous section.
+We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in the previous chapter.
 
 
 ```r
@@ -217,7 +221,7 @@ tibble(Exchanges = c("all", "NYSE"), Premium = as.numeric(c(ret_all, ret_nyse)) 
 ##   Exchanges Premium
 ##   <chr>       <dbl>
 ## 1 all         0.110
-## 2 NYSE        0.181
+## 2 NYSE        0.180
 ```
 
 The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
@@ -298,9 +302,9 @@ p_hacking_setup %>%
 ##  5           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.0114 
 ##  6           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.0109 
 ##  7           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly"           0.0103 
-##  8           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.00964
+##  8           10 NYSE|NASDAQ|AMEX TRUE           "crsp_monthly %>% ~      0.00967
 ##  9            5 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.00914
-## 10            5 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.00883
+## 10            5 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% ~      0.00884
 ## # ... with 38 more rows
 ```
 
@@ -328,3 +332,12 @@ p_hacking_setup %>%
 ```
 
 <img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+
+
+## Exercises
+
+1. We gained several insights on the size distribution above. However, we did not analyse the average size across exchanges and industries. Which exchanges/industries have the largest firms? Plot the average firm size for the three exchanges over time. What do you see?
+1. We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.
+1. The returns that we analyse above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_portfolio_returns()` to output the CAPM alpha or beta instead of the average excess return. 
+1. While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on returns.
+1. We computed several size premiums, but they do not follow the definition of [@Fama1993]. Which of our approaches comes closest to their SMB premium?

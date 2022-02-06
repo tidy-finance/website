@@ -1,4 +1,4 @@
-# Parametric Portfolio Policies
+# Parametric portfolio policies
 
 In this section, we introduce different portfolio performance measures to evaluate and compare different allocation strategies. For this purpose, we introduce a direct (and probably simplest) way to estimate optimal portfolio weights when stock characteristics are related to the stock’s expected return, variance, and covariance with other stocks: We parametrize weights as a function of the characteristics such that we maximize expected utility. The approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by [@Brandt2009] in their influential paper *Parametric Portfolio Policies: Exploiting Characteristics in the Cross Section of Equity Returns*. 
 
@@ -54,7 +54,8 @@ crsp_monthly <- crsp_monthly %>%
   drop_na(contains("lag"))
 ```
 
-## Parametric Portfolio Policies
+## Parametric portfolio policies
+
 The basic idea of parametric portfolio weights is easy to explain: Suppose that at each date $t$ we have $N_t$ stocks in the investment universe, where each stock $i$ has return of $r_{i, t+1}$ and is associated with a vector of firm characteristics $x_{i, t}$ such as time-series momentum or the market capitalization. The investors problem is to choose portfolio weights $w_{i,t}$ to maximize the expected utility of the portfolio return:
 $$\begin{align}
 \max_{w} E_t\left(u(r_{p, t+1})\right) = E_t\left[u\left(\sum\limits_{i=1}^{N_t}w_{i,t}r_{i,t+1}\right)\right]
@@ -77,7 +78,8 @@ crsp_monthly <- crsp_monthly %>%
   select(-mktcap_lag, -altprc)
 ```
 
-## Compute portfolio weights
+## Computing portfolio weights
+
 Next we can move to optimal choices of $\theta$. We rewrite the optimization problem together with the weight parametrisation and can then estimate $\theta$ to maximize the objective function based on our sample 
 $$\begin{align}
 E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
@@ -229,7 +231,7 @@ evaluate_portfolio(weights_crsp) %>%
   <tr>
    <td style="text-align:left;"> Average return </td>
    <td style="text-align:right;"> 6.858 </td>
-   <td style="text-align:right;"> -0.051 </td>
+   <td style="text-align:right;"> -0.053 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> SD return </td>
@@ -274,7 +276,7 @@ evaluate_portfolio(weights_crsp) %>%
   <tr>
    <td style="text-align:left;"> Avg. fraction of negative weights </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> 49.366 </td>
+   <td style="text-align:right;"> 49.365 </td>
   </tr>
 </tbody>
 </table>
@@ -282,6 +284,7 @@ evaluate_portfolio(weights_crsp) %>%
 The value weighted portfolio delivers an annualized return of above 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
 
 ## Optimal parameter choice
+
 Next we move to a choice of $\theta$ that actually aims to to improve some (or all) of the performance measures. We first define a helper function `compute_objective_function` which is then passed to R's optimization schemes. 
 
 ```r
@@ -323,11 +326,12 @@ optimal_theta$par # Optimal values
 
 ```
 ## momentum_lag     size_lag 
-##    0.5889182   -2.0715581
+##    0.5860763   -2.0678670
 ```
 The chosen values of $\theta$ are easy to interpret on an intuitive basis: Expected utility increases by tilting weights from the value weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). 
 
 ## More model specifications
+
 A final open question is then: How does the portfolio perform for different model specifications? For that purpose we compute the performance of a number of different modelling choices based on the entire CRSP sample. The few lines below perform all the heavy lifting.
 
 
@@ -415,27 +419,27 @@ performance_table %>%
   </tr>
   <tr>
    <td style="text-align:left;"> Average return </td>
-   <td style="text-align:right;"> 10.456 </td>
+   <td style="text-align:right;"> 10.455 </td>
    <td style="text-align:right;"> 6.858 </td>
-   <td style="text-align:right;"> 14.697 </td>
-   <td style="text-align:right;"> 13.413 </td>
-   <td style="text-align:right;"> 13.014 </td>
+   <td style="text-align:right;"> 14.685 </td>
+   <td style="text-align:right;"> 13.417 </td>
+   <td style="text-align:right;"> 13.013 </td>
    <td style="text-align:right;"> 8.052 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> SD return </td>
    <td style="text-align:right;"> 20.333 </td>
    <td style="text-align:right;"> 15.348 </td>
-   <td style="text-align:right;"> 20.342 </td>
-   <td style="text-align:right;"> 19.584 </td>
-   <td style="text-align:right;"> 22.402 </td>
-   <td style="text-align:right;"> 17.096 </td>
+   <td style="text-align:right;"> 20.332 </td>
+   <td style="text-align:right;"> 19.591 </td>
+   <td style="text-align:right;"> 22.403 </td>
+   <td style="text-align:right;"> 17.095 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> Sharpe ratio </td>
    <td style="text-align:right;"> 0.148 </td>
    <td style="text-align:right;"> 0.129 </td>
-   <td style="text-align:right;"> 0.209 </td>
+   <td style="text-align:right;"> 0.208 </td>
    <td style="text-align:right;"> 0.198 </td>
    <td style="text-align:right;"> 0.168 </td>
    <td style="text-align:right;"> 0.136 </td>
@@ -446,7 +450,7 @@ performance_table %>%
    <td style="text-align:right;"> 0.000 </td>
    <td style="text-align:right;"> 0.007 </td>
    <td style="text-align:right;"> 0.005 </td>
-   <td style="text-align:right;"> 0.005 </td>
+   <td style="text-align:right;"> 0.004 </td>
    <td style="text-align:right;"> 0.001 </td>
   </tr>
   <tr>
@@ -472,15 +476,15 @@ performance_table %>%
    <td style="text-align:right;"> 0.025 </td>
    <td style="text-align:right;"> 3.516 </td>
    <td style="text-align:right;"> 3.331 </td>
-   <td style="text-align:right;"> 2.643 </td>
-   <td style="text-align:right;"> 0.367 </td>
-   <td style="text-align:right;"> 0.297 </td>
+   <td style="text-align:right;"> 2.642 </td>
+   <td style="text-align:right;"> 0.369 </td>
+   <td style="text-align:right;"> 0.296 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> Min. weight </td>
    <td style="text-align:right;"> 0.025 </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> -0.046 </td>
+   <td style="text-align:right;"> -0.045 </td>
    <td style="text-align:right;"> 0.000 </td>
    <td style="text-align:right;"> -0.042 </td>
    <td style="text-align:right;"> 0.000 </td>
@@ -489,18 +493,18 @@ performance_table %>%
    <td style="text-align:left;"> Avg. sum of negative weights </td>
    <td style="text-align:right;"> 0.000 </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> 31.098 </td>
+   <td style="text-align:right;"> 30.984 </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> 4.040 </td>
+   <td style="text-align:right;"> 4.051 </td>
    <td style="text-align:right;"> 0.000 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> Avg. fraction of negative weights </td>
    <td style="text-align:right;"> 0.000 </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> 39.368 </td>
+   <td style="text-align:right;"> 39.348 </td>
    <td style="text-align:right;"> 0.000 </td>
-   <td style="text-align:right;"> 10.409 </td>
+   <td style="text-align:right;"> 10.425 </td>
    <td style="text-align:right;"> 0.000 </td>
   </tr>
 </tbody>

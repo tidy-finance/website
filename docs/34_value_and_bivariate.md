@@ -1,12 +1,12 @@
-# Bivariate Sorts: Value
+# Value and bivariate sorts
 
-This section extends univariate portfolio sorts to bivariate sorts which simply means that we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature. Yet, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
+This chapter extends univariate portfolio sorts to bivariate sorts which simply means that we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature. Yet, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
 ## Data preparation
 
-The current section relies on this set of packages. 
+The current chapter relies on this set of packages. 
 
 ```r
 library(tidyverse)
@@ -18,7 +18,7 @@ library(scales)
 library(furrr)
 ```
 
-We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous section.
+We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.
 
 
 ```r
@@ -30,7 +30,6 @@ crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
   collect()
 
-# Keep only relevant data
 crsp_monthly <- crsp_monthly %>%
   left_join(factors_ff_monthly, by = "month") %>%
   select(permno, gvkey, month, ret_excess, mkt_excess, mktcap, mktcap_lag, exchange) %>%
@@ -44,13 +43,15 @@ Further, we utilize accounting data. The most common source of accounting data i
 compustat <- tbl(tidy_finance, "compustat") %>%
   collect()
 
-# Book-equity data
 be <- compustat %>%
   select(gvkey, datadate, be) %>%
   drop_na() %>%
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
+
+
 ## Book-to-market ratio
+
 A fundamental problem in handling accounting data is the *look-ahead bias* - we must not include data in forming a portfolio that is not public knowledge at the time. Of course, researchers have more information when looking into the past than agents had at that moment. However, abnormal excess returns from a trading strategy should not rely on an information advantage because the differential cannot be the result of informed agents' trades. Hence, we have to lag accounting information.
 
 We continue to lag market capitalization and firm size by one month. Then, we compute the book-to-market ratio, which relates a firm's book equity to its market equity. Firms with high (low) book-to-market are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.^[The definition of a time lag is another choice a researcher has to make, similar to breakpoint choices as we describe in the section on p-hacking.]
@@ -63,7 +64,6 @@ me <- crsp_monthly %>%
   mutate(sorting_date = month %m+% months(1)) %>%
   select(permno, sorting_date, me = mktcap)
 
-# Book-to-market
 bm <- be %>%
   inner_join(crsp_monthly %>%
     select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) %>%
@@ -74,13 +74,11 @@ bm <- be %>%
   select(permno, gvkey, sorting_date, bm) %>%
   arrange(permno, gvkey, sorting_date)
 
-# Merged data
 ccm <- crsp_monthly %>%
   left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) %>%
   left_join(me, by = c("permno", "month" = "sorting_date")) %>%
   select(permno, gvkey, month, ret_excess, mktcap_lag, me, bm, exchange)
 
-# Fill accounting data
 ccm <- ccm %>%
   arrange(permno, gvkey, month) %>%
   group_by(permno, gvkey) %>%
@@ -110,6 +108,7 @@ assign_portfolio <- function(data, var, n_portfolios, exchanges) {
 ```
 
 After these data preparation steps, we will present bivariate portfolio sorts on an independent and dependent basis.
+
 
 ## Independent sorts
 
@@ -142,8 +141,6 @@ ccm_portfolios <- ccm %>%
     portfolio_bm = unique(portfolio_bm),
     .groups = "drop"
   )
-
-# TODO: Should we create a table with average returns?
 ```
 
 Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher's choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.
@@ -159,7 +156,7 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.3311771
+## [1] 0.3277675
 ```
 
 ## Dependent sorts
@@ -204,5 +201,11 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.2890729
+## [1] 0.2634137
 ```
+
+## Exercises
+
+1. In the previous chapter, we examined the distribution of market equity. Repeat this analysis for book equity and the book-to-market ratio (alongside a plot of the breakpoints, i.e., deciles).
+1. When we investigate the portfolios, we focus on the returns exclusively. However, it is also of interest to understand the characteristics of the portfolios. Write a function to compute the average characteristics for size and book-to-market across the 25 independently and dependently sorted portfolios.
+1. As for the size premium, also the value premium constructed here does not follow [@Fama1993]. Implement a p-hacking setup as in the previous chapter to find a premium that comes closest to their HML premium.

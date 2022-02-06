@@ -1,8 +1,8 @@
-# Bivariate Sorts: Replication of Fama & French Factors
+# Replicating Fama & French factors
 
-The Fama and French three-factor model (see CITATION) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We did introduce both factors in the previous section, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. While we demonstrated the main idea of portfolio sorts, we also want to show how to replicate these significant factors. However, we do not aim at a perfect replication but want to show the main ideas.
+The Fama and French three-factor model (see [@Fama1993]) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We did introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. While we demonstrated the main idea of portfolio sorts, we also want to show how to replicate these significant factors. However, we do not aim at a perfect replication but want to show the main ideas.
 
-The current section relies on this set of packages. 
+The current chapter relies on this set of packages. 
 
 ```r
 library(tidyverse)
@@ -18,7 +18,6 @@ We use the same data sources CRSP and compustat, as we need exactly the same var
 
 
 ```r
-# Load data from database
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>% 
@@ -30,21 +29,19 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 compustat <- tbl(tidy_finance, "compustat") %>% 
   collect()
 
-# Keep only relevant data
 data_ff <- crsp_monthly %>% 
   left_join(factors_ff_monthly, by = "month") %>% 
   select(permno, gvkey, month, ret_excess, mkt_excess, mktcap, mktcap_lag, exchange) %>% 
   drop_na()
 
-# Compustat data
 be <- compustat %>%
   select(gvkey, datadate, be) %>% 
   drop_na()
 ```
 
-## Data Preparation
+## Data preparation
 
-Yet when we start merging our data set for computing the premiums, there are a few differences to the previous sections. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
+Yet when we start merging our data set for computing the premiums, there are a few differences to the previous chapter. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
 
@@ -52,22 +49,17 @@ To implement all these time lags, we again employ the temporary `sorting_date`-c
 
 
 ```r
-# Market equity
 ff_me <- data_ff %>%
   filter(month(month) == 6) %>%
   mutate(sorting_date = month %m+% months(1)) %>%
   select(permno, sorting_date, ff_me = mktcap)
 
-# Book-to-market
-## December market equity
 ff_me_dec <- data_ff %>%
   filter(month(month) == 12) %>%
   mutate(sorting_date = ymd(paste0(year(month) + 1, "07-01)"))) %>%
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
-## Book to market
 ff_bm <- be %>%
-  # be from year before
   mutate(sorting_date = ymd(paste0(year(datadate) + 1, "07-01"))) %>%
   select(gvkey, sorting_date, bm_be = be) %>%
   drop_na() %>%
@@ -75,7 +67,6 @@ ff_bm <- be %>%
   mutate(ff_bm = bm_be/bm_me) %>%
   select(permno, sorting_date, ff_bm)
 
-# Combine factors
 ff_variables <- ff_me %>% 
   inner_join(ff_bm, by = c("permno", "sorting_date")) %>%
   drop_na() %>%
@@ -108,7 +99,7 @@ ff_portfolios <- data_ff %>%
   left_join(ff_breakpoints, by = "sorting_date")
 ```
 
-## Fama and French Factor Returns
+## Fama and French factor returns
 
 We can now use our returns alongside the breakpoints to assign the portfolios. We do so slightly differently by using the `case_when()`-function. We assign the portfolios by adding numbers that result in the respective portfolio. The base portfolio of small growth stocks gets the value of 11. We add 10 for large firms and 1 and 2 for higher book-to-market ratios. In the end, we add the letter p to indicate that these are portfolio numbers. Overall, this procedure is potentially less intuitive but suitable for this exercise given the low number of portfolios. 
 
@@ -134,7 +125,7 @@ ff_factors <- ff_portfolios %>%
   select(month, ff_SMB, ff_HML)
 ```
 
-## Correlation Tests
+## Correlation tests
 
 In the last step, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then; how close did we get? We answer this question by looking at the two time-series estimates in a correlation analysis using the function `cor.test()` and a test of means using the function `t.test()`.
 
@@ -155,13 +146,13 @@ cor.test(test$ff_SMB, test$smb)
 ## 	Pearson's product-moment correlation
 ## 
 ## data:  test$ff_SMB and test$smb
-## t = 216.1, df = 712, p-value < 2.2e-16
+## t = 226.3, df = 712, p-value < 2.2e-16
 ## alternative hypothesis: true correlation is not equal to 0
 ## 95 percent confidence interval:
-##  0.9912746 0.9934900
+##  0.992035 0.994058
 ## sample estimates:
-##      cor 
-## 0.992463
+##       cor 
+## 0.9931202
 ```
 
 ```r
@@ -173,13 +164,13 @@ cor.test(test$ff_HML, test$hml)
 ## 	Pearson's product-moment correlation
 ## 
 ## data:  test$ff_HML and test$hml
-## t = 129.46, df = 712, p-value < 2.2e-16
+## t = 130.06, df = 712, p-value < 2.2e-16
 ## alternative hypothesis: true correlation is not equal to 0
 ## 95 percent confidence interval:
-##  0.9761907 0.9822018
+##  0.9764032 0.9823611
 ## sample estimates:
 ##       cor 
-## 0.9794122
+## 0.9795963
 ```
 
 ```r
@@ -191,13 +182,13 @@ t.test(test$ff_SMB, test$smb)
 ## 	Welch Two Sample t-test
 ## 
 ## data:  test$ff_SMB and test$smb
-## t = 0.084818, df = 1426, p-value = 0.9324
+## t = 0.099814, df = 1426, p-value = 0.9205
 ## alternative hypothesis: true difference in means is not equal to 0
 ## 95 percent confidence interval:
-##  -0.002996805  0.003267673
+##  -0.002972962  0.003291730
 ## sample estimates:
 ##   mean of x   mean of y 
-## 0.001945378 0.001809944
+## 0.001970168 0.001810784
 ```
 
 ```r
@@ -209,11 +200,11 @@ t.test(test$ff_HML, test$hml)
 ## 	Welch Two Sample t-test
 ## 
 ## data:  test$ff_HML and test$hml
-## t = -0.11467, df = 1425.4, p-value = 0.9087
+## t = -0.11764, df = 1425.4, p-value = 0.9064
 ## alternative hypothesis: true difference in means is not equal to 0
 ## 95 percent confidence interval:
-##  -0.003147035  0.002799416
+##  -0.003151381  0.002794798
 ## sample estimates:
 ##   mean of x   mean of y 
-## 0.002485714 0.002659524
+## 0.002478011 0.002656303
 ```
