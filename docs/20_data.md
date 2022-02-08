@@ -204,18 +204,12 @@ factors_ff_monthly_db %>%
 ## # Source:   lazy query [?? x 2]
 ## # Database: sqlite 3.37.0
 ## #   [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
-##    month          rf
-##    <date>      <dbl>
-##  1 1960-01-01 0.0033
-##  2 1960-02-01 0.0029
-##  3 1960-03-01 0.0035
-##  4 1960-04-01 0.0019
-##  5 1960-05-01 0.0027
-##  6 1960-06-01 0.0024
-##  7 1960-07-01 0.0013
-##  8 1960-08-01 0.0017
-##  9 1960-09-01 0.0016
-## 10 1960-10-01 0.0022
+##   month          rf
+##   <date>      <dbl>
+## 1 1960-01-01 0.0033
+## 2 1960-02-01 0.0029
+## 3 1960-03-01 0.0035
+## 4 1960-04-01 0.0019
 ## # ... with more rows
 ```
 
@@ -230,19 +224,13 @@ factors_ff_monthly_db %>%
 
 ```
 ## # A tibble: 732 x 2
-##    month          rf
-##    <date>      <dbl>
-##  1 1960-01-01 0.0033
-##  2 1960-02-01 0.0029
-##  3 1960-03-01 0.0035
-##  4 1960-04-01 0.0019
-##  5 1960-05-01 0.0027
-##  6 1960-06-01 0.0024
-##  7 1960-07-01 0.0013
-##  8 1960-08-01 0.0017
-##  9 1960-09-01 0.0016
-## 10 1960-10-01 0.0022
-## # ... with 722 more rows
+##   month          rf
+##   <date>      <dbl>
+## 1 1960-01-01 0.0033
+## 2 1960-02-01 0.0029
+## 3 1960-03-01 0.0035
+## 4 1960-04-01 0.0019
+## # ... with 728 more rows
 ```
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
@@ -315,18 +303,12 @@ msf_db
 ```
 ## # Source:   table<"crsp"."msf"> [?? x 21]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##    cusip   permno permco issuno hexcd hsiccd date        bidlo askhi   prc   vol
-##    <chr>    <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>      <dbl> <dbl> <dbl> <dbl>
-##  1 683916~  10000   7952  10396     3   3990 1985-12-31 NA     NA    NA       NA
-##  2 683916~  10000   7952  10396     3   3990 1986-01-31 -2.5   -4.44 -4.38  1771
-##  3 683916~  10000   7952  10396     3   3990 1986-02-28 -3.25  -4.38 -3.25   828
-##  4 683916~  10000   7952  10396     3   3990 1986-03-31 -3.25  -4.44 -4.44  1078
-##  5 683916~  10000   7952  10396     3   3990 1986-04-30 -4     -4.31 -4      957
-##  6 683916~  10000   7952  10396     3   3990 1986-05-30 -3.06  -4.22 -3.11  1074
-##  7 683916~  10000   7952  10396     3   3990 1986-06-30 -2.91  -3.30 -3.09  1069
-##  8 683916~  10000   7952  10396     3   3990 1986-07-31 -2.59  -3.44 -2.84  1163
-##  9 683916~  10000   7952  10396     3   3990 1986-08-29 -1.03  -2.62 -1.09  3049
-## 10 683916~  10000   7952  10396     3   3990 1986-09-30 -0.969 -1.28 -1.03  3551
+##   cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
+##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
+## 1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
+## 2 68391610  10000   7952  10396     3   3990 1986-01-31 -2.5  -4.44 -4.38  1771
+## 3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
+## 4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
 ## # ... with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
 ## #   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
 ## #   altprcdt <date>, retx <dbl>
@@ -342,18 +324,12 @@ msenames_db
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##    permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam shrcls
-##     <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>  <chr> 
-##  1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIM~ A     
-##  2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIM~ A     
-##  3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIM~ A     
-##  4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT~ <NA>  
-##  5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERG~ <NA>  
-##  6  10001 2004-06-10 2004-10-18    11      3  4920 29274A10 EWST   ENERG~ <NA>  
-##  7  10001 2004-10-19 2004-12-26    11      3  4920 29274A10 EWST   ENERG~ <NA>  
-##  8  10001 2004-12-27 2008-02-04    11      3  4920 29274A10 EWST   ENERG~ <NA>  
-##  9  10001 2008-02-05 2008-03-04    11      3  4920 29274A20 EWST   ENERG~ <NA>  
-## 10  10001 2008-03-05 2009-08-03    11      3  4920 29274A20 EWST   ENERG~ <NA>  
+##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam  shrcls
+##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>   <chr> 
+## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMU~ A     
+## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMU~ A     
+## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMU~ A     
+## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT ~ <NA>  
 ## # ... with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
 ## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
@@ -369,18 +345,12 @@ msedelist_db
 ```
 ## # Source:   table<"crsp"."msedelist"> [?? x 19]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##    permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt   dlretx   dlprc
-##     <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>    <dbl>   <dbl>
-##  1  10000 1987-06-11    560      0      0 1987-06-12  0.219  0        -0.219
-##  2  10001 2017-08-03    233      0      0 NA         13.1    0.0116    0    
-##  3  10002 2013-02-15    231  35263   1658 NA          3.01   0.0460    0    
-##  4  10003 1995-12-15    231  10569   8477 NA          5.45   0.0137    0    
-##  5  10005 1991-07-11    560      0      0 1991-07-12  0.141  0.125    -0.141
-##  6  10006 1984-06-28    233      0      0 NA         54.5    0.0356    0    
-##  7  10007 1990-10-16    560      0      0 1990-10-17  0.406 -0.133    -0.406
-##  8  10008 1988-11-21    551      0      0 1988-11-22 28      0.00901 -28    
-##  9  10009 2000-11-03    233      0  16060 NA         33.2    0.00567   0    
-## 10  10010 1995-08-28    231  23588   5398 NA          7.26  -0.113     0    
+##   permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
+##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
+## 1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
+## 2  10001 2017-08-03    233      0      0 NA         13.1   0.0116  0    
+## 3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
+## 4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
 ## # ... with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
 ## #   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
@@ -540,19 +510,13 @@ crsp_monthly
 
 ```
 ## # A tibble: 3,225,161 x 13
-##    permno date       month           ret  shrout altprc exchcd siccd mktcap
-##     <dbl> <date>     <date>        <dbl>   <dbl>  <dbl>  <dbl> <dbl>  <dbl>
-##  1  10000 1986-02-28 1986-02-01 -0.257   3680000 -3.25       3  3990  12.0 
-##  2  10000 1986-03-31 1986-03-01  0.365   3680000 -4.44       3  3990  16.3 
-##  3  10000 1986-04-30 1986-04-01 -0.0986  3793000 -4          3  3990  15.2 
-##  4  10000 1986-05-30 1986-05-01 -0.223   3793000 -3.11       3  3990  11.8 
-##  5  10000 1986-06-30 1986-06-01 -0.00503 3793000 -3.09       3  3990  11.7 
-##  6  10000 1986-07-31 1986-07-01 -0.0808  3793000 -2.84       3  3990  10.8 
-##  7  10000 1986-08-29 1986-08-01 -0.615   3793000 -1.09       3  3990   4.15
-##  8  10000 1986-09-30 1986-09-01 -0.0571  3793000 -1.03       3  3990   3.91
-##  9  10000 1986-10-31 1986-10-01 -0.242   3843000 -0.781      3  3990   3.00
-## 10  10000 1986-11-28 1986-11-01  0.0600  3843000 -0.828      3  3990   3.18
-## # ... with 3,225,151 more rows, and 4 more variables: mktcap_lag <dbl>,
+##   permno date       month          ret  shrout altprc exchcd siccd mktcap
+##    <dbl> <date>     <date>       <dbl>   <dbl>  <dbl>  <dbl> <dbl>  <dbl>
+## 1  10000 1986-02-28 1986-02-01 -0.257  3680000  -3.25      3  3990   12.0
+## 2  10000 1986-03-31 1986-03-01  0.365  3680000  -4.44      3  3990   16.3
+## 3  10000 1986-04-30 1986-04-01 -0.0986 3793000  -4         3  3990   15.2
+## 4  10000 1986-05-30 1986-05-01 -0.223  3793000  -3.11      3  3990   11.8
+## # ... with 3,225,157 more rows, and 4 more variables: mktcap_lag <dbl>,
 ## #   exchange <chr>, industry <chr>, ret_excess <dbl>
 ```
 
@@ -828,19 +792,13 @@ ccmxpf_linktable
 
 ```
 ## # A tibble: 31,770 x 4
-##    permno gvkey  linkdt     linkenddt 
-##     <dbl> <chr>  <date>     <date>    
-##  1  25881 001000 1970-11-13 1978-06-30
-##  2  10015 001001 1983-09-20 1986-07-31
-##  3  10023 001002 1972-12-14 1973-06-05
-##  4  10031 001003 1983-12-07 1989-08-16
-##  5  54594 001004 1972-04-24 2022-02-06
-##  6  61903 001005 1973-01-31 1983-01-31
-##  7  10058 001007 1973-10-01 1979-01-30
-##  8  10058 001007 1979-01-31 1984-09-28
-##  9  10066 001008 1983-08-25 1987-02-26
-## 10  10074 001009 1982-01-18 1996-03-13
-## # ... with 31,760 more rows
+##   permno gvkey  linkdt     linkenddt 
+##    <dbl> <chr>  <date>     <date>    
+## 1  25881 001000 1970-11-13 1978-06-30
+## 2  10015 001001 1983-09-20 1986-07-31
+## 3  10023 001002 1972-12-14 1973-06-05
+## 4  10031 001003 1983-12-07 1989-08-16
+## # ... with 31,766 more rows
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 
@@ -953,8 +911,8 @@ dbListObjects(wrds)
 ## Exercises
 
 1. Check out the structure of the WRDS database by sending queries in the spirit of ["Querying WRDS Data using R"](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/) and verify the output with `dbListObjects()`. How many tables are associated with CRSP? Can you identify what is stored within *msp500*?
-2. Compute `mkt_cap_lag` using `lag(mktcap)` rather than joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are they different?
-3. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?
-4. `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by *month* of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
-5. Go back to the original Compustat data ìn `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
-6. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, used the matched sample to plot book equity against market capitalization. How are these two variables related?
+1. Compute `mkt_cap_lag` using `lag(mktcap)` rather than joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are they different?
+1. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?
+1. `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by *month* of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
+1. Go back to the original Compustat data ìn `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
+1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, used the matched sample to plot book equity against market capitalization. How are these two variables related?

@@ -145,19 +145,13 @@ beta_example
 
 ```
 ## # A tibble: 433 x 6
-##    permno month      industry      ret_excess mkt_excess  beta
-##     <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
-##  1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
-##  2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
-##  3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
-##  4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
-##  5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
-##  6  14593 1985-05-01 Manufacturing    -0.189      0.0509  1.76
-##  7  14593 1985-06-01 Manufacturing     0.0305     0.0127  1.76
-##  8  14593 1985-07-01 Manufacturing    -0.124     -0.0074  1.77
-##  9  14593 1985-08-01 Manufacturing    -0.0606    -0.0102  1.78
-## 10  14593 1985-09-01 Manufacturing     0.0440    -0.0454  1.71
-## # ... with 423 more rows
+##   permno month      industry      ret_excess mkt_excess  beta
+##    <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
+## 1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
+## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
+## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
+## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
+## # ... with 429 more rows
 ```
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
 
@@ -198,19 +192,13 @@ crsp_monthly_nested
 
 ```
 ## # A tibble: 29,207 x 3
-##    permno industry      data              
-##     <dbl> <chr>         <list>            
-##  1  10000 Manufacturing <tibble [16 x 3]> 
-##  2  10001 Utilities     <tibble [378 x 3]>
-##  3  10002 Finance       <tibble [324 x 3]>
-##  4  10003 Finance       <tibble [118 x 3]>
-##  5  10005 Mining        <tibble [65 x 3]> 
-##  6  10006 Manufacturing <tibble [292 x 3]>
-##  7  10007 Services      <tibble [41 x 3]> 
-##  8  10008 Manufacturing <tibble [33 x 3]> 
-##  9  10009 Finance       <tibble [177 x 3]>
-## 10  10010 Manufacturing <tibble [114 x 3]>
-## # ... with 29,197 more rows
+##   permno industry      data              
+##    <dbl> <chr>         <list>            
+## 1  10000 Manufacturing <tibble [16 x 3]> 
+## 2  10001 Utilities     <tibble [378 x 3]>
+## 3  10002 Finance       <tibble [324 x 3]>
+## 4  10003 Finance       <tibble [118 x 3]>
+## # ... with 29,203 more rows
 ```
 
 Note that we could use `map()` across all the `permno`s and get the same results as above. 
@@ -227,19 +215,13 @@ crsp_monthly_nested %>%
 
 ```
 ## # A tibble: 1,362 x 3
-##    permno month      beta_monthly
-##     <dbl> <date>            <dbl>
-##  1  10107 1990-03-01         1.39
-##  2  10107 1990-04-01         1.38
-##  3  10107 1990-05-01         1.43
-##  4  10107 1990-06-01         1.43
-##  5  10107 1990-07-01         1.45
-##  6  10107 1990-08-01         1.44
-##  7  10107 1990-09-01         1.41
-##  8  10107 1990-10-01         1.42
-##  9  10107 1990-11-01         1.41
-## 10  10107 1990-12-01         1.41
-## # ... with 1,352 more rows
+##   permno month      beta_monthly
+##    <dbl> <date>            <dbl>
+## 1  10107 1990-03-01         1.39
+## 2  10107 1990-04-01         1.38
+## 3  10107 1990-05-01         1.43
+## 4  10107 1990-06-01         1.43
+## # ... with 1,358 more rows
 ```
 
 However, instead, we want to perform the estimations of rolling betas for different stocks in parallel. We can use the flexibility of the `future` package, which we use to define how we want to perform the parallel estimation. If you have a Windows machine, it makes most sense to define `multisession`, which means that separate `R` processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization.
@@ -312,19 +294,13 @@ crsp_daily_nested %>%
 
 ```
 ## # A tibble: 1,543 x 3
-##    permno month      beta_daily
-##     <dbl> <date>          <dbl>
-##  1  10107 1986-05-01      0.898
-##  2  10107 1986-06-01      0.906
-##  3  10107 1986-07-01      0.822
-##  4  10107 1986-08-01      0.900
-##  5  10107 1986-09-01      1.01 
-##  6  10107 1986-10-01      1.03 
-##  7  10107 1986-11-01      1.58 
-##  8  10107 1986-12-01      1.64 
-##  9  10107 1987-01-01      2.38 
-## 10  10107 1987-02-01      1.51 
-## # ... with 1,533 more rows
+##   permno month      beta_daily
+##    <dbl> <date>          <dbl>
+## 1  10107 1986-05-01      0.898
+## 2  10107 1986-06-01      0.906
+## 3  10107 1986-07-01      0.822
+## 4  10107 1986-08-01      0.900
+## # ... with 1,539 more rows
 ```
 
 Just for safety and the sake of completeness, we tell our session again to use multiple sessions for parallelization.
@@ -344,6 +320,7 @@ beta_daily <- crsp_daily_nested %>%
   select(permno, month, beta_daily = beta) %>%
   drop_na()
 ```
+
 
 ## Comparing beta estimates
 

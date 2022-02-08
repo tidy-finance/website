@@ -13,7 +13,7 @@ library(tidyverse)
 library(tidyquant)
 ```
 
-We first download daily prices for one stock market ticker, e.g. *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the documentation's examples section. 
+We first download daily prices for one stock market ticker, e.g., *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the documentation's examples section. 
 
 
 ```r
@@ -22,20 +22,14 @@ prices
 ```
 
 ```
-## # A tibble: 2,541 x 8
-##    symbol date        open  high   low close    volume adjusted
-##    <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-##  1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
-##  2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
-##  3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
-##  4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
-##  5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
-##  6 AAPL   2012-01-10  15.2  15.2  15.1  15.1 258196400     12.9
-##  7 AAPL   2012-01-11  15.1  15.1  15.0  15.1 215084800     12.9
-##  8 AAPL   2012-01-12  15.1  15.1  15.0  15.0 212587200     12.9
-##  9 AAPL   2012-01-13  15.0  15.0  15.0  15.0 226021600     12.8
-## 10 AAPL   2012-01-17  15.2  15.2  15.1  15.2 242897200     13.0
-## # ... with 2,531 more rows
+## # A tibble: 2,542 x 8
+##   symbol date        open  high   low close    volume adjusted
+##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
+## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
+## 2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
+## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
+## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
+## # ... with 2,538 more rows
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of shares), and the *adjusted* price in USD. Notice that the adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions do affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -77,8 +71,7 @@ returns %>% head()
 ## 2 AAPL   2012-01-04  0.00537
 ## 3 AAPL   2012-01-05  0.0111 
 ## 4 AAPL   2012-01-06  0.0105 
-## 5 AAPL   2012-01-09 -0.00159
-## 6 AAPL   2012-01-10  0.00358
+## # ... with 2 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date - otherwise, `lag` would be meaningless. You should also be more cautious when working with more than one ticker at once since `lag` does not account for multiple stocks automatically.
@@ -210,7 +203,7 @@ returns %>%
    <td style="text-align:right;"> 0.002 </td>
    <td style="text-align:right;"> 1.684 </td>
    <td style="text-align:right;"> -6.116 </td>
-   <td style="text-align:right;"> 5.735 </td>
+   <td style="text-align:right;"> 5.736 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 2016 </td>
@@ -256,8 +249,8 @@ returns %>%
   </tr>
   <tr>
    <td style="text-align:right;"> 2022 </td>
-   <td style="text-align:right;"> -0.099 </td>
-   <td style="text-align:right;"> 2.037 </td>
+   <td style="text-align:right;"> -0.112 </td>
+   <td style="text-align:right;"> 1.995 </td>
    <td style="text-align:right;"> -2.660 </td>
    <td style="text-align:right;"> 6.978 </td>
   </tr>
@@ -355,7 +348,7 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> AXP </td>
    <td style="text-align:right;"> 0.057 </td>
-   <td style="text-align:right;"> 2.297 </td>
+   <td style="text-align:right;"> 2.296 </td>
    <td style="text-align:right;"> -17.595 </td>
    <td style="text-align:right;"> 21.882 </td>
   </tr>
@@ -369,21 +362,21 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> CAT </td>
    <td style="text-align:right;"> 0.069 </td>
-   <td style="text-align:right;"> 2.036 </td>
+   <td style="text-align:right;"> 2.035 </td>
    <td style="text-align:right;"> -14.518 </td>
    <td style="text-align:right;"> 14.723 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> CRM </td>
    <td style="text-align:right;"> 0.124 </td>
-   <td style="text-align:right;"> 2.681 </td>
+   <td style="text-align:right;"> 2.680 </td>
    <td style="text-align:right;"> -27.148 </td>
    <td style="text-align:right;"> 26.045 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> CSCO </td>
    <td style="text-align:right;"> 0.034 </td>
-   <td style="text-align:right;"> 2.389 </td>
+   <td style="text-align:right;"> 2.388 </td>
    <td style="text-align:right;"> -16.211 </td>
    <td style="text-align:right;"> 24.388 </td>
   </tr>
@@ -410,7 +403,7 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> HD </td>
-   <td style="text-align:right;"> 0.058 </td>
+   <td style="text-align:right;"> 0.057 </td>
    <td style="text-align:right;"> 1.935 </td>
    <td style="text-align:right;"> -28.736 </td>
    <td style="text-align:right;"> 14.067 </td>
@@ -446,21 +439,21 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> JPM </td>
    <td style="text-align:right;"> 0.062 </td>
-   <td style="text-align:right;"> 2.441 </td>
+   <td style="text-align:right;"> 2.440 </td>
    <td style="text-align:right;"> -20.727 </td>
    <td style="text-align:right;"> 25.097 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> KO </td>
-   <td style="text-align:right;"> 0.033 </td>
+   <td style="text-align:right;"> 0.034 </td>
    <td style="text-align:right;"> 1.324 </td>
    <td style="text-align:right;"> -10.061 </td>
-   <td style="text-align:right;"> 13.879 </td>
+   <td style="text-align:right;"> 13.880 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MCD </td>
    <td style="text-align:right;"> 0.055 </td>
-   <td style="text-align:right;"> 1.481 </td>
+   <td style="text-align:right;"> 1.480 </td>
    <td style="text-align:right;"> -15.875 </td>
    <td style="text-align:right;"> 18.125 </td>
   </tr>
@@ -473,28 +466,28 @@ all_returns %>%
   </tr>
   <tr>
    <td style="text-align:left;"> MRK </td>
-   <td style="text-align:right;"> 0.033 </td>
+   <td style="text-align:right;"> 0.032 </td>
    <td style="text-align:right;"> 1.693 </td>
    <td style="text-align:right;"> -26.781 </td>
    <td style="text-align:right;"> 13.033 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MSFT </td>
-   <td style="text-align:right;"> 0.057 </td>
+   <td style="text-align:right;"> 0.056 </td>
    <td style="text-align:right;"> 1.925 </td>
    <td style="text-align:right;"> -15.598 </td>
    <td style="text-align:right;"> 19.565 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> NKE </td>
-   <td style="text-align:right;"> 0.080 </td>
+   <td style="text-align:right;"> 0.079 </td>
    <td style="text-align:right;"> 1.899 </td>
    <td style="text-align:right;"> -19.813 </td>
    <td style="text-align:right;"> 15.531 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> PG </td>
-   <td style="text-align:right;"> 0.040 </td>
+   <td style="text-align:right;"> 0.039 </td>
    <td style="text-align:right;"> 1.337 </td>
    <td style="text-align:right;"> -30.236 </td>
    <td style="text-align:right;"> 12.009 </td>
@@ -530,7 +523,7 @@ all_returns %>%
   <tr>
    <td style="text-align:left;"> WBA </td>
    <td style="text-align:right;"> 0.033 </td>
-   <td style="text-align:right;"> 1.811 </td>
+   <td style="text-align:right;"> 1.810 </td>
    <td style="text-align:right;"> -14.987 </td>
    <td style="text-align:right;"> 16.636 </td>
   </tr>
@@ -661,7 +654,7 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008410193 0.031367483
+## [1] 0.008398776 0.031368732
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

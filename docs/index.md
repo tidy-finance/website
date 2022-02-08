@@ -3,8 +3,8 @@ title: "Tidy Finance with R"
 author: 
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Patrick Weiss, Vienna University of Economics and Business
-  - Stefan Voigt, University of Copenhagen
-date: "2022-02-06"
+  - Stefan Voigt, University of Copenhagen and Danish Finance Institute
+date: "2022-02-08"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -117,7 +117,7 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
 
 
 ```
-## Finding R package dependencies ... [13/19] [14/19] [15/19] [16/19] [17/19] [18/19] [19/19] Done!
+## Finding R package dependencies ... Done!
 ```
 
 <table>
