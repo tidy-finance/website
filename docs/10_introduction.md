@@ -203,7 +203,7 @@ returns %>%
    <td style="text-align:right;"> 0.002 </td>
    <td style="text-align:right;"> 1.684 </td>
    <td style="text-align:right;"> -6.116 </td>
-   <td style="text-align:right;"> 5.736 </td>
+   <td style="text-align:right;"> 5.735 </td>
   </tr>
   <tr>
    <td style="text-align:right;"> 2016 </td>
@@ -448,7 +448,7 @@ all_returns %>%
    <td style="text-align:right;"> 0.034 </td>
    <td style="text-align:right;"> 1.324 </td>
    <td style="text-align:right;"> -10.061 </td>
-   <td style="text-align:right;"> 13.880 </td>
+   <td style="text-align:right;"> 13.879 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> MCD </td>
@@ -532,7 +532,7 @@ all_returns %>%
    <td style="text-align:right;"> 0.031 </td>
    <td style="text-align:right;"> 1.491 </td>
    <td style="text-align:right;"> -10.183 </td>
-   <td style="text-align:right;"> 11.709 </td>
+   <td style="text-align:right;"> 11.708 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> AAPL </td>
@@ -654,7 +654,7 @@ c(t(mvp_weights) %*% mu, sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)) # Expec
 ```
 
 ```
-## [1] 0.008398776 0.031368732
+## [1] 0.008398773 0.031368737
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

@@ -117,7 +117,7 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
 
 
 ```
-## Finding R package dependencies ... Done!
+## Finding R package dependencies ... [12/19] [13/19] [14/19] [15/19] [16/19] [17/19] [18/19] [19/19] Done!
 ```
 
 <table>
