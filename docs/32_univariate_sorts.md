@@ -1,10 +1,10 @@
 # Univariate portfolio sorts
 
-In this chapter, we dive into portfolio sorts - one of the most widely used statistical methodologies in empirical asset pricing. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
+In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
 We start by introducing univariate portfolio sorts (which sort based on only one characteristic). Later, we tackle bivariate sorting. 
 
 A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$. Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
-The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable. 
+The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
 ## Data preparation
 
@@ -56,7 +56,6 @@ crsp_monthly
 ## 4  10000 1986-05-01     -0.228     0.0462       15.2
 ## # ... with 3,225,157 more rows
 ```
-
 
 ## Sorting by market beta
 
@@ -120,16 +119,16 @@ We compute the average return and the corresponding standard error to test wheth
 
 
 ```r
-fit <- lm(long_short ~ 1, data = beta_longshort)
-coeftest(fit, vcov = NeweyWest, lag = 6)
+model_fit <- lm(long_short ~ 1, data = beta_longshort)
+coeftest(model_fit, vcov = NeweyWest, lag = 6)
 ```
 
 ```
 ## 
 ## t test of coefficients:
 ## 
-##                Estimate  Std. Error t value Pr(>|t|)
-## (Intercept) -0.00016763  0.00100496 -0.1668   0.8676
+##              Estimate Std. Error t value Pr(>|t|)
+## (Intercept) -0.000168   0.001005   -0.17     0.87
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
@@ -251,8 +250,8 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 ## 
 ## t test of coefficients:
 ## 
-##               Estimate Std. Error t value Pr(>|t|)
-## (Intercept) 0.00073916 0.00248323  0.2977    0.766
+##             Estimate Std. Error t value Pr(>|t|)
+## (Intercept) 0.000739   0.002483     0.3     0.77
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor ([@Frazzini2014]). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
@@ -266,9 +265,9 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort), vcov = NeweyWes
 ## 
 ## t test of coefficients:
 ## 
-##               Estimate Std. Error t value Pr(>|t|)    
-## (Intercept) -0.0044070  0.0026183 -1.6832  0.09277 .  
-## mkt_excess   0.8943153  0.1021442  8.7554  < 2e-16 ***
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept) -0.00441    0.00262   -1.68    0.093 .  
+## mkt_excess   0.89432    0.10214    8.76   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```

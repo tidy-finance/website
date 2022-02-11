@@ -1,4 +1,6 @@
-# Option pricing via ML
+<!-- Naming: random forests & neural networks small cap -->
+
+# Option pricing via machine learning
 
 Machine learning (ML) is seen as a part of artificial intelligence. 
 ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
@@ -101,18 +103,18 @@ option_prices <- expand_grid(
   unnest(observed_price)
 ```
 
-The code above generates 1.574496\times 10^{6} random parameter constellations. For each of these values two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
+The code above generates 1.574\times 10^{6} random parameter constellations. For each of these values two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
 
-Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 3.1489\times 10^{4} observations and is therefore relatively small.
+Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 3.149\times 10^{4} observations and is therefore relatively small.
 In order to keep the analysis reproducible, we use `set.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 
 ```r
-set.seed(42809)
+set.seed(420)
 split <- initial_split(option_prices, prop = 1 / 100)
 ```
 
-We process the training dataset further before we fit the different ML models. We define a `recipe` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in *black_scholes*) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
+We process the training dataset further before we fit the different ML models. We define a `recipe` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
 
 
 ```r
@@ -123,7 +125,7 @@ rec <- recipe(observed_price ~ .,
   step_normalize(all_predictors())
 ```
 
-### Single layer networks and Random forests
+### Single layer networks and random forests
 
 Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 20 hidden units. We set the number of training iterations to `epochs = 75`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
 
@@ -187,23 +189,22 @@ model
 ```
 
 ```
-## Model
 ## Model: "sequential_1"
-## ________________________________________________________________________________
-## Layer (type)                        Output Shape                    Param #     
-## ================================================================================
-## dense_5 (Dense)                     (None, 20)                      120         
-## ________________________________________________________________________________
-## dense_4 (Dense)                     (None, 20)                      420         
-## ________________________________________________________________________________
-## dense_3 (Dense)                     (None, 20)                      420         
-## ________________________________________________________________________________
-## dense_2 (Dense)                     (None, 1)                       21          
-## ================================================================================
+## _________________________________________________________________________________
+## Layer (type)                        Output Shape                    Param #      
+## =================================================================================
+## dense_5 (Dense)                     (None, 20)                      120          
+## _________________________________________________________________________________
+## dense_4 (Dense)                     (None, 20)                      420          
+## _________________________________________________________________________________
+## dense_3 (Dense)                     (None, 20)                      420          
+## _________________________________________________________________________________
+## dense_2 (Dense)                     (None, 1)                       21           
+## =================================================================================
 ## Total params: 981
 ## Trainable params: 981
 ## Non-trainable params: 0
-## ________________________________________________________________________________
+## _________________________________________________________________________________
 ```
 
 To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the **raw** data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) %>% select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!

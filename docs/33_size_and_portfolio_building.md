@@ -1,4 +1,4 @@
-# Firms size and portfolio building
+# Size sorts and p-hacking
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor - the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, [@Fama1993] include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
@@ -130,12 +130,12 @@ crsp_monthly %>%
 
 ```
 ## # A tibble: 5 x 11
-##   exchange   mean     sd     min    q05    q25    q50    q75    q95    max     n
-##   <chr>     <dbl>  <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-## 1 AMEX       283.  1298.  6.04e0 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
-## 2 NASDAQ    8041. 74386.  4.65e0 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-## 3 NYSE     16416. 43115.  5.35e0 1.54e2 9.17e2 3.34e3 12022. 74826. 4.14e5  1245
-## 4 Other    10061.    NA   1.01e4 1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
+##   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
+##   <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
+## 1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
+## 2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
+## 3 NYSE     16416. 43115.     5.35 1.54e2 9.17e2 3.34e3 12022. 74826. 4.14e5  1245
+## 4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
 ## # ... with 1 more row
 ```
 
@@ -287,12 +287,12 @@ p_hacking_setup %>%
 
 ```
 ## # A tibble: 48 x 5
-##   n_portfolios exchanges        value_weighted data                 size_premium
-##          <dbl> <chr>            <lgl>          <chr>                       <dbl>
-## 1           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0184
-## 2           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0180
-## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"             0.0162
-## 4           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% f~       0.0139
+##   n_portfolios exchanges        value_weighted data                  size_premium
+##          <dbl> <chr>            <lgl>          <chr>                        <dbl>
+## 1           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% fi~       0.0184
+## 2           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% fi~       0.0180
+## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"              0.0162
+## 4           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly %>% fi~       0.0139
 ## # ... with 44 more rows
 ```
 

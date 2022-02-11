@@ -1,3 +1,7 @@
+<!-- Split up crsp_monthly and migrate comments to text -->
+<!-- Migrate compustat comments to text -->
+<!-- Exercise: download fama-french data from their website & wrds and validate that you get the same result -->
+
 # Accessing & managing financial data
 
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is familiar with storing data in various data formats like CSV, XLS, XLSX or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
@@ -92,10 +96,9 @@ factors_q_monthly <- read_csv("http://global-q.org/uploads/1/2/2/6/122679606/q5_
   filter(month >= start_date & month <= end_date)
 ```
 
-
 ## Macroeconomic predictors
 
-Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. [@Goyal2009] comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2020 on [Amit Goyal's website](https://sites.google.com/view/agoyal145). Since the data is an .xslx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file and `googledrive` for the Google drive connection.
+Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. [@Goyal2008] comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2020 on [Amit Goyal's website](https://sites.google.com/view/agoyal145). Since the data is an .xslx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file and `googledrive` for the Google drive connection.
 
 
 ```r
@@ -324,12 +327,12 @@ msenames_db
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
 ## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam  shrcls
-##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>   <chr> 
-## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMU~ A     
-## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT ~ <NA>  
+##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam   shrcls
+##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>    <chr> 
+## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
+## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
+## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
+## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F~ <NA>  
 ## # ... with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
 ## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
@@ -363,18 +366,17 @@ We use the three remote tables to fetch the data we want to put into our local d
 crsp_monthly <- msf_db %>%
   # Keep only data in time window of interest
   filter(date >= start_date & date <= end_date) %>%
-  # Keep only relevant share codes
+  # Keep only US listed stocks
   inner_join(msenames_db %>%
-    filter(shrcd %in% c(10, 11)) %>% # US listed stocks
+    filter(shrcd %in% c(10, 11)) %>% 
     select(permno, exchcd, siccd, namedt, nameendt), by = c("permno")) %>%
-  # Check that the information is valid
+  # Keep only months with valid permno-specific information
   filter(date >= namedt & date <= nameendt) %>%
   # Add delisting information (i.e. delisting reason and return) by month
   mutate(month = floor_date(date, "month")) %>%
   left_join(msedelist_db %>%
     select(permno, dlstdt, dlret, dlstcd) %>%
     mutate(month = floor_date(dlstdt, "month")), by = c("permno", "month")) %>%
-  # Keep only variables of interest
   select(
     permno, # Security identifier
     date, # Date of the observation
@@ -602,8 +604,7 @@ crsp_monthly_industry <- crsp_monthly %>%
     securities = n_distinct(permno),
     mktcap = sum(mktcap) / mean(cpi),
     .groups = "drop"
-  ) %>%
-  ungroup()
+  )
 
 crsp_monthly_industry %>%
   ggplot(aes(x = month, y = securities, color = industry, linetype = industry)) +
@@ -914,5 +915,5 @@ dbListObjects(wrds)
 1. Compute `mkt_cap_lag` using `lag(mktcap)` rather than joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are they different?
 1. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?
 1. `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by *month* of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
-1. Go back to the original Compustat data ìn `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
+1. Go back to the original Compustat data in `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
 1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, used the matched sample to plot book equity against market capitalization. How are these two variables related?

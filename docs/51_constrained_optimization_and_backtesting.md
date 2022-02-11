@@ -109,8 +109,7 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.4310531  0.2701734 -1.3024131  0.3742672  0.3093601 -0.1521489
-##  [7]  0.5374542  0.4712162 -0.1671074 -0.7718549
+##  [1]  1.431  0.270 -1.302  0.374  0.309 -0.152  0.537  0.471 -0.167 -0.772
 ```
 
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyse the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
@@ -200,8 +199,8 @@ w_no_short_sale$solution
 ```
 
 ```
-##  [1]  6.374457e-01 -2.798509e-17  1.763988e-17  0.000000e+00 -8.223748e-18
-##  [6]  5.065146e-17  9.838209e-02  2.641722e-01 -2.356495e-19  0.000000e+00
+##  [1]  6.37e-01 -2.80e-17  1.76e-17  0.00e+00 -8.22e-18  5.07e-17  9.84e-02
+##  [8]  2.64e-01 -2.36e-19  0.00e+00
 ```
 
 `solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on `solve.QP()`. Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -223,8 +222,8 @@ w_reg_t$par
 ```
 
 ```
-##  [1]  2.389244e-01 -2.406687e-03 -4.569721e-05  7.799998e-02  8.187919e-02
-##  [6]  7.383231e-02  1.837723e-01  2.358022e-01  1.205648e-01 -1.032275e-02
+##  [1]  2.39e-01 -2.41e-03 -4.57e-05  7.80e-02  8.19e-02  7.38e-02  1.84e-01
+##  [8]  2.36e-01  1.21e-01 -1.03e-02
 ```
 
 The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints and the Regulation-T constrained portfolio.
@@ -324,7 +323,7 @@ The following code chunk performs rolling-window estimation. In each period, the
 ```r
 for(p in 1:periods){
   
-  returns_window <- industry_returns[p : (p + window_length - 1),] # the last X returns available up to date t
+  returns_window <- industry_returns[p : (p + window_length - 1), ]
   next_return <- industry_returns[p + window_length, ] 
   
   Sigma <- cov(returns_window) 
@@ -397,12 +396,12 @@ The results clearly speak against mean-variance optimization. Turnover is huge w
 1. We argue that an investor with a quadratic utility function with certainty equivalent $$\max_w CE(w) = \omega'\mu - \frac{\gamma}{2} \omega'\Sigma \omega \text{ s.t. } \iota'\omega = 1$$
 faces an equivalent optimization problem to a framework where portfolio weights are chosen with the aim to minimize volatility given a pre-specified level or expected returns
 $$\min_w \omega'\Sigma \omega \text{ s.t. } \omega'\mu = \bar\mu \text{ and } \iota'\omega = 1. $$ Proof that there is an equivalence between the optimal portfolio weights in both cases. 
-2. Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter $\gamma$ 
+1. Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter $\gamma$ 
 $$\begin{aligned}
 \omega_{t+1} ^* :=&  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \\
 \end{aligned}$$
 where $\Sigma$ and $\mu$ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing **and** proportional to stock illiquidity such that 
 $$\nu_t\left(\omega, \mathbf{\beta}\right) := \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right)$$ where $B = \text{diag}(ill_1, \ldots, ill_N)$ is a diagonal matrix where $ill_1, \ldots, ill_N$. Derive a closed-form solution for the mean-variance efficient portfolio $\omega_{t+1} ^*$ based on the transaction cost specification above. Discuss the effect of illiquidity $ill_i$ on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision. 
-3. Use the solution from the previous exercise to update the function `compute_efficient_weight` such that you can compute optimal weights conditional on a matrix $B$ with illiquidity measures. 
-4. Illustrate the evolution of the *optimal* weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.
-5. Is it always optimal to choose the same $\beta$ in the optimization problem than the value used in evaluating the portfolio performance? In other words: Can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed $\beta$ values.
+1. Use the solution from the previous exercise to update the function `compute_efficient_weight` such that you can compute optimal weights conditional on a matrix $B$ with illiquidity measures. 
+1. Illustrate the evolution of the *optimal* weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.
+1. Is it always optimal to choose the same $\beta$ in the optimization problem than the value used in evaluating the portfolio performance? In other words: Can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed $\beta$ values.

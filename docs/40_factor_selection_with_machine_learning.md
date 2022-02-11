@@ -1,12 +1,14 @@
+<!-- Ensure ML / Machine Learning consistency with 41 -->
+
 # Factor selection via machine learning
 
-The aim of this section is twofold: From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the stock beta. Such findings question the usefulness of the Capital Asset Pricing Model. In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). Therefore, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. 
+The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the stock beta. Such findings question the usefulness of the Capital Asset Pricing Model. In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). Therefore, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. 
 
 We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions to identify macro-economic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
 ## Brief theoretical background
 
-This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of machine learning methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow. 
+This is a book about *doing* empirical work in a tidy manner and we refer to any of the many excellent textbook treatments of machine learning methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow. 
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
@@ -46,12 +48,11 @@ To get started, we load the required packages and data. The main focus is on the
 ```r
 library(RSQLite)
 library(tidyverse)
-library(tidymodels) # For ML applications
+library(tidymodels) 
 library(furrr) 
-library(glmnet) # For penalized regressions
+library(glmnet)
 library(broom)
 library(timetk)
-library(kableExtra)
 library(scales)
 ```
 
@@ -102,7 +103,7 @@ data <- industries_ff_monthly %>%
   left_join(macro_predictors, by = "month") %>%
   mutate(
     ret = ret - factor_ff_rf
-  ) %>% # Compute excess returns
+  ) %>% 
   select(month, industry, ret, everything()) %>%
   drop_na()
 ```
@@ -120,106 +121,19 @@ data %>%
     min = min(ret),
     median = median(ret),
     max = max(ret)
-  ) %>%
-  kable(caption = "Summary statistics: Monthly industry excess returns in percent.",
-        digits = 3)
+  )
 ```
 
-<table>
-<caption>(\#tab:industryreturns)Summary statistics: Monthly industry excess returns in percent.</caption>
- <thead>
-  <tr>
-   <th style="text-align:left;"> industry </th>
-   <th style="text-align:right;"> mean </th>
-   <th style="text-align:right;"> sd </th>
-   <th style="text-align:right;"> min </th>
-   <th style="text-align:right;"> median </th>
-   <th style="text-align:right;"> max </th>
-  </tr>
- </thead>
-<tbody>
-  <tr>
-   <td style="text-align:left;"> NoDur </td>
-   <td style="text-align:right;"> 0.700 </td>
-   <td style="text-align:right;"> 18.27 </td>
-   <td style="text-align:right;"> -21.62 </td>
-   <td style="text-align:right;"> 0.77 </td>
-   <td style="text-align:right;"> 18.27 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Durbl </td>
-   <td style="text-align:right;"> 0.635 </td>
-   <td style="text-align:right;"> 45.26 </td>
-   <td style="text-align:right;"> -33.01 </td>
-   <td style="text-align:right;"> 0.54 </td>
-   <td style="text-align:right;"> 45.26 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Manuf </td>
-   <td style="text-align:right;"> 0.613 </td>
-   <td style="text-align:right;"> 17.32 </td>
-   <td style="text-align:right;"> -27.95 </td>
-   <td style="text-align:right;"> 0.91 </td>
-   <td style="text-align:right;"> 17.32 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Enrgy </td>
-   <td style="text-align:right;"> 0.550 </td>
-   <td style="text-align:right;"> 32.38 </td>
-   <td style="text-align:right;"> -34.61 </td>
-   <td style="text-align:right;"> 0.60 </td>
-   <td style="text-align:right;"> 32.38 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> HiTec </td>
-   <td style="text-align:right;"> 0.682 </td>
-   <td style="text-align:right;"> 20.32 </td>
-   <td style="text-align:right;"> -26.52 </td>
-   <td style="text-align:right;"> 0.82 </td>
-   <td style="text-align:right;"> 20.32 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Telcm </td>
-   <td style="text-align:right;"> 0.543 </td>
-   <td style="text-align:right;"> 21.20 </td>
-   <td style="text-align:right;"> -16.30 </td>
-   <td style="text-align:right;"> 0.72 </td>
-   <td style="text-align:right;"> 21.20 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Shops </td>
-   <td style="text-align:right;"> 0.746 </td>
-   <td style="text-align:right;"> 25.41 </td>
-   <td style="text-align:right;"> -28.66 </td>
-   <td style="text-align:right;"> 0.82 </td>
-   <td style="text-align:right;"> 25.41 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Hlth </td>
-   <td style="text-align:right;"> 0.702 </td>
-   <td style="text-align:right;"> 29.01 </td>
-   <td style="text-align:right;"> -21.05 </td>
-   <td style="text-align:right;"> 0.73 </td>
-   <td style="text-align:right;"> 29.01 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Utils </td>
-   <td style="text-align:right;"> 0.481 </td>
-   <td style="text-align:right;"> 18.26 </td>
-   <td style="text-align:right;"> -13.13 </td>
-   <td style="text-align:right;"> 0.65 </td>
-   <td style="text-align:right;"> 18.26 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> Other </td>
-   <td style="text-align:right;"> 0.565 </td>
-   <td style="text-align:right;"> 19.73 </td>
-   <td style="text-align:right;"> -24.20 </td>
-   <td style="text-align:right;"> 1.02 </td>
-   <td style="text-align:right;"> 19.73 </td>
-  </tr>
-</tbody>
-</table>
+```
+## # A tibble: 10 x 6
+##   industry  mean    sd   min median   max
+##   <fct>    <dbl> <dbl> <dbl>  <dbl> <dbl>
+## 1 NoDur    0.700  18.3 -21.6   0.77  18.3
+## 2 Durbl    0.635  45.3 -33.0   0.54  45.3
+## 3 Manuf    0.613  17.3 -28.0   0.91  17.3
+## 4 Enrgy    0.550  32.4 -34.6   0.6   32.4
+## # ... with 6 more rows
+```
 
 ## The tidymodels workflow
 
@@ -261,7 +175,7 @@ Recipes help you pre-process your data before training your model. Recipes are a
 
 ```r
 rec <- recipe(ret ~ ., data = training(split)) %>%
-  step_rm(month) %>% # remove date variable
+  step_rm(month) %>% 
   step_interact(terms = ~ contains("factor"):contains("macro")) %>% 
   step_normalize(all_predictors()) %>%
   step_center(ret, skip = TRUE)
@@ -326,11 +240,11 @@ lm_fit
 ```
 
 ```
-## == Workflow ====================================================================
+## == Workflow =====================================================================
 ## Preprocessor: Recipe
 ## Model: linear_reg()
 ## 
-## -- Preprocessor ----------------------------------------------------------------
+## -- Preprocessor -----------------------------------------------------------------
 ## 4 Recipe Steps
 ## 
 ## * step_rm()
@@ -338,7 +252,7 @@ lm_fit
 ## * step_normalize()
 ## * step_center()
 ## 
-## -- Model -----------------------------------------------------------------------
+## -- Model ------------------------------------------------------------------------
 ## Linear Regression Model Specification (regression)
 ## 
 ## Main Arguments:
@@ -439,7 +353,7 @@ bind_rows(
   scale_x_log10() +
   facet_wrap(~Model, scales = "free_x") +
   labs(
-    x = "Lambda", y = "",
+    x = "Lambda", y = NULL,
     title = "Estimated Coefficients paths as a function of the penalty factor"
   ) +
   theme_minimal() +
@@ -584,10 +498,12 @@ select_variables <- function(input) {
     )
 }
 
-plan(multisession, workers = availableCores()) # Parallelization
+# Parallelization
+plan(multisession, workers = availableCores()) 
 
+# Computation by industry
 selected_factors <- data %>%
-  nest(data = -industry) %>% # Computation by industry
+  nest(data = -industry) %>% 
   mutate(selected_variables = future_map(data, select_variables,
     .options = furrr_options(seed = TRUE)
   ))
@@ -631,7 +547,7 @@ selected_factors %>%
 
 <img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
 
-The heat map conveys two main insights: First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
+The heat map conveys two main insights. First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
 
 ## Exercises 
 

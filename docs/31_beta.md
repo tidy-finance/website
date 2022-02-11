@@ -34,6 +34,18 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 crsp_monthly <- crsp_monthly %>%
   left_join(factors_ff_monthly, by = "month") %>%
   select(permno, month, industry, ret_excess, mkt_excess)
+crsp_monthly
+```
+
+```
+## # A tibble: 3,225,161 x 5
+##   permno month      industry      ret_excess mkt_excess
+##    <dbl> <date>     <chr>              <dbl>      <dbl>
+## 1  10000 1986-02-01 Manufacturing     -0.262     0.0713
+## 2  10000 1986-03-01 Manufacturing      0.359     0.0488
+## 3  10000 1986-04-01 Manufacturing     -0.104    -0.0131
+## 4  10000 1986-05-01 Manufacturing     -0.228     0.0462
+## # ... with 3,225,157 more rows
 ```
 
 To estimate the CAPM equation 
@@ -60,19 +72,19 @@ summary(fit)
 ##     filter(permno == "14593"))
 ## 
 ## Residuals:
-##      Min       1Q   Median       3Q      Max 
-## -0.51670 -0.06098  0.00090  0.06426  0.39402 
+##     Min      1Q  Median      3Q     Max 
+## -0.5167 -0.0610  0.0009  0.0643  0.3940 
 ## 
 ## Coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept) 0.010512   0.005316   1.977   0.0486 *  
-## mkt_excess  1.400852   0.117479  11.924   <2e-16 ***
+## (Intercept)  0.01051    0.00532    1.98    0.049 *  
+## mkt_excess   1.40085    0.11748   11.92   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## Residual standard error: 0.1151 on 478 degrees of freedom
-## Multiple R-squared:  0.2293,	Adjusted R-squared:  0.2277 
-## F-statistic: 142.2 on 1 and 478 DF,  p-value: < 2.2e-16
+## Residual standard error: 0.115 on 478 degrees of freedom
+## Multiple R-squared:  0.229,	Adjusted R-squared:  0.228 
+## F-statistic:  142 on 1 and 478 DF,  p-value: <2e-16
 ```
 
 `lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns an overview of the estimated parameters. `coefficients(fit)` would return only the estimated coefficients. The output above indicates that Apple moves excessively with the market as the estimated $\beta_i$ is above one ($\hat\beta_i$ = 1.4). 
@@ -473,6 +485,6 @@ beta %>%
 
 ```
 ##              beta_daily beta_monthly
-## beta_daily    1.0000000    0.3221471
-## beta_monthly  0.3221471    1.0000000
+## beta_daily        1.000        0.322
+## beta_monthly      0.322        1.000
 ```

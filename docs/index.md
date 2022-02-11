@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Patrick Weiss, Vienna University of Economics and Business
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
-date: "2022-02-08"
+date: "2022-02-11"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -12,12 +12,27 @@ bibliography: [book.bib]
 biblio-style: apalike
 link-citations: yes
 github-repo: voigtstefan/tidy_finance
-description: "Tidy Finance with R"
+url: https://www.tidy-finance.org
+cover-image: cover.jpg
+description: |
+  Tidy Finance with R.
 ---
 
 # Welcome {.unnumbered}
 
-This is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release. We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. 
+    
+[![Buy hardcover version](cover.jpg){.cover width="250"}]()
+This website is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release. We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. 
+
+## Authors {.unnumbered}
+
+This book is the result of a joint effort of three people (in alphabetical order of the last name):
+
+* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/). Christoph is responsible for product planning, execution and monitoring and also manages a team of R data scientists to analyze user behavior or develop new products.
+* [Stefan Voigt](https://www.wikifolio.com/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, market fragmentation, high-frequency trading and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
+* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the interssection between asset pricing and corporate finance. 
+
+We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) where each of us graduated with a different focus, but a shared passion: coding with R. After years of painful trial and error, we decided to share our learnings with the public. 
 
 ## License {.unnumbered}
 
@@ -29,16 +44,18 @@ The code samples in this book are licensed under [Creative Commons CC0 1.0 Unive
 
 ## Why does this book exist? {.unnumbered}
 
-Finance is an exciting area of economic research with a broad range of applied and academic empirical applications. As a student or data analyst, you are typically exposed to different types of financial data, ranging from asset prices, accounting data, trading decisions to all kinds of other data. Despite the vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key insights of financial economics. The lack of transparent codes not only leads to numerous replication efforts (and their failures), but is also a waste of resources on problems that have already been solved by countless others. 
+Finance is an exciting area of economic research with a broad range of applied and academic empirical applications. As a student, researcher or data analyst, you are typically exposed to different types of financial data, ranging from asset prices, accounting data or transaction histories to all kinds of other data. 
+Despite the vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. 
+As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key insights of financial economics. The lack of transparent codes not only leads to numerous replication efforts (and their failures), but is also a waste of resources on problems that have already been solved by countless others. 
 
-This book aims to lift this curtain on code in finance by providing a fully transparent code base for many common financial applications. In addition, we hope to inspire others in sharing their code publicly and ensure reproducibility of findings. 
+This book aims to lift this curtain on reproducible finance by providing a fully transparent code base for many common financial applications. In addition, we hope to inspire others in sharing their code publicly and ensure reproducibility of future findings. 
 
 ## Who should read this book? {.unnumbered}
 
 We write this book  for three audiences:
 
-* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. 
-* Instructors who look for materials to teach empirical finance courses.  
+* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The structure of the book is kept simple enough such that the material should suffice for self-study purposes.  
+* Instructors who look for materials to teach empirical finance courses. We provide plenty of examples and (hopefully) intuitive explanations which can easily be adjusted or expanded.   
 * Data analysts or statisticians who want to study financial problems on their own. 
 
 ## What will you learn? {.unnumbered}
@@ -64,16 +81,16 @@ We believe that R is among best choices for a programming language in the area o
 - R is free and open source, so you can use it in academic and professional contexts
 - A diverse and active online community working on a broad range of tools
 - A massive set of actively maintained packages for all kinds of applications, e.g. data manipulation, visualization, machine learning, etc.
-- Powerful tools for communication, e.g. Rmarkdown, shiny
+- Powerful tools for communication, e.g. Rmarkdown and shiny
 - RStudio as one of the best development environments for interactive data analysis
 - Strong foundation of functional programming
 - Smooth integration with other programming languages, e.g., SQL, Python, C, C++, Fortran, etc.
 
-For more information, we refer to  [@Wickham2019](https://adv-r.hadley.nz/introduction.html).
+For more information, we refer to @Wickham2019.
 
 ## Why tidy? {.unnumbered}
 
-As you start working with data, you quickly realize that you spend a lot of time reading, cleaning and transforming your data. In fact, it is often said that more than 80% of data analysis is spent on preparing data. By **tidying data**, we want to structure data sets to facilitate further analyses. As [@Wickham2014] puts it: 
+As you start working with data, you quickly realize that you spend a lot of time reading, cleaning and transforming your data. In fact, it is often said that more than 80% of data analysis is spent on preparing data. By *tidying data*, we want to structure data sets to facilitate further analyses. As @Wickham2014 puts it: 
 
 >[T]idy datasets are all alike but every messy dataset is messy in its own way. Tidy datasets provide a standardized way to link the structure of a dataset (its physical layout) with its semantics (its meaning). 
 
@@ -92,7 +109,7 @@ In addition to the data layer, there are also tidy coding principles outlined in
 3. Embrace functional programming.
 4. Design for humans.
 
-In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) ([@Wickham2019]). The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing, wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc. 
+In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing, wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc. 
 
 ## Prerequisites {.unnumbered}
 
@@ -102,12 +119,13 @@ Before we continue, make sure you have all the software you need for this book:
 - Open RStudio and [install the `tidyverse`](https://tidyverse.tidyverse.org/). Not sure how it works? You find helpful information on how to install packages in this [brief summary](https://rstudio-education.github.io/hopr/packages2.html). 
 
 If you are new to R, we recommend to start with the following sources:
+
 - A very gentle and good introduction into the workings of R can be found [here](https://rstudio-education.github.io/hopr/project-1-weighted-dice.html). Once you are done with setting up R on your machine, try to follow the "weighted dice project".
 - The main book on the `tidyverse` is available online and for free: [R for Data Science](https://r4ds.had.co.nz/introduction.html) by Hadley Wickham and Garrett Grolemund explains the majority of the tools we use in this book. 
 
-## Acknowledgements {.unnumbered}
+<!-- ## Acknowledgements {.unnumbered} -->
 
-...
+<!-- ... -->
 
 ## Colophon {.unnumbered}
 
@@ -115,10 +133,6 @@ This book was written in RStudio using bookdown. The website is hosted with gith
 
 This version of the book was built with R version 4.1.2 (2021-11-01) and the following packages:
 
-
-```
-## Finding R package dependencies ... [12/19] [13/19] [14/19] [15/19] [16/19] [17/19] [18/19] [19/19] Done!
-```
 
 <table>
  <thead>
@@ -238,10 +252,6 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> timetk </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> xfun </td>
    <td style="text-align:left;">  </td>
   </tr>
 </tbody>

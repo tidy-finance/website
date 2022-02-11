@@ -1,3 +1,7 @@
+<!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
+<!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
+<!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
+
 # Replicating Fama & French factors
 
 The Fama and French three-factor model (see [@Fama1993]) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We did introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. While we demonstrated the main idea of portfolio sorts, we also want to show how to replicate these significant factors. However, we do not aim at a perfect replication but want to show the main ideas.
@@ -56,11 +60,11 @@ ff_me <- data_ff %>%
 
 ff_me_dec <- data_ff %>%
   filter(month(month) == 12) %>%
-  mutate(sorting_date = ymd(paste0(year(month) + 1, "07-01)"))) %>%
+  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) %>%
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
 ff_bm <- be %>%
-  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "07-01"))) %>%
+  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) %>%
   select(gvkey, sorting_date, bm_be = be) %>%
   drop_na() %>%
   inner_join(ff_me_dec, by = c("gvkey", "sorting_date")) %>%
@@ -73,63 +77,78 @@ ff_variables <- ff_me %>%
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
-## Breakpoints
+## Portfolio sorts
 
-Before we attach the sorting variables to our returns, we compute the breakpoints separately. Matching everything before computing the breakpoints would be possible but less efficient. Regarding the other choice variables, Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. Additionally, we perform an `inner_join()`  with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step. 
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function, because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios` we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()`  with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step. 
 
 
 ```r
-ff_breakpoints <- ff_variables %>%
+assign_portfolio <- function(data, var, percentiles) {
+  breakpoints <- data %>%
+    filter(exchange == "NYSE") %>%
+    summarize(breakpoint = quantile(
+      {{ var }},
+      probs = {{ percentiles }},
+      na.rm = TRUE
+    )) %>%
+    pull(breakpoint) %>%
+    as.numeric()
+
+  data %>%
+    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+    pull(portfolio)
+}
+
+ff_portfolios <- ff_variables %>%
   inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) %>%
-  filter(exchange == "NYSE") %>%
   group_by(sorting_date) %>%
-  summarise(ff_me_50 = median(ff_me),
-            ff_bm_30 = quantile(ff_bm, 0.3, names = FALSE),
-            ff_bm_70 = quantile(ff_bm, 0.7, names = FALSE))
+  mutate(
+    portfolio_me = assign_portfolio(
+      data = cur_data(),
+      var = ff_me,
+      percentiles = c(0, 0.5, 1)
+    ),
+    portfolio_bm = assign_portfolio(
+      data = cur_data(),
+      var = ff_bm,
+      percentiles = c(0, 0.3, 0.7, 1)
+    )) %>%
+  select(permno, sorting_date, portfolio_me, portfolio_bm)
 ```
 
-Next, we merge the June breakpoints to the return data. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later. Doing so ensures that we form portfolios based on the information assigned to June of year $t$. In principle, we will still form portfolios on a monthly basis, but this is only incorrect to a few stocks that drop out during the year.
+Next, we merge the portfolios to the return data of the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 
 ```r
 ff_portfolios <- data_ff %>%
   mutate(sorting_date = case_when(month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
                                   month(month) >= 7 ~ ymd(paste0(year(month), "0701")))) %>%
-  inner_join(ff_variables, by = c("permno", "sorting_date")) %>%
-  left_join(ff_breakpoints, by = "sorting_date")
+  inner_join(ff_portfolios, by = c("permno", "sorting_date"))
 ```
+
 
 ## Fama and French factor returns
 
-We can now use our returns alongside the breakpoints to assign the portfolios. We do so slightly differently by using the `case_when()`-function. We assign the portfolios by adding numbers that result in the respective portfolio. The base portfolio of small growth stocks gets the value of 11. We add 10 for large firms and 1 and 2 for higher book-to-market ratios. In the end, we add the letter p to indicate that these are portfolio numbers. Overall, this procedure is potentially less intuitive but suitable for this exercise given the low number of portfolios. 
-
-After forming the monthly value-weighted return per portfolio, we use the function `pivot_wider()`. This function is useful in various scenarios. In our case, we use it to transform the data containing portfolio-months in each row into a data frame with one row for each month and columns that indicate the portfolio returns. The argument `id_cols` defines how to identify the new observations uniquely, `names_from` indicates which column of the old structure defines the new set's column names, and `values_from` gives the column that contains the data to be stored in the created columns. 
-
-Finally, we can then compute the equal-weighted monthly returns of the size and value factors. The size premium results from going long the three small portfolios (i.e., portfolios 11, 12, and 13) and shorting large portfolios (i.e., portfolios 21, 22, and 23). The value premium is achieved by investing in the two high book-to-market portfolios (i.e., portfolios 13 and 23) and shorting the growth portfolios (i.e., portfolios 11 and 21).
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., *SMB*), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., *HML*), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.
 
 
 ```r
 ff_factors <- ff_portfolios %>%
-  mutate(portfolio = 10,
-         portfolio = case_when(ff_me < ff_me_50 ~ portfolio,
-                               ff_me >= ff_me_50 ~ portfolio + 10),
-         portfolio = case_when(ff_bm < ff_bm_30 ~ portfolio + 1,
-                               ff_bm >= ff_bm_30 & ff_bm < ff_bm_70 ~ portfolio + 2,
-                               ff_bm >= ff_bm_70 ~ portfolio + 3),
-         portfolio = paste0("p", as.character(portfolio))) %>%
+  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
   group_by(portfolio, month) %>%
-  summarise(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop") %>%
-  pivot_wider(id_cols = month, names_from = portfolio, values_from = ret) %>%
-  mutate(ff_SMB = (p11 + p12 + p13) / 3 - (p21 + p22 + p23) / 3,
-         ff_HML = (p13 + p23) / 2 - (p11 + p21) / 2) %>%
-  select(month, ff_SMB, ff_HML)
+  summarise(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
+            portfolio_me = unique(portfolio_me),
+            portfolio_bm = unique(portfolio_bm)) %>%
+  group_by(month) %>%
+  summarise(ff_SMB = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
+            ff_HML = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1]))
 ```
 
-## Correlation tests
 
-In the last step, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then; how close did we get? We answer this question by looking at the two time-series estimates in a correlation analysis using the function `cor.test()` and a test of means using the function `t.test()`.
+## Replication evaluation
 
-We can see that we reject the null hypothesis for both premiums in the correlation tests, i.e., the hypothesis that the time series are uncorrelated is rejected. Moreover, we cannot reject the hypothesis that the means of the Fama and French factors and our replication results are different. Hence, we can conclude that we did a relatively good job in replicating their premiums.
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then; how close did we get? We answer this question by looking at the two time-series estimates in a correlation analysis using the function `cor.test()` and a test of means using the function `t.test()`.
+
 
 
 ```r
@@ -146,13 +165,13 @@ cor.test(test$ff_SMB, test$smb)
 ## 	Pearson's product-moment correlation
 ## 
 ## data:  test$ff_SMB and test$smb
-## t = 226.3, df = 712, p-value < 2.2e-16
+## t = 226, df = 712, p-value <2e-16
 ## alternative hypothesis: true correlation is not equal to 0
 ## 95 percent confidence interval:
-##  0.992035 0.994058
+##  0.992 0.994
 ## sample estimates:
-##       cor 
-## 0.9931202
+##   cor 
+## 0.993
 ```
 
 ```r
@@ -164,14 +183,16 @@ cor.test(test$ff_HML, test$hml)
 ## 	Pearson's product-moment correlation
 ## 
 ## data:  test$ff_HML and test$hml
-## t = 130.06, df = 712, p-value < 2.2e-16
+## t = 130, df = 712, p-value <2e-16
 ## alternative hypothesis: true correlation is not equal to 0
 ## 95 percent confidence interval:
-##  0.9764032 0.9823611
+##  0.976 0.982
 ## sample estimates:
-##       cor 
-## 0.9795963
+##  cor 
+## 0.98
 ```
+
+
 
 ```r
 t.test(test$ff_SMB, test$smb) 
@@ -182,13 +203,13 @@ t.test(test$ff_SMB, test$smb)
 ## 	Welch Two Sample t-test
 ## 
 ## data:  test$ff_SMB and test$smb
-## t = 0.099814, df = 1426, p-value = 0.9205
+## t = 0.09, df = 1426, p-value = 0.9
 ## alternative hypothesis: true difference in means is not equal to 0
 ## 95 percent confidence interval:
-##  -0.002972962  0.003291730
+##  -0.00298  0.00328
 ## sample estimates:
-##   mean of x   mean of y 
-## 0.001970168 0.001810784
+## mean of x mean of y 
+##   0.00196   0.00181
 ```
 
 ```r
@@ -200,11 +221,12 @@ t.test(test$ff_HML, test$hml)
 ## 	Welch Two Sample t-test
 ## 
 ## data:  test$ff_HML and test$hml
-## t = -0.11764, df = 1425.4, p-value = 0.9064
+## t = -0.1, df = 1425, p-value = 0.9
 ## alternative hypothesis: true difference in means is not equal to 0
 ## 95 percent confidence interval:
-##  -0.003151381  0.002794798
+##  -0.00316  0.00278
 ## sample estimates:
-##   mean of x   mean of y 
-## 0.002478011 0.002656303
+## mean of x mean of y 
+##   0.00247   0.00266
 ```
+We can see that we reject the null hypothesis for both premiums in the correlation tests, i.e., the hypothesis that the time series are uncorrelated is rejected. Moreover, we cannot reject the hypothesis that the means of the Fama and French factors and our replication results are different. Hence, we can conclude that we did a relatively good job in replicating their premiums.
