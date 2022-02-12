@@ -23,14 +23,14 @@ prices
 ```
 
 ```
-## # A tibble: 2,545 x 8
+## # A tibble: 2,546 x 8
 ##   symbol date        open  high   low close    volume adjusted
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
 ## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
 ## 2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
 ## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
 ## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
-## # ... with 2,541 more rows
+## # ... with 2,542 more rows
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of shares), and the *adjusted* price in USD. Notice that the adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions do affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -65,14 +65,14 @@ returns
 ```
 
 ```
-## # A tibble: 2,545 x 3
+## # A tibble: 2,546 x 3
 ##   symbol date            ret
 ##   <chr>  <date>        <dbl>
 ## 1 AAPL   2012-01-03 NA      
 ## 2 AAPL   2012-01-04  0.00537
 ## 3 AAPL   2012-01-05  0.0111 
 ## 4 AAPL   2012-01-06  0.0105 
-## # ... with 2,541 more rows
+## # ... with 2,542 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date - otherwise, `lag` would be meaningless. You should also be more cautious when working with more than one ticker at once since `lag` does not account for multiple stocks automatically.
@@ -131,7 +131,7 @@ returns %>%
 ## # A tibble: 1 x 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
 ##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.119         1.79         -12.9          12.0
+## 1          0.118         1.79         -12.9          12.0
 ```
 
 You can also compute these summary statistics for each year by imposing `group_by(year = year(date))`, where the call `year(date)` computes the year.
@@ -238,10 +238,10 @@ all_returns %>%
 ## # A tibble: 29 x 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AMGN       0.0475     1.99     -13.4      15.1
-## 2 AXP        0.0577     2.30     -17.6      21.9
-## 3 BA         0.0626     2.20     -23.8      24.3
-## 4 CAT        0.0695     2.03     -14.5      14.7
+## 1 AMGN       0.0474     1.99     -13.4      15.1
+## 2 AXP        0.0574     2.30     -17.6      21.9
+## 3 BA         0.0620     2.20     -23.8      24.3
+## 4 CAT        0.0693     2.03     -14.5      14.7
 ## # ... with 25 more rows
 ```
 
@@ -357,7 +357,7 @@ tibble(expected_ret = t(mvp_weights) %*% mu, volatility = sqrt(t(mvp_weights) %*
 ## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
-## 1          0.00835         0.0314
+## 1          0.00832         0.0314
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

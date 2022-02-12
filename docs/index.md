@@ -2,9 +2,9 @@
 title: "Tidy Finance with R"
 author: 
   - Christoph Scheuch, wikifolio Financial Technologies 
-  - Patrick Weiss, Vienna University of Economics and Business
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
-date: "2022-02-11"
+  - Patrick Weiss, Vienna University of Economics and Business
+date: "2022-02-12"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -252,6 +252,10 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> timetk </td>
+   <td style="text-align:left;">  </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> wesanderson </td>
    <td style="text-align:left;">  </td>
   </tr>
 </tbody>
