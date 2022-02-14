@@ -6,8 +6,6 @@ This chapter extends univariate portfolio analysis to bivariate sorts which mean
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
-## Data preparation
-
 The current chapter relies on this set of packages. 
 ```{r}
 library(tidyverse)
@@ -16,8 +14,9 @@ library(lubridate)
 library(sandwich)
 library(lmtest)
 library(scales)
-library(furrr)
 ```
+
+## Data preparation
 
 We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.
 
@@ -72,12 +71,12 @@ bm <- be %>%
   select(permno, gvkey, sorting_date, bm) %>%
   arrange(permno, gvkey, sorting_date)
 
-ccm <- crsp_monthly %>%
+data_for_sorts <- crsp_monthly %>%
   left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) %>%
   left_join(me, by = c("permno", "month" = "sorting_date")) %>%
   select(permno, gvkey, month, ret_excess, mktcap_lag, me, bm, exchange)
 
-ccm <- ccm %>%
+data_for_sorts <- data_for_sorts %>%
   arrange(permno, gvkey, month) %>%
   group_by(permno, gvkey) %>%
   fill(bm) %>%
@@ -114,7 +113,7 @@ Bivariate sorts create portfolios within a two-dimensional space spanned by two 
 To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_bm`, respectively. Then, these separate portfolios are combined to the final stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier - as the alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{r}
-ccm_portfolios <- ccm %>%
+value_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(
     portfolio_bm = assign_portfolio(
@@ -142,7 +141,7 @@ ccm_portfolios <- ccm %>%
 Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher's choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.
 
 ```{r}
-value_premium <- ccm_portfolios %>%
+value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
   summarise(ret = mean(ret), .groups = "drop_last") %>%
   summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
@@ -157,7 +156,7 @@ In the previous exercise, we assigned the portfolios without considering the sec
 To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `var = me`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{r}
-ccm_portfolios <- ccm %>%
+value_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(portfolio_me = assign_portfolio(
     data = cur_data(),
@@ -182,10 +181,10 @@ ccm_portfolios <- ccm %>%
     .groups = "drop"
   )
 
-value_premium <- ccm_portfolios %>%
+value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
-  summarise(ret = mean(ret), .groups = "drop_last") %>%
-  summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
+  summarize(ret = mean(ret), .groups = "drop_last") %>%
+  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
