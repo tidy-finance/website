@@ -1,12 +1,12 @@
 # Univariate portfolio sorts
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
-We start by introducing univariate portfolio sorts (which sort based on only one characteristic). Later, we tackle bivariate sorting. 
+We start by introducing univariate portfolio sorts (which sort based on only one characteristic). In a later chapter, we tackle bivariate sorting. 
 
-A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$. Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
-The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
-
-## Data preparation
+A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$. 
+Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
+The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. 
+To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
 The current chapter relies on the following set of packages.
 
@@ -20,11 +20,16 @@ library(lmtest)
 library(scales)
 ```
 
-We start with loading the required data from our `SQLite`-database. In particular, we use the monthly CRSP database as our asset universe. Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha). `beta` is the tibble with equity betas computed in the previous chapter. 
+## Data preparation
+
+We start with loading the required data from our `SQLite`-database. In particular, we use the monthly CRSP sample as our asset universe. 
+Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha). 
+`beta` is the tibble with market betas computed in the previous chapter. 
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>% 
   collect() 
@@ -59,7 +64,11 @@ crsp_monthly
 
 ## Sorting by market beta
 
-Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month $t$ information is available in month $t+1$. You may be tempted to simply use a call such as `crsp_monthly %>% group_by(permno) %>% mutate(beta_lag = lag(beta)))` instead. This procedure, however, does not work if there are non-explicit missing values in the time series.
+Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. 
+To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. 
+This procedure ensures that month $t$ information is available in month $t+1$. 
+You may be tempted to simply use a call such as `crsp_monthly %>% group_by(permno) %>% mutate(beta_lag = lag(beta)))` instead. 
+This procedure, however, does not work if there are non-explicit missing values in the time series.
 
 
 ```r
@@ -68,15 +77,17 @@ beta_lag <- beta %>%
   select(permno, month, beta_lag = beta_daily) %>%
   drop_na()
 
-data_beta <- crsp_monthly %>%
+data_for_sorts <- crsp_monthly %>%
   inner_join(beta_lag, by = c("permno", "month"))
 ```
 
-The first step of the portfolio analysis is to calculate periodic breakpoints that you can use to group the stocks into portfolios. For simplicity, we start with the median as the single breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios which means that the lagged market capitalizations determines the weight in `weighted.mean()`.  
+The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. 
+For simplicity, we start with the median as the single breakpoint. 
+We then compute the value-weighted returns for each of the two resulting portfolios which means that the lagged market capitalization determines the weight in `weighted.mean()`.  
 
 
 ```r
-beta_portfolios <- data_beta %>%
+beta_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(breakpoint = median(beta_lag),
          portfolio = case_when(beta_lag <= breakpoint ~ "low",
@@ -86,7 +97,7 @@ beta_portfolios <- data_beta %>%
 ```
 
 
-## Performance evaluation (I)
+## Performance evaluation
 
 The following figure shows the monthly excess returns of the two portfolios.
 
@@ -99,7 +110,6 @@ beta_portfolios %>%
   scale_y_continuous(labels = percent) + 
   labs(x = NULL, y = NULL, 
        title = "Monthly beta portfolio excess returns using median as breakpoint") +
-  theme_bw() +
   theme(legend.position = "none")
 ```
 
@@ -115,7 +125,7 @@ beta_longshort <- beta_portfolios %>%
   left_join(factors_ff_monthly, by = "month") 
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically uses [@Newey1987] $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. To implement this test, we compute the average return via `lm()` and then employ the `coeftest` function.
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically uses @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. To implement this test, we compute the average return via `lm()` and then employ the `coeftest` function.
 
 
 ```r
@@ -142,22 +152,26 @@ Now we take portfolio sorts to the next level. We want to be able to sort stocks
 ```r
 assign_portfolio <- function(data, var, n_portfolios) {
   breakpoints <- data %>%
-    summarize(breakpoint = quantile({{ var }}, probs = seq(0, 1, length.out = n_portfolios + 1),
+    summarize(breakpoint = quantile({{ var }}, 
+                                    probs = seq(0, 1, length.out = n_portfolios + 1),
                                     na.rm = TRUE)) %>%
     pull(breakpoint) %>% 
     as.numeric()
   
   data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>% 
+    mutate(portfolio = findInterval({{ var }}, 
+                                    breakpoints, 
+                                    all.inside = TRUE)) %>% 
     pull(portfolio)
 }
 ```
 
-We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.
+We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. 
+Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.
 
 
 ```r
-beta_portfolios <- data_beta %>%
+beta_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(portfolio = assign_portfolio(data = cur_data(), 
                                       var = beta_lag, 
@@ -168,7 +182,7 @@ beta_portfolios <- data_beta %>%
 ```
 
 
-## Performance evaluation (II)
+## More performance evaluation
 
 In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns. 
 
@@ -189,13 +203,12 @@ The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows
 beta_portfolios_summary %>% 
   ggplot(aes(x = portfolio, y = alpha, fill = portfolio)) +
   geom_bar(stat = "identity") +
-  theme_bw() +
   labs(title = "Alphas of beta-sorted portfolios",
        x = "Portfolio",
        y = "CAPM alpha",
        fill = "Portfolio") +
-  theme_bw() +
-  scale_y_continuous(labels = percent)
+  scale_y_continuous(labels = percent) +
+  theme(legend.position = "None")
 ```
 
 <img src="32_univariate_sorts_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
@@ -218,7 +231,6 @@ beta_portfolios_summary %>%
   geom_abline(intercept = sml_capm[1], slope = sml_capm[2], color = "green") +
   scale_y_continuous(labels = percent, limit = c(0, mean(factors_ff_monthly$mkt_excess)*2)) +
   scale_x_continuous(limits = c(0,2)) +
-  theme_bw() +
   labs(x = "Beta", y = "Excess return", color = "Portfolio",
        title = "Average portfolio excess returns and average beta estimates")
 ```
@@ -254,7 +266,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 ## (Intercept) 0.000739   0.002483     0.3     0.77
 ```
 
-However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor ([@Frazzini2014]). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
+However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor (@Frazzini2014). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
 
 
 ```r
@@ -285,7 +297,7 @@ beta_longshort %>%
   ggplot(aes(x = year, y = 1 - value, fill = name)) +
   geom_col(position = "dodge") + 
   facet_wrap(~name, ncol = 1) +
-  theme_bw() + theme(legend.position = "none") + 
+  theme(legend.position = "none") + 
   scale_y_continuous(labels = percent) + 
   labs(title = "Annual returns of beta portfolios",
        x = NULL, y = NULL)

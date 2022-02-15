@@ -12,8 +12,6 @@ The current chapter relies on this set of packages.
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
-library(sandwich)
-library(lmtest)
 ```
 
 ## Databases
@@ -53,26 +51,26 @@ To implement all these time lags, we again employ the temporary `sorting_date`-c
 
 
 ```r
-ff_me <- data_ff %>%
+me_ff <- data_ff %>%
   filter(month(month) == 6) %>%
   mutate(sorting_date = month %m+% months(1)) %>%
-  select(permno, sorting_date, ff_me = mktcap)
+  select(permno, sorting_date, me_ff = mktcap)
 
-ff_me_dec <- data_ff %>%
+me_ff_dec <- data_ff %>%
   filter(month(month) == 12) %>%
   mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) %>%
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
-ff_bm <- be %>%
+bm_ff <- be %>%
   mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) %>%
   select(gvkey, sorting_date, bm_be = be) %>%
   drop_na() %>%
-  inner_join(ff_me_dec, by = c("gvkey", "sorting_date")) %>%
-  mutate(ff_bm = bm_be/bm_me) %>%
-  select(permno, sorting_date, ff_bm)
+  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) %>%
+  mutate(bm_ff = bm_be / bm_me) %>%
+  select(permno, sorting_date, bm_ff)
 
-ff_variables <- ff_me %>% 
-  inner_join(ff_bm, by = c("permno", "sorting_date")) %>%
+variables_ff <- me_ff %>% 
+  inner_join(bm_ff, by = c("permno", "sorting_date")) %>%
   drop_na() %>%
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
@@ -99,18 +97,18 @@ assign_portfolio <- function(data, var, percentiles) {
     pull(portfolio)
 }
 
-ff_portfolios <- ff_variables %>%
+portfolios_ff <- variables_ff %>%
   inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) %>%
   group_by(sorting_date) %>%
   mutate(
     portfolio_me = assign_portfolio(
       data = cur_data(),
-      var = ff_me,
+      var = me_ff,
       percentiles = c(0, 0.5, 1)
     ),
     portfolio_bm = assign_portfolio(
       data = cur_data(),
-      var = ff_bm,
+      var = bm_ff,
       percentiles = c(0, 0.3, 0.7, 1)
     )) %>%
   select(permno, sorting_date, portfolio_me, portfolio_bm)
@@ -120,113 +118,97 @@ Next, we merge the portfolios to the return data of the rest of the year. To imp
 
 
 ```r
-ff_portfolios <- data_ff %>%
+portfolios_ff <- data_ff %>%
   mutate(sorting_date = case_when(month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
                                   month(month) >= 7 ~ ymd(paste0(year(month), "0701")))) %>%
-  inner_join(ff_portfolios, by = c("permno", "sorting_date"))
+  inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
 
 
 ## Fama and French factor returns
 
-Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., *SMB*), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., *HML*), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.
 
 
 ```r
-ff_factors <- ff_portfolios %>%
+factors_ff_monthly_replicated <- portfolios_ff %>%
   mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
   group_by(portfolio, month) %>%
   summarise(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
             portfolio_me = unique(portfolio_me),
             portfolio_bm = unique(portfolio_bm)) %>%
   group_by(month) %>%
-  summarise(ff_SMB = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
-            ff_HML = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1]))
+  summarise(smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
+            hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1]))
 ```
 
 
 ## Replication evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then; how close did we get? We answer this question by looking at the two time-series estimates in a correlation analysis using the function `cor.test()` and a test of means using the function `t.test()`.
-
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating high correlation) and an adjusted R-squared close to 1 (indicating high proportion of explained variance).
 
 
 ```r
 test <- factors_ff_monthly %>% 
-  inner_join(ff_factors, by = "month") %>%
-  mutate(ff_SMB = round(ff_SMB, 4),
-         ff_HML = round(ff_HML, 4))
-
-cor.test(test$ff_SMB, test$smb) 
+  inner_join(factors_ff_monthly_replicated, by = "month") %>%
+  mutate(smb_replicated = round(smb_replicated, 4),
+         hml_replicated = round(hml_replicated, 4))
 ```
 
-```
-## 
-## 	Pearson's product-moment correlation
-## 
-## data:  test$ff_SMB and test$smb
-## t = 226, df = 712, p-value <2e-16
-## alternative hypothesis: true correlation is not equal to 0
-## 95 percent confidence interval:
-##  0.992 0.994
-## sample estimates:
-##   cor 
-## 0.993
-```
-
-```r
-cor.test(test$ff_HML, test$hml)
-```
-
-```
-## 
-## 	Pearson's product-moment correlation
-## 
-## data:  test$ff_HML and test$hml
-## t = 130, df = 712, p-value <2e-16
-## alternative hypothesis: true correlation is not equal to 0
-## 95 percent confidence interval:
-##  0.976 0.982
-## sample estimates:
-##  cor 
-## 0.98
-```
-
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coeffiecient and R-squared are at 99%. 
 
 
 ```r
-t.test(test$ff_SMB, test$smb) 
+summary(lm(smb ~ smb_replicated, data = test))
 ```
 
 ```
 ## 
-## 	Welch Two Sample t-test
+## Call:
+## lm(formula = smb ~ smb_replicated, data = test)
 ## 
-## data:  test$ff_SMB and test$smb
-## t = 0.09, df = 1426, p-value = 0.9
-## alternative hypothesis: true difference in means is not equal to 0
-## 95 percent confidence interval:
-##  -0.00298  0.00328
-## sample estimates:
-## mean of x mean of y 
-##   0.00196   0.00181
+## Residuals:
+##       Min        1Q    Median        3Q       Max 
+## -0.020313 -0.001488  0.000028  0.001541  0.014304 
+## 
+## Coefficients:
+##                 Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)    -0.000145   0.000133   -1.09     0.28    
+## smb_replicated  0.996710   0.004404  226.29   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.00354 on 712 degrees of freedom
+## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
+## F-statistic: 5.12e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
+
+The replication of the HML factor is also a success with although at a slightly lower level with coefficient and R-squared around 95%. 
+
 
 ```r
-t.test(test$ff_HML, test$hml)
+summary(lm(hml ~ hml_replicated, data = test))
 ```
 
 ```
 ## 
-## 	Welch Two Sample t-test
+## Call:
+## lm(formula = hml ~ hml_replicated, data = test)
 ## 
-## data:  test$ff_HML and test$hml
-## t = -0.1, df = 1425, p-value = 0.9
-## alternative hypothesis: true difference in means is not equal to 0
-## 95 percent confidence interval:
-##  -0.00316  0.00278
-## sample estimates:
-## mean of x mean of y 
-##   0.00247   0.00266
+## Residuals:
+##       Min        1Q    Median        3Q       Max 
+## -0.022255 -0.002920 -0.000085  0.002378  0.027474 
+## 
+## Coefficients:
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)    0.000289   0.000214    1.35     0.18    
+## hml_replicated 0.959105   0.007384  129.90   <2e-16 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.0057 on 712 degrees of freedom
+## Multiple R-squared:  0.96,	Adjusted R-squared:  0.959 
+## F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
-We can see that we reject the null hypothesis for both premiums in the correlation tests, i.e., the hypothesis that the time series are uncorrelated is rejected. Moreover, we cannot reject the hypothesis that the means of the Fama and French factors and our replication results are different. Hence, we can conclude that we did a relatively good job in replicating their premiums.
+
+The statistical evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums although we cannot see the underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 

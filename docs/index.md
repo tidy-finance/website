@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-02-12"
+date: "2022-02-14"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -26,13 +26,13 @@ This website is the online version of *Tidy Finance with R*, a book currently un
 
 ## Authors {.unnumbered}
 
-This book is the result of a joint effort of three people (in alphabetical order of the last name):
+This book is the result of a joint effort of three people (in alphabetical order of their last names):
 
-* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/). Christoph is responsible for product planning, execution and monitoring and also manages a team of R data scientists to analyze user behavior or develop new products.
-* [Stefan Voigt](https://www.wikifolio.com/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, market fragmentation, high-frequency trading and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
-* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the interssection between asset pricing and corporate finance. 
+* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/) where he is responsible for product planning, execution and monitoring and also manages a team of data scientists to analyze user behavior and develop new products.
+* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
+* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the intersection between asset pricing and corporate finance. 
 
-We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) where each of us graduated with a different focus, but a shared passion: coding with R. After years of painful trial and error, we decided to share our learnings with the public. 
+We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from which each of us graduated with a different focus, but a shared passion: coding with R. After years of painful trial and error, we decided to share our learnings with the public in the form of this book. 
 
 ## License {.unnumbered}
 
@@ -44,19 +44,19 @@ The code samples in this book are licensed under [Creative Commons CC0 1.0 Unive
 
 ## Why does this book exist? {.unnumbered}
 
-Finance is an exciting area of economic research with a broad range of applied and academic empirical applications. As a student, researcher or data analyst, you are typically exposed to different types of financial data, ranging from asset prices, accounting data or transaction histories to all kinds of other data. 
+Finance is an exciting area of economic research with a broad range of academic and real-world empirical applications. As a student, researcher or data analyst, you are typically exposed to different types of financial data, including asset prices, accounting data or transaction histories, just to name a few examples. 
 Despite the vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. 
-As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key insights of financial economics. The lack of transparent codes not only leads to numerous replication efforts (and their failures), but is also a waste of resources on problems that have already been solved by countless others. 
+As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key concepts of financial economics. The lack of transparent codes not only leads to numerous replication efforts (and their failures), but it is also a waste of resources on problems that have already been solved by countless others in secrecy. 
 
-This book aims to lift this curtain on reproducible finance by providing a fully transparent code base for many common financial applications. In addition, we hope to inspire others in sharing their code publicly and ensure reproducibility of future findings. 
+This book aims to lift this curtain on reproducible finance by providing a fully transparent code base for many common financial applications.  We hope to inspire others in sharing their code publicly and taking part in our journey towards more reproducible research in the future. 
 
 ## Who should read this book? {.unnumbered}
 
-We write this book  for three audiences:
+We write this book for three audiences:
 
-* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The structure of the book is kept simple enough such that the material should suffice for self-study purposes.  
-* Instructors who look for materials to teach empirical finance courses. We provide plenty of examples and (hopefully) intuitive explanations which can easily be adjusted or expanded.   
-* Data analysts or statisticians who want to study financial problems on their own. 
+* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The structure of the book is kept simple enough such that the material is sufficient for self-study purposes.  
+* Instructors who look for materials to teach in empirical finance courses. We provide plenty of examples and (hopefully) intuitive explanations which can easily be adjusted or expanded.   
+* Data analysts or statisticians who work on issues pertaining to financial data and need practical tools to do so. 
 
 ## What will you learn? {.unnumbered}
 
@@ -64,15 +64,15 @@ The book is divided into 5 main parts:
 
 * Chapter 1 introduces you to important concepts around which our approach of Tidy Finance revolves. 
 * Chapter 2 provides tools to organize your data and prepare the most common data sets used in financial research: CRSP and Compustat.
-* Chapters 3-7 deal with key concepts of empirical asset pricing. 
+* Chapters 3-7 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts and performance analysis. 
 * Chapters 8-9 apply machine learning methods to problems in factor selection and option pricing. 
 * Chapters 10-11 provide approaches for parametric and constrained portfolio optimization and backtesting procedures.  
 
 ## What won’t you learn? {.unnumbered}
 
-This is a book about doing empirical work. While we will assume only basic knowledge in statistics and econometrics, we do not provide detailed treatments of the methods applied in this book. Instead, you find references to more advanced treatments or to the seminal academic work in journal articles in the book. 
-We figured that our comparative advantage is to provide a thorough implementation of portfolio sorts, backtesting procedures, machine learning methods or other related topics in empirical finance together with discussions on all the needy-greedy choices a researcher is faced to while conducting empirical analysis. 
-Instead of discussing, for instance, statistical properties of the well-established tools we use in this book, we instead confidently stand on the shoulders of giants. 
+This is a book about doing empirical work. While we assume only basic knowledge in statistics and econometrics, we do not provide detailed treatments of the methods applied in this book. Instead, you find references to the seminal academic work in journal articles and to more detailed treatments. 
+We believe that our comparative advantage is to provide a thorough implementation of portfolio sorts, backtesting procedures, machine learning methods or other related topics in empirical finance together with discussions on all the needy-greedy choices you face while conducting empirical analysis. 
+Instead of discussing, for instance, statistical properties of the well-established tools we use in this book, we hence confidently stand on the shoulders of giants. 
 
 ## Why R? {.unnumbered}
 
@@ -115,7 +115,7 @@ In particular, we heavily draw on a set of packages called the [`tidyverse`](htt
 
 Before we continue, make sure you have all the software you need for this book:
 
-- [Install R and RStudio](https://rstudio-education.github.io/hopr/starting.html#starting). To get a walk-through of the installation (for every major operating system), follow the steps outlined [in this summary](https://rstudio-education.github.io/hopr/starting.html#starthng). The whole process should be done in few clicks. If you wonder about the difference: R is an open-source language and environment for statistical computing and graphics, free to download and use. While R runs the computations, RStudio is an integrated development environment (IDE) that provides an interface by adding many convenient features and tools. We hence suggest to do all the coding in RStudio.
+- [Install R and RStudio](https://rstudio-education.github.io/hopr/starting.html#starting). To get a walk-through of the installation for every major operating system, follow the steps outlined [in this summary](https://rstudio-education.github.io/hopr/starting.html#starthng). The whole process should be done in few clicks. If you wonder about the difference: R is an open-source language and environment for statistical computing and graphics, free to download and use. While R runs the computations, RStudio is an integrated development environment that provides an interface by adding many convenient features and tools. We suggest to do all the coding in RStudio.
 - Open RStudio and [install the `tidyverse`](https://tidyverse.tidyverse.org/). Not sure how it works? You find helpful information on how to install packages in this [brief summary](https://rstudio-education.github.io/hopr/packages2.html). 
 
 If you are new to R, we recommend to start with the following sources:
@@ -129,134 +129,8 @@ If you are new to R, we recommend to start with the following sources:
 
 ## Colophon {.unnumbered}
 
-This book was written in RStudio using bookdown. The website is hosted with github pages, and automatically updated after every commit. The complete source is available from GitHub.
+This book was written in RStudio using bookdown. The website is hosted with github pages, and automatically updated after every commit. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). We generated all plots in this book using `ggplot2` and its classic dark-on-light theme (`theme_bw()`). 
 
 This version of the book was built with R version 4.1.2 (2021-11-01) and the following packages:
 
 
-<table>
- <thead>
-  <tr>
-   <th style="text-align:left;"> Package </th>
-   <th style="text-align:left;"> Version </th>
-  </tr>
- </thead>
-<tbody>
-  <tr>
-   <td style="text-align:left;"> alabama </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> bookdown </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> broom </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> dbplyr </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> frenchdata </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> furrr </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> glmnet </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> googledrive </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> hardhat </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> kableExtra </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> keras </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> knitr </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> lmtest </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> lubridate </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> quadprog </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> readxl </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> renv </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> rlang </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> rmarkdown </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> RPostgres </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> RSQLite </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> sandwich </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> scales </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> slider </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> tidymodels </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> tidyquant </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> tidyverse </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> timetk </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> wesanderson </td>
-   <td style="text-align:left;">  </td>
-  </tr>
-</tbody>
-</table>

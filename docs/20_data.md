@@ -1,12 +1,8 @@
-<!-- Split up crsp_monthly and migrate comments to text -->
-<!-- Migrate compustat comments to text -->
-<!-- Exercise: download fama-french data from their website & wrds and validate that you get the same result -->
-
 # Accessing & managing financial data
 
-In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is familiar with storing data in various data formats like CSV, XLS, XLSX or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
+In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard .csv files, an .xlsx file stored in a public Google drive repositories, and an SQL database connection. We store all the data in **one** database, which makes it easy to retrieve and share data later on. 
+This chapter shows how to import different data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repositories, and an SQL database connection. We store all the data in a **single** database, which serves as the only source of data in subsequent chapters.
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -126,7 +122,8 @@ Next, we read in the new data and transform the columns to the variables that we
 
 
 ```r
-macro_predictors <- read_xlsx("data/macro_predictors.xlsx", sheet = "Monthly") %>%
+macro_predictors <- read_xlsx("data/macro_predictors.xlsx", 
+                              sheet = "Monthly") %>%
   mutate(month = ym(yyyymm)) %>%
   filter(month >= start_date & month <= end_date) %>%
   mutate(across(where(is.character), as.numeric)) %>%
@@ -141,7 +138,7 @@ macro_predictors <- read_xlsx("data/macro_predictors.xlsx", sheet = "Monthly") %
     de = log(D12) - log(E12), # Dividend payout ratio
     tms = lty - tbl, # Term spread
     dfy = BAA - AAA # Default yield spread
-  ) %>% 
+  ) %>%
   select(month, rp_div, dp, dy, ep, de, svar,
     bm = `b/m`, ntis, tbl, lty, ltr,
     tms, dfy, infl
@@ -177,7 +174,8 @@ A SQLite database is easily created - the code below is really all there is. Not
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
 ```
 
 Next, we create a remote table with the monthly Fama-French factor data. 
@@ -261,8 +259,9 @@ From now on, all you need to do to access data that is stored in the database is
 ```r
 library(tidyverse)
 library(RSQLite)
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
-factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") 
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
+factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly %>% collect()
 ```
 
@@ -359,20 +358,16 @@ msedelist_db
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
 ```
 
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest. You can read up in the great textbook of [@BaliEngleMurray2016] (BEM) for an extensive discussion on the filters we apply in the code below.
+We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reason and returns. You can read up in the great textbook of [@BaliEngleMurray2016] (BEM) for an extensive discussion on the filters we apply in the code below.
 
 
 ```r
 crsp_monthly <- msf_db %>%
-  # Keep only data in time window of interest
   filter(date >= start_date & date <= end_date) %>%
-  # Keep only US listed stocks
   inner_join(msenames_db %>%
-    filter(shrcd %in% c(10, 11)) %>% 
+    filter(shrcd %in% c(10, 11)) %>%
     select(permno, exchcd, siccd, namedt, nameendt), by = c("permno")) %>%
-  # Keep only months with valid permno-specific information
   filter(date >= namedt & date <= nameendt) %>%
-  # Add delisting information (i.e. delisting reason and return) by month
   mutate(month = floor_date(date, "month")) %>%
   left_join(msedelist_db %>%
     select(permno, dlstdt, dlret, dlstcd) %>%
@@ -414,7 +409,7 @@ The next variable we frequently use is the one-month *lagged* market capitalizat
 
 ```r
 mktcap_lag <- crsp_monthly %>%
-  mutate(month = month %m+% months(1)) %>% 
+  mutate(month = month %m+% months(1)) %>%
   select(permno, month, mktcap_lag = mktcap)
 
 crsp_monthly <- crsp_monthly %>%
@@ -535,8 +530,7 @@ crsp_monthly %>%
     title = "Monthly number of securities by exchange"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-  scale_y_continuous(labels = comma) +
-  theme_bw()
+  scale_y_continuous(labels = comma)
 ```
 
 <img src="20_data_files/figure-html/unnamed-chunk-36-1.png" width="672" style="display: block; margin: auto;" />
@@ -585,8 +579,7 @@ tbl(tidy_finance, "crsp_monthly") %>%
     title = "Monthly total market value (billions of Dec 2020 Dollars) by listing exchange"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-  scale_y_continuous(labels = comma) +
-  theme_bw()
+  scale_y_continuous(labels = comma)
 ```
 
 <img src="20_data_files/figure-html/unnamed-chunk-39-1.png" width="672" style="display: block; margin: auto;" />
@@ -614,8 +607,7 @@ crsp_monthly_industry %>%
     title = "Monthly number of securities by industry"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-  scale_y_continuous(labels = comma) +
-  theme_bw()
+  scale_y_continuous(labels = comma)
 ```
 
 <img src="20_data_files/figure-html/unnamed-chunk-40-1.png" width="672" style="display: block; margin: auto;" />
@@ -632,8 +624,7 @@ crsp_monthly_industry %>%
     title = "Monthly total market value (billions of Dec 2020 Dollars) by industry"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
-  scale_y_continuous(labels = comma) +
-  theme_bw()
+  scale_y_continuous(labels = comma)
 ```
 
 <img src="20_data_files/figure-html/unnamed-chunk-41-1.png" width="672" style="display: block; margin: auto;" />
@@ -689,7 +680,6 @@ for (j in 1:length(permnos)) {
 close(progress)
 
 crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
-crsp_daily_db %>% count() # contains 68,895,667 rows
 ```
 
 ## Preparing Compustat data
@@ -703,21 +693,17 @@ To access Compustat data, we can again tap WRDS which hosts the `funda` table th
 funda_db <- tbl(wrds, in_schema("comp", "funda"))
 ```
 
-We follow the typical filter conventions and pull only data that we actually need. 
+We follow the typical filter conventions and pull only data that we actually need: (i) we get only industrial fundamental data (i.e., ignore financial services) in the standard format (i.e., consolidated information in standard presentation) and (iii) only data in the desired time window
 
 
 ```r
 compustat <- funda_db %>%
   filter(
-    # Get only industrial fundamental data (i.e. ignore financial services)
     indfmt == "INDL" &
-      # Get data in standard format (i.e. consolidated information in standard presentation)
       datafmt == "STD" &
       consol == "C" &
-      # Get only data in the desired time window
       datadate >= start_date & datadate <= end_date
   ) %>%
-  # Select only relevant columns
   select(
     gvkey, # Firm identifier
     datadate, # Date of the accounting data
@@ -732,7 +718,6 @@ compustat <- funda_db %>%
     pstkl, # Preferred stock liquidating value
     pstk # Preferred stock par value
   ) %>%
-  # Fetch data from the server into memory
   collect()
 ```
 
@@ -840,12 +825,42 @@ crsp_monthly %>%
     x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "End-of-year share of securities with book equity values by exchange"
   ) +
-  scale_y_continuous(labels = percent) +
-  theme_bw() +
-  coord_cartesian(ylim = c(0, 1))
+  scale_y_continuous(labels = percent)
 ```
 
 <img src="20_data_files/figure-html/unnamed-chunk-52-1.png" width="672" style="display: block; margin: auto;" />
+
+```r
+  coord_cartesian(ylim = c(0, 1))
+```
+
+```
+## <ggproto object: Class CoordCartesian, Coord, gg>
+##     aspect: function
+##     backtransform_range: function
+##     clip: on
+##     default: FALSE
+##     distance: function
+##     expand: TRUE
+##     is_free: function
+##     is_linear: function
+##     labels: function
+##     limits: list
+##     modify_scales: function
+##     range: function
+##     render_axis_h: function
+##     render_axis_v: function
+##     render_bg: function
+##     render_fg: function
+##     setup_data: function
+##     setup_layout: function
+##     setup_panel_guides: function
+##     setup_panel_params: function
+##     setup_params: function
+##     train_panel_guides: function
+##     transform: function
+##     super:  <ggproto object: Class CoordCartesian, Coord, gg>
+```
 
 
 ## Managing SQLite databases
@@ -894,13 +909,13 @@ This function comes in handy if you are unsure about the correct naming of the t
 As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documetation](https://www.postgresql.org/docs/9.1/ddl-schemas.html). For instance, if you want to find all tables that live in the `crsp` schema, you run
 
 ```r
-dbListObjects(wrds, Id(schema = "crsp")) 
+dbListObjects(wrds, Id(schema = "crsp"))
 ```
 
 This operation returns a list of all tables that belong to the `crsp` family on WRSD, e.g. `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
 
 ```r
-dbListObjects(wrds, Id(schema = "comp")) 
+dbListObjects(wrds, Id(schema = "comp"))
 ```
 
 If you want to get all schemas, then run
@@ -911,6 +926,7 @@ dbListObjects(wrds)
 
 ## Exercises
 
+1. Download the monthly Fama-French factors manually from [Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `read_csv()`. Validate that you get the same data as via the `frenchdata` package. 
 1. Check out the structure of the WRDS database by sending queries in the spirit of ["Querying WRDS Data using R"](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/) and verify the output with `dbListObjects()`. How many tables are associated with CRSP? Can you identify what is stored within *msp500*?
 1. Compute `mkt_cap_lag` using `lag(mktcap)` rather than joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are they different?
 1. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?

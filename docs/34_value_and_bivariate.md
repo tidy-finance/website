@@ -6,8 +6,6 @@ This chapter extends univariate portfolio analysis to bivariate sorts which mean
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
-## Data preparation
-
 The current chapter relies on this set of packages. 
 
 ```r
@@ -17,8 +15,9 @@ library(lubridate)
 library(sandwich)
 library(lmtest)
 library(scales)
-library(furrr)
 ```
+
+## Data preparation
 
 We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.
 
@@ -76,12 +75,12 @@ bm <- be %>%
   select(permno, gvkey, sorting_date, bm) %>%
   arrange(permno, gvkey, sorting_date)
 
-ccm <- crsp_monthly %>%
+data_for_sorts <- crsp_monthly %>%
   left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) %>%
   left_join(me, by = c("permno", "month" = "sorting_date")) %>%
   select(permno, gvkey, month, ret_excess, mktcap_lag, me, bm, exchange)
 
-ccm <- ccm %>%
+data_for_sorts <- data_for_sorts %>%
   arrange(permno, gvkey, month) %>%
   group_by(permno, gvkey) %>%
   fill(bm) %>%
@@ -120,7 +119,7 @@ To implement the independent bivariate portfolio sort, we assign monthly portfol
 
 
 ```r
-ccm_portfolios <- ccm %>%
+value_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(
     portfolio_bm = assign_portfolio(
@@ -149,7 +148,7 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 
 
 ```r
-value_premium <- ccm_portfolios %>%
+value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
   summarise(ret = mean(ret), .groups = "drop_last") %>%
   summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
@@ -169,7 +168,7 @@ To implement the dependent sorts, we first create the size portfolios by calling
 
 
 ```r
-ccm_portfolios <- ccm %>%
+value_portfolios <- data_for_sorts %>%
   group_by(month) %>%
   mutate(portfolio_me = assign_portfolio(
     data = cur_data(),
@@ -194,10 +193,10 @@ ccm_portfolios <- ccm %>%
     .groups = "drop"
   )
 
-value_premium <- ccm_portfolios %>%
+value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
-  summarise(ret = mean(ret), .groups = "drop_last") %>%
-  summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
+  summarize(ret = mean(ret), .groups = "drop_last") %>%
+  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
