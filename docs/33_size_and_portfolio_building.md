@@ -1,8 +1,9 @@
 # Size sorts and p-hacking
 
-In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, [@Fama1993] include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
+In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. You will see that these choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking and we condemn such behavior. Hence, we want to emphasize that these alternative specifications are supposed to be robustness tests.
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. 
+There is arguably a thin line between p-hacking and conducting robustness tests, our purpose here is simply to illustrate the substantial variation which can arise along the evidence generating process.
 
 ## Data preparation
 
@@ -19,7 +20,7 @@ library(scales)
 library(furrr)
 ```
 
-First, we retrieve the relevant data from our database. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. 
+First, we retrieve the relevant data from our database. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
 
 
 ```r
@@ -34,9 +35,10 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 
 ## Size distribution
 
-Before we build our size portfolios, we investigate the distribution of the variable *firm size*. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows you the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms by setting the indicator's value to one. Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization. 
+Before we build our size portfolios, we investigate the distribution of the variable *firm size*. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms. 
+Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization. 
 
-The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The size distribution means that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
+The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
 
 ```r
@@ -66,8 +68,7 @@ crsp_monthly %>%
   labs(
     x = NULL, y = NULL, color = NULL,
     title = "Percentage of total market capitalization in largest stocks"
-  ) +
-  theme_bw()
+  )
 ```
 
 <img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
@@ -80,24 +81,25 @@ crsp_monthly %>%
   group_by(month, exchange) %>%
   summarize(mktcap = sum(mktcap)) %>%
   mutate(share = mktcap / sum(mktcap)) %>%
-    ggplot(aes(x = month, y = share, fill = exchange, color = exchange)) +
-  geom_area(position="stack", 
-            stat="identity",
-            alpha = 0.5) +
-  geom_line(position = "stack") + 
-  theme_bw() +
+  ggplot(aes(x = month, y = share, fill = exchange, color = exchange)) +
+  geom_area(
+    position = "stack",
+    stat = "identity",
+    alpha = 0.5
+  ) +
+  geom_line(position = "stack") +
   scale_y_continuous(labels = percent) +
   labs(
     x = NULL, y = NULL, fill = NULL, color = NULL,
-    title = "Share of total market capitalization per exchange"
+    title = "Share of total market capitalization per listing exchange"
   )
 ```
 
 <img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" />
 
-Finally, we consider the distribution of firm size across listing exchanges by creating summary statistics. The pre-build function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each exchange. We also add a row with `add_row()` with the overall summary statistics.
+Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The pre-build function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
 
-The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this to update our portfolio sort procedure.
+The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 
 ```r
@@ -136,7 +138,7 @@ crsp_monthly %>%
 ## 2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
 ## 3 NYSE     16416. 43115.     5.35 1.54e2 9.17e2 3.34e3 12022. 74826. 4.14e5  1245
 ## 4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## # ... with 1 more row
+## 5 Overall  10556. 63966.     4.65 3.10e1 1.85e2 8.74e2  4196. 37059. 2.23e6  3693
 ```
 
 ## Univariate size portfolios with flexible breakpoints
@@ -228,11 +230,11 @@ The table shows that the size premium is more than 60% larger if we consider onl
 
 ## P-hacking and non-standard errors
 
-Since the choice of the exchange had a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. 
-The reason behind the exercise here is to show that the different ways to form portfolios result in different estimated size premia. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022].
-From a malicious perspective, these modeling choices give the researcher multiple chances to find statistically significant results. Yet this is considered *p-hacking* and it is important to highlight that p-hacking is akin to scientific fraud. Moreover, the statistical inference from multiple testing is itself invalid [@Harvey2016].
+Since the choice of the exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. 
+The intention of this application is to show that the different ways to form portfolios result in different estimated size premia. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022].
+From a malicious perspective, these modeling choices give the researcher multiple *chances* to find statistically significant results. Yet this is considered *p-hacking* which renders the statistical inference due to multiple testing invalid [@Harvey2016].
 
-Nevertheless, this creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature. 
+Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature. 
 
 Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `expand_grid()` produces a table of all possible permutations of its arguments. Notice that we use the argument `data` to exclude financial firms and truncate the time series. 
 
@@ -257,10 +259,11 @@ p_hacking_setup
 ## 2            2 NYSE      TRUE           <language>
 ## 3            2 NYSE      TRUE           <language>
 ## 4            2 NYSE      TRUE           <language>
-## # ... with 44 more rows
+## 5            2 NYSE      FALSE          <sym>     
+## # ... with 43 more rows
 ```
 
-To speed the computation up we parallelize the (many) different sorting procedures, as in chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premia possible in our data, in particular when we use equal-weighted portfolios. 
+To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premia possible in our data, in particular when we use equal-weighted portfolios. 
 
 
 ```r
@@ -282,11 +285,12 @@ p_hacking_setup <- p_hacking_setup %>%
     )
   ))
 
-p_hacking_setup %>%
+p_hacking_results <- p_hacking_setup %>%
   mutate(data = map_chr(data, deparse)) %>%
   unnest(size_premium) %>%
-  mutate(data = str_remove(data, "crsp_monthly %>% ")) %>% 
+  mutate(data = str_remove(data, "crsp_monthly %>% ")) %>%
   arrange(desc(size_premium))
+p_hacking_results
 ```
 
 ```
@@ -297,7 +301,8 @@ p_hacking_setup %>%
 ## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter(industry != ~       0.0180
 ## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"              0.0162
 ## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter(month < \"19~       0.0139
-## # ... with 44 more rows
+## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter(industry != ~       0.0114
+## # ... with 43 more rows
 ```
 
 ## The size-premium variation
@@ -306,11 +311,9 @@ We provide a graph that shows the different premiums. This plot also shows the r
 
 
 ```r
-p_hacking_setup %>%
-  mutate(data = map_chr(data, deparse)) %>%
-  unnest(size_premium) %>%
+p_hacking_results %>%
   ggplot(aes(x = size_premium)) +
-  geom_histogram(bins = 20) +
+  geom_histogram(bins = nrow(p_hacking_results)) +
   labs(
     x = NULL, y = NULL,
     title = "Size premium over different sorting choices",
@@ -320,7 +323,6 @@ p_hacking_setup %>%
     color = "red",
     linetype = "dashed"
   ) +
-  theme_bw() +
   scale_x_continuous(labels = percent)
 ```
 
@@ -331,5 +333,5 @@ p_hacking_setup %>%
 1. We gained several insights on the size distribution above. However, we did not analyse the average size across exchanges and industries. Which exchanges/industries have the largest firms? Plot the average firm size for the three exchanges over time. What do you see?
 1. We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.
 1. The returns that we analyse above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_portfolio_returns()` to output the CAPM alpha or beta instead of the average excess return. 
-1. While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on returns.
-1. We computed several size premiums, but they do not follow the definition of [@Fama1993]. Which of our approaches comes closest to their SMB premium?
+1. While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.
+1. We computed several size premiums, but they do not follow the definition of @Fama1993. Which of our approaches comes closest to their SMB premium?

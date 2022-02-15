@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-02-14"
+date: "2022-02-15"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -20,7 +20,6 @@ description: |
 
 # Welcome {.unnumbered}
 
-    
 [![Buy hardcover version](cover.jpg){.cover width="250"}]()
 This website is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release. We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. 
 
@@ -133,4 +132,133 @@ This book was written in RStudio using bookdown. The website is hosted with gith
 
 This version of the book was built with R version 4.1.2 (2021-11-01) and the following packages:
 
-
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Package </th>
+   <th style="text-align:left;"> Version </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> alabama </td>
+   <td style="text-align:left;"> 2015.3-1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> bookdown </td>
+   <td style="text-align:left;"> 0.24.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> broom </td>
+   <td style="text-align:left;"> 0.7.12 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> dbplyr </td>
+   <td style="text-align:left;"> 2.1.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> frenchdata </td>
+   <td style="text-align:left;"> 0.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> furrr </td>
+   <td style="text-align:left;"> 0.2.3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> ggplot2 </td>
+   <td style="text-align:left;"> 3.3.5 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> glmnet </td>
+   <td style="text-align:left;"> 4.1-3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> googledrive </td>
+   <td style="text-align:left;"> 2.0.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> hardhat </td>
+   <td style="text-align:left;"> 0.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> jsonlite </td>
+   <td style="text-align:left;"> 1.7.3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> kableExtra </td>
+   <td style="text-align:left;"> 1.3.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> keras </td>
+   <td style="text-align:left;"> 2.8.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> knitr </td>
+   <td style="text-align:left;"> 1.37 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> lmtest </td>
+   <td style="text-align:left;"> 0.9-39 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> lubridate </td>
+   <td style="text-align:left;"> 1.8.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> quadprog </td>
+   <td style="text-align:left;"> 1.5-8 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> readxl </td>
+   <td style="text-align:left;"> 1.3.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> renv </td>
+   <td style="text-align:left;"> 0.15.2 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> rlang </td>
+   <td style="text-align:left;"> 1.0.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> rmarkdown </td>
+   <td style="text-align:left;"> 2.11 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> RPostgres </td>
+   <td style="text-align:left;"> 1.4.3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> RSQLite </td>
+   <td style="text-align:left;"> 2.2.9 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> sandwich </td>
+   <td style="text-align:left;"> 3.0-1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> scales </td>
+   <td style="text-align:left;"> 1.1.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> slider </td>
+   <td style="text-align:left;"> 0.2.2 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidymodels </td>
+   <td style="text-align:left;"> 0.1.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyquant </td>
+   <td style="text-align:left;"> 1.0.3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyverse </td>
+   <td style="text-align:left;"> 1.3.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> timetk </td>
+   <td style="text-align:left;"> 2.7.0 </td>
+  </tr>
+</tbody>
+</table>

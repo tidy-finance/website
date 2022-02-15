@@ -9,8 +9,8 @@ knitr::opts_chunk$set(
   width = 81
 )
 
-options(tibble.print_max = 4,
-        tibble.print_min = 4,
+options(tibble.print_max = 5,
+        tibble.print_min = 5,
         digits = 3,
         width = 81 # http://oreillymedia.github.io/production-resources/styleguide/#code
 )

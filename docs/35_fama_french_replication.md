@@ -4,7 +4,7 @@
 
 # Replicating Fama & French factors
 
-The Fama and French three-factor model (see [@Fama1993]) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We did introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. While we demonstrated the main idea of portfolio sorts, we also want to show how to replicate these significant factors. However, we do not aim at a perfect replication but want to show the main ideas.
+The Fama and French three-factor model (see @Fama1993) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this Chapter we also want to show the main idea on how to replicate these significant factors. 
 
 The current chapter relies on this set of packages. 
 
@@ -16,28 +16,34 @@ library(lubridate)
 
 ## Databases
 
-We use the same data sources CRSP and compustat, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below.
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. 
+Hence, there is nothing new below.
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>% 
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>% 
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>% 
+compustat <- tbl(tidy_finance, "compustat") %>%
   collect()
 
-data_ff <- crsp_monthly %>% 
-  left_join(factors_ff_monthly, by = "month") %>% 
-  select(permno, gvkey, month, ret_excess, mkt_excess, mktcap, mktcap_lag, exchange) %>% 
+data_ff <- crsp_monthly %>%
+  left_join(factors_ff_monthly, by = "month") %>%
+  select(
+    permno, gvkey, month, ret_excess, mkt_excess,
+    mktcap, mktcap_lag, exchange
+  ) %>%
   drop_na()
 
 be <- compustat %>%
-  select(gvkey, datadate, be) %>% 
+  select(gvkey, datadate, be) %>%
   drop_na()
 ```
 
@@ -69,7 +75,7 @@ bm_ff <- be %>%
   mutate(bm_ff = bm_be / bm_me) %>%
   select(permno, sorting_date, bm_ff)
 
-variables_ff <- me_ff %>% 
+variables_ff <- me_ff %>%
   inner_join(bm_ff, by = c("permno", "sorting_date")) %>%
   drop_na() %>%
   distinct(permno, sorting_date, .keep_all = TRUE)
@@ -110,7 +116,8 @@ portfolios_ff <- variables_ff %>%
       data = cur_data(),
       var = bm_ff,
       percentiles = c(0, 0.3, 0.7, 1)
-    )) %>%
+    )
+  ) %>%
   select(permno, sorting_date, portfolio_me, portfolio_bm)
 ```
 
@@ -119,8 +126,10 @@ Next, we merge the portfolios to the return data of the rest of the year. To imp
 
 ```r
 portfolios_ff <- data_ff %>%
-  mutate(sorting_date = case_when(month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
-                                  month(month) >= 7 ~ ymd(paste0(year(month), "0701")))) %>%
+  mutate(sorting_date = case_when(
+    month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
+    month(month) >= 7 ~ ymd(paste0(year(month), "0701"))
+  )) %>%
   inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
 
@@ -134,12 +143,16 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 factors_ff_monthly_replicated <- portfolios_ff %>%
   mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
   group_by(portfolio, month) %>%
-  summarise(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
-            portfolio_me = unique(portfolio_me),
-            portfolio_bm = unique(portfolio_bm)) %>%
+  summarise(
+    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
+    portfolio_me = unique(portfolio_me),
+    portfolio_bm = unique(portfolio_bm)
+  ) %>%
   group_by(month) %>%
-  summarise(smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
-            hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1]))
+  summarise(
+    smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
+    hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1])
+  )
 ```
 
 
@@ -149,13 +162,15 @@ In the previous section, we replicated the size and value premiums following the
 
 
 ```r
-test <- factors_ff_monthly %>% 
+test <- factors_ff_monthly %>%
   inner_join(factors_ff_monthly_replicated, by = "month") %>%
-  mutate(smb_replicated = round(smb_replicated, 4),
-         hml_replicated = round(hml_replicated, 4))
+  mutate(
+    smb_replicated = round(smb_replicated, 4),
+    hml_replicated = round(hml_replicated, 4)
+  )
 ```
 
-The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coeffiecient and R-squared are at 99%. 
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%. 
 
 
 ```r
@@ -211,4 +226,5 @@ summary(lm(hml ~ hml_replicated, data = test))
 ## F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
-The statistical evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums although we cannot see the underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 
+The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums although we cannot see their underlying code. 
+From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 

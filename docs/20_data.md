@@ -211,6 +211,7 @@ factors_ff_monthly_db %>%
 ## 2 1960-02-01 0.0029
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
+## 5 1960-05-01 0.0027
 ## # ... with more rows
 ```
 
@@ -231,7 +232,8 @@ factors_ff_monthly_db %>%
 ## 2 1960-02-01 0.0029
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
-## # ... with 728 more rows
+## 5 1960-05-01 0.0027
+## # ... with 727 more rows
 ```
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
@@ -311,6 +313,7 @@ msf_db
 ## 2 68391610  10000   7952  10396     3   3990 1986-01-31 -2.5  -4.44 -4.38  1771
 ## 3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
 ## 4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
+## 5 68391610  10000   7952  10396     3   3990 1986-04-30 -4    -4.31 -4      957
 ## # ... with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
 ## #   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
 ## #   altprcdt <date>, retx <dbl>
@@ -332,6 +335,7 @@ msenames_db
 ## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
 ## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
 ## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F~ <NA>  
+## 5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERGY ~ <NA>  
 ## # ... with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
 ## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
@@ -353,6 +357,7 @@ msedelist_db
 ## 2  10001 2017-08-03    233      0      0 NA         13.1   0.0116  0    
 ## 3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
 ## 4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
+## 5  10005 1991-07-11    560      0      0 1991-07-12  0.141 0.125  -0.141
 ## # ... with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
 ## #   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
@@ -507,13 +512,14 @@ crsp_monthly
 
 ```
 ## # A tibble: 3,225,161 x 13
-##   permno date       month          ret  shrout altprc exchcd siccd mktcap
-##    <dbl> <date>     <date>       <dbl>   <dbl>  <dbl>  <dbl> <dbl>  <dbl>
-## 1  10000 1986-02-28 1986-02-01 -0.257  3680000  -3.25      3  3990   12.0
-## 2  10000 1986-03-31 1986-03-01  0.365  3680000  -4.44      3  3990   16.3
-## 3  10000 1986-04-30 1986-04-01 -0.0986 3793000  -4         3  3990   15.2
-## 4  10000 1986-05-30 1986-05-01 -0.223  3793000  -3.11      3  3990   11.8
-## # ... with 3,225,157 more rows, and 4 more variables: mktcap_lag <dbl>,
+##   permno date       month           ret  shrout altprc exchcd siccd mktcap
+##    <dbl> <date>     <date>        <dbl>   <dbl>  <dbl>  <dbl> <dbl>  <dbl>
+## 1  10000 1986-02-28 1986-02-01 -0.257   3680000  -3.25      3  3990   12.0
+## 2  10000 1986-03-31 1986-03-01  0.365   3680000  -4.44      3  3990   16.3
+## 3  10000 1986-04-30 1986-04-01 -0.0986  3793000  -4         3  3990   15.2
+## 4  10000 1986-05-30 1986-05-01 -0.223   3793000  -3.11      3  3990   11.8
+## 5  10000 1986-06-30 1986-06-01 -0.00503 3793000  -3.09      3  3990   11.7
+## # ... with 3,225,156 more rows, and 4 more variables: mktcap_lag <dbl>,
 ## #   exchange <chr>, industry <chr>, ret_excess <dbl>
 ```
 
@@ -784,7 +790,8 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## # ... with 31,766 more rows
+## 5  54594 001004 1972-04-24 2022-02-15
+## # ... with 31,765 more rows
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 

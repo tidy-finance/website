@@ -28,16 +28,17 @@ Once we form our portfolios, we use the Fama-French factor returns to compute th
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>% 
-  collect() 
-
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>% 
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
   collect()
 
-beta <- tbl(tidy_finance, "beta") %>% 
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+  collect()
+
+beta <- tbl(tidy_finance, "beta") %>%
   collect()
 ```
 
@@ -45,8 +46,8 @@ We keep only relevant data from the CRSP sample.
 
 
 ```r
-crsp_monthly <- crsp_monthly %>% 
-  left_join(factors_ff_monthly, by = "month") %>% 
+crsp_monthly <- crsp_monthly %>%
+  left_join(factors_ff_monthly, by = "month") %>%
   select(permno, month, ret_excess, mkt_excess, mktcap_lag)
 crsp_monthly
 ```
@@ -55,11 +56,12 @@ crsp_monthly
 ## # A tibble: 3,225,161 x 5
 ##   permno month      ret_excess mkt_excess mktcap_lag
 ##    <dbl> <date>          <dbl>      <dbl>      <dbl>
-## 1  10000 1986-02-01     -0.262     0.0713       16.1
-## 2  10000 1986-03-01      0.359     0.0488       12.0
-## 3  10000 1986-04-01     -0.104    -0.0131       16.3
-## 4  10000 1986-05-01     -0.228     0.0462       15.2
-## # ... with 3,225,157 more rows
+## 1  10000 1986-02-01    -0.262      0.0713       16.1
+## 2  10000 1986-03-01     0.359      0.0488       12.0
+## 3  10000 1986-04-01    -0.104     -0.0131       16.3
+## 4  10000 1986-05-01    -0.228      0.0462       15.2
+## 5  10000 1986-06-01    -0.0102     0.0103       11.8
+## # ... with 3,225,156 more rows
 ```
 
 ## Sorting by market beta
@@ -73,7 +75,7 @@ This procedure, however, does not work if there are non-explicit missing values 
 
 ```r
 beta_lag <- beta %>%
-  mutate(month = month %m+% months(1)) %>% 
+  mutate(month = month %m+% months(1)) %>%
   select(permno, month, beta_lag = beta_daily) %>%
   drop_na()
 
@@ -89,9 +91,13 @@ We then compute the value-weighted returns for each of the two resulting portfol
 ```r
 beta_portfolios <- data_for_sorts %>%
   group_by(month) %>%
-  mutate(breakpoint = median(beta_lag),
-         portfolio = case_when(beta_lag <= breakpoint ~ "low",
-                               beta_lag > breakpoint ~ "high")) %>%
+  mutate(
+    breakpoint = median(beta_lag),
+    portfolio = case_when(
+      beta_lag <= breakpoint ~ "low",
+      beta_lag > breakpoint ~ "high"
+    )
+  ) %>%
   group_by(month, portfolio) %>%
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
@@ -103,13 +109,15 @@ The following figure shows the monthly excess returns of the two portfolios.
 
 
 ```r
-beta_portfolios %>% 
+beta_portfolios %>%
   ggplot(aes(x = month, y = ret, fill = portfolio)) +
   geom_col() +
   facet_wrap(~portfolio, ncol = 1) +
-  scale_y_continuous(labels = percent) + 
-  labs(x = NULL, y = NULL, 
-       title = "Monthly beta portfolio excess returns using median as breakpoint") +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = NULL, y = NULL,
+    title = "Monthly beta portfolio excess returns using median as breakpoint"
+  ) +
   theme(legend.position = "none")
 ```
 
@@ -121,8 +129,8 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 ```r
 beta_longshort <- beta_portfolios %>%
   pivot_wider(month, names_from = portfolio, values_from = ret) %>%
-  mutate(long_short = high - low) %>% 
-  left_join(factors_ff_monthly, by = "month") 
+  mutate(long_short = high - low) %>%
+  left_join(factors_ff_monthly, by = "month")
 ```
 
 We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically uses @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. To implement this test, we compute the average return via `lm()` and then employ the `coeftest` function.
@@ -152,16 +160,18 @@ Now we take portfolio sorts to the next level. We want to be able to sort stocks
 ```r
 assign_portfolio <- function(data, var, n_portfolios) {
   breakpoints <- data %>%
-    summarize(breakpoint = quantile({{ var }}, 
-                                    probs = seq(0, 1, length.out = n_portfolios + 1),
-                                    na.rm = TRUE)) %>%
-    pull(breakpoint) %>% 
+    summarize(breakpoint = quantile({{ var }},
+      probs = seq(0, 1, length.out = n_portfolios + 1),
+      na.rm = TRUE
+    )) %>%
+    pull(breakpoint) %>%
     as.numeric()
-  
+
   data %>%
-    mutate(portfolio = findInterval({{ var }}, 
-                                    breakpoints, 
-                                    all.inside = TRUE)) %>% 
+    mutate(portfolio = findInterval({{ var }},
+      breakpoints,
+      all.inside = TRUE
+    )) %>%
     pull(portfolio)
 }
 ```
@@ -173,11 +183,15 @@ Note that we transform the portfolio column to a factor variable because it prov
 ```r
 beta_portfolios <- data_for_sorts %>%
   group_by(month) %>%
-  mutate(portfolio = assign_portfolio(data = cur_data(), 
-                                      var = beta_lag, 
-                                      n_portfolios = 10),
-         portfolio = as.factor(portfolio)) %>%
-  group_by(portfolio, month) %>% 
+  mutate(
+    portfolio = assign_portfolio(
+      data = cur_data(),
+      var = beta_lag,
+      n_portfolios = 10
+    ),
+    portfolio = as.factor(portfolio)
+  ) %>%
+  group_by(portfolio, month) %>%
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
 
@@ -191,22 +205,26 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 beta_portfolios_summary <- beta_portfolios %>%
   left_join(factors_ff_monthly, by = "month") %>%
   group_by(portfolio) %>%
-  summarise(alpha = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[1]),
-            beta = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[2]),
-            ret = mean(ret))
+  summarise(
+    alpha = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[1]),
+    beta = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[2]),
+    ret = mean(ret)
+  )
 ```
 
 The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.
 
 
 ```r
-beta_portfolios_summary %>% 
+beta_portfolios_summary %>%
   ggplot(aes(x = portfolio, y = alpha, fill = portfolio)) +
   geom_bar(stat = "identity") +
-  labs(title = "Alphas of beta-sorted portfolios",
-       x = "Portfolio",
-       y = "CAPM alpha",
-       fill = "Portfolio") +
+  labs(
+    title = "Alphas of beta-sorted portfolios",
+    x = "Portfolio",
+    y = "CAPM alpha",
+    fill = "Portfolio"
+  ) +
   scale_y_continuous(labels = percent) +
   theme(legend.position = "None")
 ```
@@ -222,17 +240,19 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 
 
 ```r
-sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients 
+sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 
-beta_portfolios_summary %>% 
+beta_portfolios_summary %>%
   ggplot(aes(x = beta, y = ret, color = portfolio)) +
   geom_point() +
   geom_abline(intercept = 0, slope = mean(factors_ff_monthly$mkt_excess)) +
   geom_abline(intercept = sml_capm[1], slope = sml_capm[2], color = "green") +
-  scale_y_continuous(labels = percent, limit = c(0, mean(factors_ff_monthly$mkt_excess)*2)) +
-  scale_x_continuous(limits = c(0,2)) +
-  labs(x = "Beta", y = "Excess return", color = "Portfolio",
-       title = "Average portfolio excess returns and average beta estimates")
+  scale_y_continuous(labels = percent, limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)) +
+  scale_x_continuous(limits = c(0, 2)) +
+  labs(
+    x = "Beta", y = "Excess return", color = "Portfolio",
+    title = "Average portfolio excess returns and average beta estimates"
+  )
 ```
 
 <img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" />
@@ -243,12 +263,14 @@ To provide more evidence against the CAPM predictions, we again form a long-shor
 ```r
 beta_longshort <- beta_portfolios %>%
   ungroup() %>%
-  mutate(portfolio = case_when(portfolio == max(as.numeric(portfolio)) ~ "high",
-                               portfolio == min(as.numeric(portfolio)) ~ "low")) %>% 
+  mutate(portfolio = case_when(
+    portfolio == max(as.numeric(portfolio)) ~ "high",
+    portfolio == min(as.numeric(portfolio)) ~ "low"
+  )) %>%
   filter(portfolio %in% c("low", "high")) %>%
   pivot_wider(month, names_from = portfolio, values_from = ret) %>%
-  mutate(long_short = high - low) %>% 
-  left_join(factors_ff_monthly, by = "month") 
+  mutate(long_short = high - low) %>%
+  left_join(factors_ff_monthly, by = "month")
 ```
 
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 
@@ -288,19 +310,23 @@ The plot below shows the annual returns of the extreme beta portfolios we are ma
 
 
 ```r
-beta_longshort %>% 
-  group_by(year = year(month)) %>% 
-  summarize(low = prod(1 + low),
-            high = prod(1 + high),
-            long_short = prod(1 + long_short)) %>% 
-  pivot_longer(cols = -year) %>% 
+beta_longshort %>%
+  group_by(year = year(month)) %>%
+  summarize(
+    low = prod(1 + low),
+    high = prod(1 + high),
+    long_short = prod(1 + long_short)
+  ) %>%
+  pivot_longer(cols = -year) %>%
   ggplot(aes(x = year, y = 1 - value, fill = name)) +
-  geom_col(position = "dodge") + 
+  geom_col(position = "dodge") +
   facet_wrap(~name, ncol = 1) +
-  theme(legend.position = "none") + 
-  scale_y_continuous(labels = percent) + 
-  labs(title = "Annual returns of beta portfolios",
-       x = NULL, y = NULL)
+  theme(legend.position = "none") +
+  scale_y_continuous(labels = percent) +
+  labs(
+    title = "Annual returns of beta portfolios",
+    x = NULL, y = NULL
+  )
 ```
 
 <img src="32_univariate_sorts_files/figure-html/unnamed-chunk-17-1.png" width="672" style="display: block; margin: auto;" />

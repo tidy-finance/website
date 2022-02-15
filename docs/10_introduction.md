@@ -27,13 +27,14 @@ prices
 ```
 
 ```
-## # A tibble: 2,546 x 8
+## # A tibble: 2,547 x 8
 ##   symbol date        open  high   low close    volume adjusted
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
 ## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
 ## 2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
 ## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
 ## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
+## 5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
 ## # ... with 2,542 more rows
 ```
 
@@ -68,13 +69,14 @@ returns
 ```
 
 ```
-## # A tibble: 2,546 x 3
+## # A tibble: 2,547 x 3
 ##   symbol date            ret
 ##   <chr>  <date>        <dbl>
 ## 1 AAPL   2012-01-03 NA      
 ## 2 AAPL   2012-01-04  0.00537
 ## 3 AAPL   2012-01-05  0.0111 
 ## 4 AAPL   2012-01-06  0.0105 
+## 5 AAPL   2012-01-09 -0.00159
 ## # ... with 2,542 more rows
 ```
 
@@ -166,7 +168,8 @@ returns %>%
 ## 2  2013    0.0472      1.80    -12.4       5.14
 ## 3  2014    0.145       1.36     -7.99      8.20
 ## 4  2015    0.00199     1.68     -6.12      5.74
-## # ... with 7 more rows
+## 5  2016    0.0575      1.47     -6.57      6.50
+## # ... with 6 more rows
 ```
 
 In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names which can be useful for reporting.
@@ -187,7 +190,7 @@ index_prices <- tq_get(ticker,
   filter(symbol != "DOW") # Exclude the index itself
 ```
 
-The resulting file contains 158200 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting file contains 158229 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
@@ -241,11 +244,12 @@ all_returns %>%
 ## # A tibble: 29 x 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AMGN       0.0474     1.99     -13.4      15.1
+## 1 AMGN       0.0471     1.99     -13.4      15.1
 ## 2 AXP        0.0574     2.30     -17.6      21.9
-## 3 BA         0.0620     2.20     -23.8      24.3
-## 4 CAT        0.0693     2.03     -14.5      14.7
-## # ... with 25 more rows
+## 3 BA         0.0618     2.20     -23.8      24.3
+## 4 CAT        0.0692     2.03     -14.5      14.7
+## 5 CRM        0.123      2.68     -27.1      26.0
+## # ... with 24 more rows
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500. However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -357,7 +361,7 @@ tibble(expected_ret = t(mvp_weights) %*% mu, volatility = sqrt(t(mvp_weights) %*
 ## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
-## 1          0.00832         0.0314
+## 1          0.00830         0.0314
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

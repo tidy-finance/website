@@ -359,11 +359,12 @@ performance_table %>%
 ## # A tibble: 11 x 7
 ##   measure        `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op~` `EW  Optimal `
 ##   <chr>             <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
-## 1 Expected util~   -0.250   -0.249         -0.247           -0.247         -0.250
-## 2 Average return   10.5      6.86          14.7             13.4           13.0  
-## 3 SD return        20.3     15.3           20.6             19.6           22.7  
-## 4 Sharpe ratio      0.149    0.129          0.206            0.198          0.166
-## # ... with 7 more rows, and 1 more variable: `EW (no s.) Optimal ` <dbl>
+## 1 Expected util~ -0.250   -2.49e-1       -0.247           -0.247         -0.250  
+## 2 Average return 10.5      6.86e+0       14.7             13.4           13.0    
+## 3 SD return      20.3      1.53e+1       20.6             19.6           22.7    
+## 4 Sharpe ratio    0.149    1.29e-1        0.206            0.198          0.166  
+## 5 CAPM alpha      0.00231  1.08e-4        0.00650          0.00528        0.00440
+## # ... with 6 more rows, and 1 more variable: `EW (no s.) Optimal ` <dbl>
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.

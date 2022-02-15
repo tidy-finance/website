@@ -21,7 +21,8 @@ library(scales)
 We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.
 
 ```{r}
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
   collect()
@@ -31,7 +32,8 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 
 crsp_monthly <- crsp_monthly %>%
   left_join(factors_ff_monthly, by = "month") %>%
-  select(permno, gvkey, month, ret_excess, mkt_excess, mktcap, mktcap_lag, exchange) %>%
+  select(permno, gvkey, month, ret_excess, mkt_excess, 
+         mktcap, mktcap_lag, exchange) %>%
   drop_na()
 ```
 
@@ -46,7 +48,6 @@ be <- compustat %>%
   drop_na() %>%
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
-
 
 ## Book-to-market ratio
 
@@ -103,14 +104,13 @@ assign_portfolio <- function(data, var, n_portfolios, exchanges) {
 }
 ```
 
-After these data preparation steps, we will present bivariate portfolio sorts on an independent and dependent basis.
-
+After these data preparation steps, we present bivariate portfolio sorts on an independent and dependent basis.
 
 ## Independent sorts
 
 Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms. The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
 
-To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_bm`, respectively. Then, these separate portfolios are combined to the final stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier - as the alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
+To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_bm`, respectively. Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{r}
 value_portfolios <- data_for_sorts %>%
@@ -144,10 +144,12 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
   summarise(ret = mean(ret), .groups = "drop_last") %>%
-  summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
+  summarise(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
+              ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
+The resulting annualized value premium is `r `12 * mean(value_premium$value_premium * 100)` percent.
 
 ## Dependent sorts
 
@@ -184,7 +186,8 @@ value_portfolios <- data_for_sorts %>%
 value_premium <- value_portfolios %>%
   group_by(month, portfolio_bm) %>%
   summarize(ret = mean(ret), .groups = "drop_last") %>%
-  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - ret[portfolio_bm == min(portfolio_bm)])
+  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
+              ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
@@ -193,4 +196,4 @@ mean(value_premium$value_premium * 100)
 
 1. In the previous chapter, we examined the distribution of market equity. Repeat this analysis for book equity and the book-to-market ratio (alongside a plot of the breakpoints, i.e., deciles).
 1. When we investigate the portfolios, we focus on the returns exclusively. However, it is also of interest to understand the characteristics of the portfolios. Write a function to compute the average characteristics for size and book-to-market across the 25 independently and dependently sorted portfolios.
-1. As for the size premium, also the value premium constructed here does not follow [@Fama1993]. Implement a p-hacking setup as in the previous chapter to find a premium that comes closest to their HML premium.
+1. As for the size premium, also the value premium constructed here does not follow @Fama1993. Implement a p-hacking setup as in the previous chapter to find a premium that comes closest to their HML premium.

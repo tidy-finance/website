@@ -132,7 +132,8 @@ data %>%
 ## 2 Durbl    0.635  45.3 -33.0   0.54  45.3
 ## 3 Manuf    0.613  17.3 -28.0   0.91  17.3
 ## 4 Enrgy    0.550  32.4 -34.6   0.6   32.4
-## # ... with 6 more rows
+## 5 HiTec    0.682  20.3 -26.5   0.82  20.3
+## # ... with 5 more rows
 ```
 
 ## The tidymodels workflow
@@ -201,7 +202,8 @@ tmp_data
 ## 2        -1.88                1.27         0.387          0.607      0.527 
 ## 3        -1.88                0.341        1.43           0.836      1.12  
 ## 4        -1.88               -1.80        -0.0411        -0.963     -0.0921
-## # ... with 126 more rows, and 121 more variables: factor_q_ia <dbl>,
+## 5        -1.88               -1.29        -0.627         -1.73      -0.850 
+## # ... with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
 ## #   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
 ## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
 ## #   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
