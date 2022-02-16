@@ -1,5 +1,3 @@
-<!-- Naming: random forests & neural networks small cap -->
-
 # Option pricing via machine learning
 
 Machine learning (ML) is seen as a part of artificial intelligence. 
@@ -58,7 +56,7 @@ Despite the computational challenges, implementation in R is not tedious at all 
 
 ## Option pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price ([Black1971]) of a call option for a non-dividend-paying underlying stock is given by
+To apply ML methods in a relevant field of finance, we focus on option pricing. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price [@Black1971] of a call option for a non-dividend-paying underlying stock is given by
 $$
 \begin{aligned}
   C(S, T) &= \Phi(d_1)S - \Phi(d_1 - \sigma\sqrt{T})Ke^{-r T} \\
@@ -96,16 +94,17 @@ option_prices <- expand_grid(
   r = seq(from = 0, to = 0.05, by = 0.01), # Risk-free rate
   T = seq(from = 3 / 12, to = 2, by = 1 / 12), # Time to maturity
   sigma = seq(from = 0.1, to = 0.8, by = 0.1) # Volatility
-) %>%   mutate(
-    black_scholes = black_scholes_price(S, K, r, T, sigma), 
+) %>%
+  mutate(
+    black_scholes = black_scholes_price(S, K, r, T, sigma),
     observed_price = map(black_scholes, function(x) x + rnorm(2, sd = 0.15))
-  ) %>% 
+  ) %>%
   unnest(observed_price)
 ```
 
-The code above generates 1.574\times 10^{6} random parameter constellations. For each of these values two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
+The code above generates more than 1.5 million random parameter constellations. For each of these values two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
 
-Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 3.149\times 10^{4} observations and is therefore relatively small.
+Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 31489 observations and is therefore relatively small.
 In order to keep the analysis reproducible, we use `set.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 
@@ -207,7 +206,7 @@ model
 ## _________________________________________________________________________________
 ```
 
-To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the **raw** data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) %>% select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
+To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) %>% select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
 
 
 ```r
@@ -247,7 +246,7 @@ Finally, we collect all predictions to compare the *out-of-sample* prediction er
 
 
 ```r
-out_of_sample_data <- testing(split) %>% slice_sample(n = 10000) 
+out_of_sample_data <- testing(split) %>% slice_sample(n = 10000)
 
 predictive_performance <- model %>%
   predict(forge(out_of_sample_data, extract_mold(nn_fit)$blueprint)$predictors %>% as.matrix()) %>%
@@ -264,8 +263,8 @@ predictive_performance <- model %>%
   pivot_longer("Deep NN":"Random forest", names_to = "Model") %>%
   mutate(
     moneyness = (S - K),
-    pricing_error = abs(value - black_scholes) 
-  ) 
+    pricing_error = abs(value - black_scholes)
+  )
 ```
 
 In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model. 
@@ -276,11 +275,11 @@ predictive_performance %>%
   ggplot(aes(x = moneyness, y = pricing_error, color = Model)) +
   geom_jitter(alpha = 0.05) +
   geom_smooth(se = FALSE) +
-  theme_minimal() +
-  theme(legend.position = "bottom") +
-  labs(x = "Moneyness (S - K)", color = NULL, 
-       y = "Mean squared prediction error (USD)", 
-       title = "Prediction errors: Call option prices") 
+  labs(
+    x = "Moneyness (S - K)", color = NULL,
+    y = "Mean squared prediction error (USD)",
+    title = "Prediction errors: Call option prices"
+  )
 ```
 
 <img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />

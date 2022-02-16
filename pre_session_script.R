@@ -17,5 +17,4 @@ options(tibble.print_max = 5,
 
 # ggplot2 global theme
 library(ggplot2)
-
 theme_set(theme_bw() + theme(legend.position = "bottom"))

@@ -17,7 +17,8 @@ We start by loading the required data. For simplicity, we restrict our investmen
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
 
 industry_returns <- tbl(tidy_finance, "industries_ff_monthly") %>% 
   collect() 
@@ -134,8 +135,7 @@ transaction_costs %>%
   scale_x_sqrt() +
   labs(x = "Transaction cost parameter", 
        y = "Distance from MVP",
-       title = "Optimal portfolio weights for different risk aversion and transaction cost") + 
-  theme_bw()
+       title = "Optimal portfolio weights for different risk aversion and transaction cost")
 ```
 
 <img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" />
@@ -242,7 +242,6 @@ tibble(`No short-sale` = w_no_short_sale$solution,
              x = Industry)) + 
   geom_bar(position = "dodge", stat = "identity") +
   coord_flip() + 
-  theme_minimal() +
   labs(y = "Allocation weight",
        title =" Optimal allocations for different investment rules") +
   scale_y_continuous(labels = scales::percent)

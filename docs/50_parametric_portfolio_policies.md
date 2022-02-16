@@ -2,7 +2,6 @@
 
 In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. For this purpose, we introduce a direct way to estimate optimal portfolio weights when stock characteristics are related to a stock's expected return, variance, and covariance with other stocks. We parameterize weights as a function of the characteristics such that we maximize the expected utility. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by [@Brandt2009]. 
 
-
 ## Data preparation
 
 To get started, we load the required packages alongside the monthly CRSP file, which forms our investment universe. 
@@ -153,7 +152,7 @@ weights_crsp <- compute_portfolio_weights(theta,
 
 ## Portfolio perfomance
 
-Are these weights optimal in any way? Most likely not, as we picked $\theta$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, [@Brandt2009] focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
+Are these weights optimal in any way? Most likely not, as we picked $\theta$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
 
 
 ```r
@@ -352,19 +351,22 @@ performance_table %>%
     values_from = " ":Optimal,
     names_glue = "{value_weighting} {allow_short_selling} {.value} "
   ) %>%
-  select(measure, `EW    `, `VW    `, sort(contains("Optimal")))
+  select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>% 
+  print(n = 11, width = 7)
 ```
 
 ```
-## # A tibble: 11 x 7
-##   measure        `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op~` `EW  Optimal `
-##   <chr>             <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
-## 1 Expected util~ -0.250   -2.49e-1       -0.247           -0.247         -0.250  
-## 2 Average return 10.5      6.86e+0       14.7             13.4           13.0    
-## 3 SD return      20.3      1.53e+1       20.6             19.6           22.7    
-## 4 Sharpe ratio    0.149    1.29e-1        0.206            0.198          0.166  
-## 5 CAPM alpha      0.00231  1.08e-4        0.00650          0.00528        0.00440
-## # ... with 6 more rows, and 1 more variable: `EW (no s.) Optimal ` <dbl>
+## # A
+## #   tibble:
+## #   11
+## #   x
+## #   7
+## #   with
+## #   7
+## #   more
+## #   variables:
+## #   measure <chr>,
+## #   `EW    ` <dbl>, ...
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.
@@ -376,4 +378,4 @@ The results indicate that the average annualized Sharpe ratio of the equal-weigh
 1. The code above is very flexible in the sense that you can easily add new firm characteristics. Construct a new characteristic and evaluate the corresponding coefficient $\hat\theta_i$. 
 1. Tweak the function `optimal_theta`such that you can impose additional performance constraints in order to determine $\hat\theta$ which maximizes expected utility under the constraint that the market beta is below 1.
 1. Does the portfolio performance resemble a realistic out-of-sample backtesting procedure? Verify the robustness of the results by first estimating $\hat\theta$ based on *past data* only. Then, use more recent periods to evaluate the actual portfolio performance. 
-1. By formulating the portfolio problem as a statistical estimation problem, you can easily obtain standard errors for the coefficients of the weight function. [@Brandt2009] provide the relevant derivations in their paper in Equation (10). Implement a small function that computes standard errors for $\hat\theta$.
+1. By formulating the portfolio problem as a statistical estimation problem, you can easily obtain standard errors for the coefficients of the weight function. @Brandt2009 provide the relevant derivations in their paper in Equation (10). Implement a small function that computes standard errors for $\hat\theta$.

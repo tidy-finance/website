@@ -1,23 +1,25 @@
-<!-- Ensure ML / Machine Learning consistency with 41 -->
-
 # Factor selection via machine learning
 
-The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the stock beta. Such findings question the usefulness of the Capital Asset Pricing Model. In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). Therefore, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. 
+The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* @Cochrane2011. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta. 
+Such findings question the usefulness of the Capital Asset Pricing Model. 
+In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). 
+Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. 
 
 We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions to identify macro-economic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
 ## Brief theoretical background
 
-This is a book about *doing* empirical work in a tidy manner and we refer to any of the many excellent textbook treatments of machine learning methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow. 
+This is a book about *doing* empirical work in a tidy manner and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow. 
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
-While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, machine learning is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = {\hat\beta^\text{ols}}' \tilde x_t.$$ 
+While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = {\hat\beta^\text{ols}}' \tilde x_t.$$ 
 Is this the best we can do? 
-Not really: Instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by reducing the variance of the estimator $\hat\beta^\text{ols}$. At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature) it may be a desirable feature to *select* reasonable factors and set $\hat\beta_k = 0$ for some redundant factors. 
+Not really: Instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators $\hat{\beta}$ with lower variance than the estimator $\hat\beta^\text{ols}$. 
+At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature) it may be a desirable feature to *select* reasonable factors and set $\hat\beta_k = 0$ for some redundant factors. 
 
-It should be clear that the promised benefits of penalized regressions come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the necessary considerations, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$$ While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. For instance, the mean-squared error (MSE) depends on our model choice as follow: $$\begin{aligned}
-&=E((y-\hat{f}(\textbf{x}))^2)=E((f(\textbf{x})+\epsilon-\hat{f}(\textbf{x}))^2)\\
+It should be clear that the promised benefits of penalized regressions come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$$ While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. For instance, the mean-squared error (MSE) depends on our model choice as follow: $$\begin{aligned}
+MSE &=E((y-\hat{f}(\textbf{x}))^2)=E((f(\textbf{x})+\epsilon-\hat{f}(\textbf{x}))^2)\\
 &= \underbrace{E((f(\textbf{x})-\hat{f}(\textbf{x}))^2)}_{\text{total quadratic error}}+\underbrace{E(\epsilon^2)}_{\text{irreducible error}} \\
 &= E\left(\hat{f}(\textbf{x})^2\right)+E\left(f(\textbf{x})^2\right)-2E\left(f(\textbf{x})\hat{f}(\textbf{x})\right)+\sigma_\varepsilon^2\\
 &=E\left(\hat{f}(\textbf{x})^2\right)+f(\textbf{x})^2-2f(\textbf{x})E\left(\hat{f}(\textbf{x})\right)+\sigma_\varepsilon^2\\
@@ -58,10 +60,10 @@ library(scales)
 
 In this analysis, we use four different data sources. We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
 
--   The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993.
--   Monthly q-factor returns from [@Hou2015]. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor
+-   The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993
+-   Monthly q-factor returns from @Hou2015. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor
 
-Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to [@Cochrane2005] on the role of conditioning information.
+Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to @Cochrane2005 on the role of conditioning information.
 
 - Our set of macroeconomic predictors comes from the paper "A Comprehensive Look at The Empirical Performance of Equity Premium Prediction" [@Goyal2008]. The data has been updated by the authors until 2020 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the Dividend Price Ratio, Earnings Price Ratio, Stock Variance, Net Equity Expansion, Treasury Bill rate and inflation
 
@@ -108,7 +110,8 @@ data <- industries_ff_monthly %>%
   drop_na()
 ```
 
-Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. The panel ranges from January 1967 until November 2020. The table below provides summary statistics for the 10 industries such as the sample standard deviation and the minimum and maximum monthly excess returns.
+Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. 
+The table below provides annualized summary statistics for the 10 industries such as the sample standard deviation and the minimum and maximum monthly excess returns in percent.
 
 
 ```r
@@ -116,29 +119,29 @@ data %>%
   group_by(industry) %>%
   mutate(ret = 100 * ret) %>%
   summarise(
-    mean = mean(ret),
-    sd = max(ret),
-    min = min(ret),
-    median = median(ret),
-    max = max(ret)
+    mean = mean(12 * ret),
+    sd = sqrt(12) * sd(ret),
+    min_monthly = min(ret),
+    median = median(12 * ret),
+    max_monthly = max(ret)
   )
 ```
 
 ```
 ## # A tibble: 10 x 6
-##   industry  mean    sd   min median   max
-##   <fct>    <dbl> <dbl> <dbl>  <dbl> <dbl>
-## 1 NoDur    0.700  18.3 -21.6   0.77  18.3
-## 2 Durbl    0.635  45.3 -33.0   0.54  45.3
-## 3 Manuf    0.613  17.3 -28.0   0.91  17.3
-## 4 Enrgy    0.550  32.4 -34.6   0.6   32.4
-## 5 HiTec    0.682  20.3 -26.5   0.82  20.3
+##   industry  mean    sd min_monthly median max_monthly
+##   <fct>    <dbl> <dbl>       <dbl>  <dbl>       <dbl>
+## 1 NoDur     8.40  15.0       -21.6   9.24        18.3
+## 2 Durbl     7.62  23.8       -33.0   6.48        45.3
+## 3 Manuf     7.35  17.5       -28.0  10.9         17.3
+## 4 Enrgy     6.60  20.8       -34.6   7.2         32.4
+## 5 HiTec     8.19  22.6       -26.5   9.84        20.3
 ## # ... with 5 more rows
 ```
 
 ## The tidymodels workflow
 
-To illustrate penalized linear regressions, we employ the `tidymodels` collection of packages for modeling and machine learning using `tidyverse` principles. You can simply use `install.packages("tidymodels")` to get access to all the related packages. We recommend checking out the work of Max Kuhn and Julia Silge: They  continuously write on a great book '[Tidy Modeling with R](https://www.tmwr.org/)' using tidy principles.
+To illustrate penalized linear regressions, we employ the `tidymodels` collection of packages for modeling and ML using `tidyverse` principles. You can simply use `install.packages("tidymodels")` to get access to all the related packages. We recommend checking out the work of Max Kuhn and Julia Silge: They  continuously write on the great book '[Tidy Modeling with R](https://www.tmwr.org/)' using tidy principles.
 
 The `tidymodels` workflow encompasses the main stages of the modeling process: pre-processing of data, model fitting, and post-processing of results. As we demonstrate below, `tidymodels` provides efficient workflows that you can update with low effort.
 
@@ -183,7 +186,7 @@ rec <- recipe(ret ~ ., data = training(split)) %>%
 ```
 
 A table of all available recipe steps can be found [here](https://www.tidymodels.org/find/recipes/). As of 2022, more than 100 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
-In the example above, it does not make a difference whether the input `data = training(split)` or `data = testing(split)` is used. 
+In the example above, it does not make a difference whether you use the input `data = training(split)` or `data = testing(split)`. 
 All that matters at this early stage are the column names and types.
 
 We can apply the recipe to any data with a suitable structure. The code below combines two different functions: `prep` estimates the required parameters from a training set that can be applied to other data sets later. `bake` applies the processed computations to new data.
@@ -289,7 +292,6 @@ predicted_values <- lm_fit %>%
 predicted_values %>%
   ggplot(aes(x = month, y = value, color = Variable)) +
   geom_line() +
-  theme_minimal() +
   labs(
     x = NULL,
     y = NULL,
@@ -311,11 +313,10 @@ predicted_values %>%
     ymin = -Inf, ymax = Inf
   ),
   alpha = 0.005
-  ) +
-  theme(legend.position = "bottom")
+  )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/industrypremia-1.png" width="672" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
@@ -358,11 +359,10 @@ bind_rows(
     x = "Lambda", y = NULL,
     title = "Estimated Coefficients paths as a function of the penalty factor"
   ) +
-  theme_minimal() +
   theme(legend.position = "none")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
 
 ::: {.rmdnote}
 One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. 
@@ -373,7 +373,7 @@ As a result, the estimated coefficients for the [special case](https://parsnip.t
 
 To compute $\hat\beta_\lambda^\text{Lasso}$ , we simply imposed a value for the penalty hyperparameter $\lambda$. Model tuning is the process of optimally selecting such hyperparameters. `tidymodels` provides extensive tuning options based on so-called *cross-validation*. Again, we refer to any treatment of cross-validation to get a more detailed  discussion of the statistical underpinnings. Here we focus on the general idea and the implementation with `tidymodels`. 
 
-The goal for choosing $\lambda$ (or any other hyperparameter, e.g., $\rho$) is to find a way to produce predictors $\hat{Y}$ for an outcome $Y$ that minimizes the mean squared prediction error (i.e., *MSPE*) $\text{MSPE} = E\left( \frac{1}{T}\sum_{t=1}^T (\hat{y}_t - y_t)^2 \right)$. Unfortunately, the MSPE is not directly observable. We can only compute an estimate because our data is random and because we do not observe the entire population.
+The goal for choosing $\lambda$ (or any other hyperparameter, e.g., $\rho$) is to find a way to produce predictors $\hat{Y}$ for an outcome $Y$ that minimizes the mean squared prediction error $\text{MSPE} = E\left( \frac{1}{T}\sum_{t=1}^T (\hat{y}_t - y_t)^2 \right)$. Unfortunately, the MSPE is not directly observable. We can only compute an estimate because our data is random and because we do not observe the entire population.
 
 Obviously, if we train an algorithm on the same data that we use to compute the error, our estimate $\hat{\text{MSPE}}$ would indicate way better predictive accuracy than what we can expect in a real out-of-sample data. The result is called overfitting.
 
@@ -431,14 +431,12 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 
 ```r
 autoplot(lm_tune) +
-  theme_minimal() +
-  theme(legend.position = "bottom") +
   labs(y = "Root mean-squared prediction error",
        title = "MSPE for Manufacturing excess returns",
        subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization.")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/cvplot-1.png" width="672" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-15-1.png" width="672" style="display: block; margin: auto;" />
 
   The figure shows that the cross-validated mean squared prediction error drops for Lasso and Elastic Net and spikes afterwards. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE, which exhibits some intermediate level of regularization.
 
@@ -539,7 +537,6 @@ selected_factors %>%
   )) +
   geom_tile() +
   scale_fill_manual(values = c("white", "cornflowerblue")) +
-  theme_minimal() +
   theme(legend.position = "None") +
   labs(
     x = NULL, y = NULL,
@@ -547,7 +544,7 @@ selected_factors %>%
   )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 
 The heat map conveys two main insights. First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
 
