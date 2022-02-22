@@ -56,7 +56,7 @@ Despite the computational challenges, implementation in R is not tedious at all 
 
 ## Option pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price [@Black1971] of a call option for a non-dividend-paying underlying stock is given by
+To apply ML methods in a relevant field of finance, we focus on option pricing. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price [@Black1976] of a call option for a non-dividend-paying underlying stock is given by
 $$
 \begin{aligned}
   C(S, T) &= \Phi(d_1)S - \Phi(d_1 - \sigma\sqrt{T})Ke^{-r T} \\

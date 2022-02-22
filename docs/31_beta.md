@@ -92,7 +92,7 @@ estimate_capm <- function(data, min_obs = 1) {
 }
 ```
 
-Next, we define a function that does the rolling estimation. To perform the rolling-window estimation, we use the `slider` package of [Davis Vaughan](https://github.com/DavisVaughan/slider), which provides a family of sliding window functions similar to `purrr::map()`. Most importantly, the `slide_period` function is able to handle months in its window input in a straightforward manner. We thus avoid using any time-series package (e.g., `zoo`) and converting the data to fit the package functions, but rather stay in the world of tibbles.
+Next, we define a function that does the rolling estimation. To perform the rolling-window estimation, we use the `slider` package of [Davis Vaughan](https://github.com/DavisVaughan/slider). The `slide_period` function is able to handle months in its window input in a straightforward manner. We thus avoid using any time-series package (e.g., `zoo`) and converting the data to fit the package functions, but rather stay in the world of tibbles.
 
 The following function takes input data and slides across the month vector, considering only a total of `months` months. The function essentially performs three steps: (i) combine all rows into a single data frame (which comes in handy in the case of daily data), (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding beta estimates (again particularly useful in the case of daily data).
 As we demonstrate further below, we can also apply the same function to daily returns data. 
@@ -180,9 +180,8 @@ Even though we could now just apply the function using `group_by()` on the whole
 Remember that we have to perform rolling-window estimations across all stocks and time periods. 
 However, this estimation problem is an ideal scenario to employ the power of parallelization. 
 Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine). 
-It turns out to be quite easy to implement with only a small addition to what we already have learned using `map()`-functions. 
 
-First, we nest the data by `permno`. Nested data means we now have a list of `permno` with corresponding time series data.
+First, we `nest()` the data by `permno`. Nested data means we now have a list of `permno` with corresponding time series data.
 
 
 ```r
@@ -203,7 +202,7 @@ crsp_monthly_nested
 ## # ... with 29,202 more rows
 ```
 
-Note that we could use `map()` across all the `permno`s and get the same results as above. 
+Next, we ant to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
 
 
 ```r
@@ -234,7 +233,7 @@ However, instead, we want to perform the estimations of rolling betas for differ
 plan(multisession, workers = availableCores())
 ```
 
-Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Notice the difference in the code below? All you need to do is to replace `map` with `future_map`.
+Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Notice the difference in the code below? All you need to do is to replace `map()` with `future_map()`.
 
 
 ```r
