@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-02-22"
+date: "2022-02-23"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -27,13 +27,8 @@ We are grateful for any kind of feedback on *every* aspect of the book. So pleas
 
 ## Why does this book exist? {.unnumbered}
 
-Financial economics is a vibrant area of research, a central part of all businesses activities, and relevant for our everyday life. Despite its relevance for our society and a vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. 
+Financial economics is a vibrant area of research, a central part of all businesses activities, and at least implicitly relevant for our everyday life. Despite its relevance for our society and a vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. 
 As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key concepts of financial economics. The lack of transparent code not only leads to numerous replication efforts (and their failures), but it also constitutes a waste of resources on problems that have already been solved by countless others in secrecy.
-
-
-Finance is a vibrant area of economic research with a broad range of academic and real-world empirical applications. As a student, researcher or data analyst, you are typically exposed to different types of financial data, including historical asset prices, accounting data or transaction histories, just to name a few examples. 
-Despite the vast number of empirical studies of financial phenomenons, one quickly learns that the actual implementation is typically rather opaque. 
-As graduate students, we were particularly surprised by the lack of public code for seminal papers or even textbooks on key concepts of financial economics. The lack of transparent code not only leads to numerous replication efforts (and their failures), but it also constitutes a waste of resources on problems that have already been solved by countless others in secrecy. 
 
 This book aims to lift the curtain on reproducible finance by providing a fully transparent code base for many common financial applications. We hope to inspire others to share their code publicly and take part in our journey towards more reproducible research in the future. 
 
@@ -47,7 +42,7 @@ We write this book for three audiences:
 
 ## What will you learn? {.unnumbered}
 
-The book is currently divided into 5 main parts:
+The book is currently divided into 5 parts:
 
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
 * Chapter 2 provides tools to organize your data and prepare the most common data sets used in financial research: CRSP and Compustat.

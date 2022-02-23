@@ -1,3 +1,5 @@
+# (PART\*) Financial data {.unnumbered}
+
 # Accessing & managing financial data
 
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
@@ -204,7 +206,7 @@ factors_ff_monthly_db %>%
 ```
 ## # Source:   lazy query [?? x 2]
 ## # Database: sqlite 3.37.0
-## #   [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
+## #   [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -790,7 +792,7 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-02-22
+## 5  54594 001004 1972-04-24 2022-02-23
 ## # ... with 31,765 more rows
 ```
 
