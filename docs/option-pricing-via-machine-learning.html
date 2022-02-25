@@ -91,12 +91,11 @@ We show how to implement random forests and deep neural networks with tidy princ
 <p>In order to replicate the analysis regarding neural networks in this chapter, you have to install <code>TensorFlow</code> on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow <a href="https://tensorflow.rstudio.com/installation/">these quick start instructions</a>.</p>
 </div>
 <p>Throughout this chapter we need the following packages.</p>
-<div class="sourceCode" id="cb211"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb209"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidymodels.tidymodels.org">tidymodels</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://keras.rstudio.com">keras</a></span><span class="op">)</span>
-<span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/tidymodels/hardhat">hardhat</a></span><span class="op">)</span>
-<span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/imbs-hl/ranger">ranger</a></span><span class="op">)</span></code></pre></div>
+<span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/tidymodels/hardhat">hardhat</a></span><span class="op">)</span></code></pre></div>
 <div id="regression-trees-and-random-forests" class="section level2" number="9.1">
 <h2>
 <span class="header-section-number">9.1</span> Regression trees and random forests<a class="anchor" aria-label="anchor" href="#regression-trees-and-random-forests"><i class="fas fa-link"></i></a>
@@ -139,7 +138,7 @@ While the easiest case with <span class="math inline">\(f(x) = \alpha + \beta x\
 \]</span>
 where <span class="math inline">\(C(S, T)\)</span> is the price of the option as a function of today’s stock price of the underlying, <span class="math inline">\(S\)</span>, with time to maturity<span class="math inline">\(T\)</span>, <span class="math inline">\(r_f\)</span> is the risk-free interest rate, and <span class="math inline">\(\sigma\)</span> is the volatility of the underlying stock return. <span class="math inline">\(\Phi\)</span> is the cumulative distribution function of a standard normal random variable.</p>
 <p>The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters <span class="math inline">\(S, K, r_f, T\)</span> and <span class="math inline">\(\sigma\)</span> are specified (arguably, all parameters are easy to specify except for <span class="math inline">\(\sigma\)</span> which has to be estimated). A simple R function allows computing the price as we do below.</p>
-<div class="sourceCode" id="cb212"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb210"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">black_scholes_price</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">S</span> <span class="op">=</span> <span class="fl">50</span>, <span class="va">K</span> <span class="op">=</span> <span class="fl">70</span>, <span class="va">r</span> <span class="op">=</span> <span class="fl">0</span>, <span class="va">T</span> <span class="op">=</span> <span class="fl">1</span>, <span class="va">sigma</span> <span class="op">=</span> <span class="fl">0.2</span><span class="op">)</span> <span class="op">{</span>
   <span class="va">d1</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html">log</a></span><span class="op">(</span><span class="va">S</span> <span class="op">/</span> <span class="va">K</span><span class="op">)</span> <span class="op">+</span> <span class="op">(</span><span class="va">r</span> <span class="op">+</span> <span class="va">sigma</span><span class="op">^</span><span class="fl">2</span> <span class="op">/</span> <span class="fl">2</span><span class="op">)</span> <span class="op">*</span> <span class="cn">T</span><span class="op">)</span> <span class="op">/</span> <span class="op">(</span><span class="va">sigma</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html">sqrt</a></span><span class="op">(</span><span class="cn">T</span><span class="op">)</span><span class="op">)</span>
   <span class="va">value</span> <span class="op">&lt;-</span> <span class="va">S</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">pnorm</a></span><span class="op">(</span><span class="va">d1</span><span class="op">)</span> <span class="op">-</span> <span class="va">K</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html">exp</a></span><span class="op">(</span><span class="op">-</span><span class="va">r</span> <span class="op">*</span> <span class="cn">T</span><span class="op">)</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html">pnorm</a></span><span class="op">(</span><span class="va">d1</span> <span class="op">-</span> <span class="va">sigma</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html">sqrt</a></span><span class="op">(</span><span class="cn">T</span><span class="op">)</span><span class="op">)</span>
@@ -156,7 +155,7 @@ where <span class="math inline">\(C(S, T)\)</span> is the price of the option as
 <span class="header-section-number">9.4.1</span> Data simulation<a class="anchor" aria-label="anchor" href="#data-simulation"><i class="fas fa-link"></i></a>
 </h3>
 <p>To that end, we start with simulated data. We compute option prices for call options for a grid of different combinations of times to maturity (<code>T</code>), risk-free rates (<code>r</code>), volatilities (<code>sigma</code>), strike prices (<code>K</code>), and current stock prices (<code>S</code>). In the code below, we add an idiosyncratic error term to each observation such that the prices considered do not exactly reflect the values implied by the Black-Scholes equation.</p>
-<div class="sourceCode" id="cb213"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb211"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">option_prices</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tidyr.tidyverse.org/reference/expand_grid.html">expand_grid</a></span><span class="op">(</span>
   S <span class="op">=</span> <span class="fl">40</span><span class="op">:</span><span class="fl">60</span>, <span class="co"># Stock price</span>
   K <span class="op">=</span> <span class="fl">20</span><span class="op">:</span><span class="fl">90</span>, <span class="co"># Strike price</span>
@@ -172,11 +171,11 @@ where <span class="math inline">\(C(S, T)\)</span> is the price of the option as
 <p>The code above generates more than 1.5 million random parameter constellations. For each of these values two <em>observed</em> prices reflecting the Black-Scholes prices are given and a random innovation term <em>pollutes</em> the observed prices.</p>
 <p>Next, we split the data into a training set (which contains 1% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 31489 observations and is therefore relatively small.
 In order to keep the analysis reproducible, we use <code><a href="https://rdrr.io/r/base/Random.html">set.seed()</a></code>. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines.</p>
-<div class="sourceCode" id="cb214"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb212"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/base/Random.html">set.seed</a></span><span class="op">(</span><span class="fl">420</span><span class="op">)</span>
 <span class="va">split</span> <span class="op">&lt;-</span> <span class="fu">initial_split</span><span class="op">(</span><span class="va">option_prices</span>, prop <span class="op">=</span> <span class="fl">1</span> <span class="op">/</span> <span class="fl">100</span><span class="op">)</span></code></pre></div>
 <p>We process the training dataset further before we fit the different ML models. We define a <code>recipe</code> that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The <em>true</em> price (stored in <code>black_scholes</code>) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.</p>
-<div class="sourceCode" id="cb215"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb213"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">rec</span> <span class="op">&lt;-</span> <span class="fu">recipe</span><span class="op">(</span><span class="va">observed_price</span> <span class="op">~</span> <span class="va">.</span>,
   data <span class="op">=</span> <span class="va">option_prices</span>
 <span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
@@ -188,7 +187,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 <span class="header-section-number">9.4.2</span> Single layer networks and random forests<a class="anchor" aria-label="anchor" href="#single-layer-networks-and-random-forests"><i class="fas fa-link"></i></a>
 </h3>
 <p>Next, we show how to fit a neural network to the data. Note that this requires that <code>keras</code> is installed on your local machine. The function <code>mlp</code> from the package <code>parsnip</code> provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 20 hidden units. We set the number of training iterations to <code>epochs = 75</code>. The option <code>set_mode("regression")</code> specifies a linear activation function for the output layer.</p>
-<div class="sourceCode" id="cb216"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb214"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">nnet_model</span> <span class="op">&lt;-</span> <span class="fu">mlp</span><span class="op">(</span>
   epochs <span class="op">=</span> <span class="fl">75</span>,
   hidden_units <span class="op">=</span> <span class="fl">20</span>
@@ -196,13 +195,13 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
   <span class="fu">set_mode</span><span class="op">(</span><span class="st">"regression"</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">set_engine</span><span class="op">(</span><span class="st">"keras"</span>, verbose <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></code></pre></div>
 <p>The <code>verbose=0</code> argument prevents logging the results. We can follow the straightforward <code>tidymodel</code> workflow as in the chapter before: Define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data.</p>
-<div class="sourceCode" id="cb217"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb215"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">nn_fit</span> <span class="op">&lt;-</span> <span class="fu">workflow</span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">add_recipe</span><span class="op">(</span><span class="va">rec</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">add_model</span><span class="op">(</span><span class="va">nnet_model</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://generics.r-lib.org/reference/fit.html">fit</a></span><span class="op">(</span>data <span class="op">=</span> <span class="fu">training</span><span class="op">(</span><span class="va">split</span><span class="op">)</span><span class="op">)</span></code></pre></div>
 <p>Once you are familiar with the <code>tidymodel</code> workflow, it is a piece of cake to fit other models from the <code>parsnip</code> family. For instance, the model below initializes a random forest with 50 trees contained in the ensemble where we require at least 20 observations in a node.</p>
-<div class="sourceCode" id="cb218"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb216"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">rf_model</span> <span class="op">&lt;-</span> <span class="fu">rand_forest</span><span class="op">(</span>
   trees <span class="op">=</span> <span class="fl">50</span>,
   min_n <span class="op">=</span> <span class="fl">20</span>
@@ -210,7 +209,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
   <span class="fu">set_engine</span><span class="op">(</span><span class="st">"ranger"</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">set_mode</span><span class="op">(</span><span class="st">"regression"</span><span class="op">)</span></code></pre></div>
 <p>Fitting the model follows exactly the same convention as for the neural network before.</p>
-<div class="sourceCode" id="cb219"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb217"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">rf_fit</span> <span class="op">&lt;-</span> <span class="fu">workflow</span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">add_recipe</span><span class="op">(</span><span class="va">rec</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">add_model</span><span class="op">(</span><span class="va">rf_model</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
@@ -221,7 +220,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 <span class="header-section-number">9.4.3</span> Deep neural networks<a class="anchor" aria-label="anchor" href="#deep-neural-networks"><i class="fas fa-link"></i></a>
 </h3>
 <p>Note that while the <code>tidymodels</code> workflow is extremely convenient, more sophisticated <em>deep</em> neural networks are not supported yet (as of January 2022). For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers with 20 units per layer. The <code>keras</code> package provides a convenient interface and is flexible enough to handle different activation functions. The <code>compile</code> command defines the loss function with which the model predictions are evaluated.</p>
-<div class="sourceCode" id="cb220"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb218"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">model</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://keras.rstudio.com/reference/keras_model_sequential.html">keras_model_sequential</a></span><span class="op">(</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://keras.rstudio.com/reference/layer_dense.html">layer_dense</a></span><span class="op">(</span>units <span class="op">=</span> <span class="fl">20</span>, activation <span class="op">=</span> <span class="st">"sigmoid"</span>, input_shape <span class="op">=</span> <span class="fl">5</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://keras.rstudio.com/reference/layer_dense.html">layer_dense</a></span><span class="op">(</span>units <span class="op">=</span> <span class="fl">20</span>, activation <span class="op">=</span> <span class="st">"sigmoid"</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
@@ -248,7 +247,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 ## Non-trainable params: 0
 ## _________________________________________________________________________________</code></pre>
 <p>To train the neural network, we provide the inputs (<code>x</code>) and the variable to predict (<code>y</code>) and then fit the parameters. Note the slightly tedious use of the method <code>extract_mold(nn_fit)</code>. Instead of simply using the <em>raw</em> data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling <code>x = training(data) %&gt;% select(-observed_price, -black_scholes)</code>? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that <code><a href="https://generics.r-lib.org/reference/fit.html">fit()</a></code> alters the <code>keras</code> model - this is one of the few instances where a function in R alters the <em>input</em> such that after the function call the object <code>model</code> is not same anymore!</p>
-<div class="sourceCode" id="cb222"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb220"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">model</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://generics.r-lib.org/reference/fit.html">fit</a></span><span class="op">(</span>
     x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/pkg/hardhat/man/hardhat-extract.html">extract_mold</a></span><span class="op">(</span><span class="va">nn_fit</span><span class="op">)</span><span class="op">$</span><span class="va">predictors</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="op">)</span>,
@@ -261,7 +260,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 <span class="header-section-number">9.4.4</span> Universal approximation<a class="anchor" aria-label="anchor" href="#universal-approximation"><i class="fas fa-link"></i></a>
 </h3>
 <p>Before we evaluate the results, we implement one more model: In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions. To illustrate this, we first define a new recipe, <code>rec_linear</code>, which processes the training data even further. We include polynomials up to the tenth degree of each predictor and then add all possible pairwise interaction terms. The final recipe step, <code>step_lincomb</code>, removes potentially redundant variables (for instance, the interaction between <span class="math inline">\(r^4\)</span> and <span class="math inline">\(r^5\)</span> is the same as the term <span class="math inline">\(r^9\)</span>). We fit a Lasso regression model with a pre-specified penalty term (consult the chapter on factor selection on how to tune the model hyperparameters).</p>
-<div class="sourceCode" id="cb223"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb221"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">rec_linear</span> <span class="op">&lt;-</span> <span class="va">rec</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">step_poly</span><span class="op">(</span><span class="fu">all_predictors</span><span class="op">(</span><span class="op">)</span>, degree <span class="op">=</span> <span class="fl">10</span>, options <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html">list</a></span><span class="op">(</span>raw <span class="op">=</span> <span class="cn">T</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu">step_interact</span><span class="op">(</span>terms <span class="op">=</span> <span class="op">~</span> <span class="fu">all_predictors</span><span class="op">(</span><span class="op">)</span><span class="op">:</span><span class="fu">all_predictors</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
@@ -281,7 +280,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 <span class="header-section-number">9.5</span> Prediction evaluation<a class="anchor" aria-label="anchor" href="#prediction-evaluation"><i class="fas fa-link"></i></a>
 </h2>
 <p>Finally, we collect all predictions to compare the <em>out-of-sample</em> prediction error evaluated on ten thousand new data points. Note that for the evaluation, we use the call to <code>extract_mold</code> to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in <code><a href="https://rdrr.io/pkg/hardhat/man/forge.html">hardhat::forge</a></code>, which provides an easy, consistent, and robust pre-processor at prediction time.</p>
-<div class="sourceCode" id="cb224"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb222"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">out_of_sample_data</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://dbplyr.tidyverse.org/reference/testing.html">testing</a></span><span class="op">(</span><span class="va">split</span><span class="op">)</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/slice.html">slice_sample</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">10000</span><span class="op">)</span>
 
 <span class="va">predictive_performance</span> <span class="op">&lt;-</span> <span class="va">model</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
@@ -302,7 +301,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
     pricing_error <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html">abs</a></span><span class="op">(</span><span class="va">value</span> <span class="op">-</span> <span class="va">black_scholes</span><span class="op">)</span>
   <span class="op">)</span></code></pre></div>
 <p>In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model.</p>
-<div class="sourceCode" id="cb225"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb223"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">predictive_performance</span> <span class="op"><a href="https://keras.rstudio.com/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">moneyness</span>, y <span class="op">=</span> <span class="va">pricing_error</span>, color <span class="op">=</span> <span class="va">Model</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span>
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_jitter.html">geom_jitter</a></span><span class="op">(</span>alpha <span class="op">=</span> <span class="fl">0.05</span><span class="op">)</span> <span class="op">+</span>
@@ -356,8 +355,8 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 
       <div class="book-extra">
         <ul class="list-unstyled">
-<li><a id="book-source" href="https://github.com/voigtstefan/tidy_finance/blob/main/docs/41_option_pricing_via_machine_learning.Rmd">View source <i class="fab fa-github"></i></a></li>
-          <li><a id="book-edit" href="https://github.com/voigtstefan/tidy_finance/edit/main/docs/41_option_pricing_via_machine_learning.Rmd">Edit this page <i class="fab fa-github"></i></a></li>
+<li><a id="book-source" href="https://github.com/voigtstefan/tidy_finance/blob/main/41_option_pricing_via_machine_learning.Rmd">View source <i class="fab fa-github"></i></a></li>
+          <li><a id="book-edit" href="https://github.com/voigtstefan/tidy_finance/edit/main/41_option_pricing_via_machine_learning.Rmd">Edit this page <i class="fab fa-github"></i></a></li>
         </ul>
 </div>
     </nav>
@@ -369,7 +368,7 @@ In order to keep the analysis reproducible, we use <code><a href="https://rdrr.i
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-02-23.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-02-25.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

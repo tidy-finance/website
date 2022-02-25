@@ -19,7 +19,6 @@ library(tidyverse)
 library(tidymodels)
 library(keras)
 library(hardhat)
-library(ranger)
 ```
 
 

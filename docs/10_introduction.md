@@ -29,7 +29,7 @@ prices
 ```
 
 ```
-## # A tibble: 2,552 x 8
+## # A tibble: 2,554 x 8
 ##   symbol date        open  high   low close    volume adjusted
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
 ## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
@@ -37,7 +37,7 @@ prices
 ## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
 ## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
 ## 5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
-## # ... with 2,547 more rows
+## # ... with 2,549 more rows
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of traded shares), and the *adjusted* price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions do affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -71,7 +71,7 @@ returns
 ```
 
 ```
-## # A tibble: 2,552 x 3
+## # A tibble: 2,554 x 3
 ##   symbol date            ret
 ##   <chr>  <date>        <dbl>
 ## 1 AAPL   2012-01-03 NA      
@@ -79,7 +79,7 @@ returns
 ## 3 AAPL   2012-01-05  0.0111 
 ## 4 AAPL   2012-01-06  0.0105 
 ## 5 AAPL   2012-01-09 -0.00159
-## # ... with 2,547 more rows
+## # ... with 2,549 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date. 
@@ -139,7 +139,7 @@ returns %>%
 ## # A tibble: 1 x 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
 ##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.117         1.79         -12.9          12.0
+## 1          0.116         1.79         -12.9          12.0
 ```
 
 We see that the maximum *daily* return was around 11.981 percent.  
@@ -192,7 +192,7 @@ index_prices <- tq_get(ticker,
   filter(symbol != "DOW") # Exclude the index itself
 ```
 
-The resulting file contains 158374 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting file contains 158432 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
@@ -246,11 +246,11 @@ all_returns %>%
 ## # A tibble: 29 x 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AAPL       0.128      2.52     -51.9      13.9
-## 2 AMGN       0.0470     1.99     -13.4      15.1
-## 3 AXP        0.0574     2.30     -17.6      21.9
-## 4 BA         0.0608     2.20     -23.8      24.3
-## 5 CAT        0.0683     2.03     -14.5      14.7
+## 1 AMGN       0.0468     1.99     -13.4      15.1
+## 2 AXP        0.0570     2.30     -17.6      21.9
+## 3 BA         0.0608     2.20     -23.8      24.3
+## 4 CAT        0.0677     2.03     -14.5      14.7
+## 5 CRM        0.123      2.68     -27.1      26.0
 ## # ... with 24 more rows
 ```
 
@@ -363,7 +363,7 @@ tibble(expected_ret = t(mvp_weights) %*% mu, volatility = sqrt(t(mvp_weights) %*
 ## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
-## 1          0.00826         0.0314
+## 1          0.00817         0.0315
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

@@ -206,7 +206,7 @@ factors_ff_monthly_db %>%
 ```
 ## # Source:   lazy query [?? x 2]
 ## # Database: sqlite 3.37.0
-## #   [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
+## #   [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -792,7 +792,7 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-02-23
+## 5  54594 001004 1972-04-24 2022-02-25
 ## # ... with 31,765 more rows
 ```
 
@@ -834,42 +834,11 @@ crsp_monthly %>%
     x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "End-of-year share of securities with book equity values by exchange"
   ) +
-  scale_y_continuous(labels = percent)
-```
-
-<img src="20_data_files/figure-html/unnamed-chunk-52-1.png" width="672" style="display: block; margin: auto;" />
-
-```r
+  scale_y_continuous(labels = percent) + 
   coord_cartesian(ylim = c(0, 1))
 ```
 
-```
-## <ggproto object: Class CoordCartesian, Coord, gg>
-##     aspect: function
-##     backtransform_range: function
-##     clip: on
-##     default: FALSE
-##     distance: function
-##     expand: TRUE
-##     is_free: function
-##     is_linear: function
-##     labels: function
-##     limits: list
-##     modify_scales: function
-##     range: function
-##     render_axis_h: function
-##     render_axis_v: function
-##     render_bg: function
-##     render_fg: function
-##     setup_data: function
-##     setup_layout: function
-##     setup_panel_guides: function
-##     setup_panel_params: function
-##     setup_params: function
-##     train_panel_guides: function
-##     transform: function
-##     super:  <ggproto object: Class CoordCartesian, Coord, gg>
-```
+<img src="20_data_files/figure-html/unnamed-chunk-52-1.png" width="672" style="display: block; margin: auto;" />
 
 
 ## Managing SQLite databases

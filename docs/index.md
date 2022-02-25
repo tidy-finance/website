@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-02-23"
+date: "2022-02-25"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -15,7 +15,7 @@ github-repo: voigtstefan/tidy_finance
 url: https://www.tidy-finance.org
 cover-image: cover.jpg
 description: |
-  Tidy Finance with R.
+  An open-source textbook for empirical finance applications with R. 
 ---
 
 # Preface {.unnumbered}
