@@ -3,7 +3,7 @@
 # Beta estimation
 
 In this chapter, we introduce you to an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM), cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio. The regression coefficient of market returns on excess returns is usually called the market beta. 
-In this chapter we show an estimation procedure for the market betas. We do not go into details about the foundations of market beta, but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization. 
+In this chapter, we show an estimation procedure for the market betas. We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization. 
 
 We use the following packages throughout this chapter:
 ```{r}
@@ -39,7 +39,7 @@ $$
 r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 $$
 we regress excess stock returns `ret_excess` on excess returns of the market portfolio `mkt_excess`. 
-R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input which is specific in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\alpha_i$ as well as $\beta_i$.
+R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\alpha_i$ as well as $\beta_i$.
 
 ```{r}
 fit <- lm(ret_excess ~ mkt_excess,
@@ -132,7 +132,7 @@ beta_examples %>%
   )
 ```
 
-## Paralellized rolling-window estimation
+## Parallelized rolling-window estimation
 
 Even though we could now just apply the function using `group_by()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. 
 Remember that we have to perform rolling-window estimations across all stocks and time periods. 
@@ -211,7 +211,7 @@ crsp_daily_nested <- crsp_daily %>%
 ```
 
 This is what the estimation looks like for a couple of examples using `map()`. 
-For the daily data, we use the same function as above, but only take 3 months of data and require at least 50 daily return observations in these months. 
+For the daily data, we use the same function as above but only take 3 months of data and require at least 50 daily return observations in these months. 
 These restrictions help us to retrieve somehow smooth coefficient estimates.
 
 ```{r}
@@ -248,7 +248,7 @@ crsp_monthly %>%
   left_join(beta_monthly, by = c("permno", "month")) %>%
   drop_na(beta_monthly) %>%
   group_by(industry, permno) %>%
-  summarise(beta = mean(beta_monthly)) %>%
+  summarize(beta = mean(beta_monthly)) %>%
   ggplot(aes(x = reorder(industry, beta, FUN = median), y = beta)) +
   geom_boxplot() +
   coord_flip() +
@@ -264,7 +264,7 @@ Next, we illustrate the time-variation in the cross-section of estimated betas. 
 beta_monthly %>%
   drop_na(beta_monthly) %>%
   group_by(month) %>%
-  summarise(
+  summarize(
     x = quantile(beta_monthly, seq(0.1, 0.9, 0.1)),
     quantile = 100 * seq(0.1, 0.9, 0.1),
     .groups = "drop"
@@ -364,7 +364,7 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 
 ## Exercises
 
-1. Compute beta estimates based on monthly data using 1, 3 and 5 years of data and impose a minimum number of observations of 10, 28 and 48 months with return data, respectively. How strongly correlated are the estimated betas?
-1. Compute beta estimates based on monthly data using 5 years of data and impose different number of minimum observations. How does the share of permno-month observations with successful beta estimates vary across the different requirements? Do you find high correlation across the estimated betas? 
-1. Instead of using `future_map()` perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
-1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas or do they resemble estimation errors? 
+1. Compute beta estimates based on monthly data using 1, 3, and 5 years of data and impose a minimum number of observations of 10, 28, and 48 months with return data, respectively. How strongly correlated are the estimated betas?
+1. Compute beta estimates based on monthly data using 5 years of data and impose different numbers of minimum observations. How does the share of permno-month observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
+1. Instead of using `future_map()`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
+1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? 
