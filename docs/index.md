@@ -4,7 +4,7 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-02-25"
+date: "2022-03-31"
 site: bookdown::bookdown_site
 output: bookdown::bs4_book
 documentclass: book
@@ -36,7 +36,7 @@ This book aims to lift the curtain on reproducible finance by providing a fully 
 
 We write this book for three audiences:
 
-* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The structure of the book is kept simple enough such that the material is sufficient for self-study purposes.  
+* Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The book's structure is simple enough such that the material is sufficient for self-study purposes.
 * Instructors who look for materials to teach in empirical finance courses. We provide plenty of examples and (hopefully) intuitive explanations which can easily be adjusted or expanded.   
 * Data analysts or statisticians who work on issues pertaining to financial data and need practical tools to do so. 
 
@@ -45,12 +45,12 @@ We write this book for three audiences:
 The book is currently divided into 5 parts:
 
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
-* Chapter 2 provides tools to organize your data and prepare the most common data sets used in financial research: CRSP and Compustat.
+* Chapter 2 provides tools to organize your data and prepare the most common data sets used in financial research: CRSP and Compustat. We reuse the data from this chapter in all following chapters.
 * Chapters 3-7 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, and performance analysis. 
 * Chapters 8-9 apply machine learning methods to problems in factor selection and option pricing. 
 * Chapters 10-11 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
 
-The number of chapters and covered content is subject to change as we will introduce additional material in the near future. 
+Each chapter is self-contained and can be read individually. Yet the data chapter provides important background necessary for the data management in subsequent chapters. The number of chapters and covered content is subject to change as we will introduce additional material in the near future. 
 
 ## What won’t you learn? {.unnumbered}
 
@@ -59,14 +59,14 @@ We believe that our comparative advantage is to provide a thorough implementatio
 
 ## Why R? {.unnumbered}
 
-We believe that R is among best choices for a programming language in the area of finance. Some of our favorite features include:
+We believe that R is among the best choices for a programming language in the area of finance. Some of our favorite features include:
 
-- R is free and open source, so you can use it in academic and professional contexts.
+- R is free and open-source so that you can use it in academic and professional contexts.
 - A diverse and active online community works on a broad range of tools.
 - A massive set of actively maintained packages for all kinds of applications exists, e.g., data manipulation, visualization, machine learning, etc.
-- Powerful tools for communication, e.g., Rmarkdown and shiny, are redily available.
+- Powerful tools for communication, e.g., Rmarkdown and shiny, are readily available.
 - RStudio is one of the best development environments for interactive data analysis.
-- Strong foundation of functional programming are provided.
+- Strong foundations of functional programming are provided.
 - Smooth integration with other programming languages, e.g., SQL, Python, C, C++, Fortran, etc.
 
 For more information, we refer to @Wickham2019.
@@ -108,17 +108,17 @@ If you are new to R, we recommend starting with the following sources:
 
 ## About the authors {.unnumbered}
 
-We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from which each of us graduated with a different focus, but a shared passion: coding with R. We continue to sharpen our R skills as part of our current occupations:
+We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from which each of us graduated with a different focus but a shared passion: coding with R. We continue to sharpen our R skills as part of our current occupations:
 
-* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/) where he is responsible for product planning, execution and monitoring. He also manages a team of data scientists to analyze user behavior and develop new products.
-* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
+* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/) where he is responsible for product planning, execution, and monitoring. He also manages a team of data scientists to analyze user behavior and develop new products.
+* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
 * [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the intersection between asset pricing and corporate finance. 
 
 ## License {.unnumbered}
 
 This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
-The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e. public domain](https://creativecommons.org/publicdomain/zero/1.0/).
+The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e., public domain](https://creativecommons.org/publicdomain/zero/1.0/).
 
 
 <!-- ## Acknowledgements {.unnumbered} -->

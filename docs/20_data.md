@@ -81,7 +81,7 @@ It is worth taking a look at all available portfolio return time series from Ken
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the [@Hou2015] *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors' homepage from within `read_csv()`.
 
-We also need to adjust this data. First, we discard information we will not use here. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lower case. You can try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's tidyverse style guide](https://style.tidyverse.org/index.html).
+We also need to adjust this data. First, we discard information we will not use here. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lower case. You can try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide](https://style.tidyverse.org/index.html).
 
 
 ```r
@@ -96,7 +96,7 @@ factors_q_monthly <- read_csv("http://global-q.org/uploads/1/2/2/6/122679606/q5_
 
 ## Macroeconomic predictors
 
-Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. [@Goyal2008] comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2020 on [Amit Goyal's website](https://sites.google.com/view/agoyal145). Since the data is an .xslx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file and `googledrive` for the Google drive connection.
+Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. [@Goyal2008] comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2020 on [Amit Goyal's website](https://sites.google.com/view/agoyal145). Since the data is a .xlsx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file and `googledrive` for the Google drive connection.
 
 
 ```r
@@ -162,7 +162,9 @@ file.remove("data/macro_predictors.xlsx")
 
 ## Setting up a database
 
-Now that we have downloaded some data from the web into the memory of our R session, let us set up a database to store that information for future use. There are many ways to set up and organize a database, depending on the use case. For our purpose, the most efficient way is to use an [SQLite](https://www.sqlite.org/index.html) database, which is the C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine. Note that [SQL](https://en.wikipedia.org/wiki/SQL) (Structured Query Language) is a standard language for accessing and manipulating databases, and it heavily inspired the `dplyr` functions. We refer to [this tutorial](https://www.w3schools.com/sql/sql_intro.asp) for more information on SQL. 
+Now that we have downloaded some data from the web into the memory of our R session, let us set up a database to store that information for future use. We will use the data stored in this database throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code. 
+
+There are many ways to set up and organize a database, depending on the use case. For our purpose, the most efficient way is to use an [SQLite](https://www.sqlite.org/index.html) database, which is the C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine. Note that [SQL](https://en.wikipedia.org/wiki/SQL) (Structured Query Language) is a standard language for accessing and manipulating databases, and it heavily inspired the `dplyr` functions. We refer to [this tutorial](https://www.w3schools.com/sql/sql_intro.asp) for more information on SQL. 
 
 There are two packages that make working with SQLite in R very simple: `RSQLite` embeds the SQLite database engine in R and `dbplyr` is the database back-end for `dplyr`. These packages allow to set up a database to remotely store tables and use these remote database tables as if they are in-memory data frames by automatically converting `dplyr` into SQL. Check out the [RSQLite](https://cran.r-project.org/web/packages/RSQLite/vignettes/RSQLite.html) and [dbplyr vignettes](https://db.rstudio.com/databases/sqlite/) for more information.
 
@@ -308,7 +310,7 @@ msf_db
 
 ```
 ## # Source:   table<"crsp"."msf"> [?? x 21]
-## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
 ##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
 ## 1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
@@ -330,7 +332,7 @@ msenames_db
 
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
-## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam   shrcls
 ##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>    <chr> 
 ## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
@@ -352,7 +354,7 @@ msedelist_db
 
 ```
 ## # Source:   table<"crsp"."msedelist"> [?? x 19]
-## # Database: postgres [svoigt@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
 ##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
 ## 1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
@@ -365,7 +367,7 @@ msedelist_db
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
 ```
 
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reason and returns. You can read up in the great textbook of [@BaliEngleMurray2016] (BEM) for an extensive discussion on the filters we apply in the code below.
+We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reasons and returns. You can read up in the great textbook of [@BaliEngleMurray2016] (BEM) for an extensive discussion on the filters we apply in the code below.
 
 
 ```r
@@ -505,7 +507,7 @@ crsp_monthly %>%
 
 ## First glimpse of the CRSP sample
 
-Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample which is our main source for stock returns. 
+Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
 
 ```r
@@ -640,9 +642,9 @@ crsp_monthly_industry %>%
 
 ## Daily CRSP data
 
-Before we turn to accounting data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fits into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
+Before we turn to accounting data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many 'big data' problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for` loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code over night). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later.
+There is a solution to this challenge. As with many 'big data' problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for` loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later.
 
 
 ```r
@@ -692,16 +694,16 @@ crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
 
 ## Preparing Compustat data
 
-Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence](https://www.spglobal.com/marketintelligence/en/), which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world. For U.S. and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
+Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence](https://www.spglobal.com/marketintelligence/en/), which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world. For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
 
-To access Compustat data, we can again tap WRDS which hosts the `funda` table that contains annual firm-level information on North American companies.
+To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies.
 
 
 ```r
 funda_db <- tbl(wrds, in_schema("comp", "funda"))
 ```
 
-We follow the typical filter conventions and pull only data that we actually need: (i) we get only industrial fundamental data (i.e., ignore financial services) in the standard format (i.e., consolidated information in standard presentation) and (iii) only data in the desired time window
+We follow the typical filter conventions and pull only data that we actually need: (i) we get only industrial fundamental data (i.e., ignore financial services) (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
 
 
 ```r
@@ -792,7 +794,7 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-02-25
+## 5  54594 001004 1972-04-24 2022-03-31
 ## # ... with 31,765 more rows
 ```
 

@@ -2,13 +2,13 @@
 
 # Introduction to Tidy Finance
 
-The main aim of this chapter is to familiarize yourself with the `tidyverse`. We start by downloading and visualizing stock data before we move to a simple portfolio choice problem. These examples introduce you to our approach of *Tidy Finance*.
+The main aim of this chapter is to familiarize yourself with the `tidyverse`. We start by downloading and visualizing stock data before moving to a simple portfolio choice problem. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with stock market data
 
 At the start of each session, we load the required packages. 
-Throughout the entire book we always use the package `tidyverse`.
-In this chapter we load the convenient `tidyquant` package to download price data. 
+Throughout the entire book, we always use the package `tidyverse`.
+In this chapter, we also load the convenient `tidyquant` package to download price data. 
 You typically have to install a package once before you can load it. In case you have not done this yet, call `install.packages("tidyquant")`. 
 If you have trouble using `tidyquant`, check out the [documentation](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ01-core-functions-in-tidyquant.html#yahoo-finance). 
 
@@ -29,7 +29,7 @@ prices
 ```
 
 ```
-## # A tibble: 2,554 x 8
+## # A tibble: 2,578 x 8
 ##   symbol date        open  high   low close    volume adjusted
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
 ## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
@@ -37,10 +37,10 @@ prices
 ## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
 ## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
 ## 5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
-## # ... with 2,549 more rows
+## # ... with 2,573 more rows
 ```
 
-`tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of traded shares), and the *adjusted* price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions do affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
+`tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of traded shares), and the *adjusted* price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
 
 Next, we use `ggplot2` to visualize the time series of adjusted prices. 
 
@@ -71,7 +71,7 @@ returns
 ```
 
 ```
-## # A tibble: 2,554 x 3
+## # A tibble: 2,578 x 3
 ##   symbol date            ret
 ##   <chr>  <date>        <dbl>
 ## 1 AAPL   2012-01-03 NA      
@@ -79,7 +79,7 @@ returns
 ## 3 AAPL   2012-01-05  0.0111 
 ## 4 AAPL   2012-01-06  0.0105 
 ## 5 AAPL   2012-01-09 -0.00159
-## # ... with 2,549 more rows
+## # ... with 2,573 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date. 
@@ -93,7 +93,7 @@ returns <- returns %>%
   drop_na(ret)
 ```
 
-Next, we visualize the distribution of daily returns in an histogram. For convenience, we multiply the returns by 100 to get returns in percent for the visualizations. Additionally, we also add a dashed red line that indicates the 5\% quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at least 5\%. 
+Next, we visualize the distribution of daily returns in a histogram. For convenience, we multiply the returns by 100 to get returns in percent for the visualizations. Additionally, we also add a dashed red line that indicates the 5\% quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at least 5\%. 
 
 
 ```r
@@ -124,7 +124,7 @@ A typical task before proceeding with *any* data is to compute summary statistic
 ```r
 returns %>%
   mutate(ret = ret * 100) %>%
-  summarise(across(
+  summarize(across(
     ret,
     list(
       daily_mean = mean,
@@ -139,7 +139,7 @@ returns %>%
 ## # A tibble: 1 x 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
 ##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.116         1.79         -12.9          12.0
+## 1          0.119         1.79         -12.9          12.0
 ```
 
 We see that the maximum *daily* return was around 11.981 percent.  
@@ -150,7 +150,7 @@ You can also compute these summary statistics for each year by imposing `group_b
 returns %>%
   mutate(ret = ret * 100) %>%
   group_by(year = year(date)) %>%
-  summarise(across(
+  summarize(across(
     ret,
     list(
       daily_mean = mean,
@@ -174,7 +174,7 @@ returns %>%
 ## # ... with 6 more rows
 ```
 
-In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names which can be useful for reporting.
+In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting.
 
 ## Scaling up the analysis
 
@@ -192,7 +192,7 @@ index_prices <- tq_get(ticker,
   filter(symbol != "DOW") # Exclude the index itself
 ```
 
-The resulting file contains 158432 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting file contains 159128 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
@@ -230,7 +230,7 @@ all_returns <- index_prices %>%
 all_returns %>%
   mutate(ret = ret * 100) %>%
   group_by(symbol) %>%
-  summarise(across(
+  summarize(across(
     ret,
     list(
       daily_mean = mean,
@@ -246,10 +246,10 @@ all_returns %>%
 ## # A tibble: 29 x 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AMGN       0.0468     1.99     -13.4      15.1
-## 2 AXP        0.0570     2.30     -17.6      21.9
-## 3 BA         0.0608     2.20     -23.8      24.3
-## 4 CAT        0.0677     2.03     -14.5      14.7
+## 1 AMGN       0.0484     1.98     -13.4      15.1
+## 2 AXP        0.0572     2.30     -17.6      21.9
+## 3 BA         0.0604     2.20     -23.8      24.3
+## 4 CAT        0.0709     2.03     -14.5      14.7
 ## 5 CRM        0.123      2.68     -27.1      26.0
 ## # ... with 24 more rows
 ```
@@ -265,7 +265,7 @@ Of course, aggregation across other variables than `symbol` can make sense as we
 volume <- index_prices %>%
   mutate(volume_usd = volume * close / 1e9) %>%
   group_by(date) %>%
-  summarise(volume = sum(volume_usd))
+  summarize(volume = sum(volume_usd))
 
 volume %>%
   ggplot(aes(x = date, y = volume)) +
@@ -309,7 +309,7 @@ Do you understand where the warning `## Warning: Removed 1 rows containing missi
 In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets. The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor*. 
 
 An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (i.e., the risk). We compute and visualize the efficient frontier for several stocks. 
-First, we extract each asset's *monthly* returns. In order to keep things simple we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
+First, we extract each asset's *monthly* returns. In order to keep things simple, we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
 
 
 ```r
@@ -323,13 +323,13 @@ index_prices <- index_prices %>%
 returns <- index_prices %>%
   mutate(month = floor_date(date, "month")) %>%
   group_by(symbol, month) %>%
-  summarise(price = last(adjusted), .groups = "drop_last") %>%
+  summarize(price = last(adjusted), .groups = "drop_last") %>%
   mutate(ret = price / lag(price) - 1) %>%
   drop_na(ret) %>%
   select(-price)
 ```
 
-Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the covariance matrix $\Sigma$ and also the expected return vector $\mu$. We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and set the values to `ret`.
+Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the covariance matrix $\Sigma$ and also the expected return vector $\mu$. We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`.
 We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of future returns. 
 
 
@@ -363,12 +363,12 @@ tibble(expected_ret = t(mvp_weights) %*% mu, volatility = sqrt(t(mvp_weights) %*
 ## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
-## 1          0.00817         0.0315
+## 1          0.00839         0.0314
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
 
-Next, we set out to find the weights for a portfolio that achieves three times the expected return of the minimum variance portfolio. However, mean-variance investors are not interested in any portfolio that achieves the required return, but rather in the efficient portfolio, i.e., the portfolio with the lowest standard deviation. 
+Next, we set out to find the weights for a portfolio that achieves three times the expected return of the minimum variance portfolio. However, mean-variance investors are not interested in any portfolio that achieves the required return but rather in the efficient portfolio, i.e., the portfolio with the lowest standard deviation. 
 If you wonder where the solution $\omega_\text{eff}$ comes from: The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum acceptable expected return* $\bar{\mu}$. Hence, their objective function is to choose $\omega_\text{eff}$ as the solution to
 $$\omega_\text{eff}(\bar{\mu}) = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
 The code below implements the analytic solution to this optimization problem for a benchmark return $\bar\mu$ which we set to 3 times the expected return of the minimum variance portfolio. We encourage you to verify that it is correct. 
@@ -438,5 +438,5 @@ The black line indicates the efficient frontier: the set of portfolios a mean-va
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
 1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. After you compute the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
-1. In the portfolio choice analysis we restricted our sample to all assets that were trading on every single day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
+1. In the portfolio choice analysis, we restricted our sample to all assets that were trading on every single day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
 1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk, i.e., standard deviation. Identify the portfolio with the highest expected return per standard deviation. Hint: the ratio of expected return to standard deviation is an important concept in Finance. 

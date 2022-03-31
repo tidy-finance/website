@@ -8,10 +8,10 @@ The roadmap is as follows: First, we briefly introduce regression trees, random 
 We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
 
 ::: {.rmdnote}
-In order to replicate the analysis regarding neural networks in this chapter, you have to install `TensorFlow` on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow [these quick start instructions](https://tensorflow.rstudio.com/installation/).
+In order to replicate the analysis regarding neural networks in this chapter, you have to install `TensorFlow` on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow [these quick-start instructions](https://tensorflow.rstudio.com/installation/).
 :::
 
-Throughout this chapter we need the following packages.
+Throughout this chapter, we need the following packages.
 
 
 ```r
@@ -65,7 +65,7 @@ $$
 $$
 where $C(S, T)$ is the price of the option as a function of today's stock price of the underlying, $S$, with time to maturity$T$, $r_f$ is the risk-free interest rate, and $\sigma$ is the volatility of the underlying stock return. $\Phi$ is the cumulative distribution function of a standard normal random variable.
 
-The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters $S, K, r_f, T$ and $\sigma$ are specified (arguably, all parameters are easy to specify except for $\sigma$ which has to be estimated). A simple R function allows computing the price as we do below. 
+The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters $S, K, r_f, T$, and $\sigma$ are specified (arguably, all parameters are easy to specify except for $\sigma$ which has to be estimated). A simple R function allows computing the price as we do below. 
 
 
 ```r
@@ -102,7 +102,7 @@ option_prices <- expand_grid(
   unnest(observed_price)
 ```
 
-The code above generates more than 1.5 million random parameter constellations. For each of these values two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
+The code above generates more than 1.5 million random parameter constellations. For each of these values, two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. 
 
 Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 3148992 different specifications. Thus, the sample to learn the Black-Scholes price contains only 31489 observations and is therefore relatively small.
 In order to keep the analysis reproducible, we use `set.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
@@ -190,15 +190,16 @@ model
 ```
 ## Model: "sequential_1"
 ## _________________________________________________________________________________
-## Layer (type)                        Output Shape                    Param #      
+##  Layer (type)                       Output Shape                    Param #      
 ## =================================================================================
-## dense_5 (Dense)                     (None, 20)                      120          
-## _________________________________________________________________________________
-## dense_4 (Dense)                     (None, 20)                      420          
-## _________________________________________________________________________________
-## dense_3 (Dense)                     (None, 20)                      420          
-## _________________________________________________________________________________
-## dense_2 (Dense)                     (None, 1)                       21           
+##  dense_5 (Dense)                    (None, 20)                      120          
+##                                                                                  
+##  dense_4 (Dense)                    (None, 20)                      420          
+##                                                                                  
+##  dense_3 (Dense)                    (None, 20)                      420          
+##                                                                                  
+##  dense_2 (Dense)                    (None, 1)                       21           
+##                                                                                  
 ## =================================================================================
 ## Total params: 981
 ## Trainable params: 981
@@ -214,7 +215,7 @@ model %>%
   fit(
     x = extract_mold(nn_fit)$predictors %>% as.matrix(),
     y = extract_mold(nn_fit)$outcomes %>% pull(observed_price),
-    epochs = 75, verbose = 0
+    epochs = 150, verbose = 0
   )
 ```
 
@@ -277,14 +278,14 @@ predictive_performance %>%
   geom_smooth(se = FALSE) +
   labs(
     x = "Moneyness (S - K)", color = NULL,
-    y = "Mean squared prediction error (USD)",
+    y = "Absolut prediction error (USD)",
     title = "Prediction errors: Call option prices"
   )
 ```
 
 <img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
 
-The results can be summarized as follow: i) All ML methods seem to be able to *price* call options after observing the training test set. ii) The average prediction errors increase for far out-of-the money options, especially for the Single Layer neural network. ii) Random forest seems to perform consistently better in prediction option prices than the Single Layer network. iii) The deep neural network yields the best out-of-sample predictions.
+The results can be summarized as follow: i) All ML methods seem to be able to *price* call options after observing the training test set. ii) The average prediction errors increase for far in-the money options, especially for the Single Layer neural network and Random Forests. ii) Random forest and the Lasso seem to perform consistently worse in prediction option prices than the Neural networks. iii) The complexity of the deep neural network relative to the single layer neural network does not result in better out-of-sample predictions.
 
 ## Exercises
 
@@ -292,5 +293,5 @@ The results can be summarized as follow: i) All ML methods seem to be able to *p
 1. Create a function that creates predictions for a new matrix of predictors `newX´ based on the estimated regression tree. 
 1. Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing.
 1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
-1. Use 'keras' to initialize a sequential neural network that can take the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simply [regression example here](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/). How many parameters does the neural network you aim to fit have? 
+1. Use 'keras' to initialize a sequential neural network that can take the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simple [regression example here](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/). How many parameters does the neural network you aim to fit have? 
 1. Next, compile the object. It is important that you specify a loss function. Illustrate the difference in predictive accuracy for different architecture choices.

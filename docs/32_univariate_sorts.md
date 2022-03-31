@@ -22,7 +22,7 @@ library(scales)
 
 ## Data preparation
 
-We start with loading the required data from our `SQLite`-database. In particular, we use the monthly CRSP sample as our asset universe. 
+We start with loading the required data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, we use the monthly CRSP sample as our asset universe. 
 Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha). 
 `beta` is the tibble with market betas computed in the previous chapter. 
 
@@ -85,7 +85,7 @@ data_for_sorts <- crsp_monthly %>%
 
 The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. 
 For simplicity, we start with the median as the single breakpoint. 
-We then compute the value-weighted returns for each of the two resulting portfolios which means that the lagged market capitalization determines the weight in `weighted.mean()`.  
+We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in `weighted.mean()`.  
 
 
 ```r
@@ -123,7 +123,7 @@ beta_portfolios %>%
 
 <img src="32_univariate_sorts_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 
-We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net zero, i.e., you do not need invest money to realize this strategy in the absence of frictions.
+We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.
 
 
 ```r
@@ -205,7 +205,7 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 beta_portfolios_summary <- beta_portfolios %>%
   left_join(factors_ff_monthly, by = "month") %>%
   group_by(portfolio) %>%
-  summarise(
+  summarize(
     alpha = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[1]),
     beta = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[2]),
     ret = mean(ret)
@@ -285,7 +285,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(>|t|)
-## (Intercept) 0.000739   0.002483     0.3     0.77
+## (Intercept)  0.00074    0.00248     0.3     0.77
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor (@Frazzini2014). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 

@@ -13,7 +13,7 @@ library(alabama)
 
 ## Data preparation
 
-We start by loading the required data. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.
+We start by loading the required data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.
 
 
 ```r
@@ -110,10 +110,10 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.431  0.270 -1.302  0.374  0.309 -0.152  0.537  0.471 -0.167 -0.772
+##  [1]  1.429  0.270 -1.301  0.375  0.309 -0.152  0.542  0.472 -0.167 -0.776
 ```
 
-What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyse the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
+What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 
 ```r
@@ -199,8 +199,8 @@ w_no_short_sale$solution
 ```
 
 ```
-##  [1]  6.37e-01 -2.80e-17  1.76e-17  0.00e+00 -8.22e-18  5.07e-17  9.84e-02
-##  [8]  2.64e-01 -2.36e-19  0.00e+00
+##  [1]  6.36e-01 -3.83e-18 -8.64e-17  3.47e-18  1.60e-18 -5.04e-17  1.00e-01
+##  [8]  2.64e-01 -1.16e-17  0.00e+00
 ```
 
 `solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on `solve.QP()`. Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -222,11 +222,11 @@ w_reg_t$par
 ```
 
 ```
-##  [1]  2.39e-01 -2.41e-03 -4.57e-05  7.80e-02  8.19e-02  7.38e-02  1.84e-01
-##  [8]  2.36e-01  1.21e-01 -1.03e-02
+##  [1]  2.63e-01 -1.69e-05 -1.08e-02  7.11e-02  7.65e-02  5.97e-02  1.98e-01
+##  [8]  2.54e-01  1.12e-01 -2.38e-02
 ```
 
-The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints and the Regulation-T constrained portfolio.
+The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
 
 ```r
@@ -314,7 +314,7 @@ evaluate_performance <- function(w, w_previous, next_return, beta = 50){
 }
 ```
 
-The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs and the naive portfolio, which allocates wealth equally across the different assets.
+The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.
 
 The following code chunk performs rolling-window estimation. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample moments, but you might use more advanced estimators in practice. 
 
@@ -373,7 +373,7 @@ performance <- lapply(performance_values, as_tibble) %>%
 
 performance %>%
   group_by(strategy) %>%
-  summarise(Mean = 12 * mean(100 * net_return),
+  summarize(Mean = 12 * mean(100 * net_return),
             SD = sqrt(12) * sd(100 * net_return), 
             `Sharpe ratio` = if_else(Mean > 0, Mean / SD, NA_real_),
             Turnover = 100 * mean(turnover))
@@ -383,8 +383,8 @@ performance %>%
 ## # A tibble: 3 x 5
 ##   strategy   Mean    SD `Sharpe ratio` Turnover
 ##   <chr>     <dbl> <dbl>          <dbl>    <dbl>
-## 1 MV       -0.636  12.4         NA     214.    
-## 2 MV (TC)  12.1    15.1          0.802   0.0316
+## 1 MV       -0.639  12.4         NA     214.    
+## 2 MV (TC)  12.1    15.1          0.802   0.0297
 ## 3 Naive    12.1    15.1          0.801   0.229
 ```
 

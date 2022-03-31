@@ -92,7 +92,7 @@
 <h2>
 <span class="header-section-number">11.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation-6"><i class="fas fa-link"></i></a>
 </h2>
-<p>We start by loading the required data. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.</p>
+<p>We start by loading the required data from our <code>SQLite</code>-database introduced in our chapter on <em>“Accessing &amp; managing financial data”</em>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.</p>
 <div class="sourceCode" id="cb243"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">tidy_finance</span> <span class="op">&lt;-</span> <span class="fu">dbConnect</span><span class="op">(</span><span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html">SQLite</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"data/tidy_finance.sqlite"</span>, 
                           extended_types <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
@@ -179,8 +179,8 @@ The optimal weights correspond to a mean-variance portfolio where the vector of 
 
 <span class="va">mu</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colMeans</a></span><span class="op">(</span><span class="va">industry_returns</span><span class="op">)</span>
 <span class="fu">compute_efficient_weight</span><span class="op">(</span><span class="va">Sigma</span>, <span class="va">mu</span><span class="op">)</span></code></pre></div>
-<pre><code>##  [1]  1.431  0.270 -1.302  0.374  0.309 -0.152  0.537  0.471 -0.167 -0.772</code></pre>
-<p>What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyse the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
+<pre><code>##  [1]  1.429  0.270 -1.301  0.375  0.309 -0.152  0.542  0.472 -0.167 -0.776</code></pre>
+<p>What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
 <div class="sourceCode" id="cb247"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">transaction_costs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tidyr.tidyverse.org/reference/expand_grid.html">expand_grid</a></span><span class="op">(</span>gamma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">4</span>, <span class="fl">8</span>, <span class="fl">20</span><span class="op">)</span>,
                                  beta <span class="op">=</span> <span class="fl">20</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/Exponential.html">qexp</a></span><span class="op">(</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">99</span><span class="op">)</span><span class="op">/</span><span class="fl">100</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span> 
@@ -243,8 +243,8 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
                             bvec <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">0</span>, <span class="va">n_industries</span><span class="op">)</span><span class="op">)</span>, 
                             meq <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>
 <span class="va">w_no_short_sale</span><span class="op">$</span><span class="va">solution</span></code></pre></div>
-<pre><code>##  [1]  6.37e-01 -2.80e-17  1.76e-17  0.00e+00 -8.22e-18  5.07e-17  9.84e-02
-##  [8]  2.64e-01 -2.36e-19  0.00e+00</code></pre>
+<pre><code>##  [1]  6.36e-01 -3.83e-18 -8.64e-17  3.47e-18  1.60e-18 -5.04e-17  1.00e-01
+##  [8]  2.64e-01 -1.16e-17  0.00e+00</code></pre>
 <p><code>solve.QP</code> is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">regulation T-constraint</a>, which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code>. Instead, we rely on the package <code>alabama</code>, which requires a separate definition of objective and constraint functions.</p>
 <div class="sourceCode" id="cb254"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">initial_weights</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">/</span> <span class="va">n_industries</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">1</span>, <span class="va">n_industries</span><span class="op">)</span>
@@ -259,9 +259,9 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
   heq <span class="op">=</span> <span class="va">equality_constraints</span>,
   control.outer <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html">list</a></span><span class="op">(</span>trace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span>
 <span class="va">w_reg_t</span><span class="op">$</span><span class="va">par</span></code></pre></div>
-<pre><code>##  [1]  2.39e-01 -2.41e-03 -4.57e-05  7.80e-02  8.19e-02  7.38e-02  1.84e-01
-##  [8]  2.36e-01  1.21e-01 -1.03e-02</code></pre>
-<p>The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints and the Regulation-T constrained portfolio.</p>
+<pre><code>##  [1]  2.63e-01 -1.69e-05 -1.08e-02  7.11e-02  7.65e-02  5.97e-02  1.98e-01
+##  [8]  2.54e-01  1.12e-01 -2.38e-02</code></pre>
+<p>The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.</p>
 <div class="sourceCode" id="cb256"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html">tibble</a></span><span class="op">(</span>`No short-sale` <span class="op">=</span> <span class="va">w_no_short_sale</span><span class="op">$</span><span class="va">solution</span>, 
        `Minimum Variance` <span class="op">=</span> <span class="va">w_mvp</span>, 
@@ -334,7 +334,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
   <span class="va">net_return</span> <span class="op">&lt;-</span> <span class="va">raw_return</span> <span class="op">-</span> <span class="va">beta</span> <span class="op">/</span> <span class="fl">10000</span> <span class="op">*</span> <span class="va">turnover</span>
   <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="va">raw_return</span>, <span class="va">turnover</span>, <span class="va">net_return</span><span class="op">)</span>
 <span class="op">}</span></code></pre></div>
-<p>The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs and the naive portfolio, which allocates wealth equally across the different assets.</p>
+<p>The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
 <p>The following code chunk performs rolling-window estimation. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample moments, but you might use more advanced estimators in practice.</p>
 <div class="sourceCode" id="cb260"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw">for</span><span class="op">(</span><span class="va">p</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="va">periods</span><span class="op">)</span><span class="op">{</span>
@@ -386,15 +386,15 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 
 <span class="va">performance</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span>
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">strategy</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span>
-  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarise</a></span><span class="op">(</span>Mean <span class="op">=</span> <span class="fl">12</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">net_return</span><span class="op">)</span>,
+  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span>Mean <span class="op">=</span> <span class="fl">12</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">net_return</span><span class="op">)</span>,
             SD <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html">sqrt</a></span><span class="op">(</span><span class="fl">12</span><span class="op">)</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/sd.html">sd</a></span><span class="op">(</span><span class="fl">100</span> <span class="op">*</span> <span class="va">net_return</span><span class="op">)</span>, 
             `Sharpe ratio` <span class="op">=</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/if_else.html">if_else</a></span><span class="op">(</span><span class="va">Mean</span> <span class="op">&gt;</span> <span class="fl">0</span>, <span class="va">Mean</span> <span class="op">/</span> <span class="va">SD</span>, <span class="cn">NA_real_</span><span class="op">)</span>,
             Turnover <span class="op">=</span> <span class="fl">100</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">turnover</span><span class="op">)</span><span class="op">)</span></code></pre></div>
 <pre><code>## # A tibble: 3 x 5
 ##   strategy   Mean    SD `Sharpe ratio` Turnover
 ##   &lt;chr&gt;     &lt;dbl&gt; &lt;dbl&gt;          &lt;dbl&gt;    &lt;dbl&gt;
-## 1 MV       -0.636  12.4         NA     214.    
-## 2 MV (TC)  12.1    15.1          0.802   0.0316
+## 1 MV       -0.639  12.4         NA     214.    
+## 2 MV (TC)  12.1    15.1          0.802   0.0297
 ## 3 Naive    12.1    15.1          0.801   0.229</code></pre>
 <p>The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a <em>negative</em> annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: <em>MV (TC)</em> effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters <span class="math inline">\(\hat\mu_t\)</span> and <span class="math inline">\(\hat\Sigma_t\)</span>indicate that the current allocation is too far away from the optimal theoretical portfolio.</p>
 </div>
@@ -449,7 +449,7 @@ where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-02-25.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-03-31.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

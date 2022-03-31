@@ -2,11 +2,11 @@
 
 # Parametric portfolio policies
 
-In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. For this purpose, we introduce a direct way to estimate optimal portfolio weights when stock characteristics are related to a stock's expected return, variance, and covariance with other stocks. We parameterize weights as a function of the characteristics such that we maximize the expected utility. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by [@Brandt2009]. 
+In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. For this purpose, we introduce a direct way to estimate optimal portfolio weights when stock characteristics are related to a stock's expected return, variance, and covariance with other stocks. We parameterize weights as a function of the characteristics such that we maximize the expected utility. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. 
 
 ## Data preparation
 
-To get started, we load the required packages alongside the monthly CRSP file, which forms our investment universe. 
+To get started, we load the required packages alongside the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*
 
 
 ```r
@@ -152,7 +152,7 @@ weights_crsp <- compute_portfolio_weights(theta,
 ```
 
 
-## Portfolio perfomance
+## Portfolio performance
 
 Are these weights optimal in any way? Most likely not, as we picked $\theta$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
 
@@ -172,14 +172,14 @@ evaluate_portfolio <- function(weights_crsp,
 
   evaluation <- weights_crsp %>%
     group_by(month) %>%
-    summarise(
+    summarize(
       return_tilt = weighted.mean(ret_excess, weight_tilt),
       return_benchmark = weighted.mean(ret_excess, weight_benchmark)
     ) %>%
     pivot_longer(-month, values_to = "portfolio_return", names_to = "model") %>%
     group_by(model) %>%
     left_join(factors_ff_monthly, by = "month") %>%
-    summarise(tibble(
+    summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(12 * portfolio_return),
       "SD return" = 100 * sqrt(12) * sd(portfolio_return),
@@ -204,7 +204,7 @@ evaluate_portfolio <- function(weights_crsp,
         "Avg. fraction of negative weights" = sum(weight < 0) / n()
       )) %>%
       group_by(model) %>%
-      summarise(across(-month, ~ 100 * mean(.))) %>%
+      summarize(across(-month, ~ 100 * mean(.))) %>%
       mutate(model = gsub("weight_", "", model)) %>%
       pivot_longer(-model, names_to = "measure") %>%
       pivot_wider(names_from = model, values_from = value)
@@ -293,7 +293,7 @@ The resulting values of $\theta$ are easy to interpret intuitively. Expected uti
 
 ## More model specifications
 
-How does the portfolio perform for different model specifications? For this purpose, we compute the performance of a number of different modelling choices based on the entire CRSP sample. The next code chunk performs all the heavy lifting.
+How does the portfolio perform for different model specifications? For this purpose, we compute the performance of a number of different modeling choices based on the entire CRSP sample. The next code chunk performs all the heavy lifting.
 
 
 ```r
