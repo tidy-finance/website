@@ -83,7 +83,7 @@
 <span class="header-section-number">11</span> Constrained optimization and backtesting<a class="anchor" aria-label="anchor" href="#constrained-optimization-and-backtesting"><i class="fas fa-link"></i></a>
 </h1>
 <p>In this chapter, we conduct portfolio backtesting in a more realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with <em>standard</em> mean-variance efficient portfolios. Then, we introduce further constraints step-by-step. Numerical constrained optimization is performed by the packages <code>quadprog</code> (for quadratic objective functions such as in typical mean-variance framework) and <code>alabama</code> (for more general, non-linear objectives and constraints).</p>
-<div class="sourceCode" id="cb242"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb245"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://rsqlite.r-dbi.org">RSQLite</a></span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va">quadprog</span><span class="op">)</span> 
@@ -93,7 +93,7 @@
 <span class="header-section-number">11.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation-6"><i class="fas fa-link"></i></a>
 </h2>
 <p>We start by loading the required data from our <code>SQLite</code>-database introduced in our chapter on <em>“Accessing &amp; managing financial data”</em>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.</p>
-<div class="sourceCode" id="cb243"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb246"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">tidy_finance</span> <span class="op">&lt;-</span> <span class="fu">dbConnect</span><span class="op">(</span><span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html">SQLite</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"data/tidy_finance.sqlite"</span>, 
                           extended_types <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
 
@@ -110,7 +110,7 @@
 <p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to
 <span class="math display">\[w_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1\]</span>
 where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following.</p>
-<div class="sourceCode" id="cb244"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb247"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">Sigma</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/cor.html">cov</a></span><span class="op">(</span><span class="va">industry_returns</span><span class="op">)</span>
 <span class="va">w_mvp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/solve-methods.html">solve</a></span><span class="op">(</span><span class="va">Sigma</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/pkg/Matrix/man/matrix-products.html">%*%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">ncol</a></span><span class="op">(</span><span class="va">Sigma</span><span class="op">)</span><span class="op">)</span>
 <span class="va">w_mvp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html">as.vector</a></span><span class="op">(</span><span class="va">w_mvp</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">w_mvp</span><span class="op">)</span><span class="op">)</span></code></pre></div>
@@ -158,7 +158,7 @@ The optimal weights correspond to a mean-variance portfolio where the vector of 
 <span class="header-section-number">11.4</span> Optimal portfolio choice<a class="anchor" aria-label="anchor" href="#optimal-portfolio-choice"><i class="fas fa-link"></i></a>
 </h2>
 <p>The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation). For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion,<code>beta</code> is the transaction cost parameter and <code>w_prev</code> are the weights before rebalancing.</p>
-<div class="sourceCode" id="cb245"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb248"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">compute_efficient_weight</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">Sigma</span>,
                                      <span class="va">mu</span>,
                                      <span class="va">gamma</span> <span class="op">=</span> <span class="fl">2</span>, 
@@ -181,7 +181,7 @@ The optimal weights correspond to a mean-variance portfolio where the vector of 
 <span class="fu">compute_efficient_weight</span><span class="op">(</span><span class="va">Sigma</span>, <span class="va">mu</span><span class="op">)</span></code></pre></div>
 <pre><code>##  [1]  1.429  0.270 -1.301  0.375  0.309 -0.152  0.542  0.472 -0.167 -0.776</code></pre>
 <p>What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
-<div class="sourceCode" id="cb247"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb250"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">transaction_costs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tidyr.tidyverse.org/reference/expand_grid.html">expand_grid</a></span><span class="op">(</span>gamma <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">4</span>, <span class="fl">8</span>, <span class="fl">20</span><span class="op">)</span>,
                                  beta <span class="op">=</span> <span class="fl">20</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/stats/Exponential.html">qexp</a></span><span class="op">(</span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">99</span><span class="op">)</span><span class="op">/</span><span class="fl">100</span><span class="op">)</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span> 
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>weights <span class="op">=</span> <span class="fu"><a href="https://purrr.tidyverse.org/reference/map2.html">map2</a></span><span class="op">(</span>.x <span class="op">=</span> <span class="va">gamma</span>, 
@@ -214,7 +214,7 @@ The optimal weights correspond to a mean-variance portfolio where the vector of 
 The function takes one argument (<code>meq</code>) for the number of equality constraints. Therefore, the above matrix <span class="math inline">\(A\)</span> is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix <span class="math inline">\(A\)</span> is of the form
 <span class="math display">\[\begin{aligned}A = \begin{pmatrix}1 &amp; 1&amp; \ldots&amp;1 \\1 &amp; 0 &amp;\ldots&amp;0\\0 &amp; 1 &amp;\ldots&amp;0\\\vdots&amp;&amp;\ddots&amp;\vdots\\0&amp;0&amp;\ldots&amp;1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}\end{aligned}.\]</span>
 Before we dive into unconstrained optimization, we revisit the <em>unconstrained</em> problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. Note that we round to the first six digits to avoid differences at higher digits that might arise due to inherent imprecision of numerical estimation procedures. As just discussed, we set <code>Amat</code> to a matrix with a column of ones and <code>bvec</code> to 1 to enforce the constraint that weights must sum up to one. <code>meq=1</code> means that one (out of one) constraints must be satisfied with equality.</p>
-<div class="sourceCode" id="cb248"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb251"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">n_industries</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">ncol</a></span><span class="op">(</span><span class="va">industry_returns</span><span class="op">)</span> 
 
 <span class="va">w_mvp_numerical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP</a></span><span class="op">(</span>Dmat <span class="op">=</span> <span class="va">Sigma</span>,
@@ -225,7 +225,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 
 <span class="fu"><a href="https://rdrr.io/r/base/all.html">all</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="va">w_mvp</span>, <span class="fl">6</span><span class="op">)</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="va">w_mvp_numerical</span><span class="op">$</span><span class="va">solution</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></code></pre></div>
 <pre><code>## [1] TRUE</code></pre>
-<div class="sourceCode" id="cb250"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb253"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">w_efficient_numerical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP</a></span><span class="op">(</span>Dmat <span class="op">=</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">Sigma</span>,
                                   dvec <span class="op">=</span> <span class="va">mu</span>, 
                                   Amat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html">cbind</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">1</span>, <span class="va">n_industries</span><span class="op">)</span><span class="op">)</span>,
@@ -236,7 +236,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 <pre><code>## [1] TRUE</code></pre>
 <p>For more complex optimization routines, <a href="https://cran.r-project.org/web/views/Optimization.html">this optimization task view</a> provides an overview of the wast optimization landscape in R.</p>
 <p>Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies <span class="math inline">\(N\)</span> inequality constraints if the form <span class="math inline">\(w_i &gt;=0\)</span>.</p>
-<div class="sourceCode" id="cb252"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb255"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">w_no_short_sale</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP</a></span><span class="op">(</span>Dmat <span class="op">=</span> <span class="fl">2</span> <span class="op">*</span> <span class="va">Sigma</span>,
                             dvec <span class="op">=</span> <span class="va">mu</span>, 
                             Amat <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/cbind.html">cbind</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fu"><a href="https://rdrr.io/r/base/diag.html">diag</a></span><span class="op">(</span><span class="va">n_industries</span><span class="op">)</span><span class="op">)</span>, 
@@ -246,7 +246,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 <pre><code>##  [1]  6.36e-01 -3.83e-18 -8.64e-17  3.47e-18  1.60e-18 -5.04e-17  1.00e-01
 ##  [8]  2.64e-01 -1.16e-17  0.00e+00</code></pre>
 <p><code>solve.QP</code> is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">regulation T-constraint</a>, which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code>. Instead, we rely on the package <code>alabama</code>, which requires a separate definition of objective and constraint functions.</p>
-<div class="sourceCode" id="cb254"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb257"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">initial_weights</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">/</span> <span class="va">n_industries</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">1</span>, <span class="va">n_industries</span><span class="op">)</span>
 <span class="va">objective</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">w</span>, <span class="va">gamma</span> <span class="op">=</span> <span class="fl">2</span><span class="op">)</span> <span class="op">-</span><span class="fu"><a href="https://rdrr.io/r/base/t.html">t</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/pkg/Matrix/man/matrix-products.html">%*%</a></span> <span class="va">mu</span> <span class="op">+</span> <span class="va">gamma</span> <span class="op">/</span> <span class="fl">2</span> <span class="op">*</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html">t</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span><span class="op"><a href="https://rdrr.io/pkg/Matrix/man/matrix-products.html">%*%</a></span><span class="va">Sigma</span><span class="op"><a href="https://rdrr.io/pkg/Matrix/man/matrix-products.html">%*%</a></span><span class="va">w</span>
 <span class="va">inequality_constraints</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">w</span>, <span class="va">reg_t</span> <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span> <span class="kw"><a href="https://rdrr.io/r/base/function.html">return</a></span><span class="op">(</span><span class="va">reg_t</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html">abs</a></span><span class="op">(</span><span class="va">w</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>
@@ -262,7 +262,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 <pre><code>##  [1]  2.63e-01 -1.69e-05 -1.08e-02  7.11e-02  7.65e-02  5.97e-02  1.98e-01
 ##  [8]  2.54e-01  1.12e-01 -2.38e-02</code></pre>
 <p>The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.</p>
-<div class="sourceCode" id="cb256"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb259"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html">tibble</a></span><span class="op">(</span>`No short-sale` <span class="op">=</span> <span class="va">w_no_short_sale</span><span class="op">$</span><span class="va">solution</span>, 
        `Minimum Variance` <span class="op">=</span> <span class="va">w_mvp</span>, 
        `Efficient portfolio` <span class="op">=</span> <span class="fu">compute_efficient_weight</span><span class="op">(</span><span class="va">Sigma</span>, <span class="va">mu</span><span class="op">)</span>,
@@ -280,7 +280,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
   <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/scale_continuous.html">scale_y_continuous</a></span><span class="op">(</span>labels <span class="op">=</span> <span class="fu">scales</span><span class="fu">::</span><span class="va"><a href="https://scales.r-lib.org/reference/label_percent.html">percent</a></span><span class="op">)</span></code></pre></div>
 <div class="inline-figure"><img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;"></div>
 <p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for <span class="math inline">\(L_1\)</span> transaction costs <span class="math inline">\(\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
-<div class="sourceCode" id="cb257"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb260"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">compute_efficient_weight_L1_TC</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">mu</span>,
                                           <span class="va">Sigma</span>, 
                                           <span class="va">gamma</span> <span class="op">=</span> <span class="fl">2</span>, 
@@ -304,7 +304,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 <span class="header-section-number">11.6</span> Out-of-sample backtesting<a class="anchor" aria-label="anchor" href="#out-of-sample-backtesting"><i class="fas fa-link"></i></a>
 </h2>
 <p>For the sake of simplicity, we committed one fundamental error in computing portfolio weights above. We used the full sample of the data to determine the optimal allocation. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2020. While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data.</p>
-<div class="sourceCode" id="cb258"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb261"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">window_length</span> <span class="op">&lt;-</span> <span class="fl">120</span> 
 <span class="va">periods</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">industry_returns</span><span class="op">)</span> <span class="op">-</span> <span class="va">window_length</span> 
 
@@ -322,7 +322,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 
 <span class="va">w_prev_1</span> <span class="op">&lt;-</span> <span class="va">w_prev_2</span> <span class="op">&lt;-</span> <span class="va">w_prev_3</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html">rep</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">/</span> <span class="va">n_industries</span> , <span class="va">n_industries</span><span class="op">)</span></code></pre></div>
 <p>We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs.</p>
-<div class="sourceCode" id="cb259"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb262"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">adjust_weights</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">w</span>, <span class="va">next_return</span><span class="op">)</span><span class="op">{</span>
   <span class="va">w_prev</span> <span class="op">&lt;-</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">w</span> <span class="op">*</span> <span class="va">next_return</span>
   <span class="fu"><a href="https://rdrr.io/r/base/numeric.html">as.numeric</a></span><span class="op">(</span><span class="va">w_prev</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/vector.html">as.vector</a></span><span class="op">(</span><span class="va">w_prev</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>
@@ -336,7 +336,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
 <span class="op">}</span></code></pre></div>
 <p>The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
 <p>The following code chunk performs rolling-window estimation. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample moments, but you might use more advanced estimators in practice.</p>
-<div class="sourceCode" id="cb260"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb263"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw">for</span><span class="op">(</span><span class="va">p</span> <span class="kw">in</span> <span class="fl">1</span><span class="op">:</span><span class="va">periods</span><span class="op">)</span><span class="op">{</span>
   
   <span class="va">returns_window</span> <span class="op">&lt;-</span> <span class="va">industry_returns</span><span class="op">[</span><span class="va">p</span> <span class="op">:</span> <span class="op">(</span><span class="va">p</span> <span class="op">+</span> <span class="va">window_length</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span>, <span class="op">]</span>
@@ -380,7 +380,7 @@ Before we dive into unconstrained optimization, we revisit the <em>unconstrained
   <span class="va">w_prev_3</span> <span class="op">&lt;-</span> <span class="fu">adjust_weights</span><span class="op">(</span><span class="va">w_3</span>, <span class="va">next_return</span><span class="op">)</span>
 <span class="op">}</span></code></pre></div>
 <p>Finally, we get to the evaluation of the portfolio strategies <em>net-of-transaction costs</em>. Note that we compute annualized returns and standard deviations.</p>
-<div class="sourceCode" id="cb261"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb264"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">performance</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="va">performance_values</span>, <span class="va">as_tibble</span><span class="op">)</span> <span class="op"><a href="https://magrittr.tidyverse.org/reference/pipe.html">%&gt;%</a></span> 
   <span class="fu"><a href="https://dplyr.tidyverse.org/reference/bind.html">bind_rows</a></span><span class="op">(</span>.id <span class="op">=</span> <span class="st">"strategy"</span><span class="op">)</span>
 
@@ -449,7 +449,7 @@ where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-03-31.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch, wikifolio Financial Technologies, Stefan Voigt, University of Copenhagen and Danish Finance Institute, Patrick Weiss, Vienna University of Economics and Business. It was last built on 2022-04-01.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

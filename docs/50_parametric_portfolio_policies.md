@@ -354,21 +354,25 @@ performance_table %>%
     names_glue = "{value_weighting} {allow_short_selling} {.value} "
   ) %>%
   select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>% 
-  print(n = 11, width = 7)
+  print(n = 11, max_extra_cols = 7)
 ```
 
 ```
-## # A
-## #   tibble:
-## #   11
-## #   x
-## #   7
-## #   with
-## #   7
-## #   more
-## #   variables:
-## #   measure <chr>,
-## #   `EW    ` <dbl>, ...
+## # A tibble: 11 x 7
+##    measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op~` `EW  Optimal `
+##    <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
+##  1 Expected uti~ -0.250   -2.49e-1       -0.247           -0.247         -0.250  
+##  2 Average retu~ 10.5      6.86e+0       14.7             13.4           13.0    
+##  3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
+##  4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
+##  5 CAPM alpha     0.00231  1.08e-4        0.00650          0.00528        0.00440
+##  6 Market beta    1.14     9.92e-1        1.01             1.04           1.14   
+##  7 Absolute wei~  0.0246   2.46e-2        0.0380           0.0246         0.0258 
+##  8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0798 
+##  9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0341 
+## 10 Avg. sum of ~  0        0             28.0              0              2.48   
+## 11 Avg. fractio~  0        0             38.8              0              7.82   
+## # ... with 1 more variable: `EW (no s.) Optimal ` <dbl>
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.
