@@ -67,8 +67,8 @@ plot <- plot_data %>%
   ) +
   scale_fill_manual(values = colors)
 
-ggsave(
-  plot = plot, width = 8, height = 9,
-  filename = "cover.jpg", bg = "white"
-)
+# ggsave(
+#   plot = plot, width = 8, height = 9,
+#   filename = "cover.jpg", bg = "white"
+# )
 ```

@@ -24,28 +24,20 @@ We especially recommend taking a look at the documentation's examples section.
 
 
 ```r
-prices <- tq_get("AAPL", get = "stock.prices")
-```
-
-```
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-```
-
-```r
+prices <- tq_get("AAPL", get = "stock.prices", from = "2000-01-01", to = "2022-03-30")
 prices
 ```
 
 ```
-## # A tibble: 2,580 x 8
+## # A tibble: 5,596 x 8
 ##   symbol date        open  high   low close    volume adjusted
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-## 1 AAPL   2012-01-03  14.6  14.7  14.6  14.7 302220800     12.6
-## 2 AAPL   2012-01-04  14.6  14.8  14.6  14.8 260022000     12.6
-## 3 AAPL   2012-01-05  14.8  14.9  14.7  14.9 271269600     12.8
-## 4 AAPL   2012-01-06  15.0  15.1  15.0  15.1 318292800     12.9
-## 5 AAPL   2012-01-09  15.2  15.3  15.0  15.1 394024400     12.9
-## # ... with 2,575 more rows
+## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.856
+## 2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.784
+## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.795
+## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.726
+## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.761
+## # ... with 5,591 more rows
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of traded shares), and the *adjusted* price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -79,15 +71,15 @@ returns
 ```
 
 ```
-## # A tibble: 2,580 x 3
-##   symbol date            ret
-##   <chr>  <date>        <dbl>
-## 1 AAPL   2012-01-03 NA      
-## 2 AAPL   2012-01-04  0.00537
-## 3 AAPL   2012-01-05  0.0111 
-## 4 AAPL   2012-01-06  0.0105 
-## 5 AAPL   2012-01-09 -0.00159
-## # ... with 2,575 more rows
+## # A tibble: 5,596 x 3
+##   symbol date           ret
+##   <chr>  <date>       <dbl>
+## 1 AAPL   2000-01-03 NA     
+## 2 AAPL   2000-01-04 -0.0843
+## 3 AAPL   2000-01-05  0.0146
+## 4 AAPL   2000-01-06 -0.0865
+## 5 AAPL   2000-01-07  0.0474
+## # ... with 5,591 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date. 
@@ -147,10 +139,10 @@ returns %>%
 ## # A tibble: 1 x 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
 ##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.118         1.79         -12.9          12.0
+## 1          0.129         2.52         -51.9          13.9
 ```
 
-We see that the maximum *daily* return was around 11.981 percent.  
+We see that the maximum *daily* return was around 13.905 percent.  
 You can also compute these summary statistics for each year by imposing `group_by(year = year(date))`, where the call `year(date)` computes the year.
 
 
@@ -171,15 +163,15 @@ returns %>%
 ```
 
 ```
-## # A tibble: 11 x 5
+## # A tibble: 23 x 5
 ##    year daily_mean daily_sd daily_min daily_max
 ##   <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
-## 1  2012    0.124       1.86     -6.44      8.87
-## 2  2013    0.0472      1.80    -12.4       5.14
-## 3  2014    0.145       1.36     -7.99      8.20
-## 4  2015    0.00199     1.68     -6.12      5.74
-## 5  2016    0.0575      1.47     -6.57      6.50
-## # ... with 6 more rows
+## 1  2000     -0.346     5.49    -51.9      13.7 
+## 2  2001      0.233     3.93    -17.2      12.9 
+## 3  2002     -0.121     3.05    -15.0       8.46
+## 4  2003      0.186     2.34     -8.14     11.3 
+## 5  2004      0.470     2.55     -5.58     13.2 
+## # ... with 18 more rows
 ```
 
 In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting.
@@ -195,104 +187,13 @@ This is where the `tidyverse` magic starts: tidy data makes it extremely easy to
 ticker <- tq_index("DOW") 
 index_prices <- tq_get(ticker,
   get = "stock.prices",
-  from = "2000-01-01"
+  from = "2000-01-01",
+  to = "2022-03-30"
 ) %>%
   filter(symbol != "DOW") # Exclude the index itself
 ```
 
-```
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-
-## Warning in zoo(y, order.by = index(x), ...): some methods for "zoo" objects do
-## not work if the index entries in 'order.by' are not unique
-```
-
-The resulting file contains 159186 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting file contains 159099 daily observations for in total 29 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
@@ -347,10 +248,10 @@ all_returns %>%
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
 ## 1 AMGN       0.0484     1.98     -13.4      15.1
-## 2 AXP        0.0569     2.30     -17.6      21.9
-## 3 BA         0.0600     2.20     -23.8      24.3
-## 4 CAT        0.0708     2.03     -14.5      14.7
-## 5 CRM        0.123      2.68     -27.1      26.0
+## 2 AXP        0.0573     2.30     -17.6      21.9
+## 3 BA         0.0603     2.20     -23.8      24.3
+## 4 CAT        0.0707     2.03     -14.5      14.7
+## 5 CRM        0.124      2.68     -27.1      26.0
 ## # ... with 24 more rows
 ```
 
@@ -463,7 +364,7 @@ tibble(expected_ret = t(mvp_weights) %*% mu, volatility = sqrt(t(mvp_weights) %*
 ## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
-## 1          0.00836         0.0314
+## 1          0.00839         0.0314
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!

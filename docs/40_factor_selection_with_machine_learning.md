@@ -308,14 +308,12 @@ predicted_values %>%
   ) +
   scale_y_continuous(
     labels = percent
-  ) +
-  geom_rect(aes(
-    xmin = testing(split) %>% pull(month) %>% min(),
-    xmax = testing(split) %>% pull(month) %>% max(),
-    ymin = -Inf, ymax = Inf
-  ),
-  alpha = 0.005
-  )
+  ) + 
+  annotate("rect", 
+           xmin = testing(split) %>% pull(month) %>% min(), 
+           xmax = testing(split) %>% pull(month) %>% max(), 
+           ymin = -Inf, ymax = Inf, 
+           alpha = 0.5, fill="grey70")
 ```
 
 <img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
