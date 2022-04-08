@@ -6,48 +6,51 @@
 
 ## Introduction to Tidy Finance
 
-| Section                | Data      | Finance                | Data Science                                         | Main Dev  |
-|------------------------|-----------|------------------------|------------------------------------------------------|-----------|
-| Visualizing Stock Data | tidyquant | Prices + returns       | RStudio + tidyverse                                  | Stefan    |
-| Efficient Frontier     | tidyquant | Vola + diversification | group_by + summarise                                 | Stefan    |
-| Outlook & Conventions  | \-        |                        | Project management, importance of coding conventions | Christoph |
+| Topic                      | Section     | Data             | Finance                                | Data Science                           | Main Dev  |
+|----------------------------|-------------|------------------|----------------------------------------|----------------------------------------|-----------|
+| Visualizing stock data     | 1.1 - 1.3   | tidyquant        | Prices, returns                        | RStudio, tidyverse                     | Stefan    |
+| Efficient frontier         | 1.4 & 1.5   | tidyquant        | vola, diversification                  | group_by, summarize                    | Stefan    |
+| Outlook & conventions      | (tbd)       |                  |                                        | project management, coding conventions | (tbd)     |
 
 ## Accessing & Managing Financial Data
 
-| Section                      | Data / Access | Finance                   | Data Science     | Main Dev              |
-|------------------------------|---------------|---------------------------|------------------|-----------------------|
-| Downloading Fama-French Data | French        |                           | frenchdata       | Christoph             |
-| Setting-Up a Database        | \-            | \-                        | RSQlite, dbplyr  | Christoph             |
-| Accessing WRDS               | WRDS          |                           | odbc, PostgreSQL | Christoph             |
-| Preparing CRSP               | WRDS          | CRSP summary              |                  | Christoph             |
-| Merging CRSP & Compustat     | WRDS          | Fama-French matching      |                  | Christoph             |
-| Preparing Compustat          | WRDS          | Main compustat variables  |                  | Christoph             |
-| Preparing TRACE              | WRDS          | Cleaning bond data        | tbd              | Not for first version |
-| Preparing ESG data           | ?             | ESG efficient portfolios? | tbd              | Not for first version |
+| Topic                      | Section     | Data             | Finance                                | Data Science                           | Main Dev  |
+|----------------------------|-------------|------------------|----------------------------------------|----------------------------------------|-----------|
+| Factors & predictors       | 2.1 - 2.3   | French, Q, Goyal |                                        | frenchdata, csv, googledrive           | Christoph |
+| Setting up a database      | 2.4         |                  |                                        | RSQlite, dbplyr                        | Christoph |
+| Accessing WRDS             | 2.5         |                  |                                        | odbc, PostgreSQL                       | Christoph |
+| CRSP                       | 2.6 - 2.8   | CRSP, WRDS       | CRSP insights                          | download large tables (daily data)     | Christoph |
+| Compustat                  | 2.9         | Compustat, WRDS  | Accounting data                        |                                        | Christoph |
+| Merging CRSP & Compustat   | 2.10        | CCM links        |                                        |                                        | Christoph |
+| Database management        | 2.11 & 2.12 |                  |                                        | VACUUM, dbListObjects                  | Christoph |
+| TRACE transaction data     | (eta: soon) | TRACE, WRDS      | Cleaning bond data                     |                                        | Patrick   |
+| Preparing ESG data         | (tbd)       | Sustainalytics?  |                                        |                                        | (tbd)     |
 
 ## Tidy Asset Pricing
 
-| Section                        | Data                      | Finance                       | Data Science                                              | Main Dev              |
-|--------------------------------|---------------------------|-------------------------------|-----------------------------------------------------------|-----------------------|
-| Beta                           | CRSP + French             | Stock beta                    | Rolling window estimation; many models (nest); multidplyr | Christoph             |
-| Univariate Portfolio Sorts     | CRSP + French             | Functions + curly curly + map | Patrick                                                   |                       |
-| Size                           | CRSP + French             |                               |                                                           | Patrick               |
-| Bivariate Portfolio Sorts      | CRSP + French + Compustat |                               |                                                           | Patrick               |
-| Value                          | CRSP + French + Compustat |                               |                                                           | Patrick               |
-| Fama-MacBeth Regressions       | CRSP + French             |                               | Functions + many models                                   | Patrick               |
-| The Fama-French 3-Factor Model | CRSP + French + Compustat |                               |                                                           | Patrick               |
-| Conditional Betas              |                           |                               |                                                           | Not for first version |
-| Profitability                  | CRSP + French + Compustat |                               |                                                           | Not for first version |
-| Investment                     | CRSP + French + Compustat |                               |                                                           | Not for first version |
-| The Fama-French 5-Factor Model | CRSP + French + Compustat |                               |                                                           | Not for first version |
-| Q-Factors                      | Q-Factos + French         |                               |                                                           | Not for first version |
+| Topic                      | Section     | Data             | Finance                                | Data Science                           | Main Dev  |
+|----------------------------|-------------|------------------|----------------------------------------|----------------------------------------|-----------|
+| Beta estimation            | 3.1 - 3.5   | CRSP, French     | Stock beta                             | lm, rolling-window estimation,         | Christoph |
+|                            |             |                  |                                        | parallelization, nest, multidplyr      | Christoph |
+| Univariate portfolio sorts | 4.2 & 4.4   | CRSP             | Portfolio sorts, information timing    | curly-curly and functions              | Patrick   |
+| Performance evaluation     | 4.3 & 4.5   | CRSP, French     | Alphas, Newey West                     | sandwich                               | Patrick   |
+| Size & p-hacking           | 5.1 - 5.6   | CRSP, French     | Weighting, p-hacking                   | regular expressions                    | Patrick   |
+| Bivariate portfolio sorts  | 6.1 & 6.2   | CRSP, Compustat  | Using accounting data along stocks     |                                        | Patrick   |
+| In-/dependent sorts        | 6.3 & 6.4   | CRSP, Compustat  | Independent and dependent sorts        |                                        | Patrick   |
+| Fama-French 3-factor model | 7.1 - 7.5   | CRSP, Compustat  | Size and value factors                 |                                        | Patrick   |
+| Fama-MacBeth regressions   | (eta: soon) | CRSP, French     | Fama-MacBeth regressions               | GMM                                    | Patrick   |
+| Conditional betas          | (tbd)       |                  |                                        |                                        | (tbd)     |
+| Profitability              | (tbd)       |                  |                                        |                                        | (tbd)     |
+| Investment                 | (tbd)       |                  |                                        |                                        | (tbd)     |
+| Fama-French 5-factor model | (tbd)       |                  |                                        |                                        | (tbd)     |
+| Q-Factors                  | (tbd)       |                  |                                        |                                        | (tbd)     |
 
 ## Tidy Modeling & Machine Learning
 
 | Section                          | Data                                | Finance                            | Data Science | Remarks / Main Dev    |
 |----------------------------------|-------------------------------------|------------------------------------|--------------|-----------------------|
 | Firm Characteristics vs. Factors | <https://dachxiu.chicagobooth.edu/> | Difference to factor models        | tidymodels   | Not for first version |
-| Shrinkage Estimation             | <http://www.hec.unil.ch/agoyal/>    | Factor selection                   | Stefan       |                       |
+| Shrinkage Estimation             | <http://www.hec.unil.ch/agoyal/>    | Factor selection                   |              | Stefan                |
 |                                  | Regression Trees and Random Forests | Factor selection                   | tidymodels   | Stefan                |
 | Neural Networks                  | Simulations                         | Option Pricing                     | keras        | Stefan                |
 | Alpha Estimation                 | Simulations                         | Market timing vs stock selectivity | Manual GMM   | Christoph             |
@@ -59,6 +62,6 @@
 |---------------------------|------|-------------------------------------------------|-------------------------------------|----------------------|
 | Modern Portfolio Theory   | CRSP | Intro to Markowitz                              | Numerical optimization              | Stefan               |
 |                           |      | Parametric Portfolio Choice: Brandt-Santa Clara | More optimization?                  | Stefan               |
-| Covariance Estimation     | CRSP | Not in first edition                            |                                     |                      |
+| Covariance Estimation     | CRSP |                                                 |                                     | Not in first edition |
 | Transaction Costs         | CRSP |                                                 |                                     | Stefan               |
 | Merton's Porfolio Problem | \-   | Intro to continuous time finance                | Intro to reinforcement / Q-learning | Too hard with only R |
