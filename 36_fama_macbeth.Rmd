@@ -1,0 +1,115 @@
+
+# Fama-MacBeth Regressions
+
+The approach of @Fama1973 is widely used in empirical asset pricing studies. Researchers use the two-stage regression approach to identify risk premiums in various markets, but predominately in the stock market. We present a simple implementation of @Fama1973 to introduce the concept of their regressions.
+
+Frequently, the application of @Fama1973 regressions starts with the estimation of $\beta^{F_f}_{i}$ for some risk factor $F_f$ from a group of $F$ risk factors $F_1, \cdots, F_F$ for each asset $i$. We consider the three risk factors of @Fama1993 below and estimate the betas from the time-series regression
+$$r_{i,t} = \alpha_i + \beta^M_i r^M_t + \beta^{SMB}_i r^{SMB}_t + \beta^{HML}_i r^{HML}_t + \epsilon_{i,t}.$$
+More generally, we could also use asset characteristics in these regressions instead of betas. Moreover, we could also consider rolling-window estimation for betas or more evolved forecasts of betas. In any case, the Fama-MacBeth regressions use these exposures or characteristics in cross-sectional regressions, i.e.,
+$$r_{i,t} = \alpha_i + \lambda^{M}_t \beta^M_i  + \lambda^{SMB}_t \beta^{SMB}_i + \lambda^{HML}_t \beta^{HML}_i + \epsilon_{i,t},$$ where we are interested in the compensation $\lambda^{F_f}_t$ for the exposure to each risk factor in each time point. The time-series average of the $\lambda^{F_f}_t$ can then be interpreted as the risk premium for the specific risk factor $F_f$.
+
+The current chapter relies on this set of packages. 
+```{r}
+library(tidyverse)
+library(RSQLite)
+library(lubridate)
+```
+
+## Data preparation
+
+We can illustrate @Fama1973-regressions with publicly available data from Prof. French's website. We collect the industry portfolio returns, and the three Fama-French factors from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
+
+```{r}
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
+
+industry_returns <- tbl(tidy_finance, "industries_ff_monthly") %>% 
+  collect() 
+
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+  collect()
+```
+
+We compute excess returns for the ten test assets by subtracting the risk-free rate with this data at hand. We also merge the three Fama-French risk factors into the data to prepare for the next step. We also rename the market excess return to be consistent for aesthetic purposes.
+
+```{r}
+data_fm <- industry_returns %>%
+  left_join(factors_ff_monthly, by = "month") %>%
+  mutate(across(NoDur:Other, ~ . - rf)) %>%
+  select(-rf) %>%
+  rename(mkt = mkt_excess)
+```
+
+If you worry about the number of test assets being too small, we agree with your concern. Yet this chapter is about introducing Fama-MacBeth regressions as a tool and not about interpreting meaningful results.
+
+## Time-series regression: Factor exposure
+
+The first step in many applications of Fama-MacBeth regressions is the estimation of factor betas. In our case, we have to estimate three $\beta_i$ for the three risk factors of @Fama1993. We do this by writing a function for the estimation (similar to the function in the chapter on *"Beta estimation"*) and then estimating the slope coefficients in one step. The function itself is sufficiently flexible to handle more or fewer risk factors and test assets. 
+
+```{r}
+factor_exposure <- function(asset_return, risk_factors) {
+  fit <- lm(as.numeric(asset_return) ~ as.matrix(risk_factors))
+  
+  table <- as_tibble(as.list(fit$coefficients[2:(ncol(risk_factors) + 1)]))
+  colnames(table) <- paste0("beta_", colnames(risk_factors))
+  return(table)
+}
+
+data_exposures <- data_fm %>%
+  pivot_longer(cols = NoDur:Other, names_to = "asset", values_to = "excess_return") %>%
+  group_by(asset) %>%
+  summarize(exposures = factor_exposure(asset_return = cur_data() %>% pull(excess_return),
+                                        risk_factors = cur_data() %>% select(mkt, smb, hml))) %>%
+  unpack(exposures)
+
+data_exposures
+```
+
+We now have three factor exposures for each of the ten test assets and are ready to turn our attention to the cross-sectional regression. At this point, you might want to reflect on the exposure estimates and analyze them in more detail. We skip this step to keep it simple.
+
+
+## Cross-sectional regression: Risk premiums
+
+To smoothly run the cross-sectional regression, we build another function as the one for the time-series estimation of risk exposures. This time, we regress the returns of the test assets at a particular point of time on the factor exposures of each asset. By doing so, we get an estimate of the risk premiums $\lambda^{F_f}_t$ for each point in time.
+
+```{r}
+risk_premiums <- function(asset_returns, exposures) {
+  asset_returns <- asset_returns %>%
+    select(exposures$asset) %>%
+    as.numeric()
+
+  exposures <- exposures %>%
+    select(-asset) %>%
+    as.matrix() 
+  
+  fit <- lm(asset_returns ~ exposures)
+  
+  table <- as_tibble(as.list(fit$coefficients)) 
+  colnames(table) <- c("alpha", gsub("beta_", "lambda_", colnames(exposures)))
+  table
+}
+
+data_risk_premiums <- data_fm %>%
+  group_by(month) %>%
+  summarize(risk_premiums = risk_premiums(asset_returns = cur_data() %>% select(data_exposures$asset), 
+                exposures = data_exposures)) %>%
+  unpack(risk_premiums)
+```
+
+Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each risk factor.
+
+```{r}
+data_risk_premiums %>%
+  select(starts_with("lambda_")) %>%
+  summarize(across(everything(), ~ c(t.test(.x)$estimate, 
+                                     t.test(.x)$statistic))) %>%
+  bind_cols(tibble("Statistc" = c("Mean", "T-value")), .)
+```
+
+In this illustration, we can conclude that there is no significant risk premium for the three @Fama1993 factors. However, we would not consider this a valid or exciting answer given the limitations of the setup used here.
+
+## Exercises
+
+1. Download a larger sample of test assets from Kenneth French's homepage and reevaluate the risk premiums.
+1. Implement a rolling-window regression for the time-series estimation of the factor exposure. Then, adapt the cross-sectional regression and compute the average risk premiums.
