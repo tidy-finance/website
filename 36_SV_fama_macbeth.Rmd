@@ -28,7 +28,7 @@ tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
 )
 
 industry_returns <- tbl(tidy_finance, "industries_ff_monthly") %>% 
-  collect() 
+  collect()
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
   collect()
@@ -41,8 +41,7 @@ We also merge the three Fama-French risk factors into the data to prepare for th
 data_macbeth <- industry_returns %>%
   left_join(factors_ff_monthly, by = "month") %>%
   mutate(across(NoDur:Other, ~ . - rf)) %>%
-  select(-rf) %>%
-  rename(mkt = mkt_excess)
+  select(-rf)
 ```
 
 If you worry about the number of test assets being too small, we agree with your concern. Yet this chapter is about introducing Fama-MacBeth regressions as a tool and not about interpreting meaningful results.
@@ -52,55 +51,43 @@ If you worry about the number of test assets being too small, we agree with your
 The first step in many applications of Fama-MacBeth regressions is the estimation of factor betas. In our case, we have to estimate three $\beta_i$ for the three risk factors of @Fama1993. We do this by writing a function for the estimation (similar to the function in the chapter on *"Beta estimation"*) and then estimating the slope coefficients in one step. The function itself is sufficiently flexible to handle more or fewer risk factors and test assets. 
 
 ```{r}
-estimate_factor_exposure <- function(asset_return, risk_factors) {
-  fit <- lm(as.numeric(asset_return) ~ as.matrix(risk_factors))
-  
-  table <- as_tibble(as.list(fit$coefficients[2:(ncol(risk_factors) + 1)]))
-  colnames(table) <- paste0("beta_", colnames(risk_factors))
-  return(table)
-}
 
-data_exposures <- data_macbeth %>%
-  pivot_longer(cols = NoDur:Other, 
-               names_to = "asset", 
-               values_to = "excess_return") %>%
-  group_by(asset) %>%
-  summarize(exposures = factor_exposure(asset_return = cur_data() %>% pull(excess_return), 
-                                        risk_factors = cur_data() %>% select(mkt, smb, hml))) %>%
-  unpack(exposures)
+X <- data_macbeth %>% select(NoDur:Other) %>% as.matrix()
+Y <- data_macbeth %>% select(mkt_excess:hml) %>% as.matrix()
+risk_exposures <- broom::tidy(lm(Y ~ X)) %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(response = paste0("beta_", response),
+         term = gsub("X", "", term)) %>% 
+  select(asset = term, response, estimate) %>% pivot_wider(names_from = "response", values_from = estimate)
 
-data_exposures
+risk_exposures
 ```
 
 We now have three factor exposures for each of the ten test assets and are ready to turn our attention to the cross-sectional regression. At this point, you might want to reflect on the exposure estimates and analyze them in more detail. We skip this step to keep it simple.
 
-
 ## Cross-sectional regression: Risk premiums
 
-To smoothly run the cross-sectional regression, we build another function as the one for the time-series estimation of risk exposures. This time, we regress the returns of the test assets at a particular point of time on the factor exposures of each asset. By doing so, we get an estimate of the risk premiums $\lambda^{F_f}_t$ for each point in time.
+To smoothly run the cross-sectional regression, we build another function as the one for the time-series estimation of risk exposures. 
+This time, we regress the returns of the test assets at a particular point of time on the factor exposures of each asset. By doing so, we get an estimate of the risk premiums $\lambda^{F_f}_t$ for each point in time.
 
 ```{r}
-risk_premiums <- function(asset_returns, exposures) {
-  asset_returns <- asset_returns %>%
-    select(exposures$asset) %>%
-    as.numeric()
-
-  exposures <- exposures %>%
-    select(-asset) %>%
-    as.matrix() 
-  
-  fit <- lm(asset_returns ~ exposures)
-  
-  table <- as_tibble(as.list(fit$coefficients)) 
-  colnames(table) <- c("alpha", gsub("beta_", "lambda_", colnames(exposures)))
-  table
-}
-
-data_risk_premiums <- data_macbeth %>%
+nest_macbeth <- data_macbeth %>%
+  pivot_longer(-month, names_to = "asset", values_to = "ret_exc") %>%
+  left_join(risk_exposures, by = "asset") %>% 
   group_by(month) %>%
-  summarize(risk_premiums = risk_premiums(asset_returns = cur_data() %>% select(data_exposures$asset), 
-                exposures = data_exposures)) %>%
-  unpack(risk_premiums)
+  select(-asset) %>% 
+  nest()
+
+cross_sectional_regs <- nest_macbeth %>%
+  mutate(model = map(data, ~lm(ret_exc ~ ., data = .x)),
+         tidy = map(model, broom::tidy),
+         n = map_dbl(model, stats::nobs))
+
+# extract average coefficient estimates
+fama_macbeth_coefs <- cross_sectional_regs %>%
+  unnest(tidy) %>%
+  group_by(term) %>%
+  summarize(coefficient = mean(estimate))
 ```
 
 Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each risk factor.
@@ -111,6 +98,35 @@ data_risk_premiums %>%
   summarize(across(everything(), ~ c(t.test(.x)$estimate, 
                                      t.test(.x)$statistic))) %>%
   bind_cols(tibble("Statistc" = c("Mean", "T-value")), .)
+
+# compute newey-west standard errors of average coefficient estimates
+newey_west_std_errors <- cross_sectional_regs %>%
+  unnest(tidy) %>%
+  group_by(term) %>%
+  arrange(month) %>%
+  group_modify(~enframe(sqrt(diag(sandwich::NeweyWest(lm(estimate ~ 1, data = .x), lag = 6))))) %>%
+  select(term, nw_std_error = value)
+
+# put coefficient estimates and standard errors together and compute t-statistics
+fama_macbeth_coefs <- fama_macbeth_coefs %>%
+  left_join(newey_west_std_errors, by = "term") %>%
+  mutate(nw_t_stat = coefficient / nw_std_error) %>%
+  select(term, coefficient, nw_t_stat) %>%
+  pivot_longer(cols = c(coefficient, nw_t_stat), names_to = "statistic") %>%
+  mutate(statistic = paste(term, statistic, sep = " ")) %>%
+  select(-term)
+
+# extract average number of observations
+fama_macbeth_stats <- cross_sectional_regs %>%
+  ungroup() %>%
+  summarize(n = mean(n)) %>%
+  pivot_longer(n, names_to = "statistic")
+
+# combine desired output and return results
+out <- rbind(fama_macbeth_coefs, fama_macbeth_stats)
+
+out %>% knitr::kable(digits = 2, "pipe")
+
 ```
 
 In this illustration, we can conclude that there is no significant risk premium for the three @Fama1993 factors. However, we would not consider this a valid or exciting answer given the limitations of the setup used here.
