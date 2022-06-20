@@ -1,4 +1,5 @@
 Sys.setlocale("LC_TIME", "English")
+Sys.setenv(LANG = "en")
 
 knitr::opts_chunk$set(
   echo = TRUE,
