@@ -205,7 +205,7 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.263
+## [1] 0.265
 ```
 
 

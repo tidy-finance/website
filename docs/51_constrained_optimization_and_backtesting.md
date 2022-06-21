@@ -110,7 +110,12 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.429  0.270 -1.301  0.375  0.309 -0.152  0.542  0.472 -0.167 -0.776
+##  [1] -0.1914  0.2291 -0.3242  0.8333  1.0955 -0.6080  0.8525 -0.1642 -1.7667
+## [10]  0.6720 -0.6077  0.8922  0.1179 -0.0314  1.0545  0.0556  0.3094 -0.2607
+## [19] -1.5555 -0.3682  0.1001  0.6472  0.3683  0.5106  0.0425  0.6461  0.0226
+## [28]  0.7373 -0.1546  0.1093 -0.0435 -0.4141 -1.2728  1.1405 -0.7336 -0.0200
+## [37]  0.6600  0.6602 -0.1942 -0.4036  0.3792 -0.5184 -0.2023  0.1821 -0.3339
+## [46]  0.6035 -1.2973  1.1322 -1.5878
 ```
 
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
@@ -199,8 +204,13 @@ w_no_short_sale$solution
 ```
 
 ```
-##  [1]  6.36e-01 -3.83e-18 -8.64e-17  3.47e-18  1.60e-18 -5.04e-17  1.00e-01
-##  [8]  2.64e-01 -1.16e-17  0.00e+00
+##  [1] -4.84e-18  8.11e-17 -5.80e-16  5.10e-03  4.89e-01  7.53e-17  2.41e-01
+##  [8] -1.05e-15  1.96e-16 -3.22e-17  1.32e-16  2.65e-01 -4.40e-17  2.58e-17
+## [15] -1.14e-16 -8.07e-17  9.47e-17 -1.00e-17  8.87e-17 -4.48e-17 -8.30e-18
+## [22]  5.89e-17  6.19e-17 -1.68e-17 -1.85e-16  3.70e-16 -2.79e-17  0.00e+00
+## [29]  6.41e-17 -6.05e-17  1.08e-16  1.45e-16 -3.36e-16  1.68e-15 -9.03e-17
+## [36]  9.30e-18 -9.67e-18  5.84e-17 -1.13e-16 -2.92e-16 -1.02e-16 -1.73e-16
+## [43] -1.29e-17  6.11e-17  2.82e-16  1.37e-16  9.59e-16  2.23e-17  0.00e+00
 ```
 
 `solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on `solve.QP()`. Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -208,7 +218,7 @@ w_no_short_sale$solution
 
 ```r
 initial_weights <- 1 / n_industries * rep(1, n_industries)
-objective <- function(w, gamma = 2) -t(w) %*% mu + gamma / 2 * t(w)%*%Sigma%*%w
+objective <- function(w, gamma = 2) -t(w) %*% (1+mu) + gamma / 2 * t(w)%*%Sigma%*%w
 inequality_constraints <- function(w, reg_t = 1.5) return(reg_t - sum(abs(w)))
 equality_constraints <- function(w) return(sum(w) - 1)
 
@@ -222,11 +232,14 @@ w_reg_t$par
 ```
 
 ```
-##  [1]  2.63e-01 -1.69e-05 -1.08e-02  7.11e-02  7.65e-02  5.97e-02  1.98e-01
-##  [8]  2.54e-01  1.12e-01 -2.38e-02
+##  [1] 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204
+## [12] 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204
+## [23] 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204
+## [34] 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204 0.0204
+## [45] 0.0204 0.0204 0.0204 0.0204 0.0204
 ```
 
-The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
+The figure below shows the optimal allocation weights across all 49 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
 
 ```r
@@ -257,13 +270,12 @@ compute_efficient_weight_L1_TC <- function(mu,
                                           Sigma, 
                                           gamma = 2, 
                                           beta = 0, 
-                                          w_prev = 1 / ncol(sigma) * rep(1, ncol(sigma))) {
+                                          initial_weights = 1 / ncol(sigma) * rep(1, ncol(sigma))) {
   
-  initial_weights <- w_prev
-  objective <- function(w) -t(w) %*% mu + gamma / 2* t(w) %*% Sigma %*% w + (beta / 10000) / 2 * sum(abs(w - w_prev))
+  objective <- function(w) -t(w) %*% mu + gamma / 2* t(w) %*% Sigma %*% w + (beta / 10000) / 2 * sum(abs(w - initial_weights))
 
   w_optimal <- constrOptim.nl(
-    par = w_prev,
+    par = initial_weights,
     fn = objective, 
     heq = function(w){sum(w) - 1},
     control.outer = list(trace = FALSE))
@@ -323,7 +335,7 @@ The following code chunk performs rolling-window estimation. In each period, the
 for(p in 1:periods){
   
   returns_window <- industry_returns[p : (p + window_length - 1), ]
-  next_return <- industry_returns[p + window_length, ] 
+  next_return <- industry_returns[p + window_length, ] %>% as.matrix()
   
   Sigma <- cov(returns_window) 
   mu <- 0 * colMeans(returns_window) 
@@ -333,7 +345,7 @@ for(p in 1:periods){
                                         Sigma = Sigma, 
                                         beta = beta, 
                                         gamma = gamma,
-                                        w_prev = w_prev_1)
+                                        initial_weights = w_prev_1)
   
   performance_values[[1]][p, ] <- evaluate_performance(w_1, 
                                                        w_prev_1, 
@@ -380,12 +392,12 @@ performance %>%
 ```
 
 ```
-## # A tibble: 3 x 5
-##   strategy   Mean    SD `Sharpe ratio` Turnover
-##   <chr>     <dbl> <dbl>          <dbl>    <dbl>
-## 1 MV       -0.639  12.4         NA     214.    
-## 2 MV (TC)  12.1    15.1          0.802   0.0297
-## 3 Naive    12.1    15.1          0.801   0.229
+## # A tibble: 3 × 5
+##   strategy  Mean    SD `Sharpe ratio` Turnover
+##   <chr>    <dbl> <dbl>          <dbl>    <dbl>
+## 1 MV       -24.4  14.3         NA     569.    
+## 2 MV (TC)   11.6  16.4          0.708  11.1   
+## 3 Naive     12.2  17.3          0.704   0.0658
 ```
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 

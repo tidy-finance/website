@@ -21,7 +21,6 @@ library(keras)
 library(hardhat)
 ```
 
-
 ## Regression trees and random forests
 
 Regression trees are a popular ML approach for incorporating multiway predictor interactions. Trees are fully nonparametric and possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each other. A tree “grows” in a sequence of steps. At each step, a new “branch” sorts the data leftover from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into rectangular partitions and approximates the unknown function $f(x)$ with the average value of the outcome variable within each partition.
@@ -111,6 +110,7 @@ In order to keep the analysis reproducible, we use `set.seed()`. A random seed s
 ```r
 set.seed(420)
 split <- initial_split(option_prices, prop = 1 / 100)
+data_folds <- vfold_cv(training(split), v = 10)
 ```
 
 We process the training dataset further before we fit the different ML models. We define a `recipe` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
@@ -126,16 +126,16 @@ rec <- recipe(observed_price ~ .,
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 20 hidden units. We set the number of training iterations to `epochs = 75`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
+Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `epochs = 500`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
 
 
 ```r
 nnet_model <- mlp(
-  epochs = 200,
-  hidden_units = 20
+  epochs = 500,
+  hidden_units = 15,
 ) %>%
   set_mode("regression") %>%
-  set_engine("keras", verbose = 0)
+  set_engine("keras", verbose = 1)
 ```
 
 The `verbose=0` argument prevents logging the results. We can follow the straightforward `tidymodel` workflow as in the chapter before: Define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data. 
@@ -172,14 +172,14 @@ rf_fit <- workflow() %>%
 
 ### Deep neural networks
 
-Note that while the `tidymodels` workflow is extremely convenient, more sophisticated *deep* neural networks are not supported yet (as of January 2022). For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers with 20 units per layer. The `keras` package provides a convenient interface and is flexible enough to handle different activation functions. The `compile` command defines the loss function with which the model predictions are evaluated. 
+Note that while the `tidymodels` workflow is extremely convenient, more sophisticated *deep* neural networks are not supported yet (as of January 2022). For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers with 10 units per layer. The `keras` package provides a convenient interface and is flexible enough to handle different activation functions. The `compile` command defines the loss function with which the model predictions are evaluated. 
 
 
 ```r
 model <- keras_model_sequential() %>%
-  layer_dense(units = 20, activation = "sigmoid", input_shape = 5) %>%
-  layer_dense(units = 20, activation = "sigmoid") %>%
-  layer_dense(units = 20, activation = "sigmoid") %>%
+  layer_dense(units = 10, activation = "sigmoid", input_shape = 5) %>%
+  layer_dense(units = 10, activation = "sigmoid") %>%
+  layer_dense(units = 10, activation = "sigmoid") %>%
   layer_dense(units = 1, activation = "linear") %>%
   compile(
     loss = "mean_absolute_error"
@@ -192,17 +192,13 @@ model
 ## _________________________________________________________________________________
 ##  Layer (type)                       Output Shape                    Param #      
 ## =================================================================================
-##  dense_5 (Dense)                    (None, 20)                      120          
-##                                                                                  
-##  dense_4 (Dense)                    (None, 20)                      420          
-##                                                                                  
-##  dense_3 (Dense)                    (None, 20)                      420          
-##                                                                                  
-##  dense_2 (Dense)                    (None, 1)                       21           
-##                                                                                  
+##  dense_5 (Dense)                    (None, 10)                      60           
+##  dense_4 (Dense)                    (None, 10)                      110          
+##  dense_3 (Dense)                    (None, 10)                      110          
+##  dense_2 (Dense)                    (None, 1)                       11           
 ## =================================================================================
-## Total params: 981
-## Trainable params: 981
+## Total params: 291
+## Trainable params: 291
 ## Non-trainable params: 0
 ## _________________________________________________________________________________
 ```
@@ -215,7 +211,7 @@ model %>%
   fit(
     x = extract_mold(nn_fit)$predictors %>% as.matrix(),
     y = extract_mold(nn_fit)$outcomes %>% pull(observed_price),
-    epochs = 150, verbose = 0
+    epochs = 500, verbose = 0
   )
 ```
 

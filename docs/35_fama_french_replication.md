@@ -183,18 +183,18 @@ summary(lm(smb ~ smb_replicated, data = test))
 ## 
 ## Residuals:
 ##       Min        1Q    Median        3Q       Max 
-## -0.020313 -0.001487  0.000029  0.001541  0.014304 
+## -0.020320 -0.001501  0.000027  0.001519  0.014615 
 ## 
 ## Coefficients:
 ##                 Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    -0.000145   0.000133   -1.09     0.27    
-## smb_replicated  0.996712   0.004405  226.28   <2e-16 ***
+## (Intercept)    -0.000143   0.000133   -1.07     0.28    
+## smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
-## Residual standard error: 0.00354 on 712 degrees of freedom
+## Residual standard error: 0.00355 on 712 degrees of freedom
 ## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
-## F-statistic: 5.12e+04 on 1 and 712 DF,  p-value: <2e-16
+## F-statistic: 5.09e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
 The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 95%. 
@@ -211,17 +211,17 @@ summary(lm(hml ~ hml_replicated, data = test))
 ## 
 ## Residuals:
 ##       Min        1Q    Median        3Q       Max 
-## -0.022256 -0.002920 -0.000085  0.002378  0.027474 
+## -0.022250 -0.002933 -0.000101  0.002366  0.027475 
 ## 
 ## Coefficients:
 ##                Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    0.000289   0.000214    1.35     0.18    
-## hml_replicated 0.959113   0.007383  129.90   <2e-16 ***
+## (Intercept)    0.000294   0.000214    1.38     0.17    
+## hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.0057 on 712 degrees of freedom
-## Multiple R-squared:  0.96,	Adjusted R-squared:  0.959 
+## Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 
 ## F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 

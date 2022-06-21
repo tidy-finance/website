@@ -66,7 +66,7 @@ summary(fit)
 ## Coefficients:
 ##             Estimate Std. Error t value Pr(>|t|)    
 ## (Intercept)  0.01051    0.00532    1.98    0.049 *  
-## mkt_excess   1.40079    0.11748   11.92   <2e-16 ***
+## mkt_excess   1.40081    0.11748   11.92   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
@@ -144,7 +144,7 @@ beta_example
 ```
 
 ```
-## # A tibble: 433 x 6
+## # A tibble: 433 × 6
 ##   permno month      industry      ret_excess mkt_excess  beta
 ##    <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
 ## 1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
@@ -152,7 +152,7 @@ beta_example
 ## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
 ## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
 ## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
-## # ... with 428 more rows
+## # … with 428 more rows
 ```
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
 
@@ -193,15 +193,15 @@ crsp_monthly_nested
 ```
 
 ```
-## # A tibble: 29,207 x 3
+## # A tibble: 29,203 × 3
 ##   permno industry      data              
 ##    <dbl> <chr>         <list>            
-## 1  10000 Manufacturing <tibble [16 x 3]> 
-## 2  10001 Utilities     <tibble [378 x 3]>
-## 3  10002 Finance       <tibble [324 x 3]>
-## 4  10003 Finance       <tibble [118 x 3]>
-## 5  10005 Mining        <tibble [65 x 3]> 
-## # ... with 29,202 more rows
+## 1  10000 Manufacturing <tibble [16 × 3]> 
+## 2  10001 Utilities     <tibble [378 × 3]>
+## 3  10002 Finance       <tibble [324 × 3]>
+## 4  10003 Finance       <tibble [118 × 3]>
+## 5  10005 Mining        <tibble [65 × 3]> 
+## # … with 29,198 more rows
 ```
 
 Next, we ant to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
@@ -217,7 +217,7 @@ crsp_monthly_nested %>%
 ```
 
 ```
-## # A tibble: 1,362 x 3
+## # A tibble: 1,362 × 3
 ##   permno month      beta_monthly
 ##    <dbl> <date>            <dbl>
 ## 1  10107 1990-03-01         1.39
@@ -225,7 +225,7 @@ crsp_monthly_nested %>%
 ## 3  10107 1990-05-01         1.43
 ## 4  10107 1990-06-01         1.43
 ## 5  10107 1990-07-01         1.45
-## # ... with 1,357 more rows
+## # … with 1,357 more rows
 ```
 
 However, instead, we want to perform the estimations of rolling betas for different stocks in parallel. We can use the flexibility of the `future` package, which we use to define how we want to perform the parallel estimation. If you have a Windows machine, it makes most sense to define `multisession`, which means that separate R processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization.
@@ -301,7 +301,7 @@ crsp_daily_nested %>%
 ```
 
 ```
-## # A tibble: 1,543 x 3
+## # A tibble: 1,543 × 3
 ##   permno month      beta_daily
 ##    <dbl> <date>          <dbl>
 ## 1  10107 1986-05-01      0.898
@@ -309,7 +309,7 @@ crsp_daily_nested %>%
 ## 3  10107 1986-07-01      0.822
 ## 4  10107 1986-08-01      0.900
 ## 5  10107 1986-09-01      1.01 
-## # ... with 1,538 more rows
+## # … with 1,538 more rows
 ```
 
 For the sake of completeness, we tell our session again to use multiple workers for parallelization.
@@ -462,11 +462,11 @@ beta_long %>%
 ```
 
 ```
-## # A tibble: 2 x 11
+## # A tibble: 2 × 11
 ##   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
 ##   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
-## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186254
-## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071015
+## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186174
+## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
 ```
 
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods).

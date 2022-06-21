@@ -63,11 +63,11 @@ factors_ff_daily <- download_french_data("Fama/French 3 Factors [Daily]")$subset
   filter(date >= start_date & date <= end_date)
 ```
 
-In a subsequent chapter, we also use the 10 monthly industry portfolios, so let us fetch that data, too. 
+In a subsequent chapter, we also use the 49 monthly industry portfolios, so let us fetch that data, too. 
 
 
 ```r
-industries_ff_monthly <- download_french_data("10 Industry Portfolios")$subsets$data[[1]] %>%
+industries_ff_monthly <- download_french_data("49 Industry Portfolios")$subsets$data[[1]] %>%
   mutate(month = floor_date(ymd(paste0(date, "01")), "month")) %>%
   mutate(across(where(is.numeric), ~ . / 100)) %>%
   select(month, everything(), -date) %>%
@@ -75,7 +75,6 @@ industries_ff_monthly <- download_french_data("10 Industry Portfolios")$subsets$
 ```
 
 It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `frenchdata::get_french_data_list()`.
-
 
 ## q-factors
 
@@ -206,9 +205,8 @@ factors_ff_monthly_db %>%
 ```
 
 ```
-## # Source:   lazy query [?? x 2]
-## # Database: sqlite 3.37.0
-## #   [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
+## # Source:   SQL [?? x 2]
+## # Database: sqlite 3.38.5 [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -216,7 +214,7 @@ factors_ff_monthly_db %>%
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
 ## 5 1960-05-01 0.0027
-## # ... with more rows
+## # … with more rows
 ```
 
 If we want to have the whole table in memory, we need to `collect()` it. You will see that we regularly load the data into the memory in the next chapters.
@@ -229,7 +227,7 @@ factors_ff_monthly_db %>%
 ```
 
 ```
-## # A tibble: 732 x 2
+## # A tibble: 732 × 2
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -237,7 +235,7 @@ factors_ff_monthly_db %>%
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
 ## 5 1960-05-01 0.0027
-## # ... with 727 more rows
+## # … with 727 more rows
 ```
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
@@ -310,7 +308,7 @@ msf_db
 
 ```
 ## # Source:   table<"crsp"."msf"> [?? x 21]
-## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
 ##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
 ## 1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
@@ -318,7 +316,7 @@ msf_db
 ## 3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
 ## 4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
 ## 5 68391610  10000   7952  10396     3   3990 1986-04-30 -4    -4.31 -4      957
-## # ... with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
+## # … with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
 ## #   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
 ## #   altprcdt <date>, retx <dbl>
 ```
@@ -332,15 +330,15 @@ msenames_db
 
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
-## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam   shrcls
 ##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>    <chr> 
-## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
-## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
-## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM~ A     
-## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F~ <NA>  
-## 5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERGY ~ <NA>  
-## # ... with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
+## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F… <NA>  
+## 5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERGY … <NA>  
+## # … with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
 ## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
 ```
@@ -354,7 +352,7 @@ msedelist_db
 
 ```
 ## # Source:   table<"crsp"."msedelist"> [?? x 19]
-## # Database: postgres [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
+## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
 ##   permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
 ##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
 ## 1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
@@ -362,7 +360,7 @@ msedelist_db
 ## 3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
 ## 4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
 ## 5  10005 1991-07-11    560      0      0 1991-07-12  0.141 0.125  -0.141
-## # ... with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
+## # … with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
 ## #   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
 ## #   cusip <chr>, acperm <dbl>, accomp <dbl>
 ```
@@ -515,7 +513,7 @@ crsp_monthly
 ```
 
 ```
-## # A tibble: 3,225,161 x 13
+## # A tibble: 3,225,079 × 13
 ##   permno date       month           ret  shrout altprc exchcd siccd mktcap
 ##    <dbl> <date>     <date>        <dbl>   <dbl>  <dbl>  <dbl> <dbl>  <dbl>
 ## 1  10000 1986-02-28 1986-02-01 -0.257   3680000  -3.25      3  3990   12.0
@@ -523,11 +521,11 @@ crsp_monthly
 ## 3  10000 1986-04-30 1986-04-01 -0.0986  3793000  -4         3  3990   15.2
 ## 4  10000 1986-05-30 1986-05-01 -0.223   3793000  -3.11      3  3990   11.8
 ## 5  10000 1986-06-30 1986-06-01 -0.00503 3793000  -3.09      3  3990   11.7
-## # ... with 3,225,156 more rows, and 4 more variables: mktcap_lag <dbl>,
+## # … with 3,225,074 more rows, and 4 more variables: mktcap_lag <dbl>,
 ## #   exchange <chr>, industry <chr>, ret_excess <dbl>
 ```
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1245 on NYSE, 147 on AMEX and only 1 belong to the other category.
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belong to the other category.
 
 
 ```r
@@ -787,15 +785,15 @@ ccmxpf_linktable
 ```
 
 ```
-## # A tibble: 31,770 x 4
+## # A tibble: 31,770 × 4
 ##   permno gvkey  linkdt     linkenddt 
 ##    <dbl> <chr>  <date>     <date>    
 ## 1  25881 001000 1970-11-13 1978-06-30
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-04-01
-## # ... with 31,765 more rows
+## 5  54594 001004 1972-04-24 2022-06-21
+## # … with 31,765 more rows
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 

@@ -4,9 +4,8 @@ author:
   - Christoph Scheuch, wikifolio Financial Technologies 
   - Stefan Voigt, University of Copenhagen and Danish Finance Institute
   - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-04-01"
+date: "2022-06-21"
 site: bookdown::bookdown_site
-output: bookdown::bs4_book
 documentclass: book
 bibliography: [book.bib]
 biblio-style: apalike
@@ -114,12 +113,13 @@ We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from 
 * [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
 * [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the intersection between asset pricing and corporate finance. 
 
+<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="tidyfinance" data-color="#3b9ab2" data-emoji="" data-font="Cookie" data-text="Want to support tidy finance? Buy us a coffee" data-outline-color="#ffffff" data-font-color="#ffffff" data-coffee-color="#e1af00" ></script>
+
 ## License {.unnumbered}
 
 This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e., public domain](https://creativecommons.org/publicdomain/zero/1.0/).
-
 
 <!-- ## Acknowledgements {.unnumbered} -->
 
@@ -129,7 +129,7 @@ The code samples in this book are licensed under [Creative Commons CC0 1.0 Unive
 
 This book was written in RStudio using bookdown. The website is hosted with github pages and automatically updated after every commit. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). We generated all plots in this book using `ggplot2` and its classic dark-on-light theme (`theme_bw()`). 
 
-This version of the book was built with R version 4.1.2 (2021-11-01) and the following packages:
+This version of the book was built with R version 4.2.0 (2022-04-22) and the following packages:
 
 <table>
  <thead>
@@ -141,19 +141,19 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
 <tbody>
   <tr>
    <td style="text-align:left;"> alabama </td>
-   <td style="text-align:left;"> 2015.3-1 </td>
+   <td style="text-align:left;"> 2022.4-1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> bookdown </td>
-   <td style="text-align:left;"> 0.24.4 </td>
+   <td style="text-align:left;"> 0.27 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
-   <td style="text-align:left;"> 0.7.12 </td>
+   <td style="text-align:left;"> 0.8.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> dbplyr </td>
-   <td style="text-align:left;"> 2.1.1 </td>
+   <td style="text-align:left;"> 2.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> frenchdata </td>
@@ -161,15 +161,15 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> furrr </td>
-   <td style="text-align:left;"> 0.2.3 </td>
+   <td style="text-align:left;"> 0.3.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> ggplot2 </td>
-   <td style="text-align:left;"> 3.3.5 </td>
+   <td style="text-align:left;"> 3.3.6 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> glmnet </td>
-   <td style="text-align:left;"> 4.1-3 </td>
+   <td style="text-align:left;"> 4.1-4 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> googledrive </td>
@@ -177,11 +177,11 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> hardhat </td>
-   <td style="text-align:left;"> 0.2.0 </td>
+   <td style="text-align:left;"> 1.1.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> jsonlite </td>
-   <td style="text-align:left;"> 1.7.3 </td>
+   <td style="text-align:left;"> 1.8.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> kableExtra </td>
@@ -189,15 +189,15 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> keras </td>
-   <td style="text-align:left;"> 2.8.0 </td>
+   <td style="text-align:left;"> 2.9.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> knitr </td>
-   <td style="text-align:left;"> 1.37 </td>
+   <td style="text-align:left;"> 1.39 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> lmtest </td>
-   <td style="text-align:left;"> 0.9-39 </td>
+   <td style="text-align:left;"> 0.9-40 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> lubridate </td>
@@ -209,35 +209,35 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> readxl </td>
-   <td style="text-align:left;"> 1.3.1 </td>
+   <td style="text-align:left;"> 1.4.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> renv </td>
-   <td style="text-align:left;"> 0.15.2 </td>
+   <td style="text-align:left;"> 0.15.5 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> rlang </td>
-   <td style="text-align:left;"> 1.0.1 </td>
+   <td style="text-align:left;"> 1.0.2 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
-   <td style="text-align:left;"> 2.11 </td>
+   <td style="text-align:left;"> 2.14 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> RPostgres </td>
-   <td style="text-align:left;"> 1.4.3 </td>
+   <td style="text-align:left;"> 1.4.4 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> RSQLite </td>
-   <td style="text-align:left;"> 2.2.9 </td>
+   <td style="text-align:left;"> 2.2.14 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> sandwich </td>
-   <td style="text-align:left;"> 3.0-1 </td>
+   <td style="text-align:left;"> 3.0-2 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> scales </td>
-   <td style="text-align:left;"> 1.1.1 </td>
+   <td style="text-align:left;"> 1.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> slider </td>
@@ -245,11 +245,11 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> tidymodels </td>
-   <td style="text-align:left;"> 0.1.4 </td>
+   <td style="text-align:left;"> 0.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyquant </td>
-   <td style="text-align:left;"> 1.0.3 </td>
+   <td style="text-align:left;"> 1.0.4 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyverse </td>
@@ -257,7 +257,7 @@ This version of the book was built with R version 4.1.2 (2021-11-01) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> timetk </td>
-   <td style="text-align:left;"> 2.7.0 </td>
+   <td style="text-align:left;"> 2.8.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> wesanderson </td>

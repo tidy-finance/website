@@ -113,7 +113,7 @@ data <- industries_ff_monthly %>%
 ```
 
 Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. 
-The table below provides annualized summary statistics for the 10 industries such as the sample standard deviation and the minimum and maximum monthly excess returns in percent.
+The table below provides annualized summary statistics for the 49 industries such as the sample standard deviation and the minimum and maximum monthly excess returns in percent.
 
 
 ```r
@@ -130,15 +130,15 @@ data %>%
 ```
 
 ```
-## # A tibble: 10 x 6
+## # A tibble: 49 × 6
 ##   industry  mean    sd min_monthly median max_monthly
 ##   <fct>    <dbl> <dbl>       <dbl>  <dbl>       <dbl>
-## 1 NoDur     8.40  15.0       -21.6   9.24        18.3
-## 2 Durbl     7.62  23.8       -33.0   6.48        45.3
-## 3 Manuf     7.35  17.5       -28.0  10.9         17.3
-## 4 Enrgy     6.60  20.8       -34.6   7.2         32.4
-## 5 HiTec     8.19  22.6       -26.5   9.84        20.3
-## # ... with 5 more rows
+## 1 Agric     6.90  22.4       -29.6   3.6         28.4
+## 2 Food      8.37  15.5       -18.5   8.52        19.0
+## 3 Soda      9.14  22.1       -27.1  11.9         38.0
+## 4 Beer      9.20  18.0       -20.2  10.2         25.5
+## 5 Smoke    11.9   21.4       -25.3  16.1         32.4
+## # … with 44 more rows
 ```
 
 ## The tidymodels workflow
@@ -149,13 +149,13 @@ The `tidymodels` workflow encompasses the main stages of the modeling process: p
 
 Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
-To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. The split takes the last 20% of the data as a test set, which is not used for any model tuning. We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
+To start, we restrict our analysis to just one industry: Agricultur. We first split the sample into a *training* and a *test* set. For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. The split takes the last 20% of the data as a test set, which is not used for any model tuning. We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
 
 
 ```r
 split <- initial_time_split(
   data %>%
-    filter(industry == "Manuf") %>%
+    filter(industry == "Agric") %>%
     select(-industry),
   prop = 4 / 5
 )
@@ -200,7 +200,7 @@ tmp_data
 ```
 
 ```
-## # A tibble: 130 x 126
+## # A tibble: 130 × 126
 ##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
 ##          <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
 ## 1        -1.92                0.644        0.298          0.947      0.371 
@@ -208,13 +208,13 @@ tmp_data
 ## 3        -1.88                0.341        1.43           0.836      1.12  
 ## 4        -1.88               -1.80        -0.0411        -0.963     -0.0921
 ## 5        -1.88               -1.29        -0.627         -1.73      -0.850 
-## # ... with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
+## # … with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
 ## #   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
 ## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
 ## #   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
 ## #   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
 ## #   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
-## #   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, ...
+## #   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
@@ -247,19 +247,19 @@ lm_fit
 ```
 
 ```
-## == Workflow =====================================================================
+## ══ Workflow ═════════════════════════════════════════════════════════════════════
 ## Preprocessor: Recipe
 ## Model: linear_reg()
 ## 
-## -- Preprocessor -----------------------------------------------------------------
+## ── Preprocessor ─────────────────────────────────────────────────────────────────
 ## 4 Recipe Steps
 ## 
-## * step_rm()
-## * step_interact()
-## * step_normalize()
-## * step_center()
+## • step_rm()
+## • step_interact()
+## • step_normalize()
+## • step_center()
 ## 
-## -- Model ------------------------------------------------------------------------
+## ── Model ────────────────────────────────────────────────────────────────────────
 ## Linear Regression Model Specification (regression)
 ## 
 ## Main Arguments:
@@ -276,14 +276,14 @@ lm_fit
 
 With the `workflow` from above, we are ready to use `fit`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Agricultur industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 
 ```r
 predicted_values <- lm_fit %>%
   fit(data = training(split)) %>%
-  predict(data %>% filter(industry == "Manuf")) %>%
-  bind_cols(data %>% filter(industry == "Manuf")) %>%
+  predict(data %>% filter(industry == "Agric")) %>%
+  bind_cols(data %>% filter(industry == "Agric")) %>%
   select(month, .pred, ret) %>%
   pivot_longer(-month, names_to = "Variable") %>%
   mutate(Variable = case_when(
@@ -298,7 +298,7 @@ predicted_values %>%
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted Manufacturing industry risk premia"
+    title = "Monthly realized and fitted agricultural industry risk premia"
   ) +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), to = max(x), by = "5 years"),
@@ -432,7 +432,7 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 ```r
 autoplot(lm_tune) +
   labs(y = "Root mean-squared prediction error",
-       title = "MSPE for Manufacturing excess returns",
+       title = "MSPE for Agricultur excess returns",
        subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization.")
 ```
 
@@ -536,6 +536,7 @@ selected_factors %>%
     fill = as_factor(selected)
   )) +
   geom_tile() +
+  scale_x_discrete(guide = guide_axis(angle = 70)) +
   scale_fill_manual(values = c("white", "cornflowerblue")) +
   theme(legend.position = "None") +
   labs(

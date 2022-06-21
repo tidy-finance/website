@@ -131,14 +131,14 @@ crsp_monthly %>%
 ```
 
 ```
-## # A tibble: 5 x 11
+## # A tibble: 5 × 11
 ##   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
 ##   <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
 ## 1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
 ## 2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-## 3 NYSE     16416. 43115.     5.35 1.54e2 9.17e2 3.34e3 12022. 74826. 4.14e5  1245
+## 3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
 ## 4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## 5 Overall  10556. 63966.     4.65 3.10e1 1.85e2 8.74e2  4196. 37059. 2.23e6  3693
+## 5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692
 ```
 
 ## Univariate size portfolios with flexible breakpoints
@@ -219,11 +219,11 @@ tibble(Exchanges = c("all", "NYSE"), Premium = as.numeric(c(ret_all, ret_nyse)) 
 ```
 
 ```
-## # A tibble: 2 x 2
+## # A tibble: 2 × 2
 ##   Exchanges Premium
 ##   <chr>       <dbl>
 ## 1 all         0.110
-## 2 NYSE        0.180
+## 2 NYSE        0.181
 ```
 
 The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
@@ -252,7 +252,7 @@ p_hacking_setup
 ```
 
 ```
-## # A tibble: 48 x 4
+## # A tibble: 48 × 4
 ##   n_portfolios exchanges value_weighted data      
 ##          <dbl> <chr>     <lgl>          <list>    
 ## 1            2 NYSE      TRUE           <sym>     
@@ -260,7 +260,7 @@ p_hacking_setup
 ## 3            2 NYSE      TRUE           <language>
 ## 4            2 NYSE      TRUE           <language>
 ## 5            2 NYSE      FALSE          <sym>     
-## # ... with 43 more rows
+## # … with 43 more rows
 ```
 
 To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premia possible in our data, in particular when we use equal-weighted portfolios. 
@@ -294,15 +294,15 @@ p_hacking_results
 ```
 
 ```
-## # A tibble: 48 x 5
+## # A tibble: 48 × 5
 ##   n_portfolios exchanges        value_weighted data                  size_premium
 ##          <dbl> <chr>            <lgl>          <chr>                        <dbl>
-## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter(month >= \"1~       0.0184
-## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter(industry != ~       0.0180
+## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter(month >= \"1…       0.0184
+## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter(industry != …       0.0180
 ## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"              0.0162
-## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter(month < \"19~       0.0139
-## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter(industry != ~       0.0114
-## # ... with 43 more rows
+## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter(month < \"19…       0.0139
+## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter(industry != …       0.0114
+## # … with 43 more rows
 ```
 
 ## The size-premium variation
