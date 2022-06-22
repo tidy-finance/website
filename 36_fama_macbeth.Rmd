@@ -1,33 +1,27 @@
 # Fama-MacBeth Regressions
 
-TODO: Chapter Summary
-
-The regression approach of @Fama1973 is widely used in empirical asset pricing studies. Researchers use the two-stage regression approach to estimate risk premiums in various markets, but predominately in the stock market. 
+The regression approach of @Fama1973 is widely used in empirical asset pricing studies. 
+Researchers use the two-stage regression approach to estimate risk premiums in various markets, but predominately in the stock market. 
 In the end, Fama-MacBeth regressions are used in much the same way as portfolio sorts introduced before.
-In their core, Fama-MacBeth regressions exploit a linear relationship between expected returns and exposure to (priced) risk factors. The basic idea of the regression approach is t project asset returns on factor exposures or characteristics that may resemble exposure to a risk factor in the cross section. Finally, the estimates are aggregated in the time dimension to test if a risk factor is priced. 
-We present a simple implementation of @Fama1973 to introduce the concept of their regressions.
+In their core, Fama-MacBeth regressions exploit a linear relationship between expected returns and exposure to (priced) risk factors. 
+The basic idea of the regression approach is t project asset returns on factor exposures or characteristics that may resemble exposure to a risk factor in the cross section. 
+Finally, the estimates are aggregated in the time dimension to test if a risk factor is priced. 
+In this chapter, we present a simple implementation of @Fama1973 to introduce the concept of their regressions: We use 49 industry portfolios as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
 
-Frequently, the application of @Fama1973 regressions starts with the estimation of $\beta^{f}_{i}$ for some risk factor $f$ from a group of $K$ risk factors $F_1, \cdots, F_K$ for each asset $i \in [1; N]$. 
-As an example, we consider the three risk factors of @Fama1993 below and estimate the betas from $N$ time-series regressions
-$$r_{i,t} = \alpha_i + \beta^M_i r^M_t + \beta^{SMB}_i r^{SMB}_t + \beta^{HML}_i r^{HML}_t + \epsilon_{i,t}\text{, for each } i.$$ We use excess returns as our dependent variable, but the approach could also incorporate raw returns which leads to a change in the interpretation of intercepts (and their standard errors have to be adjusted following @Shanken1992). 
+Generally, the Fama-MacBeth procedure is considered a two-step approach: 
+The first step in the Fama-MacBeth procedure uses the exposures (characteristics) as explanatory variables in $T$ cross-sectional regressions, i.e.,
+$$r_{i,t} = \alpha_i + \lambda^{M}_t \beta^M_{i,t}  + \lambda^{SMB}_t \beta^{SMB}_{i,t} + \lambda^{HML}_t \beta^{HML}_{i,t} + \epsilon_{i,t}\text{, for each t}.$$ 
+Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to each risk factor $\beta^{f}_{i,t}$ in each time point, i.e., the risk premium. Note the terminology: $\beta^{f}_{i,t}$ is a firm-specific characteristic. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., $\lambda_t^{f}\neq0$. 
+In a second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$.
 
-We think about the $\beta^{F_f}_{i}$ as an asset characteristic. In fact, we could also use asset characteristics like a firm's size or book-to-market ratio directly in the cross-sectional regression and skip the time-series regressions for such variables. 
-Moreover, we could also consider rolling-window estimation for betas or more evolved forecasts of betas if exposures might vary over time. For example, @Fama1973 use 60-month windows for the estimation of exposures. 
-Other authors use 24-month or 36-month windows for monthly returns or 240 trading days for data on daily frequency (TODO: CITE!). 
-In these cases it is natural to add a subscript $t$ to the coefficients, but we leave this as an exercise.
+What about the standard errors of the risk premiums? 
+It turns out that you can simply run a T-test on the time-series of $\hat\lambda^{f}_t$ to find the standard error of the mean. If you worry about serial correlation in the risk premiums, it is common to use the corrected standard errors of @Newey1987. 
 
-The second step in the Fama-MacBeth procedure uses the exposures or characteristics as explanatory variables in $T$ cross-sectional regressions, i.e.,
-$$r_{i,t} = \alpha_i + \lambda^{M}_t \beta^M_i  + \lambda^{SMB}_t \beta^{SMB}_i + \lambda^{HML}_t \beta^{HML}_i + \epsilon_{i,t}\text{, for each t}.$$ Here, we are interested in the compensation $\lambda^{F_f}_t$ for the exposure to each risk factor in each time point, i.e., the risk premium.
-The time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{F_f}_t$ of the estimates $\hat\lambda^{F_f}_t$ can then be interpreted as the risk premium for the specific risk factor $F_f$.
-
-What about the standard errors of the risk premiums? You might worry that the errors of the $\hat\beta^{F_f}_{i}$ estimated at the beginning impact the risk premium's standard errors. It turns out that you can simply run a T-test on the time-series of $\hat\lambda^{F_f}_t$ to find the standard error of the mean. If you worry about serial correlation in the risk premiums, it is common to use the corrected standard errors of @Newey1987. 
-
-The final remark before moving to the implementation concerns the coefficient estimates themselves. Measurement error in $\hat\beta^{F_f}_{i}$ affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this (see, e.g., @shanken1992, @kim1995, @chen2015, among others), but also shows that the bias goes to zero as $T \to \infty$. @gagliardini2016 provide an indepth discussion covering also the case of time-varying betas and estimation on individual stocks.
+The final remark before moving to the implementation concerns the coefficient estimates themselves. It is common, that the characteristics, e.g., $\hat\beta^{f}_{i}$ are estimated in a separate step. You might worry that the errors of the $\hat\beta^{f}_{i}$ estimated at the beginning impact the risk premium's standard errors.  Measurement error in $\hat\beta^{f}_{i}$ affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this (see, e.g., @shanken1992, @kim1995, @chen2015, among others), but also shows that the bias goes to zero as $T \to \infty$. @gagliardini2016 provide an indepth discussion covering also the case of time-varying betas and estimation on individual stocks.
 
 A side note, if you plan on using Fama-MacBeth regressions with individual stocks; @hou2020 advocate using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the numerous small firms would drive the coefficient estimates.
 
 ## Data preparation
-
 
 The current chapter relies on this set of packages. 
 ```{r}
@@ -36,7 +30,8 @@ library(RSQLite)
 library(lubridate)
 ```
 
-We illustrate @Fama1973-regressions with publicly available data from Prof. French's website. We collect the industry portfolio returns, and the three Fama-French factors from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
+We illustrate @Fama1973-regressions with publicly available data from Prof. French's website. 
+We collect the industry portfolio returns, and the three Fama-French factors from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
 ```{r}
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
@@ -51,68 +46,76 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
 ```
 
 We compute excess returns for the 49 test assets by subtracting the risk-free rate with this data at hand. 
-We also merge the three Fama-French risk factors into the data to prepare for the next step. 
+We merge the data with the three Fama-French risk factors to compute excess returns. 
 
 ```{r}
 data_famamacbeth <- industry_returns %>%
+    pivot_longer(cols = -month, 
+               names_to = "asset", 
+               values_to = "ret") %>% 
   left_join(factors_ff_monthly, by = "month") %>%
-  mutate(across(Agric:Other, ~ . - rf)) %>%
-  select(-rf)
+  mutate(ret_excess = ret - rf) %>%
+  select(month, asset, ret_excess) 
 ```
 
-## Stage 0: Factor exposure
+## Stage 0: Stock characteristics
 
-The first step in many applications of Fama-MacBeth regressions is the estimation of factor betas. 
-In our case, we have to estimate $\beta_i$ for the three risk factors of @Fama1993. We do this by writing a function for the estimation (similar to the function in the chapter on *"Beta estimation"*) and then estimating the slope coefficients in one step. The function itself is sufficiently flexible to handle more or fewer risk factors and test assets. 
+Frequently, the application of @Fama1973 regressions starts with the estimation of $\beta^{f}_{i}$ for some risk factor $f$ from a group of $K$ risk factors $F_1, \cdots, F_K$ for each asset $i \in [1; N]$. 
+As an example, we consider the three risk factors of @Fama1993 below and estimate the betas from $N$ time-series regressions
+$$r_{i,t} = \alpha_i + \beta^M_i r^M_t + \beta^{SMB}_i r^{SMB}_t + \beta^{HML}_i r^{HML}_t + \epsilon_{i,t}\text{, for each } i.$$ We use excess returns as our dependent variable, but the approach could also incorporate raw returns which leads to a change in the interpretation of intercepts (and their standard errors have to be adjusted following @Shanken1992). 
+
+We think about the $\beta^{f}_{i}$ as an asset characteristic. In fact, we could also use asset characteristics like a firm's size or book-to-market ratio directly in the cross-sectional regression and skip the time-series regressions for such variables. 
+Moreover, we could also consider rolling-window estimation for betas or more evolved forecasts of betas if exposures might vary over time. For example, @Fama1973 use 60-month windows for the estimation of exposures. 
+Other authors use 24-month or 36-month windows for monthly returns or 240 trading days for data on daily frequency. 
 
 ```{r}
-risk_exposures <- data_famamacbeth %>%
-  pivot_longer(cols = Agric:Other, 
-               names_to = "asset", 
-               values_to = "ret_excess") %>%
-  group_by(asset) %>% 
-  do(model = broom::tidy(lm(ret_excess ~ mkt_excess + smb + hml, data = .))) %>% 
-  unnest(model) %>% 
-  select(asset, term, estimate) %>% 
-  pivot_wider(names_from = term, values_from = estimate)
+characteristics <- data_famamacbeth %>%
+  left_join(factors_ff_monthly %>% select(-rf), by = "month") %>% 
+  nest(data = -asset) %>% 
+    mutate(lm = map(.x = data, 
+                        ~broom::tidy(lm(ret_excess ~ . - month, 
+                                        data = .x)))) %>% 
+  unnest(lm) %>%
+  filter(term != "(Intercept)") %>% 
+  transmute(asset, 
+            term = paste0("characteristic_", term), 
+            estimate) %>% 
+  pivot_wider(names_from = term, 
+              values_from = estimate)
 
 data_famamacbeth <- data_famamacbeth %>% 
-  pivot_longer(Agric:Other, names_to = "asset", values_to = "ret_excess") %>%
-  select(month, asset, ret_excess) %>% 
-  left_join(risk_exposures %>% select(-`(Intercept)`), by = "asset")
+  left_join(characteristics, 
+            by = "asset")
 ```
 
-We now have three factor exposures for each of the ten test assets and are ready to turn our attention to the cross-sectional regression. 
+We now have three factor exposures for each of the 49 test assets and are ready to turn our attention to the cross-sectional regression. 
 
 ## Step 1: Cross-sectional regression
 
-To smoothly run the cross-sectional regression, we build another function as the one for the time-series estimation of risk exposures. 
-We regress the returns of the test assets at a particular point of time on the factor exposures of each asset. 
+Next, we run the cross-sectional regressions with the characteristics as explanatory variable for each month.  
+We regress the returns of the test assets at a particular point of time on the characteristics of each asset. 
 By doing so, we get an estimate of the risk premiums $\hat\lambda^{F_f}_t$ for each point in time.
 
 ```{r}
-data_risk_premiums <- data_famamacbeth %>% 
-  group_by(month) %>% 
-  do(model = broom::tidy(lm(ret_excess ~ mkt_excess + smb + hml, data = .))) %>% 
-  unnest(model)
-
-data_risk_premiums %>% 
-  group_by(term) %>% 
-  summarise(risk_premium = mean(estimate), 
-            t = mean(estimate) / sd(estimate))
+risk_premiums <- data_famamacbeth %>%
+    nest(data = -month) %>% 
+    mutate(lm = map(.x = data, 
+                        ~broom::tidy(lm(ret_excess ~ . - asset, data = .x)))) %>% 
+  unnest(lm)
 ```
 
-Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each risk factor.
+## Step 2: Time-series aggregation
+
+Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic.
 
 ```{r}
-data_risk_premiums %>%
-  select(starts_with("lambda_")) %>%
-  summarize(across(everything(), ~ c(t.test(.x)$estimate, 
-                                     t.test(.x)$statistic))) %>%
-  bind_cols(tibble("Statistc" = c("Mean", "T-value")), .)
+risk_premiums %>% 
+  group_by(term) %>% 
+  summarise(risk_premium = mean(estimate), 
+            t = mean(estimate) / sd(estimate) * sqrt(n()))
 ```
 
-In this illustration, we can conclude that there is no significant risk premium for the three @Fama1993 factors. However, we would not consider this a valid or exciting answer given the limitations of the setup used here.
+TODO: Some more meaningful and exciting conclusion :-) 
 
 ## Exercises
 
