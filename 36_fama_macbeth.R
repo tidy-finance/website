@@ -56,12 +56,23 @@ regressions %>%
             t_statistic = mean(estimate) / sd(estimate) * sqrt(n()))
 
 # Newey-West standard errors
-regressions %>% 
+regressions_for_newey_west <- regressions %>% 
   select(month, factor = term, estimate) %>% 
   nest(data = c(month, estimate)) %>% 
   mutate(model = map(data, ~lm(estimate ~ 1, .)),
-         mean = map(model, tidy),
-         newey_west_se = map_dbl(model, ~sqrt(NeweyWest(., lag = 6)))) %>% 
+         mean = map(model, tidy))
+
+# Suppress prewhitening for the OG Newey-west 1987
+regressions_for_newey_west %>% 
+  mutate(newey_west_se = map_dbl(model, ~sqrt(NeweyWest(., lag = 6, prewhite = FALSE)))) %>% 
   unnest(mean) %>% 
   mutate(newey_west_t_statistic = estimate / newey_west_se) %>% 
   select(factor, risk_premium = estimate, newey_west_t_statistic)
+
+# Automatic bandwidth selection of Newey-west 1994
+regressions_for_newey_west %>% 
+  mutate(newey_west_se = map_dbl(model, ~sqrt(NeweyWest(.)))) %>% 
+  unnest(mean) %>% 
+  mutate(newey_west_t_statistic = estimate / newey_west_se) %>% 
+  select(factor, risk_premium = estimate, newey_west_t_statistic)
+
