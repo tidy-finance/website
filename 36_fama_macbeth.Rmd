@@ -8,14 +8,11 @@ The basic idea of the regression approach is to project asset returns on factor 
 The estimates are then aggregated across time to test if a risk factor is priced. 
 In this chapter, we present a simple implementation of @Fama1973 to introduce the concept of their regressions. We use 49 industry portfolios as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
 
-The Fama-MacBeth procedure is a two-step approach: 
+The Fama-MacBeth procedure is a simple two-step approach: 
 The first step uses the exposures (characteristics) as explanatory variables in $T$ cross-sectional regressions, i.e.,
-$$r_{i,t} = \alpha_i + \lambda^{M}_t \beta^M_{i,t}  + \lambda^{SMB}_t \beta^{SMB}_{i,t} + \lambda^{HML}_t \beta^{HML}_{i,t} + \epsilon_{i,t}\text{, for each t}.$$ 
+$$r_{i,t+1} = \alpha_i + \lambda^{M}_t \beta^M_{i,t}  + \lambda^{SMB}_t \beta^{SMB}_{i,t} + \lambda^{HML}_t \beta^{HML}_{i,t} + \epsilon_{i,t}\text{, for each t}.$$ 
 Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to each risk factor $\beta^{f}_{i,t}$ at each time point, i.e., the risk premium. Note the terminology: $\beta^{f}_{i,t}$ is a asset-specific characteristic. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., $\lambda_t^{f}\neq0$. 
-In a second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$.
-
-What about the standard errors of the risk premiums? 
-It turns out that you can simply run a t-test on the time-series of $\hat\lambda^{f}_t$ to find the standard error of the mean. If you worry about serial correlation in the risk premiums, the common correction for standard errors follows @Newey1987. 
+In a second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow @Zaffaroni2022 and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, the regression approach rather captures risk attributes. 
 
 Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are typically estimated in a separate step. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias (see, e.g., @shanken1992, @kim1995, @chen2015, among others), but also shows that the bias goes to zero as $T \to \infty$. We refer to @gagliardini2016 for an indepth discussion covering also the case of time-varying betas and estimation on individual stocks. Moroever, if you plan to use Fama-MacBeth regressions with individual stocks: @hou2020 advocate using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
@@ -27,64 +24,56 @@ library(tidyverse)
 library(RSQLite)
 library(lubridate)
 library(broom)
+library(sandwich)
 ```
 
-We illustrate @Fama1973-regressions with publicly available data from Prof. French's website. 
-We collect the industry portfolio returns, and the three Fama-French factors from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
+We illustrate @Fama1973-regressions with the monthly CRSP sample and use three characteristics to explain the cross section of returns: market capitalization, the book-to-market ratio and the CAPM beta, the covariance of the excess stock returns with the market excess returns. We collect the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
 ```{r}
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
-industry_returns <- tbl(tidy_finance, "industries_ff_monthly") %>% 
-  collect() 
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+  collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+compustat <- tbl(tidy_finance, "compustat") %>%
+  collect()
+
+beta <- tbl(tidy_finance, "beta") %>%
   collect()
 ```
 
-We compute excess returns for the 49 test assets by subtracting the risk-free rate with this data at hand. 
-We merge the data with the three Fama-French risk factors to compute excess returns. 
+We use the Compustat data to compute the book to market ratio and the (log) market capitalization. 
+We also use the CAPM betas based on daily data which have been computed already in the previous Chapters.
 
 ```{r}
-data_famamacbeth <- industry_returns %>%
-    pivot_longer(cols = -month, 
-               names_to = "asset", 
-               values_to = "ret") %>% 
-  left_join(factors_ff_monthly, by = "month") %>%
-  mutate(ret_excess = ret - rf) %>%
-  select(month, asset, ret_excess) 
+bm <- compustat %>%
+  mutate(month = floor_date(ymd(datadate), "month")) %>%
+  left_join(crsp_monthly, by = c("gvkey", "month")) %>%
+  left_join(beta, by = c("permno", "month")) %>%
+  transmute(
+    gvkey,
+    bm = be / mktcap,
+    log_mktcap = log(mktcap),
+    beta = beta_daily,
+    sorting_date = month %m+% months(6)
+  )
+
+data_fama_macbeth <- crsp_monthly %>%
+  left_join(bm, by = c("gvkey", "month" = "sorting_date")) %>%
+  group_by(permno) %>%
+  arrange(month) %>%
+  fill(c(beta, bm, log_mktcap), .direction = "down") %>%
+  ungroup() %>%
+  left_join(crsp_monthly %>%
+    select(permno, month, ret_excess_lead = ret) %>%
+    mutate(month = month %m-% months(1)),
+  by = c("permno", "month")
+  ) %>%
+  select(permno, month, ret_excess_lead, beta, log_mktcap, bm) %>%
+  drop_na()
 ```
-
-## Stock characteristics
-
-Typically, the application of @Fama1973 regressions starts with the estimation of $\beta^{f}_{i}$ for some risk factor $f$ from a group of $K$ risk factors $F_1, \cdots, F_K$ for each asset $i \in [1; N]$. 
-As an example, we consider the three risk factors of @Fama1993 below and estimate the betas from $N$ time-series regressions
-$$r_{i,t} = \alpha_i + \beta^M_i r^M_t + \beta^{SMB}_i r^{SMB}_t + \beta^{HML}_i r^{HML}_t + \epsilon_{i,t}\text{, for each } i.$$ We use excess returns as our dependent variable, but the approach could also incorporate raw returns which leads to a change in the interpretation of intercepts (and their standard errors have to be adjusted following @Shanken1992). 
-
-We think about the $\beta^{f}_{i}$ as an asset characteristic. In fact, we could also use asset characteristics like firm size or book-to-market ratio directly in the cross-sectional regression and skip the time-series regressions for such variables. 
-Moreover, we could also consider rolling-window estimation for betas or more evolved forecasts of betas if exposures might vary over time. For example, @Fama1973 use 60-month windows for the estimation of exposures, while others use 24-month or 36-month windows for monthly returns or 240 trading days for data on daily frequency. 
-
-```{r}
-characteristics <- data_famamacbeth %>%
-  left_join(factors_ff_monthly %>% select(-rf), by = "month") %>% 
-  nest(data = -asset) %>% 
-    mutate(lm = map(.x = data, 
-                        ~broom::tidy(lm(ret_excess ~ . - month, data = .x)))) %>% 
-  unnest(lm) %>%
-  filter(term != "(Intercept)") %>% 
-  transmute(asset, 
-            term = paste0("characteristic_", term), 
-            estimate) %>% 
-  pivot_wider(names_from = term, 
-              values_from = estimate)
-
-data_famamacbeth <- data_famamacbeth %>% 
-  left_join(characteristics, by = "asset")
-```
-
-We now have three factor exposures for each of the 49 test assets and are ready to turn our attention to the cross-sectional regression. 
 
 ## Cross-sectional regression
 
@@ -93,29 +82,54 @@ We regress the returns of the test assets at a particular point in time on the c
 By doing so, we get an estimate of the risk premiums $\hat\lambda^{F_f}_t$ for each point in time. 
 
 ```{r}
-risk_premiums <- data_famamacbeth %>%
+risk_premiums <- data_fama_macbeth %>%
     nest(data = -month) %>% 
-    mutate(lm = map(.x = data, 
-                        ~broom::tidy(lm(ret_excess ~ . - asset, data = .x)))) %>% 
-  unnest(lm)
+    mutate(estimates = map(.x = data, 
+                        ~tidy(lm(ret_excess_lead ~ . - permno, data = .x)))) %>% 
+  unnest(estimates)
 ```
 
 ## Time-series aggregation
 
-Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the t-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests. We can see that our little application does not yield any significant characteristics
+Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the t-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests. 
 
 ```{r}
-risk_premiums %>% 
-  group_by(term) %>% 
-  summarise(risk_premium = mean(estimate), 
-            t_statistic = mean(estimate) / sd(estimate) * sqrt(n()))
+price_of_risk <- risk_premiums %>%
+  group_by(factor = term) %>%
+  summarise(
+    risk_premium = mean(estimate),
+    t_statistic = risk_premium / sd(estimate) * sqrt(n())
+  )
 ```
 
-TODO: Some more meaningful and exciting conclusion :-) 
+On a final note: It is common to adjust for autocorrelation in the time of prices of risk when reporting standard errors. This can be done by computing Newey West standard errors. One necessary input to compute Newey-West standard errors is a chosen bandwith based on the number of lags employed for the estimation. While it seems that often researchers default on choosing a pre-specified lag length of 6 months, we rather recommend a data driven approach. The appearent *default* approach for many Finance applications can be enforced in the code below by explicitly enforcing `NeweyWest(., lag = 6, prewhite = FALSE)` in the code below. 
 
-TODO: also show
+```{r}
+regressions_for_newey_west <- risk_premiums %>%
+  select(month, factor = term, estimate) %>%
+  nest(data = c(month, estimate)) %>%
+  mutate(
+    model = map(data, ~ lm(estimate ~ 1, .)),
+    mean = map(model, tidy)
+  )
+
+price_of_risk_newey_west <- regressions_for_newey_west %>%
+  mutate(newey_west_se = map_dbl(model, ~ sqrt(NeweyWest(.)))) %>%
+  unnest(mean) %>%
+  mutate(t_statistic_newey_west = estimate / newey_west_se) %>%
+  select(factor,
+    risk_premium = estimate,
+    t_statistic_newey_west
+  )
+
+left_join(price_of_risk,
+          price_of_risk_newey_west %>% select(factor, t_statistic_newey_west),
+          by = "factor")
+```
+
+The results can be interpreted as follows: Higher book-to-market stocks earn higher expected future returns, the negative value for log market cap reflects the size premium for smaller stocks and the negative value for CAPM beta as a characteristic is in line with the well-established betting against beta anomalies, indicating that investors with borrowing constraints tilt their portfolio towards high beta stocks in order to replicate a levered market portfolio [@Frazzini2014].
 
 ## Exercises
 
-1. Download a larger sample of test assets from Kenneth French's homepage and reevaluate the risk premiums.
+1. Download a larger sample of test assets from Kenneth French's homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.
 1. Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.
