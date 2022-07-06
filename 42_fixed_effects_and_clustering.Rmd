@@ -1,12 +1,9 @@
 # Fixed effects and clustered standard errors
 
 When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. 
-In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. We focus on a classical panel regression common to the investment literature (e.g., @Fazzari1988, @Erickson2012, @Gulen2015). 
+In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. We focus on a classical panel regression common to the corporate finance literature (e.g., @Fazzari1988, @Erickson2012, @Gulen2015): firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.  
 
-TODO: What is the investment regression, who cares? As we write we find "similar" results: Maybe a preview on what "result" actually means in that context.
-
-Typically, the investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. 
-As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature.  
+Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors regressors.  
 
 The current chapter relies on the following set of packages. 
 ```{r}
@@ -16,7 +13,7 @@ library(lubridate)
 library(fixest)
 ```
 
-## Databases
+## Data preparation
 
 We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. 
 
@@ -31,8 +28,6 @@ crsp <- tbl(tidy_finance, "crsp_monthly") %>%
 compustat <- tbl(tidy_finance, "compustat") %>%
   collect()
 ```
-
-## Data preparation
 
 The classical investment regressions models the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure for a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. 
 
@@ -111,11 +106,8 @@ data_investment %>%
 ## Fixed effects 
 
 To illustrate fixed effects regressions, we use the `fixest` package which is both computationally powerful and flexible with respect to model specifications. We start out with the basic investment regression using the simple model
-$$ \text{Investment}_{t+1} = \alpha + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
-where $\varepsilon_t$ is iid normally distributed. We use the `fixest::feols()` function to estimate the simple model, so that the output has the same structure as the other regressions below. 
-
-TODO: STUPID QUESTION - Shouldn't the regression contain an i: Investment_t+1, i, Cash Flows_t, i; Tobin's q_t, i and e_t,i?
-TODO: STUPID QUESTION - WHAT DO YOU MEAN WITH IID? IID OVER TIME OR IID ACROSS GVKEYs?
+$$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
+where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `fixest::feols()` function to estimate the simple model, so that the output has the same structure as the other regressions below. 
 
 ```{r}
 model_ols <- feols(
@@ -129,7 +121,7 @@ model_ols
 As expected, the regression output shows a highly significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the low adjusted R-squared), the bias in our coefficients is potentially severe and the true values could be above or below zero. 
 
 One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects* - model parameters that are fixed for specific groups (e.g., @Wooldridge2010). In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
-$$ \text{Investment}_{t+1} = \alpha_i + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
+$$ \text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
 where $\alpha_i$ is the firm-specific mean investment across all years. 
 To include the firm fixed effect, we use `gvkey` as follows:
 ```{r}
@@ -147,7 +139,7 @@ We can also see that the coefficients changed slightly in magnitude, but not in 
 There is another source of variation that we can still get rid of in our setting: average investment across firms might vary over time due to macro factors that affect all firms such as economic crises. 
 By including year fixed effects, we can take out the effect of unbservables that vary over time. 
 The two-way fixed effects regression is then
-$$ \text{Investment}_{t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
+$$ \text{Investment}_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
 where $\alpha_t$ is the time fixed effect. 
 ```{r}
 model_fe_firmyear <- feols(
@@ -157,19 +149,11 @@ model_fe_firmyear <- feols(
 )
 model_fe_firmyear
 ```
-The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients which we can interpret as a good thing. 
-
-TODO: WHY IS THIS A GOOD THING? 
+The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects and the estimation becomes void. 
 
-TODO: SORRY FOR BOTHERING BUT ARE YOU SURE THAT THE REGRESSORS ARE COLINEAR WITH THE FE OR IS THE "PROBLEM" THAT THE REGRESSION MATRIX IS NOT OF FULL RANK ANYMORE (WHICH IS NOT THE SAME)?
-
-Before we move on to discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `fixest:etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. 
-
-TODO: ANOTHER STUPID QUESTION: IS THE P VALUE RELATED TO THE SIZE OF THE COEFFICIENTS OR IS IT RATHER HARD TO INTERPRET BECAUSE IT IS EASILY MISINTERPRETED?  
-
-The $t$ statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+Before we move on to discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `fixest:etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal importance of observed effects. The $t$ statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 ```{r}
 etable(model_ols, model_fe_firm, model_fe_firmyear, 
        coefstat = "tstat")
