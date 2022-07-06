@@ -1,3 +1,8 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
 <!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
 <!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
 <!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
