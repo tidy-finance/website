@@ -1,10 +1,12 @@
 # Fixed effects and clustered standard errors
 
-When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. In this chapter, we provide an intuitive introduction to the two popular concepts fixed effects regressions and clustered standard errors. We focus on a classical panel regression common to the investment literature (e.g., @FazzariEtAl1988, @EricksonWhited2012, @GulenIon201). 
+When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. 
+In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. We focus on a classical panel regression common to the investment literature (e.g., @Fazzari1988, @Erickson2012, @Gulen2015). 
 
-TODO: Explain what the investment regression actually is.
+TODO: What is the investment regression, who cares? As we write we find "similar" results: Maybe a preview on what "result" actually means in that context.
 
-Typically, the investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the same annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature.  
+Typically, the investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. 
+As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature.  
 
 The current chapter relies on the following set of packages. 
 ```{r}
@@ -32,35 +34,40 @@ compustat <- tbl(tidy_finance, "compustat") %>%
 
 ## Data preparation
 
-The classical investment regressions models the capital investment of a firm as a function that increases in operating cash flows and Tobin's q, a measure for a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. 
+The classical investment regressions models the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure for a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. 
 
 ```{r}
-data_investment <- compustat %>% 
+data_investment <- compustat %>%
   mutate(month = floor_date(datadate, "month")) %>% 
   left_join(compustat %>% 
               select(gvkey, year, at_lag = at) %>% 
-              mutate(year = year + 1), by = c("gvkey", "year")) %>% 
+              mutate(year = year + 1), 
+            by = c("gvkey", "year")) %>% 
+  filter(at > 0, at_lag > 0) %>% 
   mutate(investment = capx / at_lag,
          cash_flows = oancf / at_lag)
 
 data_investment <- data_investment %>% 
   left_join(data_investment %>% 
               select(gvkey, year, investment_lead = investment) %>% 
-              mutate(year = year - 1), by = c("gvkey", "year"))
+              mutate(year = year - 1), 
+            by = c("gvkey", "year"))
 ```
 
-Tobin's q is the ratio of market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications (@FazzariEtAl1988, @EricksonWhited2012). We follow the implementation of @GulenIon2015 and compute Tobin's q as the market value of equity `mktcap` plus the book value of assets `at` minus book value of equity `be` plus deferred taxes `txdb`, all divided by book value of assets `at`. Finally, we only keep observations where all variables of interest are non-missing or non-infinite. 
+Tobin's q is the ratio of market value of capital to its replacement costs. 
+It is one of the most common regressors in corporate finance applications (@Fazzari1988, @Erickson2012). We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). 
+Finally, we only keep observations where all variables of interest are non-missing and the report book value of assets is strictly positive.
 
 ```{r}
 data_investment <- data_investment %>% 
     left_join(crsp %>% 
-              select(gvkey, month, mktcap), by = c("gvkey", "month")) %>% 
+              select(gvkey, month, mktcap), 
+              by = c("gvkey", "month")) %>% 
   mutate(tobins_q = (mktcap + at - be + txdb) / at)
 
 data_investment <- data_investment %>% 
   select(gvkey, year, investment_lead, cash_flows, tobins_q) %>% 
-  drop_na() %>% 
-  filter(if_all(where(is.numeric), is.finite))
+  drop_na() 
 ```
 
 As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.  
@@ -77,7 +84,8 @@ winsorize <- function(x, cut){
 }
 
 data_investment <- data_investment %>% 
-  mutate(across(c(investment_lead, cash_flows, tobins_q), ~winsorize(., 0.01)))
+  mutate(across(c(investment_lead, cash_flows, tobins_q), 
+                ~winsorize(., 0.01)))
 ```
 
 Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. 
@@ -85,7 +93,7 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 ```{r}
 data_investment %>%
   pivot_longer(cols = c(investment_lead, cash_flows, tobins_q), 
-               names_to = "measure", values_drop_na = TRUE) %>% 
+               names_to = "measure") %>% 
   group_by(measure) %>%
   summarize(mean = mean(value),
             sd = sd(value),
@@ -106,7 +114,8 @@ To illustrate fixed effects regressions, we use the `fixest` package which is bo
 $$ \text{Investment}_{t+1} = \alpha + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
 where $\varepsilon_t$ is iid normally distributed. We use the `fixest::feols()` function to estimate the simple model, so that the output has the same structure as the other regressions below. 
 
-TODO: MORE STUPID QUESTIONS: WHAT DO YOU MEAN WITH IID? IID OVER TIME OR IID ACROSS GVKEYs?
+TODO: STUPID QUESTION - Shouldn't the regression contain an i: Investment_t+1, i, Cash Flows_t, i; Tobin's q_t, i and e_t,i?
+TODO: STUPID QUESTION - WHAT DO YOU MEAN WITH IID? IID OVER TIME OR IID ACROSS GVKEYs?
 
 ```{r}
 model_ols <- feols(
@@ -117,11 +126,12 @@ model_ols <- feols(
 model_ols
 ```
 
-As expected, the regression output shows a highly significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually has a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the low adjusted R-squared), the bias in our coefficients is potentially severe and the true values could be above or below zero. 
+As expected, the regression output shows a highly significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the low adjusted R-squared), the bias in our coefficients is potentially severe and the true values could be above or below zero. 
 
 One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects* - model parameters that are fixed for specific groups (e.g., @Wooldridge2010). In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
 $$ \text{Investment}_{t+1} = \alpha_i + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
-where $\alpha_i$ is the firm-specific mean investment across all years. To include the firm fixed effect, we use `gvkey` as follows:
+where $\alpha_i$ is the firm-specific mean investment across all years. 
+To include the firm fixed effect, we use `gvkey` as follows:
 ```{r}
 model_fe_firm <- feols(
   investment_lead ~ cash_flows + tobins_q | gvkey,
@@ -131,11 +141,12 @@ model_fe_firm <- feols(
 model_fe_firm
 ```
 
-TODO: Shouldn't the regression contain an i: Investment_t+1, i, Cash Flows_t, i; Tobin's q_t, i and e_t,i?
+The regression output shows that there is a lot unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of firms cash flow and Tobin's q *on top* of the average investment of each firm. 
+We can also see that the coefficients changed slightly in magnitude, but not in sign.
 
-The regression output shows that there is a lot unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of our cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude, but not in sign.
-
-There is another source of variation that we can still get rid of in our setting: average investment across firms might vary over time due to macro factors that vary over time and affect all firms the same such as economic crises. By including year fixed effects, we can take out the effect of unbservables that vary over time. The two-way fixed effects regression is then
+There is another source of variation that we can still get rid of in our setting: average investment across firms might vary over time due to macro factors that affect all firms such as economic crises. 
+By including year fixed effects, we can take out the effect of unbservables that vary over time. 
+The two-way fixed effects regression is then
 $$ \text{Investment}_{t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{t}+\beta_2\text{Tobin's q}_t+\varepsilon_t,$$
 where $\alpha_t$ is the time fixed effect. 
 ```{r}
@@ -146,11 +157,18 @@ model_fe_firmyear <- feols(
 )
 model_fe_firmyear
 ```
-The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients which we can interpret as a good thing. TODO: WHY IS THIS A GOOD THING? 
+The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients which we can interpret as a good thing. 
 
-How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects and the estimation becomes void. TODO: SORRY FOR BOTHERING BUT ARE YOU SURE THAT THE REGRESSORS ARE COLINEAR WITH THE FE OR IS THE "PROBLEM" THAT THE REGRESSION MATRIX IS NOT OF FULL RANK ANYMORE (WHICH IS NOT THE SAME)?
+TODO: WHY IS THIS A GOOD THING? 
 
-Before we move on to discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `fixest:etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statisics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. TODO: ANOTHER STUPID QUESTION: IS THE P VALUE RELATED TO THE SIZE OF THE COEFFICIENTS OR IS IT RATHER HARD TO INTERPRET BECAUSE IT IT EASILY MISINTERPRETED?  
+How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects and the estimation becomes void. 
+
+TODO: SORRY FOR BOTHERING BUT ARE YOU SURE THAT THE REGRESSORS ARE COLINEAR WITH THE FE OR IS THE "PROBLEM" THAT THE REGRESSION MATRIX IS NOT OF FULL RANK ANYMORE (WHICH IS NOT THE SAME)?
+
+Before we move on to discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `fixest:etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. 
+
+TODO: ANOTHER STUPID QUESTION: IS THE P VALUE RELATED TO THE SIZE OF THE COEFFICIENTS OR IS IT RATHER HARD TO INTERPRET BECAUSE IT IS EASILY MISINTERPRETED?  
+
 The $t$ statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 ```{r}
 etable(model_ols, model_fe_firm, model_fe_firmyear, 
@@ -159,9 +177,10 @@ etable(model_ols, model_fe_firm, model_fe_firmyear,
 
 ## Clustering standard errors
 
-Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other, hence invalidating the iid assumption of OLS and causing biased standard errors. With biased OLS standard errors, we cannot realiably interpret the statistical significance of our estimated coefficients. 
+Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other, hence invalidating the iid assumption of OLS and causing biased standard errors. 
+With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients. 
 
-In our setting, the residuals may be correlated across years for a given firm (time-series dependence) or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to deal with such dependence is the use of *clustered standard errors* (@Petersen2008). The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grow, the cluster-robust standard errors become consistent (see, e.g., @DonaldLang2007, @Wooldridge2010). A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient (e.g., @CameronGelbachMiller2011).
+In our setting, the residuals may be correlated across years for a given firm (time-series dependence) or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to deal with such dependence is the use of *clustered standard errors* (@Petersen2008). The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grow, the cluster-robust standard errors become consistent (see, e.g., @Lang2007, @Wooldridge2010). A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient (e.g., @Cameron2011).
 
 Instead of using the iid assumption, we can use the cluster option in the same function as above. The code chunk below applies both one-way clustering by firm, as well as two-way clustering by firm and year.
 
@@ -190,4 +209,4 @@ etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
 ## Exercises
 
 1. Estimate the two-way fixed effects model with two-way clustered standard errors using quarterly Compustat data from WRDS. Note that you can access quarterly data via `tbl(wrds, in_schema("comp", "fundq"))`.
-1. Following @PetersenTaylor2017, compute Tobin's q as the market value of outstanding equity `mktcap` plus the book value of debt (`dltt` + `dlc`) minus the current assets `atc` and everything divided by the book value of property, plant and equipment `ppegt`. What is the correlation between the Tobin's q measures? What is the impact on the two-way fixed effects regressions?
+1. Following @Petersen2017, compute Tobin's q as the market value of outstanding equity `mktcap` plus the book value of debt (`dltt` + `dlc`) minus the current assets `atc` and everything divided by the book value of property, plant and equipment `ppegt`. What is the correlation between the Tobin's q measures? What is the impact on the two-way fixed effects regressions?
