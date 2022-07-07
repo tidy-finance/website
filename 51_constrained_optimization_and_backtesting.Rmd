@@ -5,23 +5,23 @@ In this chapter, we conduct portfolio backtesting in a more realistic setting by
 ```{r, eval = TRUE}
 library(tidyverse)
 library(RSQLite)
-library(quadprog) 
+library(quadprog)
 library(alabama)
 ```
-
 
 ## Data preparation
 
 We start by loading the required data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.
 
 ```{r, eval = TRUE}
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
 
-industry_returns <- tbl(tidy_finance, "industries_ff_monthly") %>% 
-  collect() 
+industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
+  collect()
 
-industry_returns <- industry_returns %>% 
+industry_returns <- industry_returns |>
   select(-month)
 ```
 
@@ -76,21 +76,20 @@ The function below implements the efficient portfolio weight in its general form
 ```{r}
 compute_efficient_weight <- function(Sigma,
                                      mu,
-                                     gamma = 2, 
+                                     gamma = 2,
                                      beta = 0, # transaction costs
-                                     w_prev = 1/ncol(Sigma) * rep(1, ncol(Sigma))){ 
-
+                                     w_prev = 1 / ncol(Sigma) * rep(1, ncol(Sigma))) {
   iota <- rep(1, ncol(Sigma))
   Sigma_processed <- Sigma + beta / gamma * diag(ncol(Sigma))
   mu_processed <- mu + beta * w_prev
-  
+
   Sigma_inverse <- solve(Sigma_processed)
-  
+
   w_mvp <- Sigma_inverse %*% iota
   w_mvp <- as.vector(w_mvp / sum(w_mvp))
-  w_opt <- w_mvp  + 1/gamma * 
-    (Sigma_inverse - 1 / sum(Sigma_inverse) * Sigma_inverse %*% iota %*% t(iota) %*% Sigma_inverse) %*% 
-    mu_processed
+  w_opt <- w_mvp + 1 / gamma *
+    (Sigma_inverse - 1 / sum(Sigma_inverse) * Sigma_inverse %*% iota %*% t(iota) %*% Sigma_inverse) %*%
+      mu_processed
   return(as.vector(w_opt))
 }
 
@@ -101,25 +100,34 @@ compute_efficient_weight(Sigma, mu)
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 ```{r}
-transaction_costs <- expand_grid(gamma = c(2, 4, 8, 20),
-                                 beta = 20 * qexp((1:99)/100)) %>% 
-  mutate(weights = map2(.x = gamma, 
-                        .y = beta,
-                        ~compute_efficient_weight(Sigma,
-                                                  mu,
-                                                  gamma = .x,
-                                                  beta = .y / 10000,
-                                                  w_prev = w_mvp)),
-         concentration = map_dbl(weights, ~sum(abs(. - w_mvp))))
+transaction_costs <- expand_grid(
+  gamma = c(2, 4, 8, 20),
+  beta = 20 * qexp((1:99) / 100)
+) |>
+  mutate(
+    weights = map2(
+      .x = gamma,
+      .y = beta,
+      ~ compute_efficient_weight(Sigma,
+        mu,
+        gamma = .x,
+        beta = .y / 10000,
+        w_prev = w_mvp
+      )
+    ),
+    concentration = map_dbl(weights, ~ sum(abs(. - w_mvp)))
+  )
 
-transaction_costs %>% 
-  mutate(`Risk aversion` = as_factor(gamma)) %>% 
-  ggplot(aes(x = beta, y = concentration, color = `Risk aversion`)) + 
+transaction_costs |>
+  mutate(`Risk aversion` = as_factor(gamma)) |>
+  ggplot(aes(x = beta, y = concentration, color = `Risk aversion`)) +
   geom_line() +
   scale_x_sqrt() +
-  labs(x = "Transaction cost parameter", 
-       y = "Distance from MVP",
-       title = "Optimal portfolio weights for different risk aversion and transaction cost")
+  labs(
+    x = "Transaction cost parameter",
+    y = "Distance from MVP",
+    title = "Optimal portfolio weights for different risk aversion and transaction cost"
+  )
 ```
 
 The figure shows that the initial portfolio is always the (sample) MVP and that the higher the transaction costs parameter $\beta$, the smaller is the rebalancing from the initial portfolio (which we always set to the MVP weights in this example). In addition, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the MVP weights such that the investor desires less rebalancing from the initial holdings. 
@@ -136,21 +144,25 @@ $$A = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&
 Before we dive into unconstrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. Note that we round to the first six digits to avoid differences at higher digits that might arise due to inherent imprecision of numerical estimation procedures. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
 
 ```{r}
-n_industries <- ncol(industry_returns) 
+n_industries <- ncol(industry_returns)
 
-w_mvp_numerical <- solve.QP(Dmat = Sigma,
-                            dvec = rep(0, n_industries), 
-                            Amat = cbind(rep(1, n_industries)), 
-                            bvec = 1, 
-                            meq = 1) 
+w_mvp_numerical <- solve.QP(
+  Dmat = Sigma,
+  dvec = rep(0, n_industries),
+  Amat = cbind(rep(1, n_industries)),
+  bvec = 1,
+  meq = 1
+)
 
 all(round(w_mvp, 6) == round(w_mvp_numerical$solution, 6))
 
-w_efficient_numerical <- solve.QP(Dmat = 2 * Sigma,
-                                  dvec = mu, 
-                                  Amat = cbind(rep(1, n_industries)),
-                                  bvec = 1, 
-                                  meq = 1)
+w_efficient_numerical <- solve.QP(
+  Dmat = 2 * Sigma,
+  dvec = mu,
+  Amat = cbind(rep(1, n_industries)),
+  bvec = 1,
+  meq = 1
+)
 
 all(round(compute_efficient_weight(Sigma, mu), 6) == round(w_efficient_numerical$solution, 6))
 ```
@@ -160,11 +172,13 @@ For more complex optimization routines, [this optimization task view](https://cr
 Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints if the form $w_i >=0$. 
 
 ```{r}
-w_no_short_sale <- solve.QP(Dmat = 2 * Sigma,
-                            dvec = mu, 
-                            Amat = cbind(1, diag(n_industries)), 
-                            bvec = c(1, rep(0, n_industries)), 
-                            meq = 1)
+w_no_short_sale <- solve.QP(
+  Dmat = 2 * Sigma,
+  dvec = mu,
+  Amat = cbind(1, diag(n_industries)),
+  bvec = c(1, rep(0, n_industries)),
+  meq = 1
+)
 w_no_short_sale$solution
 ```
 
@@ -172,36 +186,48 @@ w_no_short_sale$solution
 
 ```{r}
 initial_weights <- 1 / n_industries * rep(1, n_industries)
-objective <- function(w, gamma = 2) -t(w) %*% (1+mu) + gamma / 2 * t(w)%*%Sigma%*%w
-inequality_constraints <- function(w, reg_t = 1.5) return(reg_t - sum(abs(w)))
-equality_constraints <- function(w) return(sum(w) - 1)
+objective <- function(w, gamma = 2) -t(w) %*% (1 + mu) + gamma / 2 * t(w) %*% Sigma %*% w
+inequality_constraints <- function(w, reg_t = 1.5) {
+  return(reg_t - sum(abs(w)))
+}
+equality_constraints <- function(w) {
+  return(sum(w) - 1)
+}
 
 w_reg_t <- constrOptim.nl(
   par = initial_weights,
   hin = inequality_constraints,
-  fn = objective, 
+  fn = objective,
   heq = equality_constraints,
-  control.outer = list(trace = FALSE))
+  control.outer = list(trace = FALSE)
+)
 w_reg_t$par
 ```
 
 The figure below shows the optimal allocation weights across all `r ncol(industry_returns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
 ```{r}
-tibble(`No short-sale` = w_no_short_sale$solution, 
-       `Minimum Variance` = w_mvp, 
-       `Efficient portfolio` = compute_efficient_weight(Sigma, mu),
-       `Regulation-T` = w_reg_t$par,
-       Industry = colnames(industry_returns)) %>%
-  pivot_longer(-Industry, 
-               names_to = "Strategy") %>% 
-  ggplot(aes(fill = Strategy, 
-             y = value, 
-             x = Industry)) + 
+tibble(
+  `No short-sale` = w_no_short_sale$solution,
+  `Minimum Variance` = w_mvp,
+  `Efficient portfolio` = compute_efficient_weight(Sigma, mu),
+  `Regulation-T` = w_reg_t$par,
+  Industry = colnames(industry_returns)
+) |>
+  pivot_longer(-Industry,
+    names_to = "Strategy"
+  ) |>
+  ggplot(aes(
+    fill = Strategy,
+    y = value,
+    x = Industry
+  )) +
   geom_bar(position = "dodge", stat = "identity") +
-  coord_flip() + 
-  labs(y = "Allocation weight",
-       title =" Optimal allocations for different investment rules") +
+  coord_flip() +
+  labs(
+    y = "Allocation weight",
+    title = " Optimal allocations for different investment rules"
+  ) +
   scale_y_continuous(labels = scales::percent)
 ```
 
@@ -209,19 +235,21 @@ Before we move on, we want to propose a final allocation strategy, which reflect
 
 ```{r}
 compute_efficient_weight_L1_TC <- function(mu,
-                                          Sigma, 
-                                          gamma = 2, 
-                                          beta = 0, 
-                                          initial_weights = 1 / ncol(sigma) * rep(1, ncol(sigma))) {
-  
-  objective <- function(w) -t(w) %*% mu + gamma / 2* t(w) %*% Sigma %*% w + (beta / 10000) / 2 * sum(abs(w - initial_weights))
+                                           Sigma,
+                                           gamma = 2,
+                                           beta = 0,
+                                           initial_weights = 1 / ncol(sigma) * rep(1, ncol(sigma))) {
+  objective <- function(w) -t(w) %*% mu + gamma / 2 * t(w) %*% Sigma %*% w + (beta / 10000) / 2 * sum(abs(w - initial_weights))
 
   w_optimal <- constrOptim.nl(
     par = initial_weights,
-    fn = objective, 
-    heq = function(w){sum(w) - 1},
-    control.outer = list(trace = FALSE))
-  
+    fn = objective,
+    heq = function(w) {
+      sum(w) - 1
+    },
+    control.outer = list(trace = FALSE)
+  )
+
   w_optimal$par
 }
 ```
@@ -232,34 +260,39 @@ compute_efficient_weight_L1_TC <- function(mu,
 For the sake of simplicity, we committed one fundamental error in computing portfolio weights above. We used the full sample of the data to determine the optimal allocation. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2020. While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data. 
 
 ```{r}
-window_length <- 120 
-periods <- nrow(industry_returns) - window_length 
+window_length <- 120
+periods <- nrow(industry_returns) - window_length
 
 beta <- 50
 gamma <- 2
 
-performance_values <- matrix(NA, 
-                             nrow = periods, 
-                             ncol = 3) # A matrix to collect all returns
-colnames(performance_values) <- c("raw_return", "turnover", "net_return") 
+performance_values <- matrix(NA,
+  nrow = periods,
+  ncol = 3
+) # A matrix to collect all returns
+colnames(performance_values) <- c("raw_return", "turnover", "net_return")
 
-performance_values <- list("MV (TC)" = performance_values, 
-                           "Naive" = performance_values, 
-                           "MV" = performance_values)
+performance_values <- list(
+  "MV (TC)" = performance_values,
+  "Naive" = performance_values,
+  "MV" = performance_values
+)
 
-w_prev_1 <- w_prev_2 <- w_prev_3 <- rep(1 / n_industries, 
-                                        n_industries)
+w_prev_1 <- w_prev_2 <- w_prev_3 <- rep(
+  1 / n_industries,
+  n_industries
+)
 ```
 
 We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs. 
 
 ```{r}
-adjust_weights <- function(w, next_return){
+adjust_weights <- function(w, next_return) {
   w_prev <- 1 + w * next_return
   as.numeric(w_prev / sum(as.vector(w_prev)))
 }
 
-evaluate_performance <- function(w, w_previous, next_return, beta = 50){
+evaluate_performance <- function(w, w_previous, next_return, beta = 50) {
   raw_return <- as.matrix(next_return) %*% w
   turnover <- sum(abs(w - w_previous))
   net_return <- raw_return - beta / 10000 * turnover
@@ -272,46 +305,54 @@ The lines above define the general setup. We consider 120 periods from the past 
 The following code chunk performs rolling-window estimation. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample moments, but you might use more advanced estimators in practice. 
 
 ```{r}
-for(p in 1:periods){
-  
-  returns_window <- industry_returns[p : (p + window_length - 1), ]
-  next_return <- industry_returns[p + window_length, ] %>% as.matrix()
-  
-  Sigma <- cov(returns_window) 
-  mu <- 0 * colMeans(returns_window) 
-  
+for (p in 1:periods) {
+  returns_window <- industry_returns[p:(p + window_length - 1), ]
+  next_return <- industry_returns[p + window_length, ] |> as.matrix()
+
+  Sigma <- cov(returns_window)
+  mu <- 0 * colMeans(returns_window)
+
   # Transaction-cost adjusted portfolio
-  w_1 <- compute_efficient_weight_L1_TC(mu = mu, 
-                                        Sigma = Sigma, 
-                                        beta = beta, 
-                                        gamma = gamma,
-                                        initial_weights = w_prev_1)
-  
-  performance_values[[1]][p, ] <- evaluate_performance(w_1, 
-                                                       w_prev_1, 
-                                                       next_return, 
-                                                       beta = beta)
-  
+  w_1 <- compute_efficient_weight_L1_TC(
+    mu = mu,
+    Sigma = Sigma,
+    beta = beta,
+    gamma = gamma,
+    initial_weights = w_prev_1
+  )
+
+  performance_values[[1]][p, ] <- evaluate_performance(w_1,
+    w_prev_1,
+    next_return,
+    beta = beta
+  )
+
   w_prev_1 <- adjust_weights(w_1, next_return)
-  
+
   # Naive portfolio
   w_2 <- rep(1 / n_industries, n_industries)
-  
-  performance_values[[2]][p, ] <- evaluate_performance(w_2, 
-                                                       w_prev_2, 
-                                                       next_return)
-  
+
+  performance_values[[2]][p, ] <- evaluate_performance(
+    w_2,
+    w_prev_2,
+    next_return
+  )
+
   w_prev_2 <- adjust_weights(w_2, next_return)
-  
+
   # Mean-variance efficient portfolio (w/o transaction costs)
-  w_3 <- compute_efficient_weight(Sigma = Sigma,
-                                  mu = mu, 
-                                  gamma = gamma)
-  
-  performance_values[[3]][p, ] <- evaluate_performance(w_3, 
-                                                       w_prev_3, 
-                                                       next_return)
-  
+  w_3 <- compute_efficient_weight(
+    Sigma = Sigma,
+    mu = mu,
+    gamma = gamma
+  )
+
+  performance_values[[3]][p, ] <- evaluate_performance(
+    w_3,
+    w_prev_3,
+    next_return
+  )
+
   w_prev_3 <- adjust_weights(w_3, next_return)
 }
 ```
@@ -319,15 +360,20 @@ for(p in 1:periods){
 Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations. 
 
 ```{r}
-performance <- lapply(performance_values, as_tibble) %>% 
+performance <- lapply(performance_values, as_tibble) |>
   bind_rows(.id = "strategy")
 
-performance %>%
-  group_by(strategy) %>%
-  summarize(Mean = 12 * mean(100 * net_return),
-            SD = sqrt(12) * sd(100 * net_return), 
-            `Sharpe ratio` = if_else(Mean > 0, Mean / SD, NA_real_),
-            Turnover = 100 * mean(turnover))
+performance |>
+  group_by(strategy) |>
+  summarize(
+    Mean = 12 * mean(100 * net_return),
+    SD = sqrt(12) * sd(100 * net_return),
+    `Sharpe ratio` = if_else(Mean > 0,
+      Mean / SD,
+      NA_real_
+    ),
+    Turnover = 100 * mean(turnover)
+  )
 ``` 
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 
