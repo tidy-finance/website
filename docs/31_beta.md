@@ -68,7 +68,8 @@ summary(fit)
 ## (Intercept)  0.01051    0.00532    1.98    0.049 *  
 ## mkt_excess   1.40081    0.11748   11.92   <2e-16 ***
 ## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  
+## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.115 on 478 degrees of freedom
 ## Multiple R-squared:  0.229,	Adjusted R-squared:  0.228 
@@ -145,14 +146,15 @@ beta_example
 
 ```
 ## # A tibble: 433 × 6
-##   permno month      industry      ret_excess mkt_excess  beta
-##    <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
-## 1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
-## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
-## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
-## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
-## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
-## # … with 428 more rows
+##   permno month      industry      ret_excess mkt_excess
+##    <dbl> <date>     <chr>              <dbl>      <dbl>
+## 1  14593 1984-12-01 Manufacturing     0.170      0.0184
+## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799
+## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122
+## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084
+## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096
+## # … with 428 more rows, and 1 more variable:
+## #   beta <dbl>
 ```
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
 
@@ -396,7 +398,8 @@ beta %>%
 ```
 
 ```
-## Warning: Removed 46 row(s) containing missing values (geom_path).
+## Warning: Removed 46 row(s) containing missing values
+## (geom_path).
 ```
 
 <img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
@@ -463,10 +466,12 @@ beta_long %>%
 
 ```
 ## # A tibble: 2 × 11
-##   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
-##   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
-## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186174
-## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
+##   name        mean    sd   min    q05   q25   q50   q75
+##   <chr>      <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl>
+## 1 beta_daily 0.743 0.925 -43.7 -0.452 0.203 0.679  1.22
+## 2 beta_mont… 1.10  0.711 -13.0  0.123 0.631 1.03   1.47
+## # … with 3 more variables: q95 <dbl>, max <dbl>,
+## #   n <int>
 ```
 
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods).

@@ -2,7 +2,7 @@
 
 In this chapter, we conduct portfolio backtesting in a more realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with *standard* mean-variance efficient portfolios. Then, we introduce further constraints step-by-step. Numerical constrained optimization is performed by the packages `quadprog` (for quadratic objective functions such as in typical mean-variance framework) and `alabama` (for more general, non-linear objectives and constraints).
 
-```{r}
+```{r, eval = TRUE}
 library(tidyverse)
 library(RSQLite)
 library(quadprog) 
@@ -14,7 +14,7 @@ library(alabama)
 
 We start by loading the required data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.
 
-```{r}
+```{r, eval = TRUE}
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
                           extended_types = TRUE)
 
@@ -51,12 +51,13 @@ Empirically, this classical solution imposes many problems. In particular, the e
 The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates $\hat \mu_t$ and $\hat \Sigma_t$ can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of $\Sigma$, rely on Bayesian priors inspired by theoretical asset pricing models, or use high-frequency data to improve forecasting. One unifying framework that works easily, effectively (even for large dimensions), and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs [@Hautsch2019]. 
 
 Assume that returns are from a multivariate normal distribution such that $p_t({r}_{t+1}|\mathcal{M})=N(\mu,\Sigma)$. Additionally, we assume quadratic transaction costs which penalize rebalancing such that  $$
-\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) :=\nu_t\left(\omega_{t+1}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),$$
+\begin{aligned}
+\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) :=\nu_t\left(\omega_{t+1}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned}$$
 with cost parameter $\beta>0$ and $\omega_{t^+} := {\omega_t \circ  (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}$. Note that $\omega_{t^+}$ differs mechanically from $\omega_t$ due to the returns in the past period.  
 Then, the optimal portfolio choice is
-$$\omega_{t+1} ^* :=  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \\
-=\arg\max_{\omega\in\mathbb{R}^N,\text{ }  \iota'\omega=1}
-\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega ,$$
+$$\begin{aligned}\omega_{t+1} ^* &:=  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \\
+&=\arg\max_{\omega\in\mathbb{R}^N,\text{ }  \iota'\omega=1}
+\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega ,\end{aligned}$$
 where
 $$\mu^*:=\mu+\beta \omega_{t^+} \quad  \text{and} \quad \Sigma^*:=\Sigma + \frac{\beta}{\gamma} I_N.
 $$
@@ -87,7 +88,9 @@ compute_efficient_weight <- function(Sigma,
   
   w_mvp <- Sigma_inverse %*% iota
   w_mvp <- as.vector(w_mvp / sum(w_mvp))
-  w_opt <- w_mvp  + 1/gamma * (Sigma_inverse - 1 / sum(Sigma_inverse) * Sigma_inverse %*% iota %*% t(iota) %*% Sigma_inverse) %*% mu_processed
+  w_opt <- w_mvp  + 1/gamma * 
+    (Sigma_inverse - 1 / sum(Sigma_inverse) * Sigma_inverse %*% iota %*% t(iota) %*% Sigma_inverse) %*% 
+    mu_processed
   return(as.vector(w_opt))
 }
 
@@ -244,7 +247,8 @@ performance_values <- list("MV (TC)" = performance_values,
                            "Naive" = performance_values, 
                            "MV" = performance_values)
 
-w_prev_1 <- w_prev_2 <- w_prev_3 <- rep(1 / n_industries , n_industries)
+w_prev_1 <- w_prev_2 <- w_prev_3 <- rep(1 / n_industries, 
+                                        n_industries)
 ```
 
 We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs. 
@@ -263,7 +267,7 @@ evaluate_performance <- function(w, w_previous, next_return, beta = 50){
 }
 ```
 
-The lines above define the general setup. We consider `r window_length` periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.
+The lines above define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.
 
 The following code chunk performs rolling-window estimation. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample moments, but you might use more advanced estimators in practice. 
 

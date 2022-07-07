@@ -1,8 +1,3 @@
----
-output:
-  pdf_document: default
-  html_document: default
----
 <!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
 <!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
 <!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
@@ -191,11 +186,15 @@ summary(lm(smb ~ smb_replicated, data = test))
 ## -0.020320 -0.001501  0.000027  0.001519  0.014615 
 ## 
 ## Coefficients:
-##                 Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    -0.000143   0.000133   -1.07     0.28    
-## smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
+##                 Estimate Std. Error t value Pr(>|t|)
+## (Intercept)    -0.000143   0.000133   -1.07     0.28
+## smb_replicated  0.996413   0.004418  225.55   <2e-16
+##                   
+## (Intercept)       
+## smb_replicated ***
 ## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  
+## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.00355 on 712 degrees of freedom
 ## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
@@ -219,11 +218,15 @@ summary(lm(hml ~ hml_replicated, data = test))
 ## -0.022250 -0.002933 -0.000101  0.002366  0.027475 
 ## 
 ## Coefficients:
-##                Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    0.000294   0.000214    1.38     0.17    
-## hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
+##                Estimate Std. Error t value Pr(>|t|)
+## (Intercept)    0.000294   0.000214    1.38     0.17
+## hml_replicated 0.958849   0.007376  130.00   <2e-16
+##                   
+## (Intercept)       
+## hml_replicated ***
 ## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  
+## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.0057 on 712 degrees of freedom
 ## Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 

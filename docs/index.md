@@ -1,10 +1,10 @@
 --- 
 title: "Tidy Finance with R"
 author: 
-  - Christoph Scheuch, wikifolio Financial Technologies 
-  - Stefan Voigt, University of Copenhagen and Danish Finance Institute
-  - Patrick Weiss, Vienna University of Economics and Business
-date: "2022-06-21"
+  Christoph Scheuch (wikifolio Financial Technologies) and
+  Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
+  Patrick Weiss (Vienna University of Economics and Business)
+date: "2022-07-07"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib]
@@ -20,9 +20,12 @@ description: |
 # Preface {.unnumbered}
 
 [![Buy hardcover version](cover.jpg){.cover width="250"}]()
+
 This website is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release. The book is the result of a joint effort of [Christoph Scheuch](https://christophscheuch.github.io/), [Stefan Voigt](https://voigtstefan.me/), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss). 
 
 We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. Additionally, let us know if you found the text helpful. We look forward to hearing from you!
+
+<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="tidyfinance" data-color="#3b9ab2" data-emoji="" data-font="Cookie" data-text="Support tidy finance with a coffee" data-outline-color="#ffffff" data-font-color="#ffffff" data-coffee-color="#e1af00" ></script>
 
 ## Why does this book exist? {.unnumbered}
 
@@ -113,8 +116,6 @@ We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from 
 * [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
 * [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the intersection between asset pricing and corporate finance. 
 
-<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="tidyfinance" data-color="#3b9ab2" data-emoji="" data-font="Cookie" data-text="Want to support tidy finance? Buy us a coffee" data-outline-color="#ffffff" data-font-color="#ffffff" data-coffee-color="#e1af00" ></script>
-
 ## License {.unnumbered}
 
 This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
@@ -149,11 +150,19 @@ This version of the book was built with R version 4.2.0 (2022-04-22) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
-   <td style="text-align:left;"> 0.8.0 </td>
+   <td style="text-align:left;"> 1.0.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> dbplyr </td>
-   <td style="text-align:left;"> 2.2.0 </td>
+   <td style="text-align:left;"> 2.2.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> dplyr </td>
+   <td style="text-align:left;"> 1.0.9 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> forcats </td>
+   <td style="text-align:left;"> 0.5.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> frenchdata </td>
@@ -177,7 +186,7 @@ This version of the book was built with R version 4.2.0 (2022-04-22) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> hardhat </td>
-   <td style="text-align:left;"> 1.1.0 </td>
+   <td style="text-align:left;"> 1.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> jsonlite </td>
@@ -204,8 +213,20 @@ This version of the book was built with R version 4.2.0 (2022-04-22) and the fol
    <td style="text-align:left;"> 1.8.0 </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> purrr </td>
+   <td style="text-align:left;"> 0.3.4 </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> quadprog </td>
    <td style="text-align:left;"> 1.5-8 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> ranger </td>
+   <td style="text-align:left;"> 0.14.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> readr </td>
+   <td style="text-align:left;"> 2.1.2 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> readxl </td>
@@ -217,7 +238,7 @@ This version of the book was built with R version 4.2.0 (2022-04-22) and the fol
   </tr>
   <tr>
    <td style="text-align:left;"> rlang </td>
-   <td style="text-align:left;"> 1.0.2 </td>
+   <td style="text-align:left;"> 1.0.3 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
@@ -244,12 +265,24 @@ This version of the book was built with R version 4.2.0 (2022-04-22) and the fol
    <td style="text-align:left;"> 0.2.2 </td>
   </tr>
   <tr>
+   <td style="text-align:left;"> stringr </td>
+   <td style="text-align:left;"> 1.4.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tibble </td>
+   <td style="text-align:left;"> 3.1.7 </td>
+  </tr>
+  <tr>
    <td style="text-align:left;"> tidymodels </td>
    <td style="text-align:left;"> 0.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyquant </td>
    <td style="text-align:left;"> 1.0.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyr </td>
+   <td style="text-align:left;"> 1.2.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyverse </td>

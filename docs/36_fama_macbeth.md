@@ -20,7 +20,8 @@ Before we move to the implementation, we want to highlight that the characterist
 ## Data preparation
 
 The current chapter relies on this set of packages. 
-```{r}
+
+```r
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
@@ -30,7 +31,8 @@ library(sandwich)
 
 We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
-```{r}
+
+```r
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
@@ -48,7 +50,8 @@ beta <- tbl(tidy_finance, "beta") %>%
 We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization. 
 Furthermore, we also use the CAPM betas based on daily returns we computed in the previous chapters.
 
-```{r}
+
+```r
 bm <- compustat %>%
   mutate(month = floor_date(ymd(datadate), "month")) %>%
   left_join(crsp_monthly, by = c("gvkey", "month")) %>%
@@ -79,7 +82,8 @@ Next, we run the cross-sectional regressions with the characteristics as explana
 We regress the returns of the test assets at a particular time point on each asset's characteristics. 
 By doing so, we get an estimate of the risk premiums $\hat\lambda^{F_f}_t$ for each point in time. 
 
-```{r}
+
+```r
 risk_premiums <- data_fama_macbeth %>%
   nest(data = -month) %>% 
   mutate(estimates = map(.x = data, 
@@ -91,7 +95,8 @@ risk_premiums <- data_fama_macbeth %>%
 
 Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the t-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests. 
 
-```{r}
+
+```r
 price_of_risk <- risk_premiums %>%
   group_by(factor = term) %>%
   summarise(
@@ -102,7 +107,8 @@ price_of_risk <- risk_premiums %>%
 
 On a final note: It is common to adjust for autocorrelation when reporting standard errors of risk premiums. The typical procedure for this is computing @Newey1987 standard errors. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. If you want to implement the apparent *default*, you can enforce `NeweyWest(., lag = 6, prewhite = FALSE)` in the code below. 
 
-```{r}
+
+```r
 regressions_for_newey_west <- risk_premiums %>%
   select(month, factor = term, estimate) %>%
   nest(data = c(month, estimate)) %>%
@@ -123,6 +129,16 @@ price_of_risk_newey_west <- regressions_for_newey_west %>%
 left_join(price_of_risk,
           price_of_risk_newey_west %>% select(factor, t_statistic_newey_west),
           by = "factor")
+```
+
+```
+## # A tibble: 4 × 4
+##   factor      risk_premium t_statistic t_statistic_new…
+##   <chr>              <dbl>       <dbl>            <dbl>
+## 1 (Intercept)       1.62         5.09             4.07 
+## 2 beta             -0.0587      -0.790           -0.792
+## 3 bm                0.177        3.48             2.95 
+## 4 log_mktcap       -0.114       -3.00            -2.51
 ```
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Lastly, the negative value for CAPM betas as characteristics is in line with the well-established betting against beta anomalies, indicating that investors with borrowing constraints tilt their portfolio towards high beta stocks to replicate a levered market portfolio [@Frazzini2014].

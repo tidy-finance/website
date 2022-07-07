@@ -303,7 +303,8 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort), vcov = NeweyWes
 ## (Intercept) -0.00441    0.00262   -1.69    0.092 .  
 ## mkt_excess   0.89461    0.10214    8.76   <2e-16 ***
 ## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  
+## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 The plot below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 

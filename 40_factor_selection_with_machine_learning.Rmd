@@ -4,14 +4,14 @@
 
 The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta. 
 Such findings question the usefulness of the Capital Asset Pricing Model. 
-In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2015, @McLean2016 and @Hou2017.
+In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @McLean2016 and @Hou2020.
 Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. During recent years, promising methods from the vast field of machine learning (ML) got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perseptive of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
 We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions for identifying macro-economic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
 ## Brief theoretical background
 
-This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009, @Hasti2013, @Lopez2018]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
+This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009, @Hastie2013, @DePrado2018]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
@@ -51,7 +51,7 @@ The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages
 
 To get started, we load the required packages and data. The main focus is on the workflow behind the amazing `tidymodels` package collection. @Kuhn2022 provide a thorough introduction into all `tidymodels` components.
 
-```{r}
+```{r, eval = TRUE}
 library(RSQLite)
 library(tidyverse)
 library(tidymodels) 
@@ -75,7 +75,7 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 
 - In line with many existing papers, we use monthly portfolio returns from 49 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_49_ind_port.html) as test assets.
 
-```{r}
+```{r, eval = TRUE}
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
@@ -100,7 +100,7 @@ industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") %>%
 
 We combine all the monthly observations into one data frame.
 
-```{r}
+```{r, eval = TRUE}
 data <- industries_ff_monthly %>%
   left_join(factors_ff_monthly, by = "month") %>%
   left_join(factors_q_monthly, by = "month") %>%
@@ -179,7 +179,7 @@ tmp_data <- bake(prep(rec, training(split)), new_data = testing(split))
 tmp_data
 ```
 
-Note that the resulting data contains the `r nrow(tmp_data)` observations from the test set and `r ncol(tmp_data)` columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
+Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
 
 You may ask at this stage: Why should I use a recipe instead of simply using the data wrangling commands such as `mutate` or `select`? `tidymodels` beauty is that a lot is happening under the hood. Recall, that for the simple scaling step, you actually have to compute the standard deviation of each column, then *store* this value, and apply the identical transformation to a different dataset, e.g., `testing(split)`. A prepped `recipe` stores these values and hands them on once you `bake` a novel dataset. Easy as pie with `tidymodels`, isn't it?
 

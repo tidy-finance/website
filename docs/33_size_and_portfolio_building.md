@@ -132,13 +132,15 @@ crsp_monthly %>%
 
 ```
 ## # A tibble: 5 × 11
-##   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
-##   <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-## 1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
-## 2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-## 3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
-## 4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## 5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692
+##   exchange   mean     sd      min     q05    q25    q50
+##   <chr>     <dbl>  <dbl>    <dbl>   <dbl>  <dbl>  <dbl>
+## 1 AMEX       283.  1298.     6.04    10.1 3.07e1 6.59e1
+## 2 NASDAQ    8041. 74386.     4.65    27.3 1.34e2 4.85e2
+## 3 NYSE     16427. 43130.     5.35   154.  9.16e2 3.34e3
+## 4 Other    10061.    NA  10061.   10061.  1.01e4 1.01e4
+## 5 Overall  10558. 63975.     4.65    31.0 1.85e2 8.72e2
+## # … with 4 more variables: q75 <dbl>, q95 <dbl>,
+## #   max <dbl>, n <int>
 ```
 
 ## Univariate size portfolios with flexible breakpoints
@@ -295,14 +297,15 @@ p_hacking_results
 
 ```
 ## # A tibble: 48 × 5
-##   n_portfolios exchanges        value_weighted data                  size_premium
-##          <dbl> <chr>            <lgl>          <chr>                        <dbl>
-## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter(month >= \"1…       0.0184
-## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter(industry != …       0.0180
-## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"              0.0162
-## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter(month < \"19…       0.0139
-## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter(industry != …       0.0114
-## # … with 43 more rows
+##   n_portfolios exchanges        value_weighted data    
+##          <dbl> <chr>            <lgl>          <chr>   
+## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_m…
+## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter…
+## # … with 43 more rows, and 1 more variable:
+## #   size_premium <dbl>
 ```
 
 ## The size-premium variation

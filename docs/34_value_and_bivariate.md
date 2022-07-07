@@ -160,7 +160,7 @@ mean(value_premium$value_premium * 100)
 ## [1] 0.328
 ```
 
-The resulting annualized value premium is `r `12 * mean(value_premium$value_premium * 100)` percent.
+The resulting annualized value premium is 3.936 percent.
 
 ## Dependent sorts
 
@@ -208,8 +208,7 @@ mean(value_premium$value_premium * 100)
 ## [1] 0.265
 ```
 
-
-The value premium from dependent sorts is `r `12 * mean(value_premium$value_premium * 100)` percent per year.
+The value premium from dependent sorts is 3.18 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the line of the previous chapter, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

@@ -32,14 +32,15 @@ prices
 
 ```
 ## # A tibble: 5,596 × 8
-##   symbol date        open  high   low close    volume adjusted
-##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.855
-## 2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.782
-## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.794
-## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.725
-## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.760
-## # … with 5,591 more rows
+##   symbol date        open  high   low close    volume
+##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>
+## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800
+## 2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600
+## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600
+## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800
+## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400
+## # … with 5,591 more rows, and 1 more variable:
+## #   adjusted <dbl>
 ```
 
 `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: *symbol*, *date*, the market prices at the *open, high, low* and *close*, the daily *volume* (in number of traded shares), and the *adjusted* price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock.  
@@ -139,9 +140,10 @@ returns %>%
 
 ```
 ## # A tibble: 1 × 4
-##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
-##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.129         2.52         -51.9          13.9
+##   ret_daily_mean ret_daily_sd ret_daily_min
+##            <dbl>        <dbl>         <dbl>
+## 1          0.129         2.52         -51.9
+## # … with 1 more variable: ret_daily_max <dbl>
 ```
 
 We see that the maximum *daily* return was around 13.905 percent.  
@@ -298,7 +300,8 @@ volume %>%
 ```
 
 ```
-## Warning: Removed 1 rows containing missing values (geom_point).
+## Warning: Removed 1 rows containing missing values
+## (geom_point).
 ```
 
 <img src="10_introduction_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />

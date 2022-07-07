@@ -2,11 +2,13 @@
 
 # Parametric portfolio policies
 
-In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. For this purpose, we introduce a direct way to estimate optimal portfolio weights when stock characteristics are related to a stock's expected return, variance, and covariance with other stocks. We parameterize weights as a function of the characteristics such that we maximize the expected utility. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. 
+In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. 
+For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of @Brandt2009 proposes to parametrize the optimal portfolio weights as a function of stock characteristics directly, instead of estimating the stock's expected return, variance, and covariances with other stocks in a prior step. 
+We chose weights as a function of the characteristics which maximize the expected utility of the investor. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. The review paper @Brandt2010 provides an excellent treatment of related portfolio choice methods.  
 
 ## Data preparation
 
-To get started, we load the required packages alongside the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*
+To get started, we load the required packages alongside the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
 
 ```r
@@ -17,31 +19,37 @@ library(RSQLite)
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
   collect()
 ```
 
-We need monthly market returns, which we retrieve from the Fama French 3 factor model data, to be able to compute CAPM alphas for performance evaluation. 
+To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas. 
 
 ```r
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
   collect()
 ```
 
-Next, we create some characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. In particular, we record the lagged one-year return `momentum_lag`, defined as the compounded return between months $t − 13$ and $t − 2$ for each firm and the firm's market equity `size_lag`, defined as the log of the price per share times the number of shares outstanding. To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.
+Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 13$ and $t − 2$ for each firm. The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding. To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.
 
 
 ```r
-crsp_monthly_lags <- crsp_monthly %>% 
-  transmute(permno, 
-            month_12 = month %m+% months(12), 
-            mktcap)
+crsp_monthly_lags <- crsp_monthly %>%
+  transmute(permno,
+    month_12 = month %m+% months(12),
+    mktcap
+  )
 
-crsp_monthly <- crsp_monthly %>% 
-  inner_join(crsp_monthly_lags, 
-             by = c("permno", "month" = "month_12"), suffix = c("", "_12"))
+crsp_monthly <- crsp_monthly %>%
+  inner_join(crsp_monthly_lags,
+    by = c("permno", "month" = "month_12"),
+    suffix = c("", "_12")
+  )
 
 data_portfolios <- crsp_monthly %>%
   mutate(
@@ -54,9 +62,9 @@ data_portfolios <- crsp_monthly %>%
 ## Parametric portfolio policies
 
 The basic idea of parametric portfolio weights is as follows. Suppose that at each date $t$ we have $N_t$ stocks in the investment universe, where each stock $i$ has a return of $r_{i, t+1}$ and is associated with a vector of firm characteristics $x_{i, t}$ such as time-series momentum or the market capitalization. The investor's problem is to choose portfolio weights $w_{i,t}$ to maximize the expected utility of the portfolio return:
-$$\begin{align}
+$$\begin{aligned}
 \max_{w} E_t\left(u(r_{p, t+1})\right) = E_t\left[u\left(\sum\limits_{i=1}^{N_t}w_{i,t}r_{i,t+1}\right)\right]
-\end{align}$$
+\end{aligned}$$
 where $u(\cdot)$ denotes the utility function.
 
 Where do the stock characteristics show up? We parameterize the optimal portfolio weights as a function of the stock characteristic $x_{i,t}$ with the following linear specification for the portfolio weights: 
@@ -83,21 +91,24 @@ data_portfolios <- data_portfolios %>%
 ## Computing portfolio weights
 
 Next, we move to identify optimal choices of $\theta$. We rewrite the optimization problem together with the weight parametrization and can then estimate $\theta$ to maximize the objective function based on our sample 
-$$\begin{align}
+$$\begin{aligned}
 E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
-\end{align}$$
+\end{aligned}$$
 The allocation strategy is straightforward because the number of parameters to estimate is small. Instead of a tedious specification of the $N_t$ dimensional vector of expected returns and the $N_t(N_t+1)/2$ free elements of the covariance matrix, all we need to focus on in our application is the vector $\theta$. $\theta$ contains only two elements in our application - the relative deviation from the benchmark due to *size* and *momentum*. 
 
-To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.
+To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta_0$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.
 
 
 ```r
 n_parameters <- sum(grepl("lag", colnames(data_portfolios)))
 theta <- rep(1.5, n_parameters)
-names(theta) <- colnames(data_portfolios)[grepl("lag", colnames(data_portfolios))]
+names(theta) <- colnames(data_portfolios)[grepl(
+  "lag",
+  colnames(data_portfolios)
+)]
 ```
 
-The function `compute_portfolio_weights` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value of $\theta$. Everything happens within a single pipeline, hence we provide a short walkthrough.
+The function `compute_portfolio_weights` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value $\theta_0$ of $\theta$. Everything happens within a single pipeline, hence we provide a short walkthrough.
 
 We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'\hat{x}_{i, t}$ which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio `weight_benchmark`, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. 
 `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt` which deviate from the benchmark portfolio depending on the stock characteristics.
@@ -122,25 +133,25 @@ compute_portfolio_weights <- function(theta,
     ) %>%
     mutate(
       # Definition of benchmark weight
-      weight_benchmark = case_when( 
+      weight_benchmark = case_when(
         value_weighting == TRUE ~ relative_mktcap,
         value_weighting == FALSE ~ 1 / n
       ),
       # Parametric portfolio weights
-      weight_tilt = weight_benchmark + characteristic_tilt, 
+      weight_tilt = weight_benchmark + characteristic_tilt,
       # Short-sell constraint
-      weight_tilt = case_when( 
+      weight_tilt = case_when(
         allow_short_selling == TRUE ~ weight_tilt,
         allow_short_selling == FALSE ~ pmax(0, weight_tilt)
       ),
       # Weights sum up to 1
-      weight_tilt = weight_tilt / sum(weight_tilt) 
+      weight_tilt = weight_tilt / sum(weight_tilt)
     ) %>%
     ungroup()
 }
 ```
 
-The next step is computing the portfolio weights for any vector $\theta$. In the example below, we use the value-weighted portfolio as a benchmark and allow negative portfolio weights.
+In the next step we compute the portfolio weights for the arbitrary vector $\theta_0$. In the example below, we use the value-weighted portfolio as a benchmark and allow negative portfolio weights.
 
 
 ```r
@@ -154,29 +165,34 @@ weights_crsp <- compute_portfolio_weights(theta,
 
 ## Portfolio performance
 
-Are these weights optimal in any way? Most likely not, as we picked $\theta$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
+Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
 
 
 ```r
-power_utility <- function(r, gamma = 5) { 
+power_utility <- function(r, gamma = 5) {
   (1 + r)^(1 - gamma) / (1 - gamma)
 }
 ```
 
-No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: The original paper only cares about expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
+It should be noted, that @Gehrig2020 warn that in the leading case of constant relative risk aversion (CRRA) strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy and the
+parameter space are necessary to obtain a well defined optimization problem.
+
+No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: The original paper @Brandt2009 only cares about expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
 
 
 ```r
 evaluate_portfolio <- function(weights_crsp,
                                full_evaluation = TRUE) {
-
   evaluation <- weights_crsp %>%
     group_by(month) %>%
     summarize(
       return_tilt = weighted.mean(ret_excess, weight_tilt),
       return_benchmark = weighted.mean(ret_excess, weight_benchmark)
     ) %>%
-    pivot_longer(-month, values_to = "portfolio_return", names_to = "model") %>%
+    pivot_longer(-month,
+      values_to = "portfolio_return",
+      names_to = "model"
+    ) %>%
     group_by(model) %>%
     left_join(factors_ff_monthly, by = "month") %>%
     summarize(tibble(
@@ -223,19 +239,19 @@ evaluate_portfolio(weights_crsp) %>% print(n = Inf)
 
 ```
 ## # A tibble: 11 × 3
-##    measure                            benchmark     tilt
-##    <chr>                                  <dbl>    <dbl>
-##  1 Expected utility                  -0.249     -0.262  
-##  2 Average return                     6.86      -0.604  
-##  3 SD return                         15.3       21.0    
-##  4 Sharpe ratio                       0.129     -0.00831
-##  5 CAPM alpha                         0.000108  -0.00574
-##  6 Market beta                        0.992      0.927  
-##  7 Absolute weight                    0.0246     0.0631 
-##  8 Max. weight                        3.52       3.65   
-##  9 Min. weight                        0.0000278 -0.145  
-## 10 Avg. sum of negative weights       0         78.0    
-## 11 Avg. fraction of negative weights  0         49.4
+##    measure                           benchmark     tilt
+##    <chr>                                 <dbl>    <dbl>
+##  1 Expected utility                   -2.49e-1 -0.262  
+##  2 Average return                      6.86e+0 -0.604  
+##  3 SD return                           1.53e+1 21.0    
+##  4 Sharpe ratio                        1.29e-1 -0.00831
+##  5 CAPM alpha                          1.08e-4 -0.00574
+##  6 Market beta                         9.92e-1  0.927  
+##  7 Absolute weight                     2.46e-2  0.0631 
+##  8 Max. weight                         3.52e+0  3.65   
+##  9 Min. weight                         2.78e-5 -0.145  
+## 10 Avg. sum of negative weights        0       78.0    
+## 11 Avg. fraction of negative weights   0       49.4
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
@@ -249,8 +265,8 @@ Next, we move to a choice of $\theta$ that actually aims to improve some (or all
 compute_objective_function <- function(theta,
                                        data,
                                        objective_measure = "Expected utility",
-                                       value_weighting,
-                                       allow_short_selling) {
+                                       value_weighting = TRUE,
+                                       allow_short_selling = TRUE) {
   processed_data <- compute_portfolio_weights(
     theta,
     data,
@@ -258,7 +274,9 @@ compute_objective_function <- function(theta,
     allow_short_selling
   )
 
-  objective_function <- evaluate_portfolio(processed_data, full_evaluation = FALSE) %>%
+  objective_function <- evaluate_portfolio(processed_data,
+                                           full_evaluation = FALSE
+  ) %>%
     filter(measure == objective_measure) %>%
     pull(tilt)
 
@@ -267,12 +285,12 @@ compute_objective_function <- function(theta,
 ```
 
 You may wonder why we return the negative value of the objective function. This is simply due to the common convention for optimization procedures to search for minima as a default. By minimizing the negative value of the objective function, we get the maximum value as a result.
-In its most basic form, R optimization relies on `optim`. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of $\hat\theta$, which maximize the hypothetical expected utility of the investor. 
+In its most basic form, R optimization relies on the function `optim`. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of $\hat\theta$, which maximize the hypothetical expected utility of the investor. 
 
 
 ```r
 optimal_theta <- optim(
-  par = theta, 
+  par = theta,
   compute_objective_function,
   objective_measure = "Expected utility",
   data = data_portfolios,
@@ -280,7 +298,7 @@ optimal_theta <- optim(
   allow_short_selling = TRUE
 )
 
-optimal_theta$par 
+optimal_theta$par
 ```
 
 ```
@@ -288,7 +306,7 @@ optimal_theta$par
 ##        0.189       -2.007
 ```
 
-The resulting values of $\theta$ are easy to interpret intuitively. Expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). 
+The resulting values of $\hat\theta$ are easy to interpret intuitively. Expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). 
 
 
 ## More model specifications
@@ -314,7 +332,8 @@ full_model_grid <- expand_grid(
       data = ..1,
       objective_measure = "Expected utility",
       value_weighting = ..2,
-      allow_short_selling = ..3)$par
+      allow_short_selling = ..3
+    )$par
   ))
 ```
 
@@ -328,7 +347,10 @@ performance_table <- full_model_grid %>%
       .l = list(optimal_theta, data, value_weighting, allow_short_selling),
       .f = ~ compute_portfolio_weights(..1, ..2, ..3, ..4)
     ),
-    portfolio_evaluation = map(processed_data, evaluate_portfolio, full_evaluation = TRUE)
+    portfolio_evaluation = map(processed_data,
+      evaluate_portfolio,
+      full_evaluation = TRUE
+    )
   ) %>%
   select(value_weighting, allow_short_selling, portfolio_evaluation) %>%
   unnest(portfolio_evaluation)
@@ -353,26 +375,28 @@ performance_table %>%
     values_from = " ":Optimal,
     names_glue = "{value_weighting} {allow_short_selling} {.value} "
   ) %>%
-  select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>% 
+  select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>%
   print(n = 11, max_extra_cols = 7)
 ```
 
 ```
 ## # A tibble: 11 × 7
-##    measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op…` `EW  Optimal `
-##    <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
-##  1 Expected uti… -0.250   -2.49e-1       -0.247           -0.247         -0.250  
-##  2 Average retu… 10.5      6.86e+0       14.7             13.4           13.0    
-##  3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
-##  4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
-##  5 CAPM alpha     0.00231  1.08e-4        0.00649          0.00528        0.00440
-##  6 Market beta    1.13     9.92e-1        1.01             1.04           1.14   
-##  7 Absolute wei…  0.0246   2.46e-2        0.0379           0.0246         0.0258 
-##  8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0807 
-##  9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0342 
-## 10 Avg. sum of …  0        0             27.9              0              2.49   
-## 11 Avg. fractio…  0        0             38.8              0              7.84   
-## # … with 1 more variable: `EW (no s.) Optimal ` <dbl>
+##    measure             `EW    ` `VW    ` `VW  Optimal `
+##    <chr>                  <dbl>    <dbl>          <dbl>
+##  1 Expected utility    -0.250   -2.49e-1       -0.247  
+##  2 Average return      10.5      6.86e+0       14.7    
+##  3 SD return           20.3      1.53e+1       20.6    
+##  4 Sharpe ratio         0.149    1.29e-1        0.206  
+##  5 CAPM alpha           0.00231  1.08e-4        0.00649
+##  6 Market beta          1.13     9.92e-1        1.01   
+##  7 Absolute weight      0.0246   2.46e-2        0.0379 
+##  8 Max. weight          0.0246   3.52e+0        3.34   
+##  9 Min. weight          0.0246   2.78e-5       -0.0327 
+## 10 Avg. sum of negati…  0        0             27.9    
+## 11 Avg. fraction of n…  0        0             38.8    
+## # … with 3 more variables:
+## #   `VW (no s.) Optimal ` <dbl>, `EW  Optimal ` <dbl>,
+## #   `EW (no s.) Optimal ` <dbl>
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.

@@ -2,7 +2,7 @@
 
 Machine learning (ML) is seen as a part of artificial intelligence. 
 ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
-While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options without prior knowledge of the theoretical underpinnings of the famous option pricing equation. 
+While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options without prior knowledge of the theoretical underpinnings of the famous option pricing equation.    
 
 The roadmap is as follows: First, we briefly introduce regression trees, random forests, and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
 We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
@@ -55,7 +55,7 @@ Despite the computational challenges, implementation in R is not tedious at all 
 
 ## Option pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price [@Black1976] of a call option for a non-dividend-paying underlying stock is given by
+To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from @Hull2020. In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black–Scholes price [@Black1976] of a call option for a non-dividend-paying underlying stock is given by
 $$
 \begin{aligned}
   C(S, T) &= \Phi(d_1)S - \Phi(d_1 - \sigma\sqrt{T})Ke^{-r T} \\
@@ -126,16 +126,16 @@ rec <- recipe(observed_price ~ .,
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `epochs = 500`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
+Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 15 hidden units. We set the number of training iterations to `epochs = 500`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
 
 
 ```r
 nnet_model <- mlp(
   epochs = 500,
-  hidden_units = 15,
+  hidden_units = 10,
 ) %>%
   set_mode("regression") %>%
-  set_engine("keras", verbose = 1)
+  set_engine("keras", verbose = FALSE)
 ```
 
 The `verbose=0` argument prevents logging the results. We can follow the straightforward `tidymodel` workflow as in the chapter before: Define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data. 
@@ -189,18 +189,18 @@ model
 
 ```
 ## Model: "sequential_1"
-## _________________________________________________________________________________
-##  Layer (type)                       Output Shape                    Param #      
-## =================================================================================
-##  dense_5 (Dense)                    (None, 10)                      60           
-##  dense_4 (Dense)                    (None, 10)                      110          
-##  dense_3 (Dense)                    (None, 10)                      110          
-##  dense_2 (Dense)                    (None, 1)                       11           
-## =================================================================================
+## _______________________________________________________
+##  Layer (type)           Output Shape          Param #  
+## =======================================================
+##  dense_5 (Dense)        (None, 10)            60       
+##  dense_4 (Dense)        (None, 10)            110      
+##  dense_3 (Dense)        (None, 10)            110      
+##  dense_2 (Dense)        (None, 1)             11       
+## =======================================================
 ## Total params: 291
 ## Trainable params: 291
 ## Non-trainable params: 0
-## _________________________________________________________________________________
+## _______________________________________________________
 ```
 
 To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) %>% select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
@@ -211,7 +211,7 @@ model %>%
   fit(
     x = extract_mold(nn_fit)$predictors %>% as.matrix(),
     y = extract_mold(nn_fit)$outcomes %>% pull(observed_price),
-    epochs = 500, verbose = 0
+    epochs = 500, verbose = FALSE
   )
 ```
 
