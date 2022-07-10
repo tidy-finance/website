@@ -22,29 +22,29 @@ tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
                           extended_types = TRUE
 )
 
-crsp <- tbl(tidy_finance, "crsp_monthly") %>% 
+crsp <- tbl(tidy_finance, "crsp_monthly") |> 
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 ```
 
 The classical investment regressions models the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure for a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. 
 
 ```{r}
-data_investment <- compustat %>%
-  mutate(month = floor_date(datadate, "month")) %>% 
-  left_join(compustat %>% 
-              select(gvkey, year, at_lag = at) %>% 
+data_investment <- compustat |>
+  mutate(month = floor_date(datadate, "month")) |> 
+  left_join(compustat |> 
+              select(gvkey, year, at_lag = at) |> 
               mutate(year = year + 1), 
-            by = c("gvkey", "year")) %>% 
-  filter(at > 0, at_lag > 0) %>% 
+            by = c("gvkey", "year")) |> 
+  filter(at > 0, at_lag > 0) |> 
   mutate(investment = capx / at_lag,
          cash_flows = oancf / at_lag)
 
-data_investment <- data_investment %>% 
-  left_join(data_investment %>% 
-              select(gvkey, year, investment_lead = investment) %>% 
+data_investment <- data_investment |> 
+  left_join(data_investment |> 
+              select(gvkey, year, investment_lead = investment) |> 
               mutate(year = year - 1), 
             by = c("gvkey", "year"))
 ```
@@ -54,14 +54,14 @@ It is one of the most common regressors in corporate finance applications (@Fazz
 Finally, we only keep observations where all variables of interest are non-missing and the report book value of assets is strictly positive.
 
 ```{r}
-data_investment <- data_investment %>% 
-    left_join(crsp %>% 
+data_investment <- data_investment |> 
+    left_join(crsp |> 
               select(gvkey, month, mktcap), 
-              by = c("gvkey", "month")) %>% 
+              by = c("gvkey", "month")) |> 
   mutate(tobins_q = (mktcap + at - be + txdb) / at)
 
-data_investment <- data_investment %>% 
-  select(gvkey, year, investment_lead, cash_flows, tobins_q) %>% 
+data_investment <- data_investment |> 
+  select(gvkey, year, investment_lead, cash_flows, tobins_q) |> 
   drop_na() 
 ```
 
@@ -78,7 +78,7 @@ winsorize <- function(x, cut){
   return(x)
 }
 
-data_investment <- data_investment %>% 
+data_investment <- data_investment |> 
   mutate(across(c(investment_lead, cash_flows, tobins_q), 
                 ~winsorize(., 0.01)))
 ```
@@ -86,10 +86,10 @@ data_investment <- data_investment %>%
 Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. 
 
 ```{r}
-data_investment %>%
+data_investment |>
   pivot_longer(cols = c(investment_lead, cash_flows, tobins_q), 
-               names_to = "measure") %>% 
-  group_by(measure) %>%
+               names_to = "measure") |> 
+  group_by(measure) |>
   summarize(mean = mean(value),
             sd = sd(value),
             min = min(value),
@@ -99,7 +99,7 @@ data_investment %>%
             q75 = quantile(value, 0.75),
             q95 = quantile(value, 0.95),
             max = max(value),
-            n = n()) %>%
+            n = n()) |>
   ungroup()
 ```
 
