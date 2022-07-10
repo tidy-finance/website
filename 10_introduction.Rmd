@@ -22,9 +22,11 @@ To download the data, you can use the command `tq_get`. If you do not know how t
 We especially recommend taking a look at the documentation's examples section. 
 
 ```{r, eval = TRUE}
-prices <- tq_get("AAPL", 
-                 get = "stock.prices", 
-                 from = "2000-01-01", to = "2022-03-30")
+prices <- tq_get("AAPL",
+  get = "stock.prices",
+  from = "2000-01-01",
+  to = "2022-03-30"
+)
 prices
 ```
 
@@ -33,11 +35,11 @@ prices
 Next, we use `ggplot2` to visualize the time series of adjusted prices. 
 
 ```{r}
-prices %>%
+prices |>
   ggplot(aes(x = date, y = adjusted)) +
   geom_line() +
   labs(
-    x = NULL, 
+    x = NULL,
     y = NULL,
     title = "AAPL stock prices",
     subtitle = "Prices in USD, adjusted for dividend payments and stock splits"
@@ -47,9 +49,9 @@ prices %>%
 Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. The function `lag` computes the previous value in a vector. 
 
 ```{r, eval = TRUE}
-returns <- prices %>%
-  arrange(date) %>%
-  mutate(ret = (adjusted - lag(adjusted)) / lag(adjusted)) %>%
+returns <- prices |>
+  arrange(date) |>
+  mutate(ret = (adjusted - lag(adjusted)) / lag(adjusted)) |>
   select(symbol, date, ret)
 returns
 ```
@@ -60,16 +62,16 @@ Otherwise, `lag` would be meaningless.
 For the upcoming examples, we remove missing values as these would require separate treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations. 
 
 ```{r, eval = TRUE}
-returns <- returns %>%
+returns <- returns |>
   drop_na(ret)
 ```
 
 Next, we visualize the distribution of daily returns in a histogram. For convenience, we multiply the returns by 100 to get returns in percent for the visualizations. Additionally, we also add a dashed red line that indicates the 5\% quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at least 5\%. 
 
 ```{r}
-quantile_05 <- quantile(returns %>% pull(ret) * 100, 0.05)
+quantile_05 <- quantile(returns |> pull(ret) * 100, 0.05)
 
-returns %>%
+returns |>
   ggplot(aes(x = ret * 100)) +
   geom_histogram(bins = 100) +
   geom_vline(aes(xintercept = quantile_05),
@@ -77,7 +79,7 @@ returns %>%
     linetype = "dashed"
   ) +
   labs(
-    x = NULL, 
+    x = NULL,
     y = NULL,
     title = "Distribution of daily AAPL returns (in percent)",
     subtitle = "The dotted vertical line indicates the historical 5% quantile"
@@ -89,8 +91,8 @@ Before proceeding, make sure you understand how to use the geom `geom_vline()` t
 A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest. 
 
 ```{r}
-returns %>%
-  mutate(ret = ret * 100) %>%
+returns |>
+  mutate(ret = ret * 100) |>
   summarize(across(
     ret,
     list(
@@ -102,13 +104,13 @@ returns %>%
   ))
 ```
 
-We see that the maximum *daily* return was around `r returns %>% pull(ret) %>% max() * 100` percent.  
+We see that the maximum *daily* return was around `r returns |> pull(ret) |> max() * 100` percent.  
 You can also compute these summary statistics for each year by imposing `group_by(year = year(date))`, where the call `year(date)` computes the year.
 
 ```{r}
-returns %>%
-  mutate(ret = ret * 100) %>%
-  group_by(year = year(date)) %>%
+returns |>
+  mutate(ret = ret * 100) |>
+  group_by(year = year(date)) |>
   summarize(across(
     ret,
     list(
@@ -130,17 +132,18 @@ As a next step, we generalize the code from before such that all the computation
 This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets you like. The following code takes any vector of tickers, e.g., `ticker <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average). 
 
 ```{r prices, eval = TRUE}
-ticker <- tq_index("DOW") 
+ticker <- tq_index("DOW")
 index_prices <- tq_get(ticker,
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2022-03-30")
+  to = "2022-03-30"
+)
 ```
 
-The resulting file contains `r nrow(index_prices)` daily observations for in total `r index_prices %>% count(company) %>% nrow()` different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting file contains `r nrow(index_prices)` daily observations for in total `r index_prices |> count(company) |> nrow()` different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 ```{r}
-index_prices %>%
+index_prices |>
   ggplot(aes(
     x = date,
     y = adjusted,
@@ -162,15 +165,15 @@ Do you notice the small differences relative to the code we used before? `tq_get
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate` command is performed for each symbol individually. The same logic applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest. 
 
 ```{r}
-all_returns <- index_prices %>%
-  group_by(symbol) %>%
-  mutate(ret = adjusted / lag(adjusted) - 1) %>%
-  select(symbol, date, ret) %>%
+all_returns <- index_prices |>
+  group_by(symbol) |>
+  mutate(ret = adjusted / lag(adjusted) - 1) |>
+  select(symbol, date, ret) |>
   drop_na(ret)
 
-all_returns %>%
-  mutate(ret = ret * 100) %>%
-  group_by(symbol) %>%
+all_returns |>
+  mutate(ret = ret * 100) |>
+  group_by(symbol) |>
   summarize(across(
     ret,
     list(
@@ -179,7 +182,7 @@ all_returns %>%
       daily_min = min,
       daily_max = max
     ),
-        .names = "{.fn}"
+    .names = "{.fn}"
   ))
 ```
 
@@ -190,24 +193,24 @@ Note that you are now also equipped with all tools to download price data for *e
 Of course, aggregation across other variables than `symbol` can make sense as well. For instance, suppose you are interested in answering the question: are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded prices and compute aggregate daily trading volume for all Dow Jones constituents in USD. Recall that the column *volume* is denoted in the number of traded shares. Thus, we multiply the trading volume with the daily closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e9` denotes daily trading volume in billion USD.  
 
 ```{r}
-volume <- index_prices %>%
-  mutate(volume_usd = volume * close / 1e9) %>%
-  group_by(date) %>%
+volume <- index_prices |>
+  mutate(volume_usd = volume * close / 1e9) |>
+  group_by(date) |>
   summarize(volume = sum(volume_usd))
 
-volume %>%
+volume |>
   ggplot(aes(x = date, y = volume)) +
   geom_line() +
   labs(
     x = NULL, y = NULL,
     title = "Aggregate daily trading volume (billion USD)"
-  ) 
+  )
 ```
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
 ```{r}
-volume %>%
+volume |>
   ggplot(aes(x = lag(volume), y = volume)) +
   geom_point() +
   geom_abline(aes(intercept = 0, slope = 1),
@@ -231,19 +234,19 @@ An essential tool to evaluate portfolios in the mean-variance context is the *ef
 First, we extract each asset's *monthly* returns. In order to keep things simple, we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
 
 ```{r}
-index_prices <- index_prices %>%
-  group_by(symbol) %>%
-  mutate(n = n()) %>%
-  ungroup() %>%
-  filter(n == max(n)) %>%
+index_prices <- index_prices |>
+  group_by(symbol) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n == max(n)) |>
   select(-n)
 
-returns <- index_prices %>%
-  mutate(month = floor_date(date, "month")) %>%
-  group_by(symbol, month) %>%
-  summarize(price = last(adjusted), .groups = "drop_last") %>%
-  mutate(ret = price / lag(price) - 1) %>%
-  drop_na(ret) %>%
+returns <- index_prices |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(symbol, month) |>
+  summarize(price = last(adjusted), .groups = "drop_last") |>
+  mutate(ret = price / lag(price) - 1) |>
+  drop_na(ret) |>
   select(-price)
 ```
 
@@ -251,11 +254,11 @@ Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix w
 We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of future returns. 
 
 ```{r}
-returns_matrix <- returns %>%
+returns_matrix <- returns |>
   pivot_wider(
     names_from = symbol,
     values_from = ret
-  ) %>%
+  ) |>
   select(-month)
 
 sigma <- cov(returns_matrix)
@@ -272,8 +275,10 @@ iota <- rep(1, N)
 mvp_weights <- solve(sigma) %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 
-tibble(expected_ret = t(mvp_weights) %*% mu, 
-       volatility = sqrt(t(mvp_weights) %*% sigma %*% mvp_weights))
+tibble(
+  expected_ret = t(mvp_weights) %*% mu,
+  volatility = sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)
+)
 ```
 
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
@@ -315,11 +320,11 @@ for (i in seq_along(c)) {
 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. We also add the individual stocks in the same call. 
 ```{r}
-res %>%
+res |>
   ggplot(aes(x = sd, y = mu)) +
   geom_point() +
   geom_point( # locate the minimum variance and efficient portfolio
-    data = res %>% filter(c %in% c(0, 1)),
+    data = res |> filter(c %in% c(0, 1)),
     color = "red",
     size = 4
   ) +

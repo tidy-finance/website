@@ -22,36 +22,36 @@ tidy_finance <- dbConnect(SQLite(),
   extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 ```
 
 To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas. 
 ```{r}
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
 Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 13$ and $t − 2$ for each firm. The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding. To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.
 
 ```{r}
-crsp_monthly_lags <- crsp_monthly %>%
+crsp_monthly_lags <- crsp_monthly |>
   transmute(permno,
     month_12 = month %m+% months(12),
     mktcap
   )
 
-crsp_monthly <- crsp_monthly %>%
+crsp_monthly <- crsp_monthly |>
   inner_join(crsp_monthly_lags,
     by = c("permno", "month" = "month_12"),
     suffix = c("", "_12")
   )
 
-data_portfolios <- crsp_monthly %>%
+data_portfolios <- crsp_monthly |>
   mutate(
     momentum_lag = mktcap_lag / mktcap_12,
     size_lag = log(mktcap_lag)
-  ) %>%
+  ) |>
   drop_na(contains("lag"))
 ```
 
@@ -72,14 +72,14 @@ Intuitively, the portfolio strategy is a form of active portfolio management rel
 We first implement cross-sectional standardization for the entire CRSP universe. We also keep track of (lagged) relative market capitalization `relative_mktcap`, which will represent the value-weighted benchmark portfolio, while `n` denotes the number of traded assets $N_t$, which we use to construct the naive portfolio benchmark.
 
 ```{r}
-data_portfolios <- data_portfolios %>%
-  group_by(month) %>%
+data_portfolios <- data_portfolios |>
+  group_by(month) |>
   mutate(
     n = n(),
     relative_mktcap = mktcap_lag / sum(mktcap_lag),
     across(contains("lag"), ~ (. - mean(.)) / sd(.)),
-  ) %>%
-  ungroup() %>%
+  ) |>
+  ungroup() |>
   select(-mktcap_lag, -altprc)
 ```
 
@@ -94,7 +94,10 @@ The allocation strategy is straightforward because the number of parameters to e
 To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta_0$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.
 
 ```{r}
-n_parameters <- sum(grepl("lag", colnames(data_portfolios)))
+n_parameters <- sum(grepl(
+  "lag",
+  colnames(data_portfolios)
+))
 theta <- rep(1.5, n_parameters)
 names(theta) <- colnames(data_portfolios)[grepl(
   "lag",
@@ -117,13 +120,13 @@ compute_portfolio_weights <- function(theta,
                                       data,
                                       value_weighting = TRUE,
                                       allow_short_selling = TRUE) {
-  data %>%
-    group_by(month) %>%
+  data |>
+    group_by(month) |>
     bind_cols(
-      characteristic_tilt = data %>%
-        transmute(across(contains("lag"), ~ . / n)) %>%
-        as.matrix() %*% theta %>% as.numeric()
-    ) %>%
+      characteristic_tilt = data |>
+        transmute(across(contains("lag"), ~ . / n)) |>
+        as.matrix() %*% theta |> as.numeric()
+    ) |>
     mutate(
       # Definition of benchmark weight
       weight_benchmark = case_when(
@@ -139,7 +142,7 @@ compute_portfolio_weights <- function(theta,
       ),
       # Weights sum up to 1
       weight_tilt = weight_tilt / sum(weight_tilt)
-    ) %>%
+    ) |>
     ungroup()
 }
 ```
@@ -173,18 +176,18 @@ No doubt, there are many other ways to evaluate a portfolio. The function below 
 ```{r}
 evaluate_portfolio <- function(weights_crsp,
                                full_evaluation = TRUE) {
-  evaluation <- weights_crsp %>%
-    group_by(month) %>%
+  evaluation <- weights_crsp |>
+    group_by(month) |>
     summarize(
       return_tilt = weighted.mean(ret_excess, weight_tilt),
       return_benchmark = weighted.mean(ret_excess, weight_benchmark)
-    ) %>%
+    ) |>
     pivot_longer(-month,
       values_to = "portfolio_return",
       names_to = "model"
-    ) %>%
-    group_by(model) %>%
-    left_join(factors_ff_monthly, by = "month") %>%
+    ) |>
+    group_by(model) |>
+    left_join(factors_ff_monthly, by = "month") |>
     summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(12 * portfolio_return),
@@ -192,27 +195,27 @@ evaluate_portfolio <- function(weights_crsp,
       "Sharpe ratio" = mean(portfolio_return) / sd(portfolio_return),
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
       "Market beta" = coefficients(lm(portfolio_return ~ mkt_excess))[2]
-    )) %>%
-    mutate(model = gsub("return_", "", model)) %>%
-    pivot_longer(-model, names_to = "measure") %>%
+    )) |>
+    mutate(model = gsub("return_", "", model)) |>
+    pivot_longer(-model, names_to = "measure") |>
     pivot_wider(names_from = model, values_from = value)
 
   if (full_evaluation) {
-    weight_evaluation <- weights_crsp %>%
-      select(month, contains("weight")) %>%
-      pivot_longer(-month, values_to = "weight", names_to = "model") %>%
-      group_by(model, month) %>%
+    weight_evaluation <- weights_crsp |>
+      select(month, contains("weight")) |>
+      pivot_longer(-month, values_to = "weight", names_to = "model") |>
+      group_by(model, month) |>
       transmute(tibble(
         "Absolute weight" = abs(weight),
         "Max. weight" = max(weight),
         "Min. weight" = min(weight),
         "Avg. sum of negative weights" = -sum(weight[weight < 0]),
         "Avg. fraction of negative weights" = sum(weight < 0) / n()
-      )) %>%
-      group_by(model) %>%
-      summarize(across(-month, ~ 100 * mean(.))) %>%
-      mutate(model = gsub("weight_", "", model)) %>%
-      pivot_longer(-model, names_to = "measure") %>%
+      )) |>
+      group_by(model) |>
+      summarize(across(-month, ~ 100 * mean(.))) |>
+      mutate(model = gsub("weight_", "", model)) |>
+      pivot_longer(-model, names_to = "measure") |>
       pivot_wider(names_from = model, values_from = value)
     evaluation <- bind_rows(evaluation, weight_evaluation)
   }
@@ -223,7 +226,7 @@ evaluate_portfolio <- function(weights_crsp,
 Let us take a look at the different portfolio strategies and evaluation measures.
 
 ```{r}
-evaluate_portfolio(weights_crsp) %>% print(n = Inf)
+evaluate_portfolio(weights_crsp) |> print(n = Inf)
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
@@ -246,9 +249,9 @@ compute_objective_function <- function(theta,
   )
 
   objective_function <- evaluate_portfolio(processed_data,
-                                           full_evaluation = FALSE
-  ) %>%
-    filter(measure == objective_measure) %>%
+    full_evaluation = FALSE
+  ) |>
+    filter(measure == objective_measure) |>
     pull(tilt)
 
   return(-objective_function)
@@ -283,7 +286,7 @@ full_model_grid <- expand_grid(
   value_weighting = c(TRUE, FALSE),
   allow_short_selling = c(TRUE, FALSE),
   data = list(data_portfolios)
-) %>%
+) |>
   mutate(optimal_theta = pmap(
     .l = list(
       data,
@@ -304,25 +307,34 @@ full_model_grid <- expand_grid(
 Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted towards maximizing expected utility. 
 
 ```{r}
-performance_table <- full_model_grid %>%
+performance_table <- full_model_grid |>
   mutate(
     processed_data = pmap(
-      .l = list(optimal_theta, data, value_weighting, allow_short_selling),
+      .l = list(
+        optimal_theta,
+        data,
+        value_weighting,
+        allow_short_selling
+      ),
       .f = ~ compute_portfolio_weights(..1, ..2, ..3, ..4)
     ),
     portfolio_evaluation = map(processed_data,
       evaluate_portfolio,
       full_evaluation = TRUE
     )
-  ) %>%
-  select(value_weighting, allow_short_selling, portfolio_evaluation) %>%
+  ) |>
+  select(
+    value_weighting,
+    allow_short_selling,
+    portfolio_evaluation
+  ) |>
   unnest(portfolio_evaluation)
 
-performance_table %>%
+performance_table |>
   rename(
     " " = benchmark,
     Optimal = tilt
-  ) %>%
+  ) |>
   mutate(
     value_weighting = case_when(
       value_weighting == TRUE ~ "VW",
@@ -332,13 +344,18 @@ performance_table %>%
       allow_short_selling == TRUE ~ "",
       allow_short_selling == FALSE ~ "(no s.)"
     )
-  ) %>%
+  ) |>
   pivot_wider(
     names_from = value_weighting:allow_short_selling,
     values_from = " ":Optimal,
     names_glue = "{value_weighting} {allow_short_selling} {.value} "
-  ) %>%
-  select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>%
+  ) |>
+  select(
+    measure,
+    `EW    `,
+    `VW    `,
+    sort(contains("Optimal"))
+  ) |>
   print(n = 11, max_extra_cols = 7)
 ``` 
 

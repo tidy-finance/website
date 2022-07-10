@@ -18,29 +18,29 @@ library(lubridate)
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*..
 
 ```{r}
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-data_ff <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+data_ff <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(
     permno, gvkey, month, ret_excess, mkt_excess,
     mktcap, mktcap_lag, exchange
-  ) %>%
+  ) |>
   drop_na()
 
-be <- compustat %>%
-  select(gvkey, datadate, be) %>%
+be <- compustat |>
+  select(gvkey, datadate, be) |>
   drop_na()
 ```
 
@@ -53,27 +53,27 @@ Second, Fama and French also have a different protocol for computing the book-to
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `distinct()` at the end of the chunk below.
 
 ```{r}
-me_ff <- data_ff %>%
-  filter(month(month) == 6) %>%
-  mutate(sorting_date = month %m+% months(1)) %>%
+me_ff <- data_ff |>
+  filter(month(month) == 6) |>
+  mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me_ff = mktcap)
 
-me_ff_dec <- data_ff %>%
-  filter(month(month) == 12) %>%
-  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) %>%
+me_ff_dec <- data_ff |>
+  filter(month(month) == 12) |>
+  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
-bm_ff <- be %>%
-  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) %>%
-  select(gvkey, sorting_date, bm_be = be) %>%
-  drop_na() %>%
-  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) %>%
-  mutate(bm_ff = bm_be / bm_me) %>%
+bm_ff <- be |>
+  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) |>
+  select(gvkey, sorting_date, bm_be = be) |>
+  drop_na() |>
+  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) |>
+  mutate(bm_ff = bm_be / bm_me) |>
   select(permno, sorting_date, bm_ff)
 
-variables_ff <- me_ff %>%
-  inner_join(bm_ff, by = c("permno", "sorting_date")) %>%
-  drop_na() %>%
+variables_ff <- me_ff |>
+  inner_join(bm_ff, by = c("permno", "sorting_date")) |>
+  drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
@@ -83,24 +83,25 @@ Next, we construct our portfolios with an adjusted `assign_portfolio()` function
 
 ```{r}
 assign_portfolio <- function(data, var, percentiles) {
-  breakpoints <- data %>%
-    filter(exchange == "NYSE") %>%
+  breakpoints <- data |>
+    filter(exchange == "NYSE") |>
     summarize(breakpoint = quantile(
       {{ var }},
       probs = {{ percentiles }},
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval({{ var }},
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 
-portfolios_ff <- variables_ff %>%
-  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) %>%
-  group_by(sorting_date) %>%
+portfolios_ff <- variables_ff |>
+  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) |>
+  group_by(sorting_date) |>
   mutate(
     portfolio_me = assign_portfolio(
       data = cur_data(),
@@ -112,18 +113,18 @@ portfolios_ff <- variables_ff %>%
       var = bm_ff,
       percentiles = c(0, 0.3, 0.7, 1)
     )
-  ) %>%
+  ) |>
   select(permno, sorting_date, portfolio_me, portfolio_bm)
 ```
 
 Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 ```{r}
-portfolios_ff <- data_ff %>%
+portfolios_ff <- data_ff |>
   mutate(sorting_date = case_when(
     month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
     month(month) >= 7 ~ ymd(paste0(year(month), "0701"))
-  )) %>%
+  )) |>
   inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
 
@@ -133,18 +134,20 @@ portfolios_ff <- data_ff %>%
 Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.
 
 ```{r}
-factors_ff_monthly_replicated <- portfolios_ff %>%
-  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
-  group_by(portfolio, month) %>%
+factors_ff_monthly_replicated <- portfolios_ff |>
+  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) |>
+  group_by(portfolio, month) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
     portfolio_me = unique(portfolio_me),
     portfolio_bm = unique(portfolio_bm)
-  ) %>%
-  group_by(month) %>%
+  ) |>
+  group_by(month) |>
   summarize(
-    smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
-    hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1])
+    smb_replicated = mean(ret[portfolio_me == 1]) - 
+      mean(ret[portfolio_me == 2]),
+    hml_replicated = mean(ret[portfolio_bm == 3]) - 
+      mean(ret[portfolio_bm == 1])
   )
 ```
 
@@ -154,8 +157,8 @@ factors_ff_monthly_replicated <- portfolios_ff %>%
 In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 ```{r}
-test <- factors_ff_monthly %>%
-  inner_join(factors_ff_monthly_replicated, by = "month") %>%
+test <- factors_ff_monthly |>
+  inner_join(factors_ff_monthly_replicated, by = "month") |>
   mutate(
     smb_replicated = round(smb_replicated, 4),
     hml_replicated = round(hml_replicated, 4)
