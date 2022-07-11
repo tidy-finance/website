@@ -28,17 +28,17 @@ Once we form our portfolios, we use the Fama-French factor returns to compute th
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-beta <- tbl(tidy_finance, "beta") %>%
+beta <- tbl(tidy_finance, "beta") |>
   collect()
 ```
 
@@ -46,14 +46,14 @@ We keep only relevant data from the CRSP sample.
 
 
 ```r
-crsp_monthly <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+crsp_monthly <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(permno, month, ret_excess, mkt_excess, mktcap_lag)
 crsp_monthly
 ```
 
 ```
-## # A tibble: 3,225,079 × 5
+## # A tibble: 3,225,079 x 5
 ##   permno month      ret_excess mkt_excess mktcap_lag
 ##    <dbl> <date>          <dbl>      <dbl>      <dbl>
 ## 1  10000 1986-02-01    -0.262      0.0713       16.1
@@ -61,7 +61,7 @@ crsp_monthly
 ## 3  10000 1986-04-01    -0.104     -0.0131       16.3
 ## 4  10000 1986-05-01    -0.228      0.0462       15.2
 ## 5  10000 1986-06-01    -0.0102     0.0103       11.8
-## # … with 3,225,074 more rows
+## # ... with 3,225,074 more rows
 ```
 
 ## Sorting by market beta
@@ -69,17 +69,17 @@ crsp_monthly
 Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. 
 To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. 
 This procedure ensures that month $t$ information is available in month $t+1$. 
-You may be tempted to simply use a call such as `crsp_monthly %>% group_by(permno) %>% mutate(beta_lag = lag(beta)))` instead. 
+You may be tempted to simply use a call such as `crsp_monthly |> group_by(permno) |> mutate(beta_lag = lag(beta)))` instead. 
 This procedure, however, does not work if there are non-explicit missing values in the time series.
 
 
 ```r
-beta_lag <- beta %>%
-  mutate(month = month %m+% months(1)) %>%
-  select(permno, month, beta_lag = beta_daily) %>%
+beta_lag <- beta |>
+  mutate(month = month %m+% months(1)) |>
+  select(permno, month, beta_lag = beta_daily) |>
   drop_na()
 
-data_for_sorts <- crsp_monthly %>%
+data_for_sorts <- crsp_monthly |>
   inner_join(beta_lag, by = c("permno", "month"))
 ```
 
@@ -89,16 +89,16 @@ We then compute the value-weighted returns for each of the two resulting portfol
 
 
 ```r
-beta_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+beta_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(
     breakpoint = median(beta_lag),
     portfolio = case_when(
       beta_lag <= breakpoint ~ "low",
       beta_lag > breakpoint ~ "high"
     )
-  ) %>%
-  group_by(month, portfolio) %>%
+  ) |>
+  group_by(month, portfolio) |>
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
 
@@ -109,7 +109,7 @@ The following figure shows the monthly excess returns of the two portfolios.
 
 
 ```r
-beta_portfolios %>%
+beta_portfolios |>
   ggplot(aes(x = month, y = ret, fill = portfolio)) +
   geom_col() +
   facet_wrap(~portfolio, ncol = 1) +
@@ -121,15 +121,17 @@ beta_portfolios %>%
   theme(legend.position = "none")
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-6-1} \end{center}
 
 We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.
 
 
 ```r
-beta_longshort <- beta_portfolios %>%
-  pivot_wider(month, names_from = portfolio, values_from = ret) %>%
-  mutate(long_short = high - low) %>%
+beta_longshort <- beta_portfolios |>
+  pivot_wider(month, names_from = portfolio, values_from = ret) |>
+  mutate(long_short = high - low) |>
   left_join(factors_ff_monthly, by = "month")
 ```
 
@@ -159,19 +161,19 @@ Now we take portfolio sorts to the next level. We want to be able to sort stocks
 
 ```r
 assign_portfolio <- function(data, var, n_portfolios) {
-  breakpoints <- data %>%
+  breakpoints <- data |>
     summarize(breakpoint = quantile({{ var }},
       probs = seq(0, 1, length.out = n_portfolios + 1),
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
+  data |>
     mutate(portfolio = findInterval({{ var }},
       breakpoints,
       all.inside = TRUE
-    )) %>%
+    )) |>
     pull(portfolio)
 }
 ```
@@ -181,8 +183,8 @@ Note that we transform the portfolio column to a factor variable because it prov
 
 
 ```r
-beta_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+beta_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(
     portfolio = assign_portfolio(
       data = cur_data(),
@@ -190,8 +192,8 @@ beta_portfolios <- data_for_sorts %>%
       n_portfolios = 10
     ),
     portfolio = as.factor(portfolio)
-  ) %>%
-  group_by(portfolio, month) %>%
+  ) |>
+  group_by(portfolio, month) |>
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
 
@@ -202,9 +204,9 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 
 
 ```r
-beta_portfolios_summary <- beta_portfolios %>%
-  left_join(factors_ff_monthly, by = "month") %>%
-  group_by(portfolio) %>%
+beta_portfolios_summary <- beta_portfolios |>
+  left_join(factors_ff_monthly, by = "month") |>
+  group_by(portfolio) |>
   summarize(
     alpha = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[1]),
     beta = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[2]),
@@ -216,7 +218,7 @@ The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows
 
 
 ```r
-beta_portfolios_summary %>%
+beta_portfolios_summary |>
   ggplot(aes(x = portfolio, y = alpha, fill = portfolio)) +
   geom_bar(stat = "identity") +
   labs(
@@ -229,7 +231,9 @@ beta_portfolios_summary %>%
   theme(legend.position = "None")
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-12-1} \end{center}
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
 
@@ -242,12 +246,13 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 ```r
 sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 
-beta_portfolios_summary %>%
+beta_portfolios_summary |>
   ggplot(aes(x = beta, y = ret, color = portfolio)) +
   geom_point() +
   geom_abline(intercept = 0, slope = mean(factors_ff_monthly$mkt_excess)) +
   geom_abline(intercept = sml_capm[1], slope = sml_capm[2], color = "green") +
-  scale_y_continuous(labels = percent, limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)) +
+  scale_y_continuous(labels = percent, 
+                     limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)) +
   scale_x_continuous(limits = c(0, 2)) +
   labs(
     x = "Beta", y = "Excess return", color = "Portfolio",
@@ -255,21 +260,23 @@ beta_portfolios_summary %>%
   )
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-13-1} \end{center}
 
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio. 
 
 
 ```r
-beta_longshort <- beta_portfolios %>%
-  ungroup() %>%
+beta_longshort <- beta_portfolios |>
+  ungroup() |>
   mutate(portfolio = case_when(
     portfolio == max(as.numeric(portfolio)) ~ "high",
     portfolio == min(as.numeric(portfolio)) ~ "low"
-  )) %>%
-  filter(portfolio %in% c("low", "high")) %>%
-  pivot_wider(month, names_from = portfolio, values_from = ret) %>%
-  mutate(long_short = high - low) %>%
+  )) |>
+  filter(portfolio %in% c("low", "high")) |>
+  pivot_wider(month, names_from = portfolio, values_from = ret) |>
+  mutate(long_short = high - low) |>
   left_join(factors_ff_monthly, by = "month")
 ```
 
@@ -277,7 +284,8 @@ Again, the resulting long-short strategy does not exhibit statistically signific
 
 
 ```r
-coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
+coeftest(lm(long_short ~ 1, data = beta_longshort), 
+         vcov = NeweyWest)
 ```
 
 ```
@@ -292,7 +300,8 @@ However, the long-short portfolio yields a statistically significant negative CA
 
 
 ```r
-coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort), vcov = NeweyWest)
+coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort), 
+         vcov = NeweyWest)
 ```
 
 ```
@@ -311,14 +320,14 @@ The plot below shows the annual returns of the extreme beta portfolios we are ma
 
 
 ```r
-beta_longshort %>%
-  group_by(year = year(month)) %>%
+beta_longshort |>
+  group_by(year = year(month)) |>
   summarize(
     low = prod(1 + low),
     high = prod(1 + high),
     long_short = prod(1 + long_short)
-  ) %>%
-  pivot_longer(cols = -year) %>%
+  ) |>
+  pivot_longer(cols = -year) |>
   ggplot(aes(x = year, y = 1 - value, fill = name)) +
   geom_col(position = "dodge") +
   facet_wrap(~name, ncol = 1) +
@@ -330,10 +339,11 @@ beta_longshort %>%
   )
 ```
 
-<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-17-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-17-1} \end{center}
 
 Overall, this chapter shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next chapter, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis. 
-
 
 ## Exercises
 

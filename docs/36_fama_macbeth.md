@@ -33,17 +33,17 @@ We illustrate @Fama1973 with the monthly CRSP sample and use three characteristi
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-beta <- tbl(tidy_finance, "beta") %>%
+beta <- tbl(tidy_finance, "beta") |>
   collect()
 ```
 
@@ -52,27 +52,27 @@ Furthermore, we also use the CAPM betas based on daily returns we computed in th
 
 
 ```r
-bm <- compustat %>%
-  mutate(month = floor_date(ymd(datadate), "month")) %>%
-  left_join(crsp_monthly, by = c("gvkey", "month")) %>%
-  left_join(beta, by = c("permno", "month")) %>%
+bm <- compustat |>
+  mutate(month = floor_date(ymd(datadate), "month")) |>
+  left_join(crsp_monthly, by = c("gvkey", "month")) |>
+  left_join(beta, by = c("permno", "month")) |>
   transmute(gvkey,
             bm = be / mktcap,
             log_mktcap = log(mktcap),
             beta = beta_daily,
             sorting_date = month %m+% months(6))
 
-data_fama_macbeth <- crsp_monthly %>%
-  left_join(bm, by = c("gvkey", "month" = "sorting_date")) %>%
-  group_by(permno) %>%
-  arrange(month) %>%
-  fill(c(beta, bm, log_mktcap), .direction = "down") %>%
-  ungroup() %>%
-  left_join(crsp_monthly %>%
-              select(permno, month, ret_excess_lead = ret) %>%
+data_fama_macbeth <- crsp_monthly |>
+  left_join(bm, by = c("gvkey", "month" = "sorting_date")) |>
+  group_by(permno) |>
+  arrange(month) |>
+  fill(c(beta, bm, log_mktcap), .direction = "down") |>
+  ungroup() |>
+  left_join(crsp_monthly |>
+              select(permno, month, ret_excess_lead = ret) |>
               mutate(month = month %m-% months(1)),
-            by = c("permno", "month")) %>%
-  select(permno, month, ret_excess_lead, beta, log_mktcap, bm) %>%
+            by = c("permno", "month")) |>
+  select(permno, month, ret_excess_lead, beta, log_mktcap, bm) |>
   drop_na()
 ```
 
@@ -84,10 +84,10 @@ By doing so, we get an estimate of the risk premiums $\hat\lambda^{F_f}_t$ for e
 
 
 ```r
-risk_premiums <- data_fama_macbeth %>%
-  nest(data = -month) %>% 
-  mutate(estimates = map(.x = data, 
-                         ~tidy(lm(ret_excess_lead ~ . - permno, data = .x)))) %>% 
+risk_premiums <- data_fama_macbeth |>
+  nest(data = -month) |> 
+  mutate(estimates = map(data, 
+                         ~tidy(lm(ret_excess_lead ~ . - permno, data = .x)))) |> 
   unnest(estimates)
 ```
 
@@ -97,43 +97,43 @@ Now that we have the risk premiums' estimates for each period, we can average ac
 
 
 ```r
-price_of_risk <- risk_premiums %>%
-  group_by(factor = term) %>%
+price_of_risk <- risk_premiums |>
+  group_by(factor = term) |>
   summarise(
-    risk_premium = mean(estimate)*100,
+    risk_premium = mean(estimate) * 100,
     t_statistic = mean(estimate) / sd(estimate) * sqrt(n())
   )
 ```
 
-On a final note: It is common to adjust for autocorrelation when reporting standard errors of risk premiums. The typical procedure for this is computing @Newey1987 standard errors. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. If you want to implement the apparent *default*, you can enforce `NeweyWest(., lag = 6, prewhite = FALSE)` in the code below. 
+On a final note: It is common to adjust for autocorrelation when reporting standard errors of risk premiums. The typical procedure for this is computing @Newey1987 standard errors. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. If you want to implement the apparent *default*, you can enforce `sandwich::NeweyWest(., lag = 6, prewhite = FALSE)` in the code below. 
 
 
 ```r
-regressions_for_newey_west <- risk_premiums %>%
-  select(month, factor = term, estimate) %>%
-  nest(data = c(month, estimate)) %>%
+regressions_for_newey_west <- risk_premiums |>
+  select(month, factor = term, estimate) |>
+  nest(data = c(month, estimate)) |>
   mutate(
     model = map(data, ~ lm(estimate ~ 1, .)),
     mean = map(model, tidy)
   )
 
-price_of_risk_newey_west <- regressions_for_newey_west %>%
-  mutate(newey_west_se = map_dbl(model, ~ sqrt(NeweyWest(.)))) %>%
-  unnest(mean) %>%
-  mutate(t_statistic_newey_west = estimate / newey_west_se) %>%
+price_of_risk_newey_west <- regressions_for_newey_west |>
+  mutate(newey_west_se = map_dbl(model, ~ sqrt(NeweyWest(.)))) |>
+  unnest(mean) |>
+  mutate(t_statistic_newey_west = estimate / newey_west_se) |>
   select(factor,
     risk_premium = estimate,
     t_statistic_newey_west
   )
 
 left_join(price_of_risk,
-          price_of_risk_newey_west %>% select(factor, t_statistic_newey_west),
+          price_of_risk_newey_west |> select(factor, t_statistic_newey_west),
           by = "factor")
 ```
 
 ```
-## # A tibble: 4 × 4
-##   factor      risk_premium t_statistic t_statistic_new…
+## # A tibble: 4 x 4
+##   factor      risk_premium t_statistic t_statistic_new~
 ##   <chr>              <dbl>       <dbl>            <dbl>
 ## 1 (Intercept)       1.62         5.09             4.07 
 ## 2 beta             -0.0587      -0.790           -0.792

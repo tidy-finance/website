@@ -19,19 +19,18 @@ library(RSQLite)
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(),
-  "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 ```
 
 To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas. 
 
 ```r
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
@@ -39,23 +38,23 @@ Next, we retrieve some stock characteristics that have been shown to have an eff
 
 
 ```r
-crsp_monthly_lags <- crsp_monthly %>%
+crsp_monthly_lags <- crsp_monthly |>
   transmute(permno,
     month_12 = month %m+% months(12),
     mktcap
   )
 
-crsp_monthly <- crsp_monthly %>%
+crsp_monthly <- crsp_monthly |>
   inner_join(crsp_monthly_lags,
     by = c("permno", "month" = "month_12"),
     suffix = c("", "_12")
   )
 
-data_portfolios <- crsp_monthly %>%
+data_portfolios <- crsp_monthly |>
   mutate(
     momentum_lag = mktcap_lag / mktcap_12,
     size_lag = log(mktcap_lag)
-  ) %>%
+  ) |>
   drop_na(contains("lag"))
 ```
 
@@ -77,14 +76,14 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 
 
 ```r
-data_portfolios <- data_portfolios %>%
-  group_by(month) %>%
+data_portfolios <- data_portfolios |>
+  group_by(month) |>
   mutate(
     n = n(),
     relative_mktcap = mktcap_lag / sum(mktcap_lag),
     across(contains("lag"), ~ (. - mean(.)) / sd(.)),
-  ) %>%
-  ungroup() %>%
+  ) |>
+  ungroup() |>
   select(-mktcap_lag, -altprc)
 ```
 
@@ -100,7 +99,10 @@ To get a feeling for the performance of such an allocation strategy, we start wi
 
 
 ```r
-n_parameters <- sum(grepl("lag", colnames(data_portfolios)))
+n_parameters <- sum(grepl(
+  "lag",
+  colnames(data_portfolios)
+))
 theta <- rep(1.5, n_parameters)
 names(theta) <- colnames(data_portfolios)[grepl(
   "lag",
@@ -124,13 +126,13 @@ compute_portfolio_weights <- function(theta,
                                       data,
                                       value_weighting = TRUE,
                                       allow_short_selling = TRUE) {
-  data %>%
-    group_by(month) %>%
+  data |>
+    group_by(month) |>
     bind_cols(
-      characteristic_tilt = data %>%
-        transmute(across(contains("lag"), ~ . / n)) %>%
-        as.matrix() %*% theta %>% as.numeric()
-    ) %>%
+      characteristic_tilt = data |>
+        transmute(across(contains("lag"), ~ . / n)) |>
+        as.matrix() %*% theta |> as.numeric()
+    ) |>
     mutate(
       # Definition of benchmark weight
       weight_benchmark = case_when(
@@ -146,7 +148,7 @@ compute_portfolio_weights <- function(theta,
       ),
       # Weights sum up to 1
       weight_tilt = weight_tilt / sum(weight_tilt)
-    ) %>%
+    ) |>
     ungroup()
 }
 ```
@@ -183,18 +185,18 @@ No doubt, there are many other ways to evaluate a portfolio. The function below 
 ```r
 evaluate_portfolio <- function(weights_crsp,
                                full_evaluation = TRUE) {
-  evaluation <- weights_crsp %>%
-    group_by(month) %>%
+  evaluation <- weights_crsp |>
+    group_by(month) |>
     summarize(
       return_tilt = weighted.mean(ret_excess, weight_tilt),
       return_benchmark = weighted.mean(ret_excess, weight_benchmark)
-    ) %>%
+    ) |>
     pivot_longer(-month,
       values_to = "portfolio_return",
       names_to = "model"
-    ) %>%
-    group_by(model) %>%
-    left_join(factors_ff_monthly, by = "month") %>%
+    ) |>
+    group_by(model) |>
+    left_join(factors_ff_monthly, by = "month") |>
     summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(12 * portfolio_return),
@@ -202,27 +204,27 @@ evaluate_portfolio <- function(weights_crsp,
       "Sharpe ratio" = mean(portfolio_return) / sd(portfolio_return),
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
       "Market beta" = coefficients(lm(portfolio_return ~ mkt_excess))[2]
-    )) %>%
-    mutate(model = gsub("return_", "", model)) %>%
-    pivot_longer(-model, names_to = "measure") %>%
+    )) |>
+    mutate(model = gsub("return_", "", model)) |>
+    pivot_longer(-model, names_to = "measure") |>
     pivot_wider(names_from = model, values_from = value)
 
   if (full_evaluation) {
-    weight_evaluation <- weights_crsp %>%
-      select(month, contains("weight")) %>%
-      pivot_longer(-month, values_to = "weight", names_to = "model") %>%
-      group_by(model, month) %>%
+    weight_evaluation <- weights_crsp |>
+      select(month, contains("weight")) |>
+      pivot_longer(-month, values_to = "weight", names_to = "model") |>
+      group_by(model, month) |>
       transmute(tibble(
         "Absolute weight" = abs(weight),
         "Max. weight" = max(weight),
         "Min. weight" = min(weight),
         "Avg. sum of negative weights" = -sum(weight[weight < 0]),
         "Avg. fraction of negative weights" = sum(weight < 0) / n()
-      )) %>%
-      group_by(model) %>%
-      summarize(across(-month, ~ 100 * mean(.))) %>%
-      mutate(model = gsub("weight_", "", model)) %>%
-      pivot_longer(-model, names_to = "measure") %>%
+      )) |>
+      group_by(model) |>
+      summarize(across(-month, ~ 100 * mean(.))) |>
+      mutate(model = gsub("weight_", "", model)) |>
+      pivot_longer(-model, names_to = "measure") |>
       pivot_wider(names_from = model, values_from = value)
     evaluation <- bind_rows(evaluation, weight_evaluation)
   }
@@ -234,11 +236,12 @@ Let us take a look at the different portfolio strategies and evaluation measures
 
 
 ```r
-evaluate_portfolio(weights_crsp) %>% print(n = Inf)
+evaluate_portfolio(weights_crsp) |> 
+  print(n = Inf)
 ```
 
 ```
-## # A tibble: 11 × 3
+## # A tibble: 11 x 3
 ##    measure                           benchmark     tilt
 ##    <chr>                                 <dbl>    <dbl>
 ##  1 Expected utility                   -2.49e-1 -0.262  
@@ -275,9 +278,9 @@ compute_objective_function <- function(theta,
   )
 
   objective_function <- evaluate_portfolio(processed_data,
-                                           full_evaluation = FALSE
-  ) %>%
-    filter(measure == objective_measure) %>%
+    full_evaluation = FALSE
+  ) |>
+    filter(measure == objective_measure) |>
     pull(tilt)
 
   return(-objective_function)
@@ -319,7 +322,7 @@ full_model_grid <- expand_grid(
   value_weighting = c(TRUE, FALSE),
   allow_short_selling = c(TRUE, FALSE),
   data = list(data_portfolios)
-) %>%
+) |>
   mutate(optimal_theta = pmap(
     .l = list(
       data,
@@ -341,25 +344,34 @@ Finally, we can compare the results. The table below shows summary statistics fo
 
 
 ```r
-performance_table <- full_model_grid %>%
+performance_table <- full_model_grid |>
   mutate(
     processed_data = pmap(
-      .l = list(optimal_theta, data, value_weighting, allow_short_selling),
+      .l = list(
+        optimal_theta,
+        data,
+        value_weighting,
+        allow_short_selling
+      ),
       .f = ~ compute_portfolio_weights(..1, ..2, ..3, ..4)
     ),
     portfolio_evaluation = map(processed_data,
       evaluate_portfolio,
       full_evaluation = TRUE
     )
-  ) %>%
-  select(value_weighting, allow_short_selling, portfolio_evaluation) %>%
+  ) |>
+  select(
+    value_weighting,
+    allow_short_selling,
+    portfolio_evaluation
+  ) |>
   unnest(portfolio_evaluation)
 
-performance_table %>%
+performance_table |>
   rename(
     " " = benchmark,
     Optimal = tilt
-  ) %>%
+  ) |>
   mutate(
     value_weighting = case_when(
       value_weighting == TRUE ~ "VW",
@@ -369,18 +381,23 @@ performance_table %>%
       allow_short_selling == TRUE ~ "",
       allow_short_selling == FALSE ~ "(no s.)"
     )
-  ) %>%
+  ) |>
   pivot_wider(
     names_from = value_weighting:allow_short_selling,
     values_from = " ":Optimal,
     names_glue = "{value_weighting} {allow_short_selling} {.value} "
-  ) %>%
-  select(measure, `EW    `, `VW    `, sort(contains("Optimal"))) %>%
+  ) |>
+  select(
+    measure,
+    `EW    `,
+    `VW    `,
+    sort(contains("Optimal"))
+  ) |>
   print(n = 11, max_extra_cols = 7)
 ```
 
 ```
-## # A tibble: 11 × 7
+## # A tibble: 11 x 7
 ##    measure             `EW    ` `VW    ` `VW  Optimal `
 ##    <chr>                  <dbl>    <dbl>          <dbl>
 ##  1 Expected utility    -0.250   -2.49e-1       -0.247  
@@ -392,9 +409,9 @@ performance_table %>%
 ##  7 Absolute weight      0.0246   2.46e-2        0.0379 
 ##  8 Max. weight          0.0246   3.52e+0        3.34   
 ##  9 Min. weight          0.0246   2.78e-5       -0.0327 
-## 10 Avg. sum of negati…  0        0             27.9    
-## 11 Avg. fraction of n…  0        0             38.8    
-## # … with 3 more variables:
+## 10 Avg. sum of negati~  0        0             27.9    
+## 11 Avg. fraction of n~  0        0             38.8    
+## # ... with 3 more variables:
 ## #   `VW (no s.) Optimal ` <dbl>, `EW  Optimal ` <dbl>,
 ## #   `EW (no s.) Optimal ` <dbl>
 ```

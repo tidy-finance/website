@@ -24,14 +24,16 @@ We especially recommend taking a look at the documentation's examples section.
 
 
 ```r
-prices <- tq_get("AAPL", 
-                 get = "stock.prices", 
-                 from = "2000-01-01", to = "2022-03-30")
+prices <- tq_get("AAPL",
+  get = "stock.prices",
+  from = "2000-01-01",
+  to = "2022-03-30"
+)
 prices
 ```
 
 ```
-## # A tibble: 5,596 × 8
+## # A tibble: 5,596 x 8
 ##   symbol date        open  high   low close    volume
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>
 ## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800
@@ -39,7 +41,7 @@ prices
 ## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600
 ## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800
 ## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400
-## # … with 5,591 more rows, and 1 more variable:
+## # ... with 5,591 more rows, and 1 more variable:
 ## #   adjusted <dbl>
 ```
 
@@ -49,32 +51,34 @@ Next, we use `ggplot2` to visualize the time series of adjusted prices.
 
 
 ```r
-prices %>%
+prices |>
   ggplot(aes(x = date, y = adjusted)) +
   geom_line() +
   labs(
-    x = NULL, 
+    x = NULL,
     y = NULL,
     title = "AAPL stock prices",
     subtitle = "Prices in USD, adjusted for dividend payments and stock splits"
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-3-1} \end{center}
 
 Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. The function `lag` computes the previous value in a vector. 
 
 
 ```r
-returns <- prices %>%
-  arrange(date) %>%
-  mutate(ret = (adjusted - lag(adjusted)) / lag(adjusted)) %>%
+returns <- prices |>
+  arrange(date) |>
+  mutate(ret = (adjusted - lag(adjusted)) / lag(adjusted)) |>
   select(symbol, date, ret)
 returns
 ```
 
 ```
-## # A tibble: 5,596 × 3
+## # A tibble: 5,596 x 3
 ##   symbol date           ret
 ##   <chr>  <date>       <dbl>
 ## 1 AAPL   2000-01-03 NA     
@@ -82,7 +86,7 @@ returns
 ## 3 AAPL   2000-01-05  0.0146
 ## 4 AAPL   2000-01-06 -0.0865
 ## 5 AAPL   2000-01-07  0.0474
-## # … with 5,591 more rows
+## # ... with 5,591 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date. 
@@ -92,7 +96,7 @@ For the upcoming examples, we remove missing values as these would require separ
 
 
 ```r
-returns <- returns %>%
+returns <- returns |>
   drop_na(ret)
 ```
 
@@ -100,9 +104,9 @@ Next, we visualize the distribution of daily returns in a histogram. For conveni
 
 
 ```r
-quantile_05 <- quantile(returns %>% pull(ret) * 100, 0.05)
+quantile_05 <- quantile(returns |> pull(ret) * 100, 0.05)
 
-returns %>%
+returns |>
   ggplot(aes(x = ret * 100)) +
   geom_histogram(bins = 100) +
   geom_vline(aes(xintercept = quantile_05),
@@ -110,14 +114,16 @@ returns %>%
     linetype = "dashed"
   ) +
   labs(
-    x = NULL, 
+    x = NULL,
     y = NULL,
     title = "Distribution of daily AAPL returns (in percent)",
     subtitle = "The dotted vertical line indicates the historical 5% quantile"
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-6-1} \end{center}
 
 Here, `bins = 100` determines the number of bins and hence implicitly the width of the bins. 
 Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
@@ -125,8 +131,8 @@ A typical task before proceeding with *any* data is to compute summary statistic
 
 
 ```r
-returns %>%
-  mutate(ret = ret * 100) %>%
+returns |>
+  mutate(ret = ret * 100) |>
   summarize(across(
     ret,
     list(
@@ -139,11 +145,11 @@ returns %>%
 ```
 
 ```
-## # A tibble: 1 × 4
+## # A tibble: 1 x 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min
 ##            <dbl>        <dbl>         <dbl>
 ## 1          0.129         2.52         -51.9
-## # … with 1 more variable: ret_daily_max <dbl>
+## # ... with 1 more variable: ret_daily_max <dbl>
 ```
 
 We see that the maximum *daily* return was around 13.905 percent.  
@@ -151,9 +157,9 @@ You can also compute these summary statistics for each year by imposing `group_b
 
 
 ```r
-returns %>%
-  mutate(ret = ret * 100) %>%
-  group_by(year = year(date)) %>%
+returns |>
+  mutate(ret = ret * 100) |>
+  group_by(year = year(date)) |>
   summarize(across(
     ret,
     list(
@@ -167,7 +173,7 @@ returns %>%
 ```
 
 ```
-## # A tibble: 23 × 5
+## # A tibble: 23 x 5
 ##    year daily_mean daily_sd daily_min daily_max
 ##   <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
 ## 1  2000     -0.346     5.49    -51.9      13.7 
@@ -175,7 +181,7 @@ returns %>%
 ## 3  2002     -0.121     3.05    -15.0       8.46
 ## 4  2003      0.186     2.34     -8.14     11.3 
 ## 5  2004      0.470     2.55     -5.58     13.2 
-## # … with 18 more rows
+## # ... with 18 more rows
 ```
 
 In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting.
@@ -188,18 +194,19 @@ This is where the `tidyverse` magic starts: tidy data makes it extremely easy to
 
 
 ```r
-ticker <- tq_index("DOW") 
+ticker <- tq_index("DOW")
 index_prices <- tq_get(ticker,
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2022-03-30")
+  to = "2022-03-30"
+)
 ```
 
 The resulting file contains 159863 daily observations for in total 30 different corporations. The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
-index_prices %>%
+index_prices |>
   ggplot(aes(
     x = date,
     y = adjusted,
@@ -216,7 +223,9 @@ index_prices %>%
   theme(legend.position = "none")
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-9-1} \end{center}
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
 
@@ -224,15 +233,15 @@ The same holds for stock returns. Before computing the returns, we use `group_by
 
 
 ```r
-all_returns <- index_prices %>%
-  group_by(symbol) %>%
-  mutate(ret = adjusted / lag(adjusted) - 1) %>%
-  select(symbol, date, ret) %>%
+all_returns <- index_prices |>
+  group_by(symbol) |>
+  mutate(ret = adjusted / lag(adjusted) - 1) |>
+  select(symbol, date, ret) |>
   drop_na(ret)
 
-all_returns %>%
-  mutate(ret = ret * 100) %>%
-  group_by(symbol) %>%
+all_returns |>
+  mutate(ret = ret * 100) |>
+  group_by(symbol) |>
   summarize(across(
     ret,
     list(
@@ -241,20 +250,20 @@ all_returns %>%
       daily_min = min,
       daily_max = max
     ),
-        .names = "{.fn}"
+    .names = "{.fn}"
   ))
 ```
 
 ```
-## # A tibble: 30 × 5
+## # A tibble: 30 x 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AMGN       0.0484     1.98     -13.4      15.1
-## 2 AXP        0.0572     2.30     -17.6      21.9
-## 3 BA         0.0603     2.20     -23.8      24.3
-## 4 CAT        0.0707     2.03     -14.5      14.7
-## 5 CRM        0.124      2.68     -27.1      26.0
-## # … with 25 more rows
+## 1 AAPL       0.129      2.52     -51.9      13.9
+## 2 AMGN       0.0484     1.98     -13.4      15.1
+## 3 AXP        0.0572     2.30     -17.6      21.9
+## 4 BA         0.0603     2.20     -23.8      24.3
+## 5 CAT        0.0707     2.03     -14.5      14.7
+## # ... with 25 more rows
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500. However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -265,27 +274,29 @@ Of course, aggregation across other variables than `symbol` can make sense as we
 
 
 ```r
-volume <- index_prices %>%
-  mutate(volume_usd = volume * close / 1e9) %>%
-  group_by(date) %>%
+volume <- index_prices |>
+  mutate(volume_usd = volume * close / 1e9) |>
+  group_by(date) |>
   summarize(volume = sum(volume_usd))
 
-volume %>%
+volume |>
   ggplot(aes(x = date, y = volume)) +
   geom_line() +
   labs(
     x = NULL, y = NULL,
     title = "Aggregate daily trading volume (billion USD)"
-  ) 
+  )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-11-1} \end{center}
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
 
 ```r
-volume %>%
+volume |>
   ggplot(aes(x = lag(volume), y = volume)) +
   geom_point() +
   geom_abline(aes(intercept = 0, slope = 1),
@@ -304,7 +315,9 @@ volume %>%
 ## (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-12-1} \end{center}
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
 
@@ -317,19 +330,19 @@ First, we extract each asset's *monthly* returns. In order to keep things simple
 
 
 ```r
-index_prices <- index_prices %>%
-  group_by(symbol) %>%
-  mutate(n = n()) %>%
-  ungroup() %>%
-  filter(n == max(n)) %>%
+index_prices <- index_prices |>
+  group_by(symbol) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n == max(n)) |>
   select(-n)
 
-returns <- index_prices %>%
-  mutate(month = floor_date(date, "month")) %>%
-  group_by(symbol, month) %>%
-  summarize(price = last(adjusted), .groups = "drop_last") %>%
-  mutate(ret = price / lag(price) - 1) %>%
-  drop_na(ret) %>%
+returns <- index_prices |>
+  mutate(month = floor_date(date, "month")) |>
+  group_by(symbol, month) |>
+  summarize(price = last(adjusted), .groups = "drop_last") |>
+  mutate(ret = price / lag(price) - 1) |>
+  drop_na(ret) |>
   select(-price)
 ```
 
@@ -338,11 +351,11 @@ We compute the vector of sample average returns and the sample variance-covarian
 
 
 ```r
-returns_matrix <- returns %>%
+returns_matrix <- returns |>
   pivot_wider(
     names_from = symbol,
     values_from = ret
-  ) %>%
+  ) |>
   select(-month)
 
 sigma <- cov(returns_matrix)
@@ -360,12 +373,14 @@ iota <- rep(1, N)
 mvp_weights <- solve(sigma) %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 
-tibble(expected_ret = t(mvp_weights) %*% mu, 
-       volatility = sqrt(t(mvp_weights) %*% sigma %*% mvp_weights))
+tibble(
+  expected_ret = t(mvp_weights) %*% mu,
+  volatility = sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)
+)
 ```
 
 ```
-## # A tibble: 1 × 2
+## # A tibble: 1 x 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
 ## 1          0.00838         0.0314
@@ -413,11 +428,11 @@ for (i in seq_along(c)) {
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. We also add the individual stocks in the same call. 
 
 ```r
-res %>%
+res |>
   ggplot(aes(x = sd, y = mu)) +
   geom_point() +
   geom_point( # locate the minimum variance and efficient portfolio
-    data = res %>% filter(c %in% c(0, 1)),
+    data = res |> filter(c %in% c(0, 1)),
     color = "red",
     size = 4
   ) +
@@ -433,7 +448,9 @@ res %>%
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-18-1} \end{center}
 The black line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
 
 ## Exercises

@@ -55,8 +55,8 @@ To get started, we load the required packages and data. The main focus is on the
 ```r
 library(RSQLite)
 library(tidyverse)
-library(tidymodels) 
-library(furrr) 
+library(tidymodels)
+library(furrr)
 library(glmnet)
 library(broom)
 library(timetk)
@@ -74,29 +74,32 @@ Next, we include macroeconomic predictors which may predict the general stock ma
 
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets' cross-section of returns. 
 
-- In line with many existing papers, we use monthly portfolio returns from 49 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_49_ind_port.html) as test assets.
+- In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+)
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
-  collect() %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+  collect() |>
   rename_with(~ paste0("factor_ff_", .), -month)
 
-factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") %>%
-  collect() %>%
+factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") |>
+  collect() |>
   rename_with(~ paste0("factor_q_", .), -month)
 
-macro_predictors <- tbl(tidy_finance, "macro_predictors") %>%
-  collect() %>%
-  rename_with(~ paste0("macro_", .), -month) %>%
+macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
+  collect() |>
+  rename_with(~ paste0("macro_", .), -month) |>
   select(-macro_rp_div)
 
-industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") %>%
-  collect() %>%
-  pivot_longer(-month, 
-               names_to = "industry", values_to = "ret") %>%
+industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
+  collect() |>
+  pivot_longer(-month,
+    names_to = "industry", values_to = "ret"
+  ) |>
   mutate(industry = as_factor(industry))
 ```
 
@@ -104,32 +107,37 @@ We combine all the monthly observations into one data frame.
 
 
 ```r
-data <- industries_ff_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
-  left_join(factors_q_monthly, by = "month") %>%
-  left_join(macro_predictors, by = "month") %>%
+data <- industries_ff_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
+  left_join(factors_q_monthly, by = "month") |>
+  left_join(macro_predictors, by = "month") |>
   mutate(
     ret = ret - factor_ff_rf
-  ) %>% 
-  select(month, industry, ret, everything()) %>%
+  ) |>
+  select(month, industry, ret, everything()) |>
   drop_na()
 ```
 
 Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. 
-The figure below provides summary statistics for the 49 monthly industry excess returns in percent.
+The figure below provides summary statistics for the 10 monthly industry excess returns in percent.
 
 
 ```r
-data %>%
-  group_by(industry) %>%
-  mutate(ret = 100 * ret) %>%
-  ggplot(aes(x = industry, y = ret)) + 
-  geom_boxplot() + coord_flip() +
-  labs(x = NULL, y = NULL,
-       title = "Industry excess return distribtion (in %)")
+data |>
+  group_by(industry) |>
+  mutate(ret = 100 * ret) |>
+  ggplot(aes(x = industry, y = ret)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    x = NULL, y = NULL,
+    title = "Industry excess return distribtion (in %)"
+  )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/industryreturns-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/industryreturns-1} \end{center}
 
 ## The tidymodels workflow
 
@@ -139,7 +147,7 @@ The `tidymodels` workflow encompasses the main stages of the modeling process: p
 
 Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
-To start, we restrict our analysis to just one industry: Agriculture. We first split the sample into a *training* and a *test* set. 
+To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. 
 For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. 
 The split takes the last 20% of the data as a test set, which is not used for any model tuning. 
 We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
@@ -147,8 +155,8 @@ We use this test set to evaluate the predictive accuracy in an out-of-sample sce
 
 ```r
 split <- initial_time_split(
-  data %>%
-    filter(industry == "Agric") %>%
+  data |>
+    filter(industry == "Manuf") |>
     select(-industry),
   prop = 4 / 5
 )
@@ -174,10 +182,10 @@ Recipes help you pre-process your data before training your model. Recipes are a
 
 
 ```r
-rec <- recipe(ret ~ ., data = training(split)) %>%
-  step_rm(month) %>% 
-  step_interact(terms = ~ contains("factor"):contains("macro")) %>% 
-  step_normalize(all_predictors()) %>%
+rec <- recipe(ret ~ ., data = training(split)) |>
+  step_rm(month) |>
+  step_interact(terms = ~ contains("factor"):contains("macro")) |>
+  step_normalize(all_predictors()) |>
   step_center(ret, skip = TRUE)
 ```
 
@@ -194,7 +202,7 @@ tmp_data
 ```
 
 ```
-## # A tibble: 130 × 126
+## # A tibble: 130 x 126
 ##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb
 ##          <dbl>                <dbl>         <dbl>
 ## 1        -1.92                0.644        0.298 
@@ -202,13 +210,13 @@ tmp_data
 ## 3        -1.88                0.341        1.43  
 ## 4        -1.88               -1.80        -0.0411
 ## 5        -1.88               -1.29        -0.627 
-## # … with 125 more rows, and 123 more variables:
+## # ... with 125 more rows, and 123 more variables:
 ## #   factor_ff_hml <dbl>, factor_q_me <dbl>,
 ## #   factor_q_ia <dbl>, factor_q_roe <dbl>,
 ## #   factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
 ## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>,
 ## #   macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
-## #   macro_lty <dbl>, macro_ltr <dbl>, …
+## #   macro_lty <dbl>, macro_ltr <dbl>, ...
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
@@ -218,7 +226,7 @@ You may ask at this stage: Why should I use a recipe instead of simply using the
 ### Build a model
 
 Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
-$$\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow` and use the `fit` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
+$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow` and use the `fit` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
 For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
 
 
@@ -226,7 +234,7 @@ For now, we start with the linear regression model with a given value for the pe
 lm_model <- linear_reg(
   penalty = 0.0001,
   mixture = 1
-) %>%
+) |>
   set_engine("glmnet", intercept = FALSE)
 ```
 
@@ -234,26 +242,26 @@ That's it - we are done! The object `lm_model` contains the definition of our mo
 
 
 ```r
-lm_fit <- workflow() %>%
-  add_recipe(rec) %>%
+lm_fit <- workflow() |>
+  add_recipe(rec) |>
   add_model(lm_model)
 lm_fit
 ```
 
 ```
-## ══ Workflow ═══════════════════════════════════════════
+## == Workflow ===========================================
 ## Preprocessor: Recipe
 ## Model: linear_reg()
 ## 
-## ── Preprocessor ───────────────────────────────────────
+## -- Preprocessor ---------------------------------------
 ## 4 Recipe Steps
 ## 
-## • step_rm()
-## • step_interact()
-## • step_normalize()
-## • step_center()
+## * step_rm()
+## * step_interact()
+## * step_normalize()
+## * step_center()
 ## 
-## ── Model ──────────────────────────────────────────────
+## -- Model ----------------------------------------------
 ## Linear Regression Model Specification (regression)
 ## 
 ## Main Arguments:
@@ -270,27 +278,28 @@ lm_fit
 
 With the `workflow` from above, we are ready to use `fit`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Agricultur industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 
 ```r
-predicted_values <- lm_fit %>%
-  fit(data = training(split)) %>%
-  predict(data %>% filter(industry == "Agric")) %>%
-  bind_cols(data %>% filter(industry == "Agric")) %>%
-  select(month, 
-         "Fitted value"= .pred, 
-         "Realization" = ret) %>%
+predicted_values <- lm_fit |>
+  fit(data = training(split)) |>
+  predict(data |> filter(industry == "Manuf")) |>
+  bind_cols(data |> filter(industry == "Manuf")) |>
+  select(month,
+    "Fitted value" = .pred,
+    "Realization" = ret
+  ) |>
   pivot_longer(-month, names_to = "Variable")
 
-predicted_values %>%
+predicted_values |>
   ggplot(aes(x = month, y = value, color = Variable)) +
   geom_line() +
   labs(
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted agricultural industry risk premia"
+    title = "Monthly realized and fitted manufacturing industry risk premia"
   ) +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), to = max(x), by = "5 years"),
@@ -300,36 +309,43 @@ predicted_values %>%
   ) +
   scale_y_continuous(
     labels = percent
-  ) + 
-  annotate("rect", 
-           xmin = testing(split) %>% pull(month) %>% min(), 
-           xmax = testing(split) %>% pull(month) %>% max(), 
-           ymin = -Inf, ymax = Inf, 
-           alpha = 0.5, fill="grey70")
+  ) +
+  annotate("rect",
+    xmin = testing(split) |> pull(month) |> min(),
+    xmax = testing(split) |> pull(month) |> max(),
+    ymin = -Inf, ymax = Inf,
+    alpha = 0.5, fill = "grey70"
+  )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-9-1} \end{center}
 
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
 
 ```r
-x <- tmp_data %>%
-  select(-ret) %>%
+x <- tmp_data |>
+  select(-ret) |>
   as.matrix()
-y <- tmp_data %>% pull(ret)
+y <- tmp_data |> pull(ret)
 
 fit_lasso <- glmnet(
   x = x,
   y = y,
-  alpha = 1, intercept = FALSE, standardize = FALSE,
+  alpha = 1,
+  intercept = FALSE,
+  standardize = FALSE,
   lambda.min.ratio = 0
 )
 
 fit_ridge <- glmnet(
   x = x,
   y = y,
-  alpha = 0, intercept = FALSE, standardize = FALSE,
+  alpha = 0,
+  intercept = FALSE,
+  standardize = FALSE,
   lambda.min.ratio = 0
 )
 ```
@@ -339,22 +355,25 @@ The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated 
 
 ```r
 bind_rows(
-  tidy(fit_lasso) %>% mutate(Model = "Lasso"),
-  tidy(fit_ridge) %>% mutate(Model = "Ridge")
-) %>%
-  rename("Variable" = term) %>%
+  tidy(fit_lasso) |> mutate(Model = "Lasso"),
+  tidy(fit_ridge) |> mutate(Model = "Ridge")
+) |>
+  rename("Variable" = term) |>
   ggplot(aes(x = lambda, y = estimate, color = Variable)) +
   geom_line() +
   scale_x_log10() +
   facet_wrap(~Model, scales = "free_x") +
   labs(
     x = "Lambda", y = NULL,
-    title = "Estimated Coefficients paths as a function of the penalty factor"
+    title = "Estimated Coefficients paths as a
+    function of the penalty factor"
   ) +
   theme(legend.position = "none")
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-11-1} \end{center}
 
 ::: {.rmdnote}
 One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. 
@@ -385,10 +404,10 @@ How should you pick $K$? Large values of $K$ are preferable because the training
 lm_model <- linear_reg(
   penalty = tune(),
   mixture = tune()
-) %>%
+) |>
   set_engine("glmnet")
 
-lm_fit <- lm_fit %>%
+lm_fit <- lm_fit |>
   update_model(lm_model)
 ```
 
@@ -410,7 +429,7 @@ Then, we evaluate the performance for a grid of different penalty values. `tidym
 
 
 ```r
-lm_tune <- lm_fit %>%
+lm_tune <- lm_fit |>
   tune_grid(
     resample = data_folds,
     grid = grid_regular(penalty(), mixture(), levels = c(10, 3)),
@@ -423,12 +442,16 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 
 ```r
 autoplot(lm_tune) +
-  labs(y = "Root mean-squared prediction error",
-       title = "MSPE for Agricultur excess returns",
-       subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization.")
+  labs(
+    y = "Root mean-squared prediction error",
+    title = "MSPE for Manufacturing excess returns",
+    subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization."
+  )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-15-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-15-1} \end{center}
 
   The figure shows that the cross-validated mean squared prediction error drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE, which exhibits some intermediate level of regularization.
 
@@ -443,10 +466,10 @@ First, we define the Lasso model with one tuning parameter.
 lasso_model <- linear_reg(
   penalty = tune(),
   mixture = 1
-) %>%
+) |>
   set_engine("glmnet")
 
-lm_fit <- lm_fit %>%
+lm_fit <- lm_fit |>
   update_model(lasso_model)
 ```
 
@@ -469,7 +492,7 @@ select_variables <- function(input) {
   )
 
   # Model tuning with the Lasso model
-  lm_tune <- lm_fit %>%
+  lm_tune <- lm_fit |>
     tune_grid(
       resample = data_folds,
       grid = grid_regular(penalty(), levels = c(10)),
@@ -477,25 +500,25 @@ select_variables <- function(input) {
     )
 
   # Finalizing: Identify the best model and fit with the training data
-  lasso_lowest_rmse <- lm_tune %>% select_by_one_std_err("rmse")
+  lasso_lowest_rmse <- lm_tune |> select_by_one_std_err("rmse")
   lasso_final <- finalize_workflow(lm_fit, lasso_lowest_rmse)
   lasso_final_fit <- last_fit(lasso_final, split, metrics = metric_set(rmse))
 
   # Extract the estimated coefficients
-  lasso_final_fit %>%
-    extract_fit_parsnip() %>%
-    tidy() %>%
+  lasso_final_fit |>
+    extract_fit_parsnip() |>
+    tidy() |>
     mutate(
-      term = gsub("factor_|macro_|industry_", "", term)
+      term = str_remove_all(term, "factor_|macro_|industry_")
     )
 }
 
 # Parallelization
-plan(multisession, workers = availableCores()) 
+plan(multisession, workers = availableCores())
 
 # Computation by industry
-selected_factors <- data %>%
-  nest(data = -industry) %>% 
+selected_factors <- data |>
+  nest(data = -industry) |>
   mutate(selected_variables = future_map(data, select_variables,
     .options = furrr_options(seed = TRUE)
   ))
@@ -506,23 +529,23 @@ Now, we just have to do some housekeeping and keep only variables that Lasso doe
 
 
 ```r
-selected_factors %>%
-  unnest(selected_variables) %>%
+selected_factors |>
+  unnest(selected_variables) |>
   filter(
     term != "(Intercept)",
     estimate != 0
-  ) %>%
-  add_count(term) %>%
+  ) |>
+  add_count(term) |>
   mutate(
-    term = gsub("NA|ff_|q_", "", term),
-    term = gsub("_x_", " ", term),
+    term = str_remove_all(term, "NA|ff_|q_"),
+    term = str_replace_all(term, "_x_", " "),
     term = fct_reorder(as_factor(term), n),
     term = fct_lump_min(term, min = 2),
     selected = 1
-  ) %>%
-  filter(term != "Other") %>%
-  mutate(term = fct_drop(term)) %>%
-  complete(industry, term, fill = list(selected = 0)) %>%
+  ) |>
+  filter(term != "Other") |>
+  mutate(term = fct_drop(term)) |>
+  complete(industry, term, fill = list(selected = 0)) |>
   ggplot(aes(industry,
     term,
     fill = as_factor(selected)
@@ -537,7 +560,9 @@ selected_factors %>%
   )
 ```
 
-<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-18-1} \end{center}
 
 The heat map conveys two main insights. First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
 

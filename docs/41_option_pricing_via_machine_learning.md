@@ -93,11 +93,12 @@ option_prices <- expand_grid(
   r = seq(from = 0, to = 0.05, by = 0.01), # Risk-free rate
   T = seq(from = 3 / 12, to = 2, by = 1 / 12), # Time to maturity
   sigma = seq(from = 0.1, to = 0.8, by = 0.1) # Volatility
-) %>%
+) |>
   mutate(
     black_scholes = black_scholes_price(S, K, r, T, sigma),
-    observed_price = map(black_scholes, function(x) x + rnorm(2, sd = 0.15))
-  ) %>%
+    observed_price = map(black_scholes, 
+                         function(x) x + rnorm(2, sd = 0.15))
+  ) |>
   unnest(observed_price)
 ```
 
@@ -110,7 +111,6 @@ In order to keep the analysis reproducible, we use `set.seed()`. A random seed s
 ```r
 set.seed(420)
 split <- initial_split(option_prices, prop = 1 / 100)
-data_folds <- vfold_cv(training(split), v = 10)
 ```
 
 We process the training dataset further before we fit the different ML models. We define a `recipe` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
@@ -119,8 +119,8 @@ We process the training dataset further before we fit the different ML models. W
 ```r
 rec <- recipe(observed_price ~ .,
   data = option_prices
-) %>%
-  step_rm(black_scholes) %>%
+) |>
+  step_rm(black_scholes) |>
   step_normalize(all_predictors())
 ```
 
@@ -133,8 +133,8 @@ Next, we show how to fit a neural network to the data. Note that this requires t
 nnet_model <- mlp(
   epochs = 500,
   hidden_units = 10,
-) %>%
-  set_mode("regression") %>%
+) |>
+  set_mode("regression") |>
   set_engine("keras", verbose = FALSE)
 ```
 
@@ -142,9 +142,9 @@ The `verbose=0` argument prevents logging the results. We can follow the straigh
 
 
 ```r
-nn_fit <- workflow() %>%
-  add_recipe(rec) %>%
-  add_model(nnet_model) %>%
+nn_fit <- workflow() |>
+  add_recipe(rec) |>
+  add_model(nnet_model) |>
   fit(data = training(split))
 ```
 
@@ -155,8 +155,8 @@ Once you are familiar with the `tidymodel` workflow, it is a piece of cake to fi
 rf_model <- rand_forest(
   trees = 50,
   min_n = 20
-) %>%
-  set_engine("ranger") %>%
+) |>
+  set_engine("ranger") |>
   set_mode("regression")
 ```
 
@@ -164,9 +164,9 @@ Fitting the model follows exactly the same convention as for the neural network 
 
 
 ```r
-rf_fit <- workflow() %>%
-  add_recipe(rec) %>%
-  add_model(rf_model) %>%
+rf_fit <- workflow() |>
+  add_recipe(rec) |>
+  add_model(rf_model) |>
   fit(data = training(split))
 ```
 
@@ -176,11 +176,12 @@ Note that while the `tidymodels` workflow is extremely convenient, more sophisti
 
 
 ```r
-model <- keras_model_sequential() %>%
-  layer_dense(units = 10, activation = "sigmoid", input_shape = 5) %>%
-  layer_dense(units = 10, activation = "sigmoid") %>%
-  layer_dense(units = 10, activation = "sigmoid") %>%
-  layer_dense(units = 1, activation = "linear") %>%
+model <- keras_model_sequential() |>
+  layer_dense(units = 10, activation = "sigmoid", 
+              input_shape = 5) |>
+  layer_dense(units = 10, activation = "sigmoid") |>
+  layer_dense(units = 10, activation = "sigmoid") |>
+  layer_dense(units = 1, activation = "linear") |>
   compile(
     loss = "mean_absolute_error"
   )
@@ -190,12 +191,15 @@ model
 ```
 ## Model: "sequential_1"
 ## _______________________________________________________
-##  Layer (type)           Output Shape          Param #  
+## Layer (type)            Output Shape          Param #  
 ## =======================================================
-##  dense_5 (Dense)        (None, 10)            60       
-##  dense_4 (Dense)        (None, 10)            110      
-##  dense_3 (Dense)        (None, 10)            110      
-##  dense_2 (Dense)        (None, 1)             11       
+## dense_5 (Dense)         (None, 10)            60       
+## _______________________________________________________
+## dense_4 (Dense)         (None, 10)            110      
+## _______________________________________________________
+## dense_3 (Dense)         (None, 10)            110      
+## _______________________________________________________
+## dense_2 (Dense)         (None, 1)             11       
 ## =======================================================
 ## Total params: 291
 ## Trainable params: 291
@@ -203,14 +207,14 @@ model
 ## _______________________________________________________
 ```
 
-To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) %>% select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
+To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
 
 
 ```r
-model %>%
+model |>
   fit(
-    x = extract_mold(nn_fit)$predictors %>% as.matrix(),
-    y = extract_mold(nn_fit)$outcomes %>% pull(observed_price),
+    x = extract_mold(nn_fit)$predictors |> as.matrix(),
+    y = extract_mold(nn_fit)$outcomes |> pull(observed_price),
     epochs = 500, verbose = FALSE
   )
 ```
@@ -221,17 +225,19 @@ Before we evaluate the results, we implement one more model: In principle, any n
 
 
 ```r
-rec_linear <- rec %>%
-  step_poly(all_predictors(), degree = 10, options = list(raw = T)) %>%
-  step_interact(terms = ~ all_predictors():all_predictors()) %>%
+rec_linear <- rec |>
+  step_poly(all_predictors(),
+            degree = 10, 
+            options = list(raw = T)) |>
+  step_interact(terms = ~ all_predictors():all_predictors()) |>
   step_lincomb(all_predictors())
 
-lm_model <- linear_reg(penalty = 0.01) %>%
+lm_model <- linear_reg(penalty = 0.01) |>
   set_engine("glmnet")
 
-lm_fit <- workflow() %>%
-  add_recipe(rec_linear) %>%
-  add_model(lm_model) %>%
+lm_fit <- workflow() |>
+  add_recipe(rec_linear) |>
+  add_model(lm_model) |>
   fit(data = training(split))
 ```
 
@@ -241,21 +247,23 @@ Finally, we collect all predictions to compare the *out-of-sample* prediction er
 
 
 ```r
-out_of_sample_data <- testing(split) %>% slice_sample(n = 10000)
+out_of_sample_data <- testing(split) |> 
+  slice_sample(n = 10000)
 
-predictive_performance <- model %>%
-  predict(forge(out_of_sample_data, extract_mold(nn_fit)$blueprint)$predictors %>% as.matrix()) %>%
-  as.vector() %>%
-  tibble("Deep NN" = .) %>%
-  bind_cols(nn_fit %>%
-    predict(out_of_sample_data)) %>%
-  rename("Single layer" = .pred) %>%
-  bind_cols(lm_fit %>% predict(out_of_sample_data)) %>%
-  rename("Lasso" = .pred) %>%
-  bind_cols(rf_fit %>% predict(out_of_sample_data)) %>%
-  rename("Random forest" = .pred) %>%
-  bind_cols(out_of_sample_data) %>%
-  pivot_longer("Deep NN":"Random forest", names_to = "Model") %>%
+predictive_performance <- model |>
+  predict(forge(out_of_sample_data, 
+                extract_mold(nn_fit)$blueprint)$predictors |> as.matrix()) |>
+  as.vector() |>
+  tibble("Deep NN" = _) |>
+  bind_cols(nn_fit |>
+    predict(out_of_sample_data)) |>
+  rename("Single layer" = .pred) |>
+  bind_cols(lm_fit |> predict(out_of_sample_data)) |>
+  rename("Lasso" = .pred) |>
+  bind_cols(rf_fit |> predict(out_of_sample_data)) |>
+  rename("Random forest" = .pred) |>
+  bind_cols(out_of_sample_data) |>
+  pivot_longer("Deep NN":"Random forest", names_to = "Model") |>
   mutate(
     moneyness = (S - K),
     pricing_error = abs(value - black_scholes)
@@ -266,10 +274,10 @@ In the lines above, we use each of the fitted models to generate predictions for
 
 
 ```r
-predictive_performance %>%
+predictive_performance |>
   ggplot(aes(x = moneyness, y = pricing_error, color = Model)) +
   geom_jitter(alpha = 0.05) +
-  geom_smooth(se = FALSE) +
+  geom_smooth(se = FALSE, method = "gam") +
   labs(
     x = "Moneyness (S - K)", color = NULL,
     y = "Absolut prediction error (USD)",
@@ -277,7 +285,9 @@ predictive_performance %>%
   )
 ```
 
-<img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
+
+
+\begin{center}\includegraphics{41_option_pricing_via_machine_learning_files/figure-latex/unnamed-chunk-14-1} \end{center}
 
 The results can be summarized as follow: i) All ML methods seem to be able to *price* call options after observing the training test set. ii) The average prediction errors increase for far in-the money options, especially for the Single Layer neural network and Random Forests. ii) Random forest and the Lasso seem to perform consistently worse in prediction option prices than the Neural networks. iii) The complexity of the deep neural network relative to the single layer neural network does not result in better out-of-sample predictions.
 

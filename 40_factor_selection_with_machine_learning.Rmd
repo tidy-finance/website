@@ -76,9 +76,8 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 - In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
 
 ```{r, eval = TRUE}
-tidy_finance <- dbConnect(SQLite(),
-  "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
@@ -140,7 +139,7 @@ The `tidymodels` workflow encompasses the main stages of the modeling process: p
 
 Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
-To start, we restrict our analysis to just one industry: Agriculture. We first split the sample into a *training* and a *test* set. 
+To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. 
 For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. 
 The split takes the last 20% of the data as a test set, which is not used for any model tuning. 
 We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
@@ -148,7 +147,7 @@ We use this test set to evaluate the predictive accuracy in an out-of-sample sce
 ```{r}
 split <- initial_time_split(
   data |>
-    filter(industry == "Agric") |>
+    filter(industry == "Manuf") |>
     select(-industry),
   prop = 4 / 5
 )
@@ -217,13 +216,13 @@ lm_fit
 
 With the `workflow` from above, we are ready to use `fit`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Agricultur industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 ```{r}
 predicted_values <- lm_fit |>
   fit(data = training(split)) |>
-  predict(data |> filter(industry == "Agric")) |>
-  bind_cols(data |> filter(industry == "Agric")) |>
+  predict(data |> filter(industry == "Manuf")) |>
+  bind_cols(data |> filter(industry == "Manuf")) |>
   select(month,
     "Fitted value" = .pred,
     "Realization" = ret
@@ -237,7 +236,7 @@ predicted_values |>
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted agricultural industry risk premia"
+    title = "Monthly realized and fitted manufacturing industry risk premia"
   ) +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), to = max(x), by = "5 years"),
@@ -368,7 +367,7 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 autoplot(lm_tune) +
   labs(
     y = "Root mean-squared prediction error",
-    title = "MSPE for Agricultur excess returns",
+    title = "MSPE for Manufacturing excess returns",
     subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization."
   )
 ```
@@ -427,7 +426,7 @@ select_variables <- function(input) {
     extract_fit_parsnip() |>
     tidy() |>
     mutate(
-      term = gsub("factor_|macro_|industry_", "", term)
+      term = str_remove_all(term, "factor_|macro_|industry_")
     )
 }
 
@@ -454,8 +453,8 @@ selected_factors |>
   ) |>
   add_count(term) |>
   mutate(
-    term = gsub("NA|ff_|q_", "", term),
-    term = gsub("_x_", " ", term),
+    term = str_remove_all(term, "NA|ff_|q_"),
+    term = str_replace_all(term, "_x_", " "),
     term = fct_reorder(as_factor(term), n),
     term = fct_lump_min(term, min = 2),
     selected = 1

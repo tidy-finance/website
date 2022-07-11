@@ -22,32 +22,33 @@ First, we load the necessary data from our `SQLite`-database introduced in our c
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+)
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-crsp_monthly <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+crsp_monthly <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(permno, gvkey, month, ret_excess, mkt_excess, 
-         mktcap, mktcap_lag, exchange) %>%
+         mktcap, mktcap_lag, exchange) |>
   drop_na()
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.
+Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `lubridate::floor_date()`.
 
 
 ```r
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-be <- compustat %>%
-  select(gvkey, datadate, be) %>%
-  drop_na() %>%
+be <- compustat |>
+  select(gvkey, datadate, be) |>
+  drop_na() |>
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
 
@@ -61,29 +62,29 @@ Having both variables, i.e., firm size lagged by one month and book-to-market la
 
 
 ```r
-me <- crsp_monthly %>%
-  mutate(sorting_date = month %m+% months(1)) %>%
+me <- crsp_monthly |>
+  mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me = mktcap)
 
-bm <- be %>%
-  inner_join(crsp_monthly %>%
-    select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) %>%
+bm <- be |>
+  inner_join(crsp_monthly |>
+    select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) |>
   mutate(
     bm = be / mktcap,
     sorting_date = month %m+% months(6)
-  ) %>%
-  select(permno, gvkey, sorting_date, bm) %>%
+  ) |>
+  select(permno, gvkey, sorting_date, bm) |>
   arrange(permno, gvkey, sorting_date)
 
-data_for_sorts <- crsp_monthly %>%
-  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) %>%
-  left_join(me, by = c("permno", "month" = "sorting_date")) %>%
+data_for_sorts <- crsp_monthly |>
+  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) |>
+  left_join(me, by = c("permno", "month" = "sorting_date")) |>
   select(permno, gvkey, month, ret_excess, mktcap_lag, me, bm, exchange)
 
-data_for_sorts <- data_for_sorts %>%
-  arrange(permno, gvkey, month) %>%
-  group_by(permno, gvkey) %>%
-  fill(bm) %>%
+data_for_sorts <- data_for_sorts |>
+  arrange(permno, gvkey, month) |>
+  group_by(permno, gvkey) |>
+  fill(bm) |>
   drop_na()
 ```
 
@@ -92,18 +93,19 @@ The last step of preparation for the portfolio sorts is the computation of break
 
 ```r
 assign_portfolio <- function(data, var, n_portfolios, exchanges) {
-  breakpoints <- data %>%
-    filter(exchange %in% exchanges) %>%
+  breakpoints <- data |>
+    filter(exchange %in% exchanges) |>
     summarize(breakpoint = quantile(
       {{ var }},
       probs = seq(0, 1, length.out = n_portfolios + 1),
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval({{ var }}, 
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 ```
@@ -118,8 +120,8 @@ To implement the independent bivariate portfolio sort, we assign monthly portfol
 
 
 ```r
-value_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+value_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = cur_data(),
@@ -134,8 +136,8 @@ value_portfolios <- data_for_sorts %>%
       exchanges = c("NYSE")
     ),
     portfolio_combined = paste0(portfolio_bm, portfolio_me)
-  ) %>%
-  group_by(month, portfolio_combined) %>%
+  ) |>
+  group_by(month, portfolio_combined) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     portfolio_bm = unique(portfolio_bm),
@@ -147,9 +149,9 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 
 
 ```r
-value_premium <- value_portfolios %>%
-  group_by(month, portfolio_bm) %>%
-  summarize(ret = mean(ret), .groups = "drop_last") %>%
+value_premium <- value_portfolios |>
+  group_by(month, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
               ret[portfolio_bm == min(portfolio_bm)])
 
@@ -157,7 +159,7 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.328
+## [1] 0.329
 ```
 
 The resulting annualized value premium is 3.936 percent.
@@ -170,15 +172,15 @@ To implement the dependent sorts, we first create the size portfolios by calling
 
 
 ```r
-value_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+value_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(portfolio_me = assign_portfolio(
     data = cur_data(),
     var = me,
     n_portfolios = 5,
     exchanges = c("NYSE")
-  )) %>%
-  group_by(month, portfolio_me) %>%
+  )) |>
+  group_by(month, portfolio_me) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = cur_data(),
@@ -187,17 +189,17 @@ value_portfolios <- data_for_sorts %>%
       exchanges = c("NYSE")
     ),
     portfolio_combined = paste0(portfolio_bm, portfolio_me)
-  ) %>%
-  group_by(month, portfolio_combined) %>%
+  ) |>
+  group_by(month, portfolio_combined) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     portfolio_bm = unique(portfolio_bm),
     .groups = "drop"
   )
 
-value_premium <- value_portfolios %>%
-  group_by(month, portfolio_bm) %>%
-  summarize(ret = mean(ret), .groups = "drop_last") %>%
+value_premium <- value_portfolios |>
+  group_by(month, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
               ret[portfolio_bm == min(portfolio_bm)])
 
