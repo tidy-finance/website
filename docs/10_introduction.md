@@ -33,7 +33,7 @@ prices
 ```
 
 ```
-## # A tibble: 5,596 x 8
+## # A tibble: 5,596 × 8
 ##   symbol date        open  high   low close    volume
 ##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>
 ## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800
@@ -41,7 +41,7 @@ prices
 ## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600
 ## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800
 ## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400
-## # ... with 5,591 more rows, and 1 more variable:
+## # … with 5,591 more rows, and 1 more variable:
 ## #   adjusted <dbl>
 ```
 
@@ -62,9 +62,7 @@ prices |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-3-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 
 Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. The function `lag` computes the previous value in a vector. 
 
@@ -78,7 +76,7 @@ returns
 ```
 
 ```
-## # A tibble: 5,596 x 3
+## # A tibble: 5,596 × 3
 ##   symbol date           ret
 ##   <chr>  <date>       <dbl>
 ## 1 AAPL   2000-01-03 NA     
@@ -86,7 +84,7 @@ returns
 ## 3 AAPL   2000-01-05  0.0146
 ## 4 AAPL   2000-01-06 -0.0865
 ## 5 AAPL   2000-01-07  0.0474
-## # ... with 5,591 more rows
+## # … with 5,591 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns. Note that the first entry naturally contains `NA` because there is no previous price. Additionally, the computations require that the time series is ordered by date. 
@@ -121,9 +119,7 @@ returns |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-6-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 
 Here, `bins = 100` determines the number of bins and hence implicitly the width of the bins. 
 Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
@@ -145,11 +141,11 @@ returns |>
 ```
 
 ```
-## # A tibble: 1 x 4
+## # A tibble: 1 × 4
 ##   ret_daily_mean ret_daily_sd ret_daily_min
 ##            <dbl>        <dbl>         <dbl>
 ## 1          0.129         2.52         -51.9
-## # ... with 1 more variable: ret_daily_max <dbl>
+## # … with 1 more variable: ret_daily_max <dbl>
 ```
 
 We see that the maximum *daily* return was around 13.905 percent.  
@@ -173,7 +169,7 @@ returns |>
 ```
 
 ```
-## # A tibble: 23 x 5
+## # A tibble: 23 × 5
 ##    year daily_mean daily_sd daily_min daily_max
 ##   <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
 ## 1  2000     -0.346     5.49    -51.9      13.7 
@@ -181,7 +177,7 @@ returns |>
 ## 3  2002     -0.121     3.05    -15.0       8.46
 ## 4  2003      0.186     2.34     -8.14     11.3 
 ## 5  2004      0.470     2.55     -5.58     13.2 
-## # ... with 18 more rows
+## # … with 18 more rows
 ```
 
 In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting.
@@ -223,9 +219,7 @@ index_prices |>
   theme(legend.position = "none")
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-9-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
 
@@ -255,7 +249,7 @@ all_returns |>
 ```
 
 ```
-## # A tibble: 30 x 5
+## # A tibble: 30 × 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
 ## 1 AAPL       0.129      2.52     -51.9      13.9
@@ -263,7 +257,7 @@ all_returns |>
 ## 3 AXP        0.0572     2.30     -17.6      21.9
 ## 4 BA         0.0603     2.20     -23.8      24.3
 ## 5 CAT        0.0707     2.03     -14.5      14.7
-## # ... with 25 more rows
+## # … with 25 more rows
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500. However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -288,9 +282,7 @@ volume |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-11-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
 
 One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
@@ -315,9 +307,7 @@ volume |>
 ## (geom_point).
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-12-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
 
@@ -380,7 +370,7 @@ tibble(
 ```
 
 ```
-## # A tibble: 1 x 2
+## # A tibble: 1 × 2
 ##   expected_ret[,1] volatility[,1]
 ##              <dbl>          <dbl>
 ## 1          0.00838         0.0314
@@ -448,9 +438,7 @@ res |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{10_introduction_files/figure-latex/unnamed-chunk-18-1} \end{center}
+<img src="10_introduction_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 The black line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
 
 ## Exercises

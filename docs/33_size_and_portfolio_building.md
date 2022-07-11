@@ -73,9 +73,7 @@ crsp_monthly |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{33_size_and_portfolio_building_files/figure-latex/unnamed-chunk-3-1} \end{center}
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?
 
@@ -99,9 +97,7 @@ crsp_monthly |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{33_size_and_portfolio_building_files/figure-latex/unnamed-chunk-4-1} \end{center}
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" />
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `base::summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `tibble::add_row()` with the overall summary statistics.
 
@@ -137,7 +133,7 @@ crsp_monthly |>
 ```
 
 ```
-## # A tibble: 5 x 11
+## # A tibble: 5 × 11
 ##   exchange   mean     sd      min     q05    q25    q50
 ##   <chr>     <dbl>  <dbl>    <dbl>   <dbl>  <dbl>  <dbl>
 ## 1 AMEX       283.  1298.     6.04    10.1 3.07e1 6.59e1
@@ -145,7 +141,7 @@ crsp_monthly |>
 ## 3 NYSE     16427. 43130.     5.35   154.  9.16e2 3.34e3
 ## 4 Other    10061.    NA  10061.   10061.  1.01e4 1.01e4
 ## 5 Overall  10558. 63975.     4.65    31.0 1.85e2 8.72e2
-## # ... with 4 more variables: q75 <dbl>, q95 <dbl>,
+## # … with 4 more variables: q75 <dbl>, q95 <dbl>,
 ## #   max <dbl>, n <int>
 ```
 
@@ -231,7 +227,7 @@ tibble(Exchanges = c("all", "NYSE"),
 ```
 
 ```
-## # A tibble: 2 x 2
+## # A tibble: 2 × 2
 ##   Exchanges Premium
 ##   <chr>       <dbl>
 ## 1 all         0.110
@@ -265,7 +261,7 @@ p_hacking_setup
 ```
 
 ```
-## # A tibble: 48 x 4
+## # A tibble: 48 × 4
 ##   n_portfolios exchanges value_weighted data      
 ##          <dbl> <chr>     <lgl>          <list>    
 ## 1            2 NYSE      TRUE           <sym>     
@@ -273,7 +269,7 @@ p_hacking_setup
 ## 3            2 NYSE      TRUE           <language>
 ## 4            2 NYSE      TRUE           <language>
 ## 5            2 NYSE      FALSE          <sym>     
-## # ... with 43 more rows
+## # … with 43 more rows
 ```
 
 To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premia possible in our data, in particular when we use equal-weighted portfolios. 
@@ -307,15 +303,15 @@ p_hacking_results
 ```
 
 ```
-## # A tibble: 48 x 5
+## # A tibble: 48 × 5
 ##   n_portfolios exchanges        value_weighted data    
 ##          <dbl> <chr>            <lgl>          <chr>   
-## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter~
-## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter~
-## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_m~
-## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter~
-## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter~
-## # ... with 43 more rows, and 1 more variable:
+## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_m…
+## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter…
+## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter…
+## # … with 43 more rows, and 1 more variable:
 ## #   size_premium <dbl>
 ```
 
@@ -340,9 +336,7 @@ p_hacking_results |>
   scale_x_continuous(labels = percent)
 ```
 
-
-
-\begin{center}\includegraphics{33_size_and_portfolio_building_files/figure-latex/unnamed-chunk-11-1} \end{center}
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
 
 ## Exercises
 

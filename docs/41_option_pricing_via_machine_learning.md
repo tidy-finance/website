@@ -285,9 +285,7 @@ predictive_performance |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{41_option_pricing_via_machine_learning_files/figure-latex/unnamed-chunk-14-1} \end{center}
+<img src="41_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
 
 The results can be summarized as follow: i) All ML methods seem to be able to *price* call options after observing the training test set. ii) The average prediction errors increase for far in-the money options, especially for the Single Layer neural network and Random Forests. ii) Random forest and the Lasso seem to perform consistently worse in prediction option prices than the Neural networks. iii) The complexity of the deep neural network relative to the single layer neural network does not result in better out-of-sample predictions.
 

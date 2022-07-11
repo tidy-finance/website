@@ -135,9 +135,7 @@ data |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/industryreturns-1} \end{center}
+<img src="40_factor_selection_with_machine_learning_files/figure-html/industryreturns-1.png" width="672" style="display: block; margin: auto;" />
 
 ## The tidymodels workflow
 
@@ -202,7 +200,7 @@ tmp_data
 ```
 
 ```
-## # A tibble: 130 x 126
+## # A tibble: 130 × 126
 ##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb
 ##          <dbl>                <dbl>         <dbl>
 ## 1        -1.92                0.644        0.298 
@@ -210,13 +208,13 @@ tmp_data
 ## 3        -1.88                0.341        1.43  
 ## 4        -1.88               -1.80        -0.0411
 ## 5        -1.88               -1.29        -0.627 
-## # ... with 125 more rows, and 123 more variables:
+## # … with 125 more rows, and 123 more variables:
 ## #   factor_ff_hml <dbl>, factor_q_me <dbl>,
 ## #   factor_q_ia <dbl>, factor_q_roe <dbl>,
 ## #   factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
 ## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>,
 ## #   macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
-## #   macro_lty <dbl>, macro_ltr <dbl>, ...
+## #   macro_lty <dbl>, macro_ltr <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
@@ -249,19 +247,19 @@ lm_fit
 ```
 
 ```
-## == Workflow ===========================================
+## ══ Workflow ═══════════════════════════════════════════
 ## Preprocessor: Recipe
 ## Model: linear_reg()
 ## 
-## -- Preprocessor ---------------------------------------
+## ── Preprocessor ───────────────────────────────────────
 ## 4 Recipe Steps
 ## 
-## * step_rm()
-## * step_interact()
-## * step_normalize()
-## * step_center()
+## • step_rm()
+## • step_interact()
+## • step_normalize()
+## • step_center()
 ## 
-## -- Model ----------------------------------------------
+## ── Model ──────────────────────────────────────────────
 ## Linear Regression Model Specification (regression)
 ## 
 ## Main Arguments:
@@ -318,9 +316,7 @@ predicted_values |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-9-1} \end{center}
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
@@ -371,9 +367,7 @@ bind_rows(
   theme(legend.position = "none")
 ```
 
-
-
-\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-11-1} \end{center}
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
 
 ::: {.rmdnote}
 One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. 
@@ -449,9 +443,7 @@ autoplot(lm_tune) +
   )
 ```
 
-
-
-\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-15-1} \end{center}
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-15-1.png" width="672" style="display: block; margin: auto;" />
 
   The figure shows that the cross-validated mean squared prediction error drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE, which exhibits some intermediate level of regularization.
 
@@ -560,9 +552,7 @@ selected_factors |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{40_factor_selection_with_machine_learning_files/figure-latex/unnamed-chunk-18-1} \end{center}
+<img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 
 The heat map conveys two main insights. First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide conses across industries when it comes to pricing abilities.
 

@@ -68,7 +68,7 @@ msf_db
 ## 3 68391610  10000   7952  10396     3   3990 1986-02-28
 ## 4 68391610  10000   7952  10396     3   3990 1986-03-31
 ## 5 68391610  10000   7952  10396     3   3990 1986-04-30
-## # ... with more rows, and 14 more variables:
+## # … with more rows, and 14 more variables:
 ## #   bidlo <dbl>, askhi <dbl>, prc <dbl>, vol <dbl>,
 ## #   ret <dbl>, bid <dbl>, ask <dbl>, shrout <dbl>,
 ## #   cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>,
@@ -92,7 +92,7 @@ msenames_db
 ## 3  10000 1987-03-10 1987-06-11    10      3  3990
 ## 4  10001 1986-01-09 1993-11-21    11      3  4920
 ## 5  10001 1993-11-22 2004-06-09    11      3  4920
-## # ... with more rows, and 15 more variables:
+## # … with more rows, and 15 more variables:
 ## #   ncusip <chr>, ticker <chr>, comnam <chr>,
 ## #   shrcls <chr>, tsymbol <chr>, naics <chr>,
 ## #   primexch <chr>, trdstat <chr>, secstat <chr>,
@@ -117,7 +117,7 @@ msedelist_db
 ## 3  10002 2013-02-15    231  35263   1658 NA        
 ## 4  10003 1995-12-15    231  10569   8477 NA        
 ## 5  10005 1991-07-11    560      0      0 1991-07-12
-## # ... with more rows, and 13 more variables:
+## # … with more rows, and 13 more variables:
 ## #   dlamt <dbl>, dlretx <dbl>, dlprc <dbl>,
 ## #   dlpdt <date>, dlret <dbl>, permco <dbl>,
 ## #   compno <dbl>, issuno <dbl>, hexcd <dbl>,
@@ -300,9 +300,7 @@ crsp_monthly |>
   scale_y_continuous(labels = comma)
 ```
 
-
-
-\begin{center}\includegraphics{21_WRDS_files/figure-latex/unnamed-chunk-18-1} \end{center}
+<img src="21_WRDS_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 
 Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. We use the familiar `tidyquant` package to fetch consumer price index (CPI) data from the [Federal Reserve Economic Data (FRED)](https://fred.stlouisfed.org/series/CPIAUCNS).
 
@@ -352,9 +350,7 @@ tbl(tidy_finance, "crsp_monthly") |>
   scale_y_continuous(labels = comma)
 ```
 
-
-
-\begin{center}\includegraphics{21_WRDS_files/figure-latex/unnamed-chunk-21-1} \end{center}
+<img src="21_WRDS_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
 
 Of course, performing the computation in the database is not really meaningful because we already have all the required data in memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory.
 
@@ -385,9 +381,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-
-
-\begin{center}\includegraphics{21_WRDS_files/figure-latex/unnamed-chunk-22-1} \end{center}
+<img src="21_WRDS_files/figure-html/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
 
 We also compute the market value of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 dollars. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market value.
 
@@ -407,9 +401,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-
-
-\begin{center}\includegraphics{21_WRDS_files/figure-latex/unnamed-chunk-23-1} \end{center}
+<img src="21_WRDS_files/figure-html/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" />
 
 
 ## Daily CRSP data
@@ -570,7 +562,7 @@ ccmxpf_linktable
 ```
 
 ```
-## # A tibble: 31,770 x 4
+## # A tibble: 31,770 × 4
 ##   permno gvkey  linkdt     linkenddt 
 ##    <dbl> <chr>  <date>     <date>    
 ## 1  25881 001000 1970-11-13 1978-06-30
@@ -578,7 +570,7 @@ ccmxpf_linktable
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
 ## 5  54594 001004 1972-04-24 2022-07-11
-## # ... with 31,765 more rows
+## # … with 31,765 more rows
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 
@@ -627,10 +619,69 @@ crsp_monthly |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
+<img src="21_WRDS_files/figure-html/unnamed-chunk-34-1.png" width="672" style="display: block; margin: auto;" />
+
+## Managing SQLite databases
+
+Finally, at the end of our data chapter, we revisit the SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for the future uses. As a result, the database file always grows in size.
+
+To optimize the database file, you can run the `VACUUM` command in the database, which rebuilds the database and frees up unused space. You can execute the command in the database using the `dbSendQuery()` function. 
 
 
-\begin{center}\includegraphics{21_WRDS_files/figure-latex/unnamed-chunk-34-1} \end{center}
+```r
+dbSendQuery(tidy_finance, "VACUUM")
+```
 
+```
+## <SQLiteResult>
+##   SQL  VACUUM
+##   ROWS Fetched: 0 [complete]
+##        Changed: 0
+```
+
+The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read up in [this tutorial](https://www.sqlitetutorial.net/sqlite-vacuum/). 
+
+Apart from cleaning up, you might be interested in listing all the tables that are currently in your database. You can do this via the `dbListTables()` function. 
+
+
+```r
+dbListTables(tidy_finance)
+```
+
+```
+## Warning: Closing open result set, pending rows
+```
+
+```
+## [1] "compustat"             "cpi_monthly"          
+## [3] "crsp_daily"            "crsp_monthly"         
+## [5] "factors_ff_daily"      "factors_ff_monthly"   
+## [7] "factors_q_monthly"     "industries_ff_monthly"
+## [9] "macro_predictors"
+```
+
+This function comes in handy if you are unsure about the correct naming of the tables in your database. 
+
+
+## Some tricks for PostgreSQL databases
+
+As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documetation](https://www.postgresql.org/docs/9.1/ddl-schemas.html). For instance, if you want to find all tables that live in the `crsp` schema, you run
+
+```r
+dbListObjects(wrds, Id(schema = "crsp"))
+```
+
+This operation returns a list of all tables that belong to the `crsp` family on WRSD, e.g. `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
+
+```r
+dbListObjects(wrds, Id(schema = "comp"))
+```
+
+If you want to get all schemas, then run
+
+```r
+dbListObjects(wrds)
+```
 
 ## Exercises
 

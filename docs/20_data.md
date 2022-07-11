@@ -219,7 +219,7 @@ factors_ff_monthly_db |>
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
 ## 5 1960-05-01 0.0027
-## # ... with more rows
+## # … with more rows
 ```
 
 If we want to have the whole table in memory, we need to `collect()` it. You will see that we regularly load the data into the memory in the next chapters.
@@ -232,7 +232,7 @@ factors_ff_monthly_db |>
 ```
 
 ```
-## # A tibble: 732 x 2
+## # A tibble: 732 × 2
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -240,7 +240,7 @@ factors_ff_monthly_db |>
 ## 3 1960-03-01 0.0035
 ## 4 1960-04-01 0.0019
 ## 5 1960-05-01 0.0027
-## # ... with 727 more rows
+## # … with 727 more rows
 ```
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
@@ -286,68 +286,6 @@ tidy_finance <- dbConnect(SQLite(),
 factors_q_monthly <- tbl(tidy_finance, 
                          "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly |> collect()
-```
-
-## Managing SQLite databases
-
-Finally, at the end of our data chapter, we revisit the SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for the future uses. As a result, the database file always grows in size.
-
-To optimize the database file, you can run the `VACUUM` command in the database, which rebuilds the database and frees up unused space. You can execute the command in the database using the `dbSendQuery()` function. 
-
-
-```r
-dbSendQuery(tidy_finance, "VACUUM")
-```
-
-```
-## <SQLiteResult>
-##   SQL  VACUUM
-##   ROWS Fetched: 0 [complete]
-##        Changed: 0
-```
-
-The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read up in [this tutorial](https://www.sqlitetutorial.net/sqlite-vacuum/). 
-
-Apart from cleaning up, you might be interested in listing all the tables that are currently in your database. You can do this via the `dbListTables()` function. 
-
-
-```r
-dbListTables(tidy_finance)
-```
-
-```
-## Warning: Closing open result set, pending rows
-```
-
-```
-##  [1] "beta"                  "compustat"            
-##  [3] "cpi_monthly"           "crsp_daily"           
-##  [5] "crsp_monthly"          "factors_ff_daily"     
-##  [7] "factors_ff_monthly"    "factors_q_monthly"    
-##  [9] "industries_ff_monthly" "macro_predictors"
-```
-
-This function comes in handy if you are unsure about the correct naming of the tables in your database. 
-
-
-## Some tricks for PostgreSQL databases
-
-As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documetation](https://www.postgresql.org/docs/9.1/ddl-schemas.html). For instance, if you want to find all tables that live in the `crsp` schema, you run
-
-```r
-dbListObjects(wrds, Id(schema = "crsp"))
-```
-
-This operation returns a list of all tables that belong to the `crsp` family on WRSD, e.g. `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
-
-```r
-dbListObjects(wrds, Id(schema = "comp"))
-```
-
-If you want to get all schemas, then run
-
-```r
-dbListObjects(wrds)
 ```
 
 ## Exercises

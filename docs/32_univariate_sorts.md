@@ -53,7 +53,7 @@ crsp_monthly
 ```
 
 ```
-## # A tibble: 3,225,079 x 5
+## # A tibble: 3,225,079 × 5
 ##   permno month      ret_excess mkt_excess mktcap_lag
 ##    <dbl> <date>          <dbl>      <dbl>      <dbl>
 ## 1  10000 1986-02-01    -0.262      0.0713       16.1
@@ -61,7 +61,7 @@ crsp_monthly
 ## 3  10000 1986-04-01    -0.104     -0.0131       16.3
 ## 4  10000 1986-05-01    -0.228      0.0462       15.2
 ## 5  10000 1986-06-01    -0.0102     0.0103       11.8
-## # ... with 3,225,074 more rows
+## # … with 3,225,074 more rows
 ```
 
 ## Sorting by market beta
@@ -121,9 +121,7 @@ beta_portfolios |>
   theme(legend.position = "none")
 ```
 
-
-
-\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-6-1} \end{center}
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
 
 We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.
 
@@ -148,7 +146,7 @@ coeftest(model_fit, vcov = NeweyWest, lag = 6)
 ## t test of coefficients:
 ## 
 ##              Estimate Std. Error t value Pr(>|t|)
-## (Intercept) -0.000171   0.001005   -0.17     0.86
+## (Intercept) -0.000169   0.001005   -0.17     0.87
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
@@ -231,9 +229,7 @@ beta_portfolios_summary |>
   theme(legend.position = "None")
 ```
 
-
-
-\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-12-1} \end{center}
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
 
@@ -260,9 +256,7 @@ beta_portfolios_summary |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-13-1} \end{center}
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" />
 
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio. 
 
@@ -293,7 +287,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort),
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(>|t|)
-## (Intercept) 0.000734   0.002483     0.3     0.77
+## (Intercept) 0.000739   0.002483     0.3     0.77
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor (@Frazzini2014). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
@@ -309,8 +303,8 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept) -0.00441    0.00262   -1.69    0.092 .  
-## mkt_excess   0.89461    0.10214    8.76   <2e-16 ***
+## (Intercept) -0.00441    0.00262   -1.68    0.093 .  
+## mkt_excess   0.89427    0.10215    8.75   <2e-16 ***
 ## ---
 ## Signif. codes:  
 ## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -339,9 +333,7 @@ beta_longshort |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{32_univariate_sorts_files/figure-latex/unnamed-chunk-17-1} \end{center}
+<img src="32_univariate_sorts_files/figure-html/unnamed-chunk-17-1.png" width="672" style="display: block; margin: auto;" />
 
 Overall, this chapter shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next chapter, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis. 
 

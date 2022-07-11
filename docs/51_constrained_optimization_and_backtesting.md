@@ -139,9 +139,7 @@ transaction_costs |>
   )
 ```
 
-
-
-\begin{center}\includegraphics{51_constrained_optimization_and_backtesting_files/figure-latex/unnamed-chunk-5-1} \end{center}
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-5-1.png" width="672" style="display: block; margin: auto;" />
 
 The figure shows that the initial portfolio is always the (sample) MVP and that the higher the transaction costs parameter $\beta$, the smaller is the rebalancing from the initial portfolio (which we always set to the MVP weights in this example). In addition, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the MVP weights such that the investor desires less rebalancing from the initial holdings. 
 
@@ -268,9 +266,7 @@ tibble(
   scale_y_continuous(labels = scales::percent)
 ```
 
-
-
-\begin{center}\includegraphics{51_constrained_optimization_and_backtesting_files/figure-latex/unnamed-chunk-9-1} \end{center}
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
 
 Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for $L_1$ transaction costs $\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
 
@@ -423,7 +419,7 @@ performance |>
 ```
 
 ```
-## # A tibble: 3 x 5
+## # A tibble: 3 × 5
 ##   strategy   Mean    SD `Sharpe ratio` Turnover
 ##   <chr>     <dbl> <dbl>          <dbl>    <dbl>
 ## 1 MV       -0.637  12.4         NA     214.    

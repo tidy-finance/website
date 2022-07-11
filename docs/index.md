@@ -145,87 +145,169 @@ We generated all plots in this book using `ggplot2` and its classic dark-on-ligh
 
 This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looking Kid) and the following packages:
 
-
-\begin{tabular}[t]{l|l}
-\hline
-Package & Version\\
-\hline
-alabama & 2022.4-1\\
-\hline
-bookdown & 0.27\\
-\hline
-broom & 1.0.0\\
-\hline
-dbplyr & 2.2.1\\
-\hline
-dplyr & 1.0.9\\
-\hline
-forcats & 0.5.1\\
-\hline
-frenchdata & 0.2.0\\
-\hline
-furrr & 0.3.0\\
-\hline
-ggplot2 & 3.3.6\\
-\hline
-glmnet & 4.1-4\\
-\hline
-googledrive & 2.0.0\\
-\hline
-hardhat & 1.2.0\\
-\hline
-jsonlite & 1.8.0\\
-\hline
-kableExtra & 1.3.4\\
-\hline
-keras & 2.9.0\\
-\hline
-knitr & 1.39\\
-\hline
-lmtest & 0.9-40\\
-\hline
-lubridate & 1.8.0\\
-\hline
-purrr & 0.3.4\\
-\hline
-quadprog & 1.5-8\\
-\hline
-ranger & 0.14.1\\
-\hline
-readr & 2.1.2\\
-\hline
-readxl & 1.4.0\\
-\hline
-renv & 0.15.5\\
-\hline
-rlang & 1.0.3\\
-\hline
-rmarkdown & 2.14\\
-\hline
-RPostgres & 1.4.4\\
-\hline
-RSQLite & 2.2.14\\
-\hline
-sandwich & 3.0-2\\
-\hline
-scales & 1.2.0\\
-\hline
-slider & 0.2.2\\
-\hline
-stringr & 1.4.0\\
-\hline
-tibble & 3.1.7\\
-\hline
-tidymodels & 0.2.0\\
-\hline
-tidyquant & 1.0.4\\
-\hline
-tidyr & 1.2.0\\
-\hline
-tidyverse & 1.3.1\\
-\hline
-timetk & 2.8.1\\
-\hline
-wesanderson & 0.3.6\\
-\hline
-\end{tabular}
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Package </th>
+   <th style="text-align:left;"> Version </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> alabama </td>
+   <td style="text-align:left;"> 2022.4-1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> bookdown </td>
+   <td style="text-align:left;"> 0.27 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> broom </td>
+   <td style="text-align:left;"> 1.0.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> dbplyr </td>
+   <td style="text-align:left;"> 2.2.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> dplyr </td>
+   <td style="text-align:left;"> 1.0.9 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> forcats </td>
+   <td style="text-align:left;"> 0.5.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> frenchdata </td>
+   <td style="text-align:left;"> 0.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> furrr </td>
+   <td style="text-align:left;"> 0.3.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> ggplot2 </td>
+   <td style="text-align:left;"> 3.3.6 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> glmnet </td>
+   <td style="text-align:left;"> 4.1-4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> googledrive </td>
+   <td style="text-align:left;"> 2.0.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> hardhat </td>
+   <td style="text-align:left;"> 1.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> jsonlite </td>
+   <td style="text-align:left;"> 1.8.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> kableExtra </td>
+   <td style="text-align:left;"> 1.3.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> keras </td>
+   <td style="text-align:left;"> 2.9.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> knitr </td>
+   <td style="text-align:left;"> 1.39 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> lmtest </td>
+   <td style="text-align:left;"> 0.9-40 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> lubridate </td>
+   <td style="text-align:left;"> 1.8.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> purrr </td>
+   <td style="text-align:left;"> 0.3.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> quadprog </td>
+   <td style="text-align:left;"> 1.5-8 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> ranger </td>
+   <td style="text-align:left;"> 0.14.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> readr </td>
+   <td style="text-align:left;"> 2.1.2 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> readxl </td>
+   <td style="text-align:left;"> 1.4.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> renv </td>
+   <td style="text-align:left;"> 0.15.5 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> rlang </td>
+   <td style="text-align:left;"> 1.0.3 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> rmarkdown </td>
+   <td style="text-align:left;"> 2.14 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> RPostgres </td>
+   <td style="text-align:left;"> 1.4.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> RSQLite </td>
+   <td style="text-align:left;"> 2.2.14 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> sandwich </td>
+   <td style="text-align:left;"> 3.0-2 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> scales </td>
+   <td style="text-align:left;"> 1.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> slider </td>
+   <td style="text-align:left;"> 0.2.2 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> stringr </td>
+   <td style="text-align:left;"> 1.4.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tibble </td>
+   <td style="text-align:left;"> 3.1.7 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidymodels </td>
+   <td style="text-align:left;"> 0.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyquant </td>
+   <td style="text-align:left;"> 1.0.4 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyr </td>
+   <td style="text-align:left;"> 1.2.0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> tidyverse </td>
+   <td style="text-align:left;"> 1.3.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> timetk </td>
+   <td style="text-align:left;"> 2.8.1 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> wesanderson </td>
+   <td style="text-align:left;"> 0.3.6 </td>
+  </tr>
+</tbody>
+</table>

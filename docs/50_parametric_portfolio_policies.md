@@ -241,7 +241,7 @@ evaluate_portfolio(weights_crsp) |>
 ```
 
 ```
-## # A tibble: 11 x 3
+## # A tibble: 11 × 3
 ##    measure                           benchmark     tilt
 ##    <chr>                                 <dbl>    <dbl>
 ##  1 Expected utility                   -2.49e-1 -0.262  
@@ -397,7 +397,7 @@ performance_table |>
 ```
 
 ```
-## # A tibble: 11 x 7
+## # A tibble: 11 × 7
 ##    measure             `EW    ` `VW    ` `VW  Optimal `
 ##    <chr>                  <dbl>    <dbl>          <dbl>
 ##  1 Expected utility    -0.250   -2.49e-1       -0.247  
@@ -409,9 +409,9 @@ performance_table |>
 ##  7 Absolute weight      0.0246   2.46e-2        0.0379 
 ##  8 Max. weight          0.0246   3.52e+0        3.34   
 ##  9 Min. weight          0.0246   2.78e-5       -0.0327 
-## 10 Avg. sum of negati~  0        0             27.9    
-## 11 Avg. fraction of n~  0        0             38.8    
-## # ... with 3 more variables:
+## 10 Avg. sum of negati…  0        0             27.9    
+## 11 Avg. fraction of n…  0        0             38.8    
+## # … with 3 more variables:
 ## #   `VW (no s.) Optimal ` <dbl>, `EW  Optimal ` <dbl>,
 ## #   `EW (no s.) Optimal ` <dbl>
 ```
