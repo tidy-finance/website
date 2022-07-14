@@ -54,13 +54,13 @@ prices |>
   )
 ```
 
-\index{returns} Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1}$ where $p_t$ is the adjusted day $t$ price. 
+\index{returns} Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
 In that context, the function `lag` is helpful, which returns the previous value in a vector. 
 
 ```{r, eval = TRUE}
 returns <- prices |>
   arrange(date) |>
-  mutate(ret = (adjusted - lag(adjusted)) / lag(adjusted)) |>
+  mutate(ret = adjusted / lag(adjusted) - 1) |>
   select(symbol, date, ret)
 returns
 ```
@@ -157,11 +157,11 @@ Conveniently, `tidyquant` provides a function to get all stocks in a stock index
 index_prices <- tq_get(ticker,
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2022-03-30"
+  to = "2022-06-30"
 )
 ```
 
-The resulting file contains `r nrow(index_prices)` daily observations for in total `r index_prices |> count(company) |> nrow()` different corporations. 
+The resulting file contains `r nrow(index_prices)` daily observations for `r index_prices |> count(company) |> nrow()` different corporations. 
 The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 ```{r}
@@ -184,7 +184,7 @@ index_prices |>
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
 
-The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate` command is performed for each symbol individually. The same logic applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest. 
+The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest. 
 
 ```{r}
 all_returns <- index_prices |>
@@ -212,7 +212,7 @@ Note that you are now also equipped with all tools to download price data for *e
 
 ## Other forms of data aggregation 
 
-Of course, aggregation across other variables than `symbol` can make sense as well. For instance, suppose you are interested in answering the question: are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded prices and compute aggregate daily trading volume for all Dow Jones constituents in USD. 
+Of course, aggregation across other variables than `symbol` can make sense as well. For instance, suppose you are interested in answering the question: are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow Jones constituents in USD. 
 Recall that the column *volume* is denoted in the number of traded shares.\index{Trading volume}
 Thus, we multiply the trading volume with the daily closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e9` denotes daily trading volume in billion USD.  
 
@@ -231,7 +231,8 @@ volume |>
   )
 ```
 
-One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
+The figure indicates a clear upwards trend in aggregated daily trading volume. In particular since the outbreak of COVID-19 pandemic do markets process huge trading volume, as analyzed for instance by @Goldstein2021 
+One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
 
 ```{r}
 volume |>
@@ -251,9 +252,10 @@ Do you understand where the warning `## Warning: Removed 1 rows containing missi
 
 ## Portfolio choice problems
 
-In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets.\index{Portfolio Choice} The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor*. 
+In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. 
+Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets.\index{Portfolio Choice} The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor* [@Markowitz1952]. 
 
-\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (i.e., the risk). 
+\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (the square-root of the variance, i.e., the risk), see, e.g. @Merton1972. 
 We compute and visualize the efficient frontier for several stocks. 
 First, we extract each asset's *monthly* returns. 
 In order to keep things simple, we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
@@ -275,8 +277,11 @@ returns <- index_prices |>
   select(-price)
 ```
 
-Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the covariance matrix $\Sigma$ and also the expected return vector $\mu$. We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`.
-We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of future returns. \index{Covariance}
+Here, `floor_date` is a function from the `lubridate`package [@lubridate] which provides useful functions to work with dates and time. 
+Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'$$. 
+We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`.
+We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. 
+Thus, for simplicity we refer to $\Sigma$ and $\mu$ instead of explictly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account. 
 
 ```{r}
 returns_matrix <- returns |>
@@ -286,27 +291,29 @@ returns_matrix <- returns |>
   ) |>
   select(-month)
 
-sigma <- cov(returns_matrix)
+Sigma <- cov(returns_matrix)
 mu <- colMeans(returns_matrix)
 ```
 
-Then, we compute the minimum variance portfolio weights $\omega_\text{mvp}$ as well as the expected return $\omega_\text{mvp}'\mu$ and volatility $\sqrt{\omega_\text{mvp}'\Sigma\omega_\text{mvp}}$ of this portfolio. 
+Then, we compute the minimum variance portfolio weights $\omega_\text{mvp}$ as well as the expected portfolio return $\omega_\text{mvp}'\mu$ and volatility $\sqrt{\omega_\text{mvp}'\Sigma\omega_\text{mvp}}$ of this portfolio. 
 \index{Minimum variance portfolio} Recall that the minimum variance portfolio is the vector of portfolio weights that are the solution to 
 $$\omega_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } \sum\limits_{i=1}^Nw_i = 1.$$
-It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones.
+The constraint that weights sum up to one simply implies that all funds have to distributed across the available asset universe, there is no possible to retain cash. 
+It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones and $\Sigma^{-1}$ is the inverse of $\Sigma$. Note, that $\iota'\Sigma^{-1}\iota = \sum\limits_{j=1}^N\sum\limits_{i = 1\\i\neq j}^N \sigma_{ij}$ where $\sigma_{ij}$ is the $(i,j)$-th element of $\Sigma$.
 
 ```{r}
 N <- ncol(returns_matrix)
 iota <- rep(1, N)
-mvp_weights <- solve(sigma) %*% iota
+mvp_weights <- solve(Sigma) %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 
 tibble(
   expected_ret = t(mvp_weights) %*% mu,
-  volatility = sqrt(t(mvp_weights) %*% sigma %*% mvp_weights)
+  volatility = sqrt(t(mvp_weights) %*% Sigma %*% mvp_weights)
 )
 ```
 
+The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
 
 Next, we set out to find the weights for a portfolio that achieves three times the expected return of the minimum variance portfolio. 
@@ -318,17 +325,19 @@ The code below implements the analytic solution to this optimization problem for
 ```{r}
 mu_bar <- 3 * t(mvp_weights) %*% mu
 
-C <- as.numeric(t(iota) %*% solve(sigma) %*% iota)
-D <- as.numeric(t(iota) %*% solve(sigma) %*% mu)
-E <- as.numeric(t(mu) %*% solve(sigma) %*% mu)
+C <- as.numeric(t(iota) %*% solve(Sigma) %*% iota)
+D <- as.numeric(t(iota) %*% solve(Sigma) %*% mu)
+E <- as.numeric(t(mu) %*% solve(Sigma) %*% mu)
 
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
-efp_weights <- mvp_weights + lambda_tilde / 2 * (solve(sigma) %*% mu - D / C * solve(sigma) %*% iota)
+efp_weights <- mvp_weights + 
+  lambda_tilde / 2 * (solve(Sigma) %*% mu - D * mvp_weights)
 ```
 
 ## The efficient frontier 
 
-\index{two mutual fund separation theorem} The two mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio and the efficient portfolio for another required level of expected returns like above), we can characterize the entire efficient frontier by combining these two portfolios. 
+\index{separation theorem} The two mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $w_{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{eff}(\bar{\mu})$ like above), we can characterize the entire efficient frontier by combining these two portfolios. 
+That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. 
 \index{Efficient frontier} The code below implements the construction of the *efficient frontier*, which characterizes the highest expected return achievable at each level of risk. To understand the code better, make sure to familiarize yourself with the inner workings of the `for` loop.
 
 ```{r}
@@ -346,7 +355,10 @@ for (i in seq_along(c)) {
 }
 ```
 
+The code above proceeds in two steps: First, we compute a vector of combination weights $c$ and then we evaluate the resulting linear combination with $c\in\mathbb{R}_+$:   
+$$w^* = cw_\text{eff}(\bar\mu) + (1-c)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{c\bar\mu + (1-c)\tilde\mu - D/C}{E-D^2/C}$. 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. We also add the individual stocks in the same call. 
+We compute annualized returns based on the simple assumption that monthly returns are iid distributed. Thus, the average annualized return is just 12 times the expected monthly return.  
 
 ```{r}
 res |>
@@ -357,14 +369,16 @@ res |>
     size = 4
   ) +
   geom_point( # locate the individual assets
-    data = tibble(mu = 12 * 100 * mu, sd = 12 * 10 * sqrt(diag(sigma))),
+    data = tibble(mu = 12 * 100 * mu, 
+                  sd = 12 * 10 * sqrt(diag(sigma))),
     aes(y = mu, x = sd), size = 1
   ) +
   labs(
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
     title = "Dow Jones asset returns and efficient frontier",
-    subtitle = "Thick dots indicate the location of the minimum variance and efficient tangency portfolio"
+    subtitle = "Thick dots indicate the location of the minimum variance
+    and efficient tangency portfolio"
   )
 ```
 
@@ -376,6 +390,6 @@ The line indicates the efficient frontier: the set of portfolios a mean-variance
 1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5% quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
-1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. After you compute the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
+1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
 1. In the portfolio choice analysis, we restricted our sample to all assets that were trading on every single day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
 1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk, i.e., standard deviation. Identify the portfolio with the highest expected return per standard deviation. Hint: the ratio of expected return to standard deviation is an important concept in Finance. 
