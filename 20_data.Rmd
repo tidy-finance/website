@@ -17,8 +17,8 @@ library(scales)
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you need to adjust these dates. Our data starts with 1960 since most asset pricing studies use data from 1962 on. 
 
 ```{r, eval = TRUE}
-start_date <- as.Date("1960-01-01")
-end_date <- as.Date("2020-12-31")
+start_date <- ymd("1960-01-01")
+end_date <- ymd("2020-12-31")
 ```
 
 
@@ -35,7 +35,7 @@ We can use the main function of the package to download monthly Fama-French fact
 ```{r}
 factors_ff_monthly <- download_french_data("Fama/French 3 Factors")$subsets$data[[1]] |>
   transmute(
-    month = floor_date(ymd(paste0(date, "01")), "month"),
+    month = floor_date(ymd(str_c(date, "01")), "month"),
     rf = as.numeric(RF) / 100,
     mkt_excess = as.numeric(`Mkt-RF`) / 100,
     smb = as.numeric(SMB) / 100,
@@ -62,7 +62,7 @@ In a subsequent chapter, we also use the 10 monthly industry portfolios, so let 
 
 ```{r}
 industries_ff_monthly <- download_french_data("10 Industry Portfolios")$subsets$data[[1]] |>
-  mutate(month = floor_date(ymd(paste0(date, "01")), "month")) |>
+  mutate(month = floor_date(ymd(str_c(date, "01")), "month")) |>
   mutate(across(where(is.numeric), ~ . / 100)) |>
   select(month, everything(), -date) |>
   filter(month >= start_date & month <= end_date)
@@ -78,9 +78,9 @@ We also need to adjust this data. First, we discard information we will not use 
 
 ```{r}
 factors_q_monthly <- read_csv("http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2020.csv") |>
-  mutate(month = as.Date(paste(year, month, "01", sep = "-"))) |>
+  mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
-  rename_with(~ gsub("R_", "", .)) |>
+  rename_with(~ str_remove(., "R_")) |>
   rename_with(~ str_to_lower(.)) |>
   mutate(across(-month, ~ . / 100)) |>
   filter(month >= start_date & month <= end_date)
