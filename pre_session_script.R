@@ -13,10 +13,11 @@ knitr::opts_chunk$set(
 
 options(tibble.print_max = 5,
         tibble.print_min = 5,
+        tibble.width = 81,
         htmltools.dir.version = FALSE,
         formatR.indent = 2,
         digits = 3,
-        width = 55
+        width = 81
 )
 
 # ggplot2 global theme
