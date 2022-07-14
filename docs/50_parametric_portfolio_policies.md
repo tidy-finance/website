@@ -99,14 +99,12 @@ To get a feeling for the performance of such an allocation strategy, we start wi
 
 
 ```r
-n_parameters <- sum(grepl(
-  "lag",
-  colnames(data_portfolios)
+n_parameters <- sum(str_detect(
+  colnames(data_portfolios), "lag"
 ))
 theta <- rep(1.5, n_parameters)
-names(theta) <- colnames(data_portfolios)[grepl(
-  "lag",
-  colnames(data_portfolios)
+names(theta) <- colnames(data_portfolios)[str_detect(
+  colnames(data_portfolios), "lag"
 )]
 ```
 
@@ -205,7 +203,7 @@ evaluate_portfolio <- function(weights_crsp,
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
       "Market beta" = coefficients(lm(portfolio_return ~ mkt_excess))[2]
     )) |>
-    mutate(model = gsub("return_", "", model)) |>
+    mutate(model = str_remove(model, "return_")) |>
     pivot_longer(-model, names_to = "measure") |>
     pivot_wider(names_from = model, values_from = value)
 
@@ -223,7 +221,7 @@ evaluate_portfolio <- function(weights_crsp,
       )) |>
       group_by(model) |>
       summarize(across(-month, ~ 100 * mean(.))) |>
-      mutate(model = gsub("weight_", "", model)) |>
+      mutate(model = str_remove(model, "weight_")) |>
       pivot_longer(-model, names_to = "measure") |>
       pivot_wider(names_from = model, values_from = value)
     evaluation <- bind_rows(evaluation, weight_evaluation)
@@ -242,19 +240,19 @@ evaluate_portfolio(weights_crsp) |>
 
 ```
 ## # A tibble: 11 × 3
-##    measure                           benchmark     tilt
-##    <chr>                                 <dbl>    <dbl>
-##  1 Expected utility                   -2.49e-1 -0.262  
-##  2 Average return                      6.86e+0 -0.604  
-##  3 SD return                           1.53e+1 21.0    
-##  4 Sharpe ratio                        1.29e-1 -0.00831
-##  5 CAPM alpha                          1.08e-4 -0.00574
-##  6 Market beta                         9.92e-1  0.927  
-##  7 Absolute weight                     2.46e-2  0.0631 
-##  8 Max. weight                         3.52e+0  3.65   
-##  9 Min. weight                         2.78e-5 -0.145  
-## 10 Avg. sum of negative weights        0       78.0    
-## 11 Avg. fraction of negative weights   0       49.4
+##    measure                            benchmark     tilt
+##    <chr>                                  <dbl>    <dbl>
+##  1 Expected utility                  -0.249     -0.262  
+##  2 Average return                     6.86      -0.604  
+##  3 SD return                         15.3       21.0    
+##  4 Sharpe ratio                       0.129     -0.00831
+##  5 CAPM alpha                         0.000108  -0.00574
+##  6 Market beta                        0.992      0.927  
+##  7 Absolute weight                    0.0246     0.0631 
+##  8 Max. weight                        3.52       3.65   
+##  9 Min. weight                        0.0000278 -0.145  
+## 10 Avg. sum of negative weights       0         78.0    
+## 11 Avg. fraction of negative weights  0         49.4
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
@@ -398,22 +396,20 @@ performance_table |>
 
 ```
 ## # A tibble: 11 × 7
-##    measure             `EW    ` `VW    ` `VW  Optimal `
-##    <chr>                  <dbl>    <dbl>          <dbl>
-##  1 Expected utility    -0.250   -2.49e-1       -0.247  
-##  2 Average return      10.5      6.86e+0       14.7    
-##  3 SD return           20.3      1.53e+1       20.6    
-##  4 Sharpe ratio         0.149    1.29e-1        0.206  
-##  5 CAPM alpha           0.00231  1.08e-4        0.00649
-##  6 Market beta          1.13     9.92e-1        1.01   
-##  7 Absolute weight      0.0246   2.46e-2        0.0379 
-##  8 Max. weight          0.0246   3.52e+0        3.34   
-##  9 Min. weight          0.0246   2.78e-5       -0.0327 
-## 10 Avg. sum of negati…  0        0             27.9    
-## 11 Avg. fraction of n…  0        0             38.8    
-## # … with 3 more variables:
-## #   `VW (no s.) Optimal ` <dbl>, `EW  Optimal ` <dbl>,
-## #   `EW (no s.) Optimal ` <dbl>
+##    measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op…` `EW  Optimal `
+##    <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
+##  1 Expected uti… -0.250   -2.49e-1       -0.247           -0.247         -0.250  
+##  2 Average retu… 10.5      6.86e+0       14.7             13.4           13.0    
+##  3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
+##  4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
+##  5 CAPM alpha     0.00231  1.08e-4        0.00649          0.00528        0.00440
+##  6 Market beta    1.13     9.92e-1        1.01             1.04           1.14   
+##  7 Absolute wei…  0.0246   2.46e-2        0.0379           0.0246         0.0258 
+##  8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0807 
+##  9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0342 
+## 10 Avg. sum of …  0        0             27.9              0              2.49   
+## 11 Avg. fractio…  0        0             38.8              0              7.84   
+## # … with 1 more variable: `EW (no s.) Optimal ` <dbl>
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.

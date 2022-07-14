@@ -1,7 +1,3 @@
-<!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
-<!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
-<!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
-
 # Replicating Fama & French factors
 
 The Fama and French three-factor model (see @Fama1993) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this chapter, we also want to show the main idea of how to replicate these significant factors. 
@@ -63,11 +59,11 @@ me_ff <- data_ff |>
 
 me_ff_dec <- data_ff |>
   filter(month(month) == 12) |>
-  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) |>
+  mutate(sorting_date = ymd(str_c(year(month) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
 bm_ff <- be |>
-  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) |>
+  mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
   select(gvkey, sorting_date, bm_be = be) |>
   drop_na() |>
   inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) |>
@@ -127,8 +123,8 @@ Next, we merge the portfolios to the return data for the rest of the year. To im
 ```r
 portfolios_ff <- data_ff |>
   mutate(sorting_date = case_when(
-    month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
-    month(month) >= 7 ~ ymd(paste0(year(month), "0701"))
+    month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
+    month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
   )) |>
   inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
@@ -141,7 +137,7 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 
 ```r
 factors_ff_monthly_replicated <- portfolios_ff |>
-  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) |>
+  mutate(portfolio = str_c(portfolio_me, portfolio_bm)) |>
   group_by(portfolio, month) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
@@ -189,15 +185,11 @@ summary(lm(smb ~ smb_replicated, data = test))
 ## -0.020320 -0.001501  0.000027  0.001519  0.014615 
 ## 
 ## Coefficients:
-##                 Estimate Std. Error t value Pr(>|t|)
-## (Intercept)    -0.000143   0.000133   -1.07     0.28
-## smb_replicated  0.996413   0.004418  225.55   <2e-16
-##                   
-## (Intercept)       
-## smb_replicated ***
+##                 Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)    -0.000143   0.000133   -1.07     0.28    
+## smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
 ## ---
-## Signif. codes:  
-## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.00355 on 712 degrees of freedom
 ## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
@@ -221,15 +213,11 @@ summary(lm(hml ~ hml_replicated, data = test))
 ## -0.022250 -0.002933 -0.000101  0.002366  0.027475 
 ## 
 ## Coefficients:
-##                Estimate Std. Error t value Pr(>|t|)
-## (Intercept)    0.000294   0.000214    1.38     0.17
-## hml_replicated 0.958849   0.007376  130.00   <2e-16
-##                   
-## (Intercept)       
-## hml_replicated ***
+##                Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)    0.000294   0.000214    1.38     0.17    
+## hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
 ## ---
-## Signif. codes:  
-## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.0057 on 712 degrees of freedom
 ## Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 

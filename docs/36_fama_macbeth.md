@@ -85,9 +85,10 @@ By doing so, we get an estimate of the risk premiums $\hat\lambda^{F_f}_t$ for e
 
 ```r
 risk_premiums <- data_fama_macbeth |>
-  nest(data = -month) |> 
-  mutate(estimates = map(data, 
-                         ~tidy(lm(ret_excess_lead ~ . - permno, data = .x)))) |> 
+  nest(data = c(ret_excess_lead, beta, log_mktcap, bm, permno)) |> 
+  mutate(estimates = map(
+    data,
+    ~tidy(lm(ret_excess_lead ~ beta + log_mktcap + bm, data = .x)))) |> 
   unnest(estimates)
 ```
 
@@ -105,7 +106,7 @@ price_of_risk <- risk_premiums |>
   )
 ```
 
-On a final note: It is common to adjust for autocorrelation when reporting standard errors of risk premiums. The typical procedure for this is computing @Newey1987 standard errors. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. If you want to implement the apparent *default*, you can enforce `sandwich::NeweyWest(., lag = 6, prewhite = FALSE)` in the code below. 
+It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in chapter 5, the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`. 
 
 
 ```r
@@ -127,18 +128,19 @@ price_of_risk_newey_west <- regressions_for_newey_west |>
   )
 
 left_join(price_of_risk,
-          price_of_risk_newey_west |> select(factor, t_statistic_newey_west),
+          price_of_risk_newey_west |> 
+            select(factor, t_statistic_newey_west),
           by = "factor")
 ```
 
 ```
 ## # A tibble: 4 × 4
-##   factor      risk_premium t_statistic t_statistic_new…
-##   <chr>              <dbl>       <dbl>            <dbl>
-## 1 (Intercept)       1.62         5.09             4.07 
-## 2 beta             -0.0586      -0.790           -0.792
-## 3 bm                0.177        3.48             2.95 
-## 4 log_mktcap       -0.114       -3.00            -2.51
+##   factor      risk_premium t_statistic t_statistic_newey_west
+##   <chr>              <dbl>       <dbl>                  <dbl>
+## 1 (Intercept)       1.62         5.09                   4.07 
+## 2 beta             -0.0586      -0.790                 -0.792
+## 3 bm                0.177        3.48                   2.95 
+## 4 log_mktcap       -0.114       -3.00                  -2.51
 ```
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Lastly, the negative value for CAPM betas as characteristics is in line with the well-established betting against beta anomalies, indicating that investors with borrowing constraints tilt their portfolio towards high beta stocks to replicate a levered market portfolio [@Frazzini2014].

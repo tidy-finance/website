@@ -19,6 +19,7 @@ library(tidyverse)
 library(tidymodels)
 library(keras)
 library(hardhat)
+library(ranger)
 ```
 
 ## Regression trees and random forests
@@ -148,7 +149,9 @@ nn_fit <- workflow() |>
   fit(data = training(split))
 ```
 
-Once you are familiar with the `tidymodel` workflow, it is a piece of cake to fit other models from the `parsnip` family. For instance, the model below initializes a random forest with 50 trees contained in the ensemble where we require at least 20 observations in a node. 
+Once you are familiar with the `tidymodel` workflow, it is a piece of cake to fit other models from the `parsnip` family. 
+For instance, the model below initializes a random forest with 50 trees contained in the ensemble where we require at least 20 observations in a node.
+The random forests are trained using the package `ranger`, which is required to be installed in order to run the code below (loading the package as we do above is not necessary, however, provides a transparent overview of the required packages for the session). 
 
 
 ```r
@@ -190,21 +193,21 @@ model
 
 ```
 ## Model: "sequential_1"
-## _______________________________________________________
-## Layer (type)            Output Shape          Param #  
-## =======================================================
-## dense_5 (Dense)         (None, 10)            60       
-## _______________________________________________________
-## dense_4 (Dense)         (None, 10)            110      
-## _______________________________________________________
-## dense_3 (Dense)         (None, 10)            110      
-## _______________________________________________________
-## dense_2 (Dense)         (None, 1)             11       
-## =======================================================
+## _________________________________________________________________________________
+## Layer (type)                        Output Shape                    Param #      
+## =================================================================================
+## dense_5 (Dense)                     (None, 10)                      60           
+## _________________________________________________________________________________
+## dense_4 (Dense)                     (None, 10)                      110          
+## _________________________________________________________________________________
+## dense_3 (Dense)                     (None, 10)                      110          
+## _________________________________________________________________________________
+## dense_2 (Dense)                     (None, 1)                       11           
+## =================================================================================
 ## Total params: 291
 ## Trainable params: 291
 ## Non-trainable params: 0
-## _______________________________________________________
+## _________________________________________________________________________________
 ```
 
 To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
@@ -243,7 +246,7 @@ lm_fit <- workflow() |>
 
 ## Prediction evaluation
 
-Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on ten thousand new data points. Note that for the evaluation, we use the call to `extract_mold` to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in `hardhat::forge`, which provides an easy, consistent, and robust pre-processor at prediction time. 
+Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on ten thousand new data points. Note that for the evaluation, we use the call to `extract_mold` to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in `forge()`, which provides an easy, consistent, and robust pre-processor at prediction time. 
 
 
 ```r

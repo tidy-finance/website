@@ -39,7 +39,7 @@ crsp_monthly <- crsp_monthly |>
   drop_na()
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `lubridate::floor_date()`.
+Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.
 
 
 ```r
@@ -135,7 +135,7 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
-    portfolio_combined = paste0(portfolio_bm, portfolio_me)
+    portfolio_combined = str_c(portfolio_bm, portfolio_me)
   ) |>
   group_by(month, portfolio_combined) |>
   summarize(
@@ -188,7 +188,7 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
-    portfolio_combined = paste0(portfolio_bm, portfolio_me)
+    portfolio_combined = str_c(portfolio_bm, portfolio_me)
   ) |>
   group_by(month, portfolio_combined) |>
   summarize(

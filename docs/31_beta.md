@@ -67,8 +67,7 @@ summary(fit)
 ## (Intercept)  0.01051    0.00532    1.98    0.049 *  
 ## mkt_excess   1.40081    0.11748   11.92   <2e-16 ***
 ## ---
-## Signif. codes:  
-## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
 ## Residual standard error: 0.115 on 478 degrees of freedom
 ## Multiple R-squared:  0.229,	Adjusted R-squared:  0.228 
@@ -145,15 +144,14 @@ beta_example
 
 ```
 ## # A tibble: 433 × 6
-##   permno month      industry      ret_excess mkt_excess
-##    <dbl> <date>     <chr>              <dbl>      <dbl>
-## 1  14593 1984-12-01 Manufacturing     0.170      0.0184
-## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799
-## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122
-## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084
-## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096
-## # … with 428 more rows, and 1 more variable:
-## #   beta <dbl>
+##   permno month      industry      ret_excess mkt_excess  beta
+##    <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
+## 1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
+## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
+## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
+## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
+## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
+## # … with 428 more rows
 ```
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
 
@@ -184,7 +182,7 @@ Remember that we have to perform rolling-window estimations across all stocks an
 However, this estimation problem is an ideal scenario to employ the power of parallelization. 
 Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine). 
 
-First, we `nest()` the data by `permno`. Nested data means we now have a list of `permno` with corresponding time series data.
+First, we `nest()` the data by `permno`. Nested data means we now have a list of `permno` with corresponding time series data and an `industry` label. We get one row of output for each unique combination of non-nested variables which are `permno` and `industry`.
 
 
 ```r
@@ -203,6 +201,14 @@ crsp_monthly_nested
 ## 4  10003 Finance       <tibble [118 × 3]>
 ## 5  10005 Mining        <tibble [65 × 3]> 
 ## # … with 29,198 more rows
+```
+
+Alternatively, we could have created the same nested data by *excluding* the variables that we *do not* want to nest, as in the following code chunk. However, for most applications it is desirable to explicitly state the variables that are nested into the `data` list-column, so that the reader can track what ends up in there.
+
+
+```r
+crsp_monthly_nested <- crsp_monthly |>
+  nest(data = -c(permno, industry))
 ```
 
 Next, we ant to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
@@ -361,7 +367,7 @@ crsp_monthly |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
 
 Next, we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are an extremely rare exception.
 
@@ -384,7 +390,7 @@ beta_monthly |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks. 
 
@@ -407,11 +413,10 @@ beta |>
 ```
 
 ```
-## Warning: Removed 46 row(s) containing missing values
-## (geom_path).
+## Warning: Removed 46 row(s) containing missing values (geom_path).
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
 
 The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
@@ -450,7 +455,7 @@ beta_long |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-24-1.png" width="672" style="display: block; margin: auto;" />
 
 The figure above does not indicate any troubles, so let us move on to the next check. 
 
@@ -478,12 +483,10 @@ beta_long |>
 
 ```
 ## # A tibble: 2 × 11
-##   name        mean    sd   min    q05   q25   q50   q75
-##   <chr>      <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl>
-## 1 beta_daily 0.743 0.925 -43.7 -0.452 0.203 0.679  1.22
-## 2 beta_mont… 1.10  0.711 -13.0  0.123 0.631 1.03   1.47
-## # … with 3 more variables: q95 <dbl>, max <dbl>,
-## #   n <int>
+##   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
+##   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
+## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186316
+## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
 ```
 
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods).

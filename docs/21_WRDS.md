@@ -17,8 +17,8 @@ We use the same date range as in the previous chapter to ensure consistency.
 
 
 ```r
-start_date <- as.Date("1960-01-01")
-end_date <- as.Date("2020-12-31")
+start_date <- ymd("1960-01-01")
+end_date <- ymd("2020-12-31")
 ```
 
 ## Accessing WRDS
@@ -61,18 +61,16 @@ msf_db
 ```
 ## # Source:   table<"crsp"."msf"> [?? x 21]
 ## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   cusip    permno permco issuno hexcd hsiccd date      
-##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>    
-## 1 68391610  10000   7952  10396     3   3990 1985-12-31
-## 2 68391610  10000   7952  10396     3   3990 1986-01-31
-## 3 68391610  10000   7952  10396     3   3990 1986-02-28
-## 4 68391610  10000   7952  10396     3   3990 1986-03-31
-## 5 68391610  10000   7952  10396     3   3990 1986-04-30
-## # … with more rows, and 14 more variables:
-## #   bidlo <dbl>, askhi <dbl>, prc <dbl>, vol <dbl>,
-## #   ret <dbl>, bid <dbl>, ask <dbl>, shrout <dbl>,
-## #   cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>,
-## #   spread <dbl>, altprcdt <date>, retx <dbl>
+##   cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
+##   <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
+## 1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
+## 2 68391610  10000   7952  10396     3   3990 1986-01-31 -2.5  -4.44 -4.38  1771
+## 3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
+## 4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
+## 5 68391610  10000   7952  10396     3   3990 1986-04-30 -4    -4.31 -4      957
+## # … with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
+## #   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
+## #   altprcdt <date>, retx <dbl>
 ```
 
 (ii) the identifying information,
@@ -85,19 +83,16 @@ msenames_db
 ```
 ## # Source:   table<"crsp"."msenames"> [?? x 21]
 ## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   permno namedt     nameendt   shrcd exchcd siccd
-##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl>
-## 1  10000 1986-01-07 1986-12-03    10      3  3990
-## 2  10000 1986-12-04 1987-03-09    10      3  3990
-## 3  10000 1987-03-10 1987-06-11    10      3  3990
-## 4  10001 1986-01-09 1993-11-21    11      3  4920
-## 5  10001 1993-11-22 2004-06-09    11      3  4920
-## # … with more rows, and 15 more variables:
-## #   ncusip <chr>, ticker <chr>, comnam <chr>,
-## #   shrcls <chr>, tsymbol <chr>, naics <chr>,
-## #   primexch <chr>, trdstat <chr>, secstat <chr>,
-## #   permco <dbl>, compno <dbl>, issuno <dbl>,
-## #   hexcd <dbl>, hsiccd <dbl>, cusip <chr>
+##   permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam   shrcls
+##    <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>    <chr> 
+## 1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM… A     
+## 4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F… <NA>  
+## 5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERGY … <NA>  
+## # … with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
+## #   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
+## #   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
 ```
 
 and (iii) the delisting information.
@@ -110,19 +105,16 @@ msedelist_db
 ```
 ## # Source:   table<"crsp"."msedelist"> [?? x 19]
 ## # Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-##   permno dlstdt     dlstcd nwperm nwcomp nextdt    
-##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>    
-## 1  10000 1987-06-11    560      0      0 1987-06-12
-## 2  10001 2017-08-03    233      0      0 NA        
-## 3  10002 2013-02-15    231  35263   1658 NA        
-## 4  10003 1995-12-15    231  10569   8477 NA        
-## 5  10005 1991-07-11    560      0      0 1991-07-12
-## # … with more rows, and 13 more variables:
-## #   dlamt <dbl>, dlretx <dbl>, dlprc <dbl>,
-## #   dlpdt <date>, dlret <dbl>, permco <dbl>,
-## #   compno <dbl>, issuno <dbl>, hexcd <dbl>,
-## #   hsiccd <dbl>, cusip <chr>, acperm <dbl>,
-## #   accomp <dbl>
+##   permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
+##    <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
+## 1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
+## 2  10001 2017-08-03    233      0      0 NA         13.1   0.0116  0    
+## 3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
+## 4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
+## 5  10005 1991-07-11    560      0      0 1991-07-12  0.141 0.125  -0.141
+## # … with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
+## #   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
+## #   cusip <chr>, acperm <dbl>, accomp <dbl>
 ```
 
 We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reasons and returns. You can read up in the great textbook of @BaliEngleMurray2016 (BEM) for an extensive discussion on the filters we apply in the code below.
@@ -155,11 +147,11 @@ crsp_monthly <- msf_db |>
     dlret, # Delisting return
     dlstcd # Delisting code
   ) |>
+  collect() |>
   mutate(
-    month = as.Date(month),
+    month = ymd(month),
     shrout = shrout * 1000
-  ) |>
-  collect()
+  )
 ```
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
@@ -339,7 +331,7 @@ tbl(tidy_finance, "crsp_monthly") |>
     .groups = 'drop'
   ) |>
   collect() |>
-  mutate(month = as.Date(month)) |>
+  mutate(month = ymd(month)) |>
   ggplot(aes(x = month, y = mktcap / 1000, color = exchange, linetype = exchange)) +
   geom_line() +
   labs(
@@ -569,7 +561,7 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-07-11
+## 5  54594 001004 1972-04-24 2022-07-14
 ## # … with 31,765 more rows
 ```
 
@@ -620,48 +612,6 @@ crsp_monthly |>
 ```
 
 <img src="21_WRDS_files/figure-html/unnamed-chunk-34-1.png" width="672" style="display: block; margin: auto;" />
-
-## Managing SQLite databases
-
-Finally, at the end of our data chapter, we revisit the SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for the future uses. As a result, the database file always grows in size.
-
-To optimize the database file, you can run the `VACUUM` command in the database, which rebuilds the database and frees up unused space. You can execute the command in the database using the `dbSendQuery()` function. 
-
-
-```r
-dbSendQuery(tidy_finance, "VACUUM")
-```
-
-```
-## <SQLiteResult>
-##   SQL  VACUUM
-##   ROWS Fetched: 0 [complete]
-##        Changed: 0
-```
-
-The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read up in [this tutorial](https://www.sqlitetutorial.net/sqlite-vacuum/). 
-
-Apart from cleaning up, you might be interested in listing all the tables that are currently in your database. You can do this via the `dbListTables()` function. 
-
-
-```r
-dbListTables(tidy_finance)
-```
-
-```
-## Warning: Closing open result set, pending rows
-```
-
-```
-## [1] "compustat"             "cpi_monthly"          
-## [3] "crsp_daily"            "crsp_monthly"         
-## [5] "factors_ff_daily"      "factors_ff_monthly"   
-## [7] "factors_q_monthly"     "industries_ff_monthly"
-## [9] "macro_predictors"
-```
-
-This function comes in handy if you are unsure about the correct naming of the tables in your database. 
-
 
 ## Some tricks for PostgreSQL databases
 

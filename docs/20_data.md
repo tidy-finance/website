@@ -19,8 +19,8 @@ Moreover, we initially define the date range for which we fetch and store the fi
 
 
 ```r
-start_date <- as.Date("1960-01-01")
-end_date <- as.Date("2020-12-31")
+start_date <- ymd("1960-01-01")
+end_date <- ymd("2020-12-31")
 ```
 
 
@@ -39,7 +39,7 @@ We can use the main function of the package to download monthly Fama-French fact
 ```r
 factors_ff_monthly <- download_french_data("Fama/French 3 Factors")$subsets$data[[1]] |>
   transmute(
-    month = floor_date(ymd(paste0(date, "01")), "month"),
+    month = floor_date(ymd(str_c(date, "01")), "month"),
     rf = as.numeric(RF) / 100,
     mkt_excess = as.numeric(`Mkt-RF`) / 100,
     smb = as.numeric(SMB) / 100,
@@ -68,13 +68,13 @@ In a subsequent chapter, we also use the 10 monthly industry portfolios, so let 
 
 ```r
 industries_ff_monthly <- download_french_data("10 Industry Portfolios")$subsets$data[[1]] |>
-  mutate(month = floor_date(ymd(paste0(date, "01")), "month")) |>
+  mutate(month = floor_date(ymd(str_c(date, "01")), "month")) |>
   mutate(across(where(is.numeric), ~ . / 100)) |>
   select(month, everything(), -date) |>
   filter(month >= start_date & month <= end_date)
 ```
 
-It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `frenchdata::get_french_data_list()`.
+It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`.
 
 ## q-factors
 
@@ -85,9 +85,9 @@ We also need to adjust this data. First, we discard information we will not use 
 
 ```r
 factors_q_monthly <- read_csv("http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2020.csv") |>
-  mutate(month = as.Date(paste(year, month, "01", sep = "-"))) |>
+  mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
-  rename_with(~ gsub("R_", "", .)) |>
+  rename_with(~ str_remove(., "R_")) |>
   rename_with(~ str_to_lower(.)) |>
   mutate(across(-month, ~ . / 100)) |>
   filter(month >= start_date & month <= end_date)
@@ -287,6 +287,46 @@ factors_q_monthly <- tbl(tidy_finance,
                          "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly |> collect()
 ```
+
+## Managing SQLite databases
+
+Finally, at the end of our data chapter, we revisit the SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for the future uses. As a result, the database file always grows in size.
+
+To optimize the database file, you can run the `VACUUM` command in the database, which rebuilds the database and frees up unused space. You can execute the command in the database using the `dbSendQuery()` function. 
+
+
+```r
+dbSendQuery(tidy_finance, "VACUUM")
+```
+
+```
+## <SQLiteResult>
+##   SQL  VACUUM
+##   ROWS Fetched: 0 [complete]
+##        Changed: 0
+```
+
+The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read up in [this tutorial](https://www.sqlitetutorial.net/sqlite-vacuum/). 
+
+Apart from cleaning up, you might be interested in listing all the tables that are currently in your database. You can do this via the `dbListTables()` function. 
+
+
+```r
+dbListTables(tidy_finance)
+```
+
+```
+## Warning: Closing open result set, pending rows
+```
+
+```
+##  [1] "beta"                  "compustat"             "cpi_monthly"          
+##  [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
+##  [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
+## [10] "macro_predictors"
+```
+
+This function comes in handy if you are unsure about the correct naming of the tables in your database. 
 
 ## Exercises
 

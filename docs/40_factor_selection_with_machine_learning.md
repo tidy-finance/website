@@ -84,15 +84,15 @@ tidy_finance <- dbConnect(
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect() |>
-  rename_with(~ paste0("factor_ff_", .), -month)
+  rename_with(~ str_c("factor_ff_", .), -month)
 
 factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") |>
   collect() |>
-  rename_with(~ paste0("factor_q_", .), -month)
+  rename_with(~ str_c("factor_q_", .), -month)
 
 macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
   collect() |>
-  rename_with(~ paste0("macro_", .), -month) |>
+  rename_with(~ str_c("macro_", .), -month) |>
   select(-macro_rp_div)
 
 industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
@@ -201,20 +201,20 @@ tmp_data
 
 ```
 ## # A tibble: 130 × 126
-##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb
-##          <dbl>                <dbl>         <dbl>
-## 1        -1.92                0.644        0.298 
-## 2        -1.88                1.27         0.387 
-## 3        -1.88                0.341        1.43  
-## 4        -1.88               -1.80        -0.0411
-## 5        -1.88               -1.29        -0.627 
-## # … with 125 more rows, and 123 more variables:
-## #   factor_ff_hml <dbl>, factor_q_me <dbl>,
-## #   factor_q_ia <dbl>, factor_q_roe <dbl>,
-## #   factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
-## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>,
-## #   macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
-## #   macro_lty <dbl>, macro_ltr <dbl>, …
+##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
+##          <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
+## 1        -1.92                0.644        0.298          0.947      0.371 
+## 2        -1.88                1.27         0.387          0.607      0.527 
+## 3        -1.88                0.341        1.43           0.836      1.12  
+## 4        -1.88               -1.80        -0.0411        -0.963     -0.0921
+## 5        -1.88               -1.29        -0.627         -1.73      -0.850 
+## # … with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
+## #   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
+## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
+## #   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
+## #   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
+## #   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
+## #   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
@@ -247,11 +247,11 @@ lm_fit
 ```
 
 ```
-## ══ Workflow ═══════════════════════════════════════════
+## ══ Workflow ═════════════════════════════════════════════════════════════════════
 ## Preprocessor: Recipe
 ## Model: linear_reg()
 ## 
-## ── Preprocessor ───────────────────────────────────────
+## ── Preprocessor ─────────────────────────────────────────────────────────────────
 ## 4 Recipe Steps
 ## 
 ## • step_rm()
@@ -259,7 +259,7 @@ lm_fit
 ## • step_normalize()
 ## • step_center()
 ## 
-## ── Model ──────────────────────────────────────────────
+## ── Model ────────────────────────────────────────────────────────────────────────
 ## Linear Regression Model Specification (regression)
 ## 
 ## Main Arguments:
@@ -511,7 +511,8 @@ plan(multisession, workers = availableCores())
 # Computation by industry
 selected_factors <- data |>
   nest(data = -industry) |>
-  mutate(selected_variables = future_map(data, select_variables,
+  mutate(selected_variables = future_map(
+    data, select_variables,
     .options = furrr_options(seed = TRUE)
   ))
 ```

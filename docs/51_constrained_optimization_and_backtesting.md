@@ -8,6 +8,7 @@ library(tidyverse)
 library(RSQLite)
 library(quadprog)
 library(alabama)
+library(scales)
 ```
 
 ## Data preparation
@@ -101,8 +102,7 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.428  0.270 -1.302  0.375  0.308 -0.152  0.544
-##  [8]  0.472 -0.167 -0.776
+##  [1]  1.428  0.270 -1.302  0.375  0.308 -0.152  0.544  0.472 -0.167 -0.776
 ```
 
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the MVP and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
@@ -206,8 +206,8 @@ w_no_short_sale$solution
 ```
 
 ```
-##  [1]  6.34e-01 -1.91e-17  1.20e-16 -3.47e-18  6.78e-18
-##  [6] -6.24e-17  1.02e-01  2.64e-01  3.38e-22 -2.22e-16
+##  [1]  6.34e-01 -1.91e-17  1.20e-16 -3.47e-18  6.78e-18 -6.24e-17  1.02e-01
+##  [8]  2.64e-01  3.38e-22 -2.22e-16
 ```
 
 `solve.QP` is fast because it benefits from a very clear structure with a quadratic objective and linear constraints. However, optimization typically requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5. The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear objective function. Thus, we can no longer rely on `solve.QP()`. Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -234,8 +234,8 @@ w_reg_t$par
 ```
 
 ```
-##  [1]  4.11e-01 -2.07e-02 -9.00e-02  3.37e-02  8.03e-02
-##  [6] -2.25e-08  3.08e-01  3.52e-01  6.25e-02 -1.37e-01
+##  [1]  4.11e-01 -2.07e-02 -9.00e-02  3.37e-02  8.03e-02 -2.25e-08  3.08e-01
+##  [8]  3.52e-01  6.25e-02 -1.37e-01
 ```
 
 The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
@@ -263,7 +263,7 @@ tibble(
     y = "Allocation weight",
     title = " Optimal allocations for different investment rules"
   ) +
-  scale_y_continuous(labels = scales::percent)
+  scale_y_continuous(labels = percent)
 ```
 
 <img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />

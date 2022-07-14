@@ -4,10 +4,10 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-07-11"
+date: "2022-07-14"
 site: bookdown::bookdown_site
 documentclass: book
-bibliography: [book.bib]
+bibliography: [book.bib, packages.bib]
 biblio-style: apalike
 link-citations: yes
 github-repo: voigtstefan/tidy_finance
@@ -26,6 +26,7 @@ This website is the online version of *Tidy Finance with R*, a book currently un
 We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. Additionally, let us know if you found the text helpful. We look forward to hearing from you!
 
 <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="tidyfinance" data-color="#3b9ab2" data-emoji="" data-font="Cookie" data-text="Support tidy finance with a coffee" data-outline-color="#ffffff" data-font-color="#ffffff" data-coffee-color="#e1af00" ></script>
+
 
 ## Why does this book exist? {.unnumbered}
 
@@ -100,7 +101,10 @@ In addition to the data layer, there are also tidy coding principles outlined in
 3. Embrace functional programming.
 4. Design for humans.
 
-In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc. 
+In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. 
+The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. 
+In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc.
+The core packages contained in the `tidyverse` [@tidyverse] are: `lubridate` [@lubridate], `dplyr` [@dplyr], `tidyr`[@tidyr], `readr` [@readr], `purrr` [@purrr], `tibble` [@tibble], `stringr` [@stringr], and `forcats` [@forcats]. 
 
 ::: {.rmdnote}
 Throughout the book we use the pipe `|>`, a powerful tool to clearly express a sequence of operations. Readers familiar with the `tidyverse` may be used to the predecessor `%>%` by the `magrittr` package. For simple cases `|>` and `%>%` behave identically, however, we follow Hadley Wickhams note "the main advantage of `|>` is that it does less than `%>%`, i.e. it has what is important about the pipe with less of what is not important." For a more thorough discussion on the subtle differences, we refer to the [second edition](https://r4ds.hadley.nz/workflow-pipes.html) of @Wickham2016. 

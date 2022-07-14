@@ -133,12 +133,12 @@ beta_longshort <- beta_portfolios |>
   left_join(factors_ff_monthly, by = "month")
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically uses @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. To implement this test, we compute the average return via `lm()` and then employ the `coeftest` function.
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
 
 
 ```r
 model_fit <- lm(long_short ~ 1, data = beta_longshort)
-coeftest(model_fit, vcov = NeweyWest, lag = 6)
+coeftest(model_fit, vcov = NeweyWest)
 ```
 
 ```
@@ -146,7 +146,7 @@ coeftest(model_fit, vcov = NeweyWest, lag = 6)
 ## t test of coefficients:
 ## 
 ##              Estimate Std. Error t value Pr(>|t|)
-## (Intercept) -0.000169   0.001005   -0.17     0.87
+## (Intercept) -0.000169   0.001002   -0.17     0.87
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
@@ -176,8 +176,7 @@ assign_portfolio <- function(data, var, n_portfolios) {
 }
 ```
 
-We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. 
-Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.
+We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.
 
 
 ```r
@@ -192,7 +191,8 @@ beta_portfolios <- data_for_sorts |>
     portfolio = as.factor(portfolio)
   ) |>
   group_by(portfolio, month) |>
-  summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
+  summarize(ret = weighted.mean(ret_excess, mktcap_lag), 
+            .groups = "drop")
 ```
 
 
@@ -306,8 +306,7 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 ## (Intercept) -0.00441    0.00262   -1.68    0.093 .  
 ## mkt_excess   0.89427    0.10215    8.75   <2e-16 ***
 ## ---
-## Signif. codes:  
-## 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 The plot below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 
