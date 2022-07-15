@@ -20,7 +20,8 @@ library(RSQLite)
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+  SQLite(), "data/tidy_finance.sqlite", 
+  extended_types = TRUE
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
@@ -34,7 +35,8 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
-Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 13$ and $t − 2$ for each firm. The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding. To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.
+Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 12$ and $t − 2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
+To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.\index{Data!CRSP}
 
 
 ```r
@@ -102,13 +104,15 @@ To get a feeling for the performance of such an allocation strategy, we start wi
 n_parameters <- sum(str_detect(
   colnames(data_portfolios), "lag"
 ))
+
 theta <- rep(1.5, n_parameters)
+
 names(theta) <- colnames(data_portfolios)[str_detect(
   colnames(data_portfolios), "lag"
 )]
 ```
 
-The function `compute_portfolio_weights` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value $\theta_0$ of $\theta$. Everything happens within a single pipeline, hence we provide a short walkthrough.
+The function `compute_portfolio_weights` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value $\theta_0$. Everything happens within a single pipeline, hence we provide a short walk through.
 
 We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'\hat{x}_{i, t}$ which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio `weight_benchmark`, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. 
 `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt` which deviate from the benchmark portfolio depending on the stock characteristics.
@@ -165,7 +169,7 @@ weights_crsp <- compute_portfolio_weights(theta,
 
 ## Portfolio performance
 
-Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.
+Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.\index{Power utility}
 
 
 ```r
@@ -230,6 +234,7 @@ evaluate_portfolio <- function(weights_crsp,
 }
 ```
 
+\index{Sharpe Ratio}
 Let us take a look at the different portfolio strategies and evaluation measures.
 
 
@@ -307,8 +312,7 @@ optimal_theta$par
 ##        0.189       -2.007
 ```
 
-The resulting values of $\hat\theta$ are easy to interpret intuitively. Expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). 
-
+The resulting values of $\hat\theta$ are easy to interpret: Intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
 
 ## More model specifications
 
@@ -391,7 +395,7 @@ performance_table |>
     `VW    `,
     sort(contains("Optimal"))
   ) |>
-  print(n = 11, max_extra_cols = 7)
+  print(n = 11)
 ```
 
 ```

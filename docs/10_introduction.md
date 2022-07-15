@@ -178,22 +178,40 @@ returns |>
       daily_max = max
     ),
     .names = "{.fn}"
-  ))
+  )) |>
+  print(n = Inf)
 ```
 
 ```
 ## # A tibble: 23 × 5
-##    year daily_mean daily_sd daily_min daily_max
-##   <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
-## 1  2000     -0.346     5.49    -51.9      13.7 
-## 2  2001      0.233     3.93    -17.2      12.9 
-## 3  2002     -0.121     3.05    -15.0       8.46
-## 4  2003      0.186     2.34     -8.14     11.3 
-## 5  2004      0.470     2.55     -5.58     13.2 
-## # … with 18 more rows
+##     year daily_mean daily_sd daily_min daily_max
+##    <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
+##  1  2000   -0.346       5.49    -51.9      13.7 
+##  2  2001    0.233       3.93    -17.2      12.9 
+##  3  2002   -0.121       3.05    -15.0       8.46
+##  4  2003    0.186       2.34     -8.14     11.3 
+##  5  2004    0.470       2.55     -5.58     13.2 
+##  6  2005    0.349       2.45     -9.21      9.12
+##  7  2006    0.0949      2.43     -6.33     11.8 
+##  8  2007    0.366       2.38     -7.02     10.5 
+##  9  2008   -0.265       3.67    -17.9      13.9 
+## 10  2009    0.382       2.14     -5.02      6.76
+## 11  2010    0.183       1.69     -4.96      7.69
+## 12  2011    0.104       1.65     -5.59      5.89
+## 13  2012    0.130       1.86     -6.44      8.87
+## 14  2013    0.0472      1.80    -12.4       5.14
+## 15  2014    0.145       1.36     -7.99      8.20
+## 16  2015    0.00199     1.68     -6.12      5.74
+## 17  2016    0.0575      1.47     -6.57      6.50
+## 18  2017    0.164       1.11     -3.88      6.10
+## 19  2018   -0.00573     1.81     -6.63      7.04
+## 20  2019    0.266       1.65     -9.96      6.83
+## 21  2020    0.281       2.94    -12.9      12.0 
+## 22  2021    0.131       1.58     -4.17      5.39
+## 23  2022   -0.170       2.26     -5.64      6.98
 ```
 
-In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting.
+In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The command `print` simply controls the output options for the R console. 
 
 ## Scaling up the analysis
 
@@ -212,11 +230,11 @@ ticker
 ## # A tibble: 30 × 8
 ##   symbol company        identifier sedol weight sector shares_held local_currency
 ##   <chr>  <chr>          <chr>      <chr>  <dbl> <chr>        <dbl> <chr>         
-## 1 UNH    UnitedHealth … 91324P10   2917… 0.107  Healt…     5643627 USD           
-## 2 GS     Goldman Sachs… 38141G10   2407… 0.0621 Finan…     5643627 USD           
-## 3 HD     Home Depot In… 43707610   2434… 0.0615 Consu…     5643627 USD           
-## 4 MSFT   Microsoft Cor… 59491810   2588… 0.0541 Infor…     5643627 USD           
-## 5 MCD    McDonald's Co… 58013510   2550… 0.0541 Consu…     5643627 USD           
+## 1 UNH    UnitedHealth … 91324P10   2917… 0.108  Healt…     5637039 USD           
+## 2 HD     Home Depot In… 43707610   2434… 0.0623 Consu…     5637039 USD           
+## 3 GS     Goldman Sachs… 38141G10   2407… 0.0606 Finan…     5637039 USD           
+## 4 MSFT   Microsoft Cor… 59491810   2588… 0.0547 Infor…     5637039 USD           
+## 5 MCD    McDonald's Co… 58013510   2550… 0.0544 Consu…     5637039 USD           
 ## # … with 25 more rows
 ```
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). 
@@ -285,11 +303,11 @@ all_returns |>
 ## # A tibble: 30 × 5
 ##   symbol daily_mean daily_sd daily_min daily_max
 ##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AMGN       0.0483     1.98     -13.4      15.1
-## 2 AXP        0.0514     2.30     -17.6      21.9
-## 3 BA         0.0544     2.23     -23.8      24.3
-## 4 CAT        0.0670     2.04     -14.5      14.7
-## 5 CRM        0.117      2.69     -27.1      26.0
+## 1 AAPL       0.123      2.52     -51.9      13.9
+## 2 AMGN       0.0483     1.98     -13.4      15.1
+## 3 AXP        0.0514     2.30     -17.6      21.9
+## 4 BA         0.0544     2.23     -23.8      24.3
+## 5 CAT        0.0670     2.04     -14.5      14.7
 ## # … with 25 more rows
 ```
 
