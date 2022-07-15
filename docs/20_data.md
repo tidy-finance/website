@@ -4,7 +4,7 @@
 
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repositories, and an SQL database connection. We store all the data in a **single** database, which serves as the only source of data in subsequent chapters.
+This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repositories and other macroeconomic time series. We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases. 
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -22,7 +22,6 @@ Moreover, we initially define the date range for which we fetch and store the fi
 start_date <- ymd("1960-01-01")
 end_date <- ymd("2020-12-31")
 ```
-
 
 ## Fama-French data
 
@@ -158,6 +157,25 @@ file.remove("data/macro_predictors.xlsx")
 ## [1] TRUE
 ```
 
+## Other macroeconomic data
+
+The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `tidyquant` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key. 
+
+
+```r
+library(tidyquant)
+
+cpi_monthly <- tq_get("CPIAUCNS",
+  get = "economic.data",
+  from = start_date, to = end_date
+) |>
+  transmute(
+    month = floor_date(date, "month"),
+    cpi = price / price[month == max(month)]
+  )
+```
+
+To download other time series, we just have to it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package @fredr. Note that you need to get an API key to use its functionality, but refer to the package documentation for details. 
 
 ## Setting up a database
 
@@ -211,7 +229,7 @@ factors_ff_monthly_db |>
 
 ```
 ## # Source:   SQL [?? x 2]
-## # Database: sqlite 3.38.5 [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
+## # Database: sqlite 3.38.5 [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
@@ -270,6 +288,12 @@ factors_q_monthly |>
 macro_predictors |>
   dbWriteTable(tidy_finance, 
                "macro_predictors", 
+               value = _, 
+               overwrite = TRUE)
+
+cpi_monthly |>
+  dbWriteTable(tidy_finance, 
+               "cpi_monthly", 
                value = _, 
                overwrite = TRUE)
 ```

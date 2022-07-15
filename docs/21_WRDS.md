@@ -1,6 +1,6 @@
 # WRDS, CRSP, and Compustat
 
-This chapter shows how to connect to WRDS from within R. Then, we use this connection to download the most commonly used databases, i.e., CRSP and Compustat, from WRDS. We show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in our previous chapter on *"Accessing & managing financial data"*.
+This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and research typically have access to WRDS through their libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working the WRDS database. 
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -23,7 +23,7 @@ end_date <- ymd("2020-12-31")
 
 ## Accessing WRDS
 
-[Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/) is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with R as SQLite. We use the `RPostgres` package to establish a connection to the WRDS database. Note that you could also use the `odbc` package to connect to a PostgreSQL database, but then you need to install the appropriate drivers yourself. `RPostgres` already contains a suitable driver.
+WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with R as SQLite. We use the `RPostgres` package to establish a connection to the WRDS database. Note that you could also use the `odbc` package to connect to a PostgreSQL database, but then you need to install the appropriate drivers yourself. `RPostgres` already contains a suitable driver.
 
 
 ```r
@@ -294,31 +294,7 @@ crsp_monthly |>
 
 <img src="21_WRDS_files/figure-html/unnamed-chunk-18-1.png" width="672" style="display: block; margin: auto;" />
 
-Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. We use the familiar `tidyquant` package to fetch consumer price index (CPI) data from the [Federal Reserve Economic Data (FRED)](https://fred.stlouisfed.org/series/CPIAUCNS).
-
-
-```r
-library(tidyquant)
-
-cpi_monthly <- tq_get("CPIAUCNS",
-  get = "economic.data",
-  from = start_date, to = end_date
-) |>
-  transmute(
-    month = floor_date(date, "month"),
-    cpi = price / price[month == max(crsp_monthly$month)]
-  )
-```
-
-As the CPI data might come in handy at some point, we also put it into our local database.
-
-
-```r
-cpi_monthly |>
-  dbWriteTable(tidy_finance, "cpi_monthly", value = _, overwrite = TRUE)
-```
-
-In fact, we can use the tables in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` dollars to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` dollars to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
 
 ```r
@@ -342,9 +318,15 @@ tbl(tidy_finance, "crsp_monthly") |>
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
+<img src="21_WRDS_files/figure-html/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" />
 
-Of course, performing the computation in the database is not really meaningful because we already have all the required data in memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory.
+Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data. 
+
+
+```r
+cpi_monthly <- tbl(tidy_finance, "cpi_monthly") %>% 
+  collect()
+```
 
 Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is apparently in Manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing Manufacturing at the end of our sample period.
 
@@ -373,7 +355,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
+<img src="21_WRDS_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
 
 We also compute the market value of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 dollars. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market value.
 
@@ -393,7 +375,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-23-1.png" width="672" style="display: block; margin: auto;" />
+<img src="21_WRDS_files/figure-html/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
 
 
 ## Daily CRSP data
@@ -611,7 +593,7 @@ crsp_monthly |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-34-1.png" width="672" style="display: block; margin: auto;" />
+<img src="21_WRDS_files/figure-html/unnamed-chunk-33-1.png" width="672" style="display: block; margin: auto;" />
 
 ## Some tricks for PostgreSQL databases
 

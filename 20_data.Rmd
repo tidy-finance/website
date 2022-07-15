@@ -4,7 +4,7 @@
 
 In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repositories, and an SQL database connection. We store all the data in a **single** database, which serves as the only source of data in subsequent chapters.
+This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repositories and other macroeconomic time series. We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases. 
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -21,7 +21,6 @@ start_date <- ymd("1960-01-01")
 end_date <- ymd("2020-12-31")
 ```
 
-
 ## Fama-French data
 
 We start by downloading some famous Fama-French factors (e.g., @Fama1993) and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to easily access the data: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html).
@@ -33,7 +32,8 @@ library(frenchdata)
 We can use the main function of the package to download monthly Fama-French factors. The set *3 Factors* includes the return time series of the market, size, and value factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately as the raw Fama-French data comes in very unpractical data format. For precise descriptions of the variables, we suggest consulting [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) directly. If you are on the site, check the raw data files to appreciate the time saved by `frenchdata`.
 
 ```{r}
-factors_ff_monthly <- download_french_data("Fama/French 3 Factors")$subsets$data[[1]] |>
+factors_ff_monthly_raw <- download_french_data("Fama/French 3 Factors")
+factors_ff_monthly <- factors_ff_monthly_raw$subsets$data[[1]] |>
   transmute(
     month = floor_date(ymd(str_c(date, "01")), "month"),
     rf = as.numeric(RF) / 100,
@@ -47,7 +47,8 @@ factors_ff_monthly <- download_french_data("Fama/French 3 Factors")$subsets$data
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function. 
 
 ```{r}
-factors_ff_daily <- download_french_data("Fama/French 3 Factors [Daily]")$subsets$data[[1]] |>
+factors_ff_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
+factors_ff_daily <- factors_ff_daily_raw$subsets$data[[1]] |>
   transmute(
     date = ymd(date),
     rf = as.numeric(RF) / 100,
@@ -61,7 +62,8 @@ factors_ff_daily <- download_french_data("Fama/French 3 Factors [Daily]")$subset
 In a subsequent chapter, we also use the 10 monthly industry portfolios, so let us fetch that data, too. 
 
 ```{r}
-industries_ff_monthly <- download_french_data("10 Industry Portfolios")$subsets$data[[1]] |>
+industries_ff_monthly_raw <- download_french_data("10 Industry Portfolios")
+industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
   mutate(month = floor_date(ymd(str_c(date, "01")), "month")) |>
   mutate(across(where(is.numeric), ~ . / 100)) |>
   select(month, everything(), -date) |>
@@ -77,7 +79,9 @@ In recent years, the academic discourse experienced the rise of alternative fact
 We also need to adjust this data. First, we discard information we will not use here. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lower case. You can try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide](https://style.tidyverse.org/index.html).
 
 ```{r}
-factors_q_monthly <- read_csv("http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2020.csv") |>
+factors_q_monthly_link <- 
+  "http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2020.csv"
+factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
   rename_with(~ str_remove(., "R_")) |>
@@ -104,16 +108,21 @@ drive_deauth()
 The `drive_download()` function from the `googledrive` package allows us to download the data and store it locally.
 
 ```{r}
-drive_download("https://drive.google.com/file/d/1ACbhdnIy0VbCWgsnXkjcddiV8HF4feWv/view",
+macro_predictors_link <- 
+  "https://drive.google.com/file/d/1ACbhdnIy0VbCWgsnXkjcddiV8HF4feWv/view"
+drive_download(
+  macro_predictors_link, 
   path = "data/macro_predictors.xlsx"
-)
+  )
 ```
 
 Next, we read in the new data and transform the columns to the variables that we later use. You can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145) for the definitions of the variables and the transformations.
 
 ```{r}
-macro_predictors <- read_xlsx("data/macro_predictors.xlsx", 
-                              sheet = "Monthly") |>
+macro_predictors <- read_xlsx(
+  "data/macro_predictors.xlsx", 
+  sheet = "Monthly"
+) |>
   mutate(month = ym(yyyymm)) |>
   filter(month >= start_date & month <= end_date) |>
   mutate(across(where(is.character), as.numeric)) |>
@@ -130,8 +139,8 @@ macro_predictors <- read_xlsx("data/macro_predictors.xlsx",
     dfy = BAA - AAA # Default yield spread
   ) |>
   select(month, rp_div, dp, dy, ep, de, svar,
-    bm = `b/m`, ntis, tbl, lty, ltr,
-    tms, dfy, infl
+         bm = `b/m`, ntis, tbl, lty, ltr,
+         tms, dfy, infl
   ) |>
   drop_na()
 ```
@@ -142,6 +151,24 @@ Finally, after reading in the macro predictors to our memory, we remove the raw 
 file.remove("data/macro_predictors.xlsx")
 ```
 
+## Other macroeconomic data
+
+The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `tidyquant` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key. 
+
+```{r}
+library(tidyquant)
+
+cpi_monthly <- tq_get("CPIAUCNS",
+  get = "economic.data",
+  from = start_date, to = end_date
+) |>
+  transmute(
+    month = floor_date(date, "month"),
+    cpi = price / price[month == max(month)]
+  )
+```
+
+To download other time series, we just have to it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package @fredr. Note that you need to get an API key to use its functionality, but refer to the package documentation for details. 
 
 ## Setting up a database
 
@@ -156,29 +183,32 @@ library(RSQLite)
 library(dbplyr)
 ```
 
-A SQLite database is easily created - the code below is really all there is. Note that we use the `extended_types` option to enable date types when storing and fetching data, otherwise date columns are stored as integer values. 
+A SQLite database is easily created - the code below is really all there is. Note that we use the `extended_types=TRUE` option to enable date types when storing and fetching data, otherwise date columns are stored as integer values. 
 
 ```{r}
-tidy_finance <- dbConnect(SQLite(), 
-                          "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+  extended_types = TRUE
+)
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. Notice that we use the base R pipe placeholder `_` and a named argument to pipe  `factors_ff_monthly` to the argument `value = `.
+Next, we create a remote table with the monthly Fama-French factor data. Notice that we use the base R pipe placeholder `_` and a named argument to pipe  `factors_ff_monthly` to the argument `value`.
 
 ```{r}
 factors_ff_monthly |>
-  dbWriteTable(tidy_finance, 
-               "factors_ff_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(
+    tidy_finance, 
+    "factors_ff_monthly", 
+    value = _, 
+    overwrite = TRUE
+  )
 ```
 
 We can use the remote table as an in-memory data frame by building a connection via `tbl()`.
 
 ```{r}
-factors_ff_monthly_db <- tbl(tidy_finance, 
-                             "factors_ff_monthly")
+factors_ff_monthly_db <- tbl(tidy_finance, "factors_ff_monthly")
 ```
 
 All `dplyr` calls are evaluated lazily, i.e., the data is not in the memory of our R session, and actually, the database does most of the work. You can see that by noticing that the output below does not show the number of rows. In fact, the following code chunk only fetches the top 10 rows from the database for printing.  
@@ -202,28 +232,44 @@ Before we move on to the next data source, let us also store the other four tabl
 
 ```{r}
 factors_ff_daily |>
-  dbWriteTable(tidy_finance, 
-               "factors_ff_daily", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(
+    tidy_finance, 
+    "factors_ff_daily", 
+    value = _, 
+    overwrite = TRUE
+  )
 
 industries_ff_monthly |>
-  dbWriteTable(tidy_finance, 
-               "industries_ff_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(
+    tidy_finance, 
+    "industries_ff_monthly", 
+    value = _, 
+    overwrite = TRUE
+  )
 
 factors_q_monthly |>
-  dbWriteTable(tidy_finance, 
-               "factors_q_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(
+    tidy_finance, 
+    "factors_q_monthly", 
+    value = _, 
+    overwrite = TRUE
+  )
 
 macro_predictors |>
-  dbWriteTable(tidy_finance, 
-               "macro_predictors", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(
+    tidy_finance, 
+    "macro_predictors", 
+    value = _, 
+    overwrite = TRUE
+  )
+
+cpi_monthly |>
+  dbWriteTable(
+    tidy_finance, 
+    "cpi_monthly", 
+    value = _, 
+    overwrite = TRUE
+  )
 ```
 
 From now on, all you need to do to access data that is stored in the database is to follow three steps: (i) Establish the connection to the SQLite database, (ii) call the table you want to extract, and (iii) collect the data. For your convenience, the following steps show all you need in a compact fashion.
@@ -231,11 +277,12 @@ From now on, all you need to do to access data that is stored in the database is
 ```{r, results = FALSE}
 library(tidyverse)
 library(RSQLite)
-tidy_finance <- dbConnect(SQLite(), 
-                          "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
-factors_q_monthly <- tbl(tidy_finance, 
-                         "factors_q_monthly")
+tidy_finance <- dbConnect(
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+  extended_types = TRUE
+)
+factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly |> collect()
 ```
 
