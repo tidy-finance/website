@@ -115,7 +115,7 @@ Here, <span class="math inline">\(i\)</span> denotes the stock and <span class="
 The objective is to assess the cross-sectional relation between <span class="math inline">\(x_{t-1,i}\)</span> and, typically, stock excess returns <span class="math inline">\(r_{t,i}\)</span> at time <span class="math inline">\(t\)</span> as the outcome variable.
 To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.</p>
 <p>The current chapter relies on the following set of packages.</p>
-<div class="sourceCode" id="cb134"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb133"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://rsqlite.r-dbi.org">RSQLite</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://lubridate.tidyverse.org">lubridate</a></span><span class="op">)</span></span>
@@ -129,7 +129,7 @@ To illustrate how portfolio sorts work, we use estimates for market betas from t
 <p>We start with loading the required data from our <code>SQLite</code>-database introduced in our chapter on <em>“Accessing &amp; managing financial data”</em>. In particular, we use the monthly CRSP sample as our asset universe.
 Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha).
 <code>beta</code> is the tibble with market betas computed in the previous chapter.</p>
-<div class="sourceCode" id="cb135"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb134"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tidy_finance</span> <span class="op">&lt;-</span> <span class="fu">dbConnect</span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html">SQLite</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"data/tidy_finance.sqlite"</span>, extended_types <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
@@ -143,7 +143,7 @@ Once we form our portfolios, we use the Fama-French factor returns to compute th
 <span><span class="va">beta</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/tbl.html">tbl</a></span><span class="op">(</span><span class="va">tidy_finance</span>, <span class="st">"beta"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/compute.html">collect</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>We keep only relevant data from the CRSP sample.</p>
-<div class="sourceCode" id="cb136"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb135"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crsp_monthly</span> <span class="op">&lt;-</span> <span class="va">crsp_monthly</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html">left_join</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span>, by <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span><span class="va">permno</span>, <span class="va">month</span>, <span class="va">ret_excess</span>, <span class="va">mkt_excess</span>, <span class="va">mktcap_lag</span><span class="op">)</span></span>
@@ -167,7 +167,7 @@ To lag stock beta by one month, we add one month to the current date and join th
 This procedure ensures that month <span class="math inline">\(t\)</span> information is available in month <span class="math inline">\(t+1\)</span>.
 You may be tempted to simply use a call such as <code>crsp_monthly |&gt; group_by(permno) |&gt; mutate(beta_lag = lag(beta)))</code> instead.
 This procedure, however, does not work if there are non-explicit missing values in the time series.</p>
-<div class="sourceCode" id="cb138"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb137"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_lag</span> <span class="op">&lt;-</span> <span class="va">beta</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>month <span class="op">=</span> <span class="va">month</span> <span class="op"><a href="https://lubridate.tidyverse.org/reference/mplus.html">%m+%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/weekday.POSIXt.html">months</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span><span class="va">permno</span>, <span class="va">month</span>, beta_lag <span class="op">=</span> <span class="va">beta_daily</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -178,7 +178,7 @@ This procedure, however, does not work if there are non-explicit missing values 
 <p>The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.
 For simplicity, we start with the median as the single breakpoint.
 We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in <code><a href="https://rdrr.io/r/stats/weighted.mean.html">weighted.mean()</a></code>.</p>
-<div class="sourceCode" id="cb139"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb138"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios</span> <span class="op">&lt;-</span> <span class="va">data_for_sorts</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">month</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span></span>
@@ -196,7 +196,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span class="header-section-number">5.3</span> Performance evaluation<a class="anchor" aria-label="anchor" href="#performance-evaluation"><i class="fas fa-link"></i></a>
 </h2>
 <p>The following figure shows the monthly excess returns of the two portfolios.</p>
-<div class="sourceCode" id="cb140"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb139"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">month</span>, y <span class="op">=</span> <span class="va">ret</span>, fill <span class="op">=</span> <span class="va">portfolio</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_bar.html">geom_col</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
@@ -209,20 +209,20 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/theme.html">theme</a></span><span class="op">(</span>legend.position <span class="op">=</span> <span class="st">"none"</span><span class="op">)</span></span></code></pre></div>
 <div class="inline-figure"><img src="32_univariate_sorts_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;"></div>
 <p>We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.</p>
-<div class="sourceCode" id="cb141"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb140"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_longshort</span> <span class="op">&lt;-</span> <span class="va">beta_portfolios</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://tidyr.tidyverse.org/reference/pivot_wider.html">pivot_wider</a></span><span class="op">(</span><span class="va">month</span>, names_from <span class="op">=</span> <span class="va">portfolio</span>, values_from <span class="op">=</span> <span class="va">ret</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>long_short <span class="op">=</span> <span class="va">high</span> <span class="op">-</span> <span class="va">low</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html">left_join</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span>, by <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span></span></code></pre></div>
 <p>We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using <span class="citation">Whitney K. Newey and West (<a href="references.html#ref-Newey1987" role="doc-biblioref">1987</a>)</span> <span class="math inline">\(t\)</span>-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by <span class="citation">Whitney K. Newey and West (<a href="references.html#ref-Newey1994" role="doc-biblioref">1994</a>)</span> and available in the <code>sandwich</code> package thanks to <span class="citation">Zeileis (<a href="references.html#ref-Zeileis2004" role="doc-biblioref">2004</a>)</span>. To implement this test, we compute the average return via <code><a href="https://rdrr.io/r/stats/lm.html">lm()</a></code> and then employ the <code><a href="https://rdrr.io/pkg/lmtest/man/coeftest.html">coeftest()</a></code> function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments <code>lag = 6, prewhite = FALSE</code> to the <code><a href="https://rdrr.io/pkg/lmtest/man/coeftest.html">coeftest()</a></code> function in the code below and it passes them on to <code><a href="https://sandwich.R-Forge.R-project.org/reference/NeweyWest.html">NeweyWest()</a></code>.</p>
-<div class="sourceCode" id="cb142"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb141"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">model_fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">long_short</span> <span class="op">~</span> <span class="fl">1</span>, data <span class="op">=</span> <span class="va">beta_longshort</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/pkg/lmtest/man/coeftest.html">coeftest</a></span><span class="op">(</span><span class="va">model_fit</span>, vcov <span class="op">=</span> <span class="va">NeweyWest</span><span class="op">)</span></span></code></pre></div>
 <pre><code>## 
 ## t test of coefficients:
 ## 
 ##              Estimate Std. Error t value Pr(&gt;|t|)
-## (Intercept) -0.000169   0.001002   -0.17     0.87</code></pre>
+## (Intercept) -0.000171   0.001001   -0.17     0.86</code></pre>
 <p>The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.</p>
 </div>
 <div id="functional-programming-for-portfolio-sorts" class="section level2" number="5.4">
@@ -230,7 +230,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span class="header-section-number">5.4</span> Functional programming for portfolio sorts<a class="anchor" aria-label="anchor" href="#functional-programming-for-portfolio-sorts"><i class="fas fa-link"></i></a>
 </h2>
 <p>Now we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we employ the <a href="https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-">curly-curly</a>-operator to give us flexibility concerning which variable to use for the sorting, denoted by <code>var</code>. We use <code><a href="https://rdrr.io/r/stats/quantile.html">quantile()</a></code> to compute breakpoints for <code>n_portfolios</code>. Then, we assign portfolios to stocks using the <code><a href="https://rdrr.io/r/base/findInterval.html">findInterval()</a></code> function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.</p>
-<div class="sourceCode" id="cb144"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb143"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">assign_portfolio</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">var</span>, <span class="va">n_portfolios</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">breakpoints</span> <span class="op">&lt;-</span> <span class="va">data</span> <span class="op">|&gt;</span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span>breakpoint <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/quantile.html">quantile</a></span><span class="op">(</span><span class="op">{</span><span class="op">{</span> <span class="va">var</span> <span class="op">}</span><span class="op">}</span>,</span>
@@ -248,7 +248,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/pull.html">pull</a></span><span class="op">(</span><span class="va">portfolio</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p>We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.</p>
-<div class="sourceCode" id="cb145"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb144"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios</span> <span class="op">&lt;-</span> <span class="va">data_for_sorts</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">month</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span></span>
@@ -268,7 +268,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span class="header-section-number">5.5</span> More performance evaluation<a class="anchor" aria-label="anchor" href="#more-performance-evaluation"><i class="fas fa-link"></i></a>
 </h2>
 <p>In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.</p>
-<div class="sourceCode" id="cb146"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb145"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios_summary</span> <span class="op">&lt;-</span> <span class="va">beta_portfolios</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html">left_join</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span>, by <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">portfolio</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -278,7 +278,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span>    ret <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">ret</span><span class="op">)</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
 <p>The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.</p>
-<div class="sourceCode" id="cb147"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb146"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios_summary</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">portfolio</span>, y <span class="op">=</span> <span class="va">alpha</span>, fill <span class="op">=</span> <span class="va">portfolio</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_bar.html">geom_bar</a></span><span class="op">(</span>stat <span class="op">=</span> <span class="st">"identity"</span><span class="op">)</span> <span class="op">+</span></span>
@@ -298,7 +298,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span class="header-section-number">5.6</span> The security market line and beta portfolios<a class="anchor" aria-label="anchor" href="#the-security-market-line-and-beta-portfolios"><i class="fas fa-link"></i></a>
 </h2>
 <p>The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.</p>
-<div class="sourceCode" id="cb148"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb147"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sml_capm</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">ret</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">beta</span>, data <span class="op">=</span> <span class="va">beta_portfolios_summary</span><span class="op">)</span><span class="op">$</span><span class="va">coefficients</span></span>
 <span></span>
 <span><span class="va">beta_portfolios_summary</span> <span class="op">|&gt;</span></span>
@@ -315,7 +315,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span>  <span class="op">)</span></span></code></pre></div>
 <div class="inline-figure"><img src="32_univariate_sorts_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;"></div>
 <p>To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.</p>
-<div class="sourceCode" id="cb149"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb148"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_longshort</span> <span class="op">&lt;-</span> <span class="va">beta_portfolios</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">ungroup</a></span><span class="op">(</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>portfolio <span class="op">=</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/case_when.html">case_when</a></span><span class="op">(</span></span>
@@ -327,28 +327,28 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>long_short <span class="op">=</span> <span class="va">high</span> <span class="op">-</span> <span class="va">low</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html">left_join</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span>, by <span class="op">=</span> <span class="st">"month"</span><span class="op">)</span></span></code></pre></div>
 <p>Again, the resulting long-short strategy does not exhibit statistically significant returns.</p>
-<div class="sourceCode" id="cb150"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb149"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/lmtest/man/coeftest.html">coeftest</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">long_short</span> <span class="op">~</span> <span class="fl">1</span>, data <span class="op">=</span> <span class="va">beta_longshort</span><span class="op">)</span>, </span>
 <span>         vcov <span class="op">=</span> <span class="va">NeweyWest</span><span class="op">)</span></span></code></pre></div>
 <pre><code>## 
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(&gt;|t|)
-## (Intercept) 0.000739   0.002483     0.3     0.77</code></pre>
+## (Intercept) 0.000734   0.002483     0.3     0.77</code></pre>
 <p>However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor (<span class="citation">Frazzini and Pedersen (<a href="references.html#ref-Frazzini2014" role="doc-biblioref">2014</a>)</span>). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.</p>
-<div class="sourceCode" id="cb152"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb151"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/pkg/lmtest/man/coeftest.html">coeftest</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/lm.html">lm</a></span><span class="op">(</span><span class="va">long_short</span> <span class="op">~</span> <span class="fl">1</span> <span class="op">+</span> <span class="va">mkt_excess</span>, data <span class="op">=</span> <span class="va">beta_longshort</span><span class="op">)</span>, </span>
 <span>         vcov <span class="op">=</span> <span class="va">NeweyWest</span><span class="op">)</span></span></code></pre></div>
 <pre><code>## 
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(&gt;|t|)    
-## (Intercept) -0.00441    0.00262   -1.68    0.093 .  
-## mkt_excess   0.89427    0.10215    8.75   &lt;2e-16 ***
+## (Intercept) -0.00441    0.00262   -1.69    0.092 .  
+## mkt_excess   0.89461    0.10214    8.76   &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 <p>The plot below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns.</p>
-<div class="sourceCode" id="cb154"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb153"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_longshort</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span>year <span class="op">=</span> <span class="fu"><a href="https://lubridate.tidyverse.org/reference/year.html">year</a></span><span class="op">(</span><span class="va">month</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span></span>
@@ -412,7 +412,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-07-14.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-07-15.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

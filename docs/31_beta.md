@@ -485,7 +485,7 @@ beta_long |>
 ## # A tibble: 2 × 11
 ##   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
 ##   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
-## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186316
+## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186174
 ## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
 ```
 

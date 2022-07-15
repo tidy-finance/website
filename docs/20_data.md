@@ -211,7 +211,7 @@ factors_ff_monthly_db |>
 
 ```
 ## # Source:   SQL [?? x 2]
-## # Database: sqlite 3.38.5 [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
+## # Database: sqlite 3.38.5 [C:\Users\ncj140\Dropbox\Projects\tidy_finance\data\tidy_finance.sqlite]
 ##   month          rf
 ##   <date>      <dbl>
 ## 1 1960-01-01 0.0033
