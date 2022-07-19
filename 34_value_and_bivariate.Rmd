@@ -6,7 +6,7 @@ This chapter extends univariate portfolio analysis to bivariate sorts which mean
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
 The current chapter relies on this set of packages. 
-```{r}
+```{r, eval = TRUE}
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
@@ -20,31 +20,32 @@ library(scales)
 First, we load the necessary data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.
 
 ```{r}
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+)
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-crsp_monthly <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+crsp_monthly <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(permno, gvkey, month, ret_excess, mkt_excess, 
-         mktcap, mktcap_lag, exchange) %>%
+         mktcap, mktcap_lag, exchange) |>
   drop_na()
 ```
 
 Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.
 
 ```{r}
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-be <- compustat %>%
-  select(gvkey, datadate, be) %>%
-  drop_na() %>%
+be <- compustat |>
+  select(gvkey, datadate, be) |>
+  drop_na() |>
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
 
@@ -57,29 +58,29 @@ We continue to lag market capitalization and firm size by one month. Then, we co
 Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fill()`-function after sorting by date and firm (which we identify by permno and gvkey) and on a firm basis (which we do by `group_by()` as usual). As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
 ```{r}
-me <- crsp_monthly %>%
-  mutate(sorting_date = month %m+% months(1)) %>%
+me <- crsp_monthly |>
+  mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me = mktcap)
 
-bm <- be %>%
-  inner_join(crsp_monthly %>%
-    select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) %>%
+bm <- be |>
+  inner_join(crsp_monthly |>
+    select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) |>
   mutate(
     bm = be / mktcap,
     sorting_date = month %m+% months(6)
-  ) %>%
-  select(permno, gvkey, sorting_date, bm) %>%
+  ) |>
+  select(permno, gvkey, sorting_date, bm) |>
   arrange(permno, gvkey, sorting_date)
 
-data_for_sorts <- crsp_monthly %>%
-  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) %>%
-  left_join(me, by = c("permno", "month" = "sorting_date")) %>%
+data_for_sorts <- crsp_monthly |>
+  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) |>
+  left_join(me, by = c("permno", "month" = "sorting_date")) |>
   select(permno, gvkey, month, ret_excess, mktcap_lag, me, bm, exchange)
 
-data_for_sorts <- data_for_sorts %>%
-  arrange(permno, gvkey, month) %>%
-  group_by(permno, gvkey) %>%
-  fill(bm) %>%
+data_for_sorts <- data_for_sorts |>
+  arrange(permno, gvkey, month) |>
+  group_by(permno, gvkey) |>
+  fill(bm) |>
   drop_na()
 ```
 
@@ -87,18 +88,19 @@ The last step of preparation for the portfolio sorts is the computation of break
 
 ```{r}
 assign_portfolio <- function(data, var, n_portfolios, exchanges) {
-  breakpoints <- data %>%
-    filter(exchange %in% exchanges) %>%
+  breakpoints <- data |>
+    filter(exchange %in% exchanges) |>
     summarize(breakpoint = quantile(
       {{ var }},
       probs = seq(0, 1, length.out = n_portfolios + 1),
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval({{ var }}, 
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 ```
@@ -112,8 +114,8 @@ Bivariate sorts create portfolios within a two-dimensional space spanned by two 
 To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_bm`, respectively. Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{r}
-value_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+value_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = cur_data(),
@@ -127,9 +129,9 @@ value_portfolios <- data_for_sorts %>%
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
-    portfolio_combined = paste0(portfolio_bm, portfolio_me)
-  ) %>%
-  group_by(month, portfolio_combined) %>%
+    portfolio_combined = str_c(portfolio_bm, portfolio_me)
+  ) |>
+  group_by(month, portfolio_combined) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     portfolio_bm = unique(portfolio_bm),
@@ -140,16 +142,16 @@ value_portfolios <- data_for_sorts %>%
 Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher's choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.
 
 ```{r}
-value_premium <- value_portfolios %>%
-  group_by(month, portfolio_bm) %>%
-  summarize(ret = mean(ret), .groups = "drop_last") %>%
+value_premium <- value_portfolios |>
+  group_by(month, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
               ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
 
-The resulting annualized value premium is `r `12 * mean(value_premium$value_premium * 100)` percent.
+The resulting annualized value premium is 3.936 percent.
 
 ## Dependent sorts
 
@@ -158,15 +160,15 @@ In the previous exercise, we assigned the portfolios without considering the sec
 To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `var = me`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{r}
-value_portfolios <- data_for_sorts %>%
-  group_by(month) %>%
+value_portfolios <- data_for_sorts |>
+  group_by(month) |>
   mutate(portfolio_me = assign_portfolio(
     data = cur_data(),
     var = me,
     n_portfolios = 5,
     exchanges = c("NYSE")
-  )) %>%
-  group_by(month, portfolio_me) %>%
+  )) |>
+  group_by(month, portfolio_me) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = cur_data(),
@@ -174,26 +176,25 @@ value_portfolios <- data_for_sorts %>%
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
-    portfolio_combined = paste0(portfolio_bm, portfolio_me)
-  ) %>%
-  group_by(month, portfolio_combined) %>%
+    portfolio_combined = str_c(portfolio_bm, portfolio_me)
+  ) |>
+  group_by(month, portfolio_combined) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     portfolio_bm = unique(portfolio_bm),
     .groups = "drop"
   )
 
-value_premium <- value_portfolios %>%
-  group_by(month, portfolio_bm) %>%
-  summarize(ret = mean(ret), .groups = "drop_last") %>%
+value_premium <- value_portfolios |>
+  group_by(month, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
               ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
 
-
-The value premium from dependent sorts is `r `12 * mean(value_premium$value_premium * 100)` percent per year.
+The value premium from dependent sorts is 3.18 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the line of the previous chapter, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

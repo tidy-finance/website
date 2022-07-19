@@ -6,14 +6,22 @@
 
 # Cover design
 
+The cover of the book is inspired by the fast growing generative art community in R. 
+Generative art refers to art that in whole or in part has been created with the use of an autonomous system. 
+Instead of creating random dynamics we rely on what is core to the book: The evolution of financial markets. 
+Thus, each circle in the logo corresponds to daily market returns within one year of our sample. The colors are determined by the standard deviation of market returns during the particular year. The few lines of code below replicate the entire figure. 
+
 
 ```r
 library(tidyverse)
 library(RSQLite)
 library(wesanderson)
 
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
-mfac <- tbl(tidy_finance, "factors_ff_daily") %>%
+tidy_finance <- dbConnect(SQLite(), 
+                          "data/tidy_finance.sqlite", 
+                          extended_types = TRUE)
+mfac <- tbl(tidy_finance, 
+            "factors_ff_daily") %>%
   collect()
 
 cp <- coord_polar(direction = -1, clip = "on")

@@ -1,7 +1,3 @@
-<!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
-<!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
-<!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
-
 # Replicating Fama & French factors
 
 The Fama and French three-factor model (see @Fama1993) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this chapter, we also want to show the main idea of how to replicate these significant factors. 
@@ -20,29 +16,29 @@ We use CRSP and Compustat as data sources, as we need exactly the same variables
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-data_ff <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+data_ff <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(
     permno, gvkey, month, ret_excess, mkt_excess,
     mktcap, mktcap_lag, exchange
-  ) %>%
+  ) |>
   drop_na()
 
-be <- compustat %>%
-  select(gvkey, datadate, be) %>%
+be <- compustat |>
+  select(gvkey, datadate, be) |>
   drop_na()
 ```
 
@@ -56,27 +52,27 @@ To implement all these time lags, we again employ the temporary `sorting_date`-c
 
 
 ```r
-me_ff <- data_ff %>%
-  filter(month(month) == 6) %>%
-  mutate(sorting_date = month %m+% months(1)) %>%
+me_ff <- data_ff |>
+  filter(month(month) == 6) |>
+  mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me_ff = mktcap)
 
-me_ff_dec <- data_ff %>%
-  filter(month(month) == 12) %>%
-  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) %>%
+me_ff_dec <- data_ff |>
+  filter(month(month) == 12) |>
+  mutate(sorting_date = ymd(str_c(year(month) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
-bm_ff <- be %>%
-  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) %>%
-  select(gvkey, sorting_date, bm_be = be) %>%
-  drop_na() %>%
-  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) %>%
-  mutate(bm_ff = bm_be / bm_me) %>%
+bm_ff <- be |>
+  mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
+  select(gvkey, sorting_date, bm_be = be) |>
+  drop_na() |>
+  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) |>
+  mutate(bm_ff = bm_be / bm_me) |>
   select(permno, sorting_date, bm_ff)
 
-variables_ff <- me_ff %>%
-  inner_join(bm_ff, by = c("permno", "sorting_date")) %>%
-  drop_na() %>%
+variables_ff <- me_ff |>
+  inner_join(bm_ff, by = c("permno", "sorting_date")) |>
+  drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
@@ -87,24 +83,25 @@ Next, we construct our portfolios with an adjusted `assign_portfolio()` function
 
 ```r
 assign_portfolio <- function(data, var, percentiles) {
-  breakpoints <- data %>%
-    filter(exchange == "NYSE") %>%
+  breakpoints <- data |>
+    filter(exchange == "NYSE") |>
     summarize(breakpoint = quantile(
       {{ var }},
       probs = {{ percentiles }},
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval({{ var }},
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 
-portfolios_ff <- variables_ff %>%
-  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) %>%
-  group_by(sorting_date) %>%
+portfolios_ff <- variables_ff |>
+  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) |>
+  group_by(sorting_date) |>
   mutate(
     portfolio_me = assign_portfolio(
       data = cur_data(),
@@ -116,7 +113,7 @@ portfolios_ff <- variables_ff %>%
       var = bm_ff,
       percentiles = c(0, 0.3, 0.7, 1)
     )
-  ) %>%
+  ) |>
   select(permno, sorting_date, portfolio_me, portfolio_bm)
 ```
 
@@ -124,11 +121,11 @@ Next, we merge the portfolios to the return data for the rest of the year. To im
 
 
 ```r
-portfolios_ff <- data_ff %>%
+portfolios_ff <- data_ff |>
   mutate(sorting_date = case_when(
-    month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
-    month(month) >= 7 ~ ymd(paste0(year(month), "0701"))
-  )) %>%
+    month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
+    month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
+  )) |>
   inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
 
@@ -139,18 +136,20 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 
 
 ```r
-factors_ff_monthly_replicated <- portfolios_ff %>%
-  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
-  group_by(portfolio, month) %>%
+factors_ff_monthly_replicated <- portfolios_ff |>
+  mutate(portfolio = str_c(portfolio_me, portfolio_bm)) |>
+  group_by(portfolio, month) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
     portfolio_me = unique(portfolio_me),
     portfolio_bm = unique(portfolio_bm)
-  ) %>%
-  group_by(month) %>%
+  ) |>
+  group_by(month) |>
   summarize(
-    smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
-    hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1])
+    smb_replicated = mean(ret[portfolio_me == 1]) - 
+      mean(ret[portfolio_me == 2]),
+    hml_replicated = mean(ret[portfolio_bm == 3]) - 
+      mean(ret[portfolio_bm == 1])
   )
 ```
 
@@ -161,8 +160,8 @@ In the previous section, we replicated the size and value premiums following the
 
 
 ```r
-test <- factors_ff_monthly %>%
-  inner_join(factors_ff_monthly_replicated, by = "month") %>%
+test <- factors_ff_monthly |>
+  inner_join(factors_ff_monthly_replicated, by = "month") |>
   mutate(
     smb_replicated = round(smb_replicated, 4),
     hml_replicated = round(hml_replicated, 4)

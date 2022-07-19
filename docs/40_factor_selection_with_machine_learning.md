@@ -2,25 +2,25 @@
 
 # Factor selection via machine learning
 
-The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* @Cochrane2011. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta. 
+The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta. 
 Such findings question the usefulness of the Capital Asset Pricing Model. 
-In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). 
-Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. 
+In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016 and @Hou2020.
+Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. During recent years, promising methods from the vast field of machine learning (ML) got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perseptive of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
 We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions for identifying macro-economic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
 ## Brief theoretical background
 
-This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow. 
+This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion [e.g., @Hastie2009, @Hastie2013, @DePrado2018]. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
-While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = {\hat\beta^\text{ols}}' \tilde x_t.$$ 
+While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = \hat\beta^\text{ols}{}' \tilde x_t.$$ 
 Is this the best we can do? 
 Not really: Instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators $\hat{\beta}$ with lower variance than the estimator $\hat\beta^\text{ols}$. 
-At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set $\hat\beta_k = 0$ for some redundant factors. 
+At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set $\hat\beta^{\text{ols}}_k = 0$ for some redundant factors. 
 
-It should be clear that the promised benefits of penalized regressions come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$$ While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. For instance, the mean-squared error (MSE) depends on our model choice as follow: $$\begin{aligned}
+It should be clear that the promised benefits of penalized regressions (reducing the mean squared error) come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$$ While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. For instance, the mean-squared error (MSE) depends on our model choice as follow: $$\begin{aligned}
 MSE &=E((y-\hat{f}(\textbf{x}))^2)=E((f(\textbf{x})+\epsilon-\hat{f}(\textbf{x}))^2)\\
 &= \underbrace{E((f(\textbf{x})-\hat{f}(\textbf{x}))^2)}_{\text{total quadratic error}}+\underbrace{E(\epsilon^2)}_{\text{irreducible error}} \\
 &= E\left(\hat{f}(\textbf{x})^2\right)+E\left(f(\textbf{x})^2\right)-2E\left(f(\textbf{x})\hat{f}(\textbf{x})\right)+\sigma_\varepsilon^2\\
@@ -30,30 +30,33 @@ MSE &=E((y-\hat{f}(\textbf{x}))^2)=E((f(\textbf{x})+\epsilon-\hat{f}(\textbf{x})
 
 ### Ridge regression
 
-One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$ the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq \lambda$. Here, $X = \left(x_1  \ldots  x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.$$ A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. But note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*.
-Usually, $X$ contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that $y$ is simply demeaned before computing $\hat\beta^\text{ridge}$.
+One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$ the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here, $X = \left(x_1  \ldots  x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.$$ A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: A larger value of $\lambda$ implies *shrinkage* of the regression coefficient towards 0, a smaller value of $\lambda$ reduces the bias of the resulting estimator.     
 
-What about the statistical properties of the Ridge estimator?  First, the bad news is that $\hat\beta^\text{ridge}$ is a biased estimator of $\beta$. However, the good news is that (under homoscedastic error terms) the variance of the Ridge estimator is *smaller* than the variance of the ordinary least square estimator. We encourage you to verify these two statements in the exercises. As a result, we face a trade-off: The Ridge regression sacrifices some bias to achieve a smaller variance than the OLS estimator.
+::: {.rmdnote}
+Usually, $X$ contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that $y$ is simply demeaned before computing $\hat\beta^\text{ridge}$.
+::: 
+
+What about the statistical properties of the Ridge estimator? First, the bad news is that $\hat\beta^\text{ridge}$ is a biased estimator of $\beta$. However, the good news is that (under homoscedastic error terms) the variance of the Ridge estimator is guaranteed to be *smaller* than the variance of the ordinary least square estimator. We encourage you to verify these two statements in the exercises. As a result, we face a trade-off: The Ridge regression sacrifices some bias to achieve a smaller variance than the OLS estimator.
 
 ### Lasso
 
 An alternative to Ridge regression is the Lasso (*l*east *a*bsolute *s*hrinkage and *s*election *o*perator). Similar to Ridge regression, the Lasso [@Tibshirani1996] is a penalized and biased estimator. 
-The main difference to Ridge regression is that Lasso does not only *shrink* coefficients but effectively selects variables by setting coefficients for *irrelevant* variables to zero. Lasso implements a $L_1$ penalization on the parameters such that: $$\hat\beta^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.$$ There is no closed form solution for $\hat\beta^\text{Lasso}$ in the above maximization problem but efficient algorithms exist (e.g., the R package `glmnet`). Like for Ridge regression, the hyperparameter $\lambda$ has to be specified beforehand.
+The main difference to Ridge regression is that Lasso does not only *shrink* coefficients but effectively selects variables by setting coefficients for *irrelevant* variables to zero. Lasso implements a $L_1$ penalization on the parameters such that: $$\hat\beta^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right)\text{ s.t. } \sum\limits_{k=1}^K|\beta_k| < c.$$ There is no closed form solution for $\hat\beta^\text{Lasso}$ in the above maximization problem but efficient algorithms exist (e.g., the R package `glmnet`). Like for Ridge regression, the hyperparameter $\lambda$ has to be specified beforehand.
 
 ### Elastic Net
 
-The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages a grouping effect where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: $$\hat\beta^\text{EN} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda(1-\rho)\sum\limits_{k=1}^K|\beta_k| +\frac{1}{2}\lambda\rho\sum\limits_{k=1}^K\beta_k^2$$ Now, we have to chose two hyperparameters: the *shrinkage* factor $\lambda$ and the *weighting parameter* $\rho$. The Elastic Net resembles Lasso for $\rho = 1$ and Ridge regression for $\rho = 0$.
-While the R package `glmnet` provides efficient algorithms to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use the `glmnet` package or the `tidymodels` back-end.
+The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages a grouping effect where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: $$\hat\beta^\text{EN} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda(1-\rho)\sum\limits_{k=1}^K|\beta_k| +\frac{1}{2}\lambda\rho\sum\limits_{k=1}^K\beta_k^2$$ Now, we have to chose two hyperparameters: the *shrinkage* factor $\lambda$ and the *weighting parameter* $\rho$. The Elastic Net resembles Lasso for $\rho = 1$ and Ridge regression for $\rho = 0$. While the R package `glmnet` provides efficient algorithms to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use the `glmnet` package or the `tidymodels` back-end.
 
 ## Data preparation
 
-To get started, we load the required packages and data. The main focus is on the workflow behind the amazing `tidymodels` package collection. 
+To get started, we load the required packages and data. The main focus is on the workflow behind the amazing `tidymodels` package collection. @Kuhn2022 provide a thorough introduction into all `tidymodels` components.
+
 
 ```r
 library(RSQLite)
 library(tidyverse)
-library(tidymodels) 
-library(furrr) 
+library(tidymodels)
+library(furrr)
 library(glmnet)
 library(broom)
 library(timetk)
@@ -65,7 +68,7 @@ In this analysis, we use four different data sources that we load from our `SQLi
 -   The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993
 -   Monthly q-factor returns from @Hou2015. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor
 
-Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to @Cochrane2005 on the role of conditioning information.
+Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to @Cochrane2009 on the role of conditioning information.
 
 - Our set of macroeconomic predictors comes from the paper "A Comprehensive Look at The Empirical Performance of Equity Premium Prediction" [@Goyal2008]. The data has been updated by the authors until 2020 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the Dividend Price Ratio, Earnings Price Ratio, Stock Variance, Net Equity Expansion, Treasury Bill rate, and inflation
 
@@ -75,71 +78,64 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+)
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
-  collect() %>%
-  rename_with(~ paste0("factor_ff_", .), -month)
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+  collect() |>
+  rename_with(~ str_c("factor_ff_", .), -month)
 
-factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") %>%
-  collect() %>%
-  rename_with(~ paste0("factor_q_", .), -month)
+factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") |>
+  collect() |>
+  rename_with(~ str_c("factor_q_", .), -month)
 
-macro_predictors <- tbl(tidy_finance, "macro_predictors") %>%
-  collect() %>%
-  rename_with(~ paste0("macro_", .), -month) %>%
+macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
+  collect() |>
+  rename_with(~ str_c("macro_", .), -month) |>
   select(-macro_rp_div)
 
-industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") %>%
-  collect() %>%
-  pivot_longer(-month, 
-               names_to = "industry", values_to = "ret") %>%
+industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
+  collect() |>
+  pivot_longer(-month,
+    names_to = "industry", values_to = "ret"
+  ) |>
   mutate(industry = as_factor(industry))
 ```
 
-We combine all observations into one data frame.
+We combine all the monthly observations into one data frame.
 
 
 ```r
-data <- industries_ff_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
-  left_join(factors_q_monthly, by = "month") %>%
-  left_join(macro_predictors, by = "month") %>%
+data <- industries_ff_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
+  left_join(factors_q_monthly, by = "month") |>
+  left_join(macro_predictors, by = "month") |>
   mutate(
     ret = ret - factor_ff_rf
-  ) %>% 
-  select(month, industry, ret, everything()) %>%
+  ) |>
+  select(month, industry, ret, everything()) |>
   drop_na()
 ```
 
 Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. 
-The table below provides annualized summary statistics for the 49 industries such as the sample standard deviation and the minimum and maximum monthly excess returns in percent.
+The figure below provides summary statistics for the 10 monthly industry excess returns in percent.
 
 
 ```r
-data %>%
-  group_by(industry) %>%
-  mutate(ret = 100 * ret) %>%
-  summarize(
-    mean = mean(12 * ret),
-    sd = sqrt(12) * sd(ret),
-    min_monthly = min(ret),
-    median = median(12 * ret),
-    max_monthly = max(ret)
+data |>
+  group_by(industry) |>
+  mutate(ret = 100 * ret) |>
+  ggplot(aes(x = industry, y = ret)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(
+    x = NULL, y = NULL,
+    title = "Industry excess return distribtion (in %)"
   )
 ```
 
-```
-## # A tibble: 49 × 6
-##   industry  mean    sd min_monthly median max_monthly
-##   <fct>    <dbl> <dbl>       <dbl>  <dbl>       <dbl>
-## 1 Agric     6.90  22.4       -29.6   3.6         28.4
-## 2 Food      8.37  15.5       -18.5   8.52        19.0
-## 3 Soda      9.14  22.1       -27.1  11.9         38.0
-## 4 Beer      9.20  18.0       -20.2  10.2         25.5
-## 5 Smoke    11.9   21.4       -25.3  16.1         32.4
-## # … with 44 more rows
-```
+<img src="40_factor_selection_with_machine_learning_files/figure-html/industryreturns-1.png" width="672" style="display: block; margin: auto;" />
 
 ## The tidymodels workflow
 
@@ -149,13 +145,16 @@ The `tidymodels` workflow encompasses the main stages of the modeling process: p
 
 Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
-To start, we restrict our analysis to just one industry: Agricultur. We first split the sample into a *training* and a *test* set. For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. The split takes the last 20% of the data as a test set, which is not used for any model tuning. We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
+To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. 
+For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package. 
+The split takes the last 20% of the data as a test set, which is not used for any model tuning. 
+We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
 
 
 ```r
 split <- initial_time_split(
-  data %>%
-    filter(industry == "Agric") %>%
+  data |>
+    filter(industry == "Manuf") |>
     select(-industry),
   prop = 4 / 5
 )
@@ -163,11 +162,12 @@ split
 ```
 
 ```
-## <Analysis/Assess/Total>
+## <Training/Testing/Total>
 ## <517/130/647>
 ```
 
-The object `split` simply keeps track of the observations of the training and the test set. We can call the training set with `training(split)`, while we can extract the test set with `testing(split)`.
+The object `split` simply keeps track of the observations of the training and the test set. 
+We can call the training set with `training(split)`, while we can extract the test set with `testing(split)`.
 
 ### Pre-process data
 
@@ -180,14 +180,14 @@ Recipes help you pre-process your data before training your model. Recipes are a
 
 
 ```r
-rec <- recipe(ret ~ ., data = training(split)) %>%
-  step_rm(month) %>% 
-  step_interact(terms = ~ contains("factor"):contains("macro")) %>% 
-  step_normalize(all_predictors()) %>%
+rec <- recipe(ret ~ ., data = training(split)) |>
+  step_rm(month) |>
+  step_interact(terms = ~ contains("factor"):contains("macro")) |>
+  step_normalize(all_predictors()) |>
   step_center(ret, skip = TRUE)
 ```
 
-A table of all available recipe steps can be found [here](https://www.tidymodels.org/find/recipes/). As of 2022, more than 100 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
+A table of all available recipe steps can be found [here](https://www.tidymodels.org/find/recipes/). As of 2022, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
 In the example above, it does not make a difference whether you use the input `data = training(split)` or `data = testing(split)`. 
 All that matters at this early stage are the column names and types.
 
@@ -224,7 +224,7 @@ You may ask at this stage: Why should I use a recipe instead of simply using the
 ### Build a model
 
 Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
-$$\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow` and use the `fit` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
+$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow` and use the `fit` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
 For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
 
 
@@ -232,7 +232,7 @@ For now, we start with the linear regression model with a given value for the pe
 lm_model <- linear_reg(
   penalty = 0.0001,
   mixture = 1
-) %>%
+) |>
   set_engine("glmnet", intercept = FALSE)
 ```
 
@@ -240,8 +240,8 @@ That's it - we are done! The object `lm_model` contains the definition of our mo
 
 
 ```r
-lm_fit <- workflow() %>%
-  add_recipe(rec) %>%
+lm_fit <- workflow() |>
+  add_recipe(rec) |>
   add_model(lm_model)
 lm_fit
 ```
@@ -276,29 +276,28 @@ lm_fit
 
 With the `workflow` from above, we are ready to use `fit`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Agricultur industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 
 ```r
-predicted_values <- lm_fit %>%
-  fit(data = training(split)) %>%
-  predict(data %>% filter(industry == "Agric")) %>%
-  bind_cols(data %>% filter(industry == "Agric")) %>%
-  select(month, .pred, ret) %>%
-  pivot_longer(-month, names_to = "Variable") %>%
-  mutate(Variable = case_when(
-    Variable == ".pred" ~ "Fitted value",
-    Variable == "ret" ~ "Realization"
-  )) 
+predicted_values <- lm_fit |>
+  fit(data = training(split)) |>
+  predict(data |> filter(industry == "Manuf")) |>
+  bind_cols(data |> filter(industry == "Manuf")) |>
+  select(month,
+    "Fitted value" = .pred,
+    "Realization" = ret
+  ) |>
+  pivot_longer(-month, names_to = "Variable")
 
-predicted_values %>%
+predicted_values |>
   ggplot(aes(x = month, y = value, color = Variable)) +
   geom_line() +
   labs(
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted agricultural industry risk premia"
+    title = "Monthly realized and fitted manufacturing industry risk premia"
   ) +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), to = max(x), by = "5 years"),
@@ -308,12 +307,13 @@ predicted_values %>%
   ) +
   scale_y_continuous(
     labels = percent
-  ) + 
-  annotate("rect", 
-           xmin = testing(split) %>% pull(month) %>% min(), 
-           xmax = testing(split) %>% pull(month) %>% max(), 
-           ymin = -Inf, ymax = Inf, 
-           alpha = 0.5, fill="grey70")
+  ) +
+  annotate("rect",
+    xmin = testing(split) |> pull(month) |> min(),
+    xmax = testing(split) |> pull(month) |> max(),
+    ymin = -Inf, ymax = Inf,
+    alpha = 0.5, fill = "grey70"
+  )
 ```
 
 <img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-9-1.png" width="672" style="display: block; margin: auto;" />
@@ -322,22 +322,26 @@ What do the estimated coefficients look like? To analyze these values and to ill
 
 
 ```r
-x <- tmp_data %>%
-  select(-ret) %>%
+x <- tmp_data |>
+  select(-ret) |>
   as.matrix()
-y <- tmp_data %>% pull(ret)
+y <- tmp_data |> pull(ret)
 
 fit_lasso <- glmnet(
   x = x,
   y = y,
-  alpha = 1, intercept = FALSE, standardize = FALSE,
+  alpha = 1,
+  intercept = FALSE,
+  standardize = FALSE,
   lambda.min.ratio = 0
 )
 
 fit_ridge <- glmnet(
   x = x,
   y = y,
-  alpha = 0, intercept = FALSE, standardize = FALSE,
+  alpha = 0,
+  intercept = FALSE,
+  standardize = FALSE,
   lambda.min.ratio = 0
 )
 ```
@@ -347,17 +351,18 @@ The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated 
 
 ```r
 bind_rows(
-  tidy(fit_lasso) %>% mutate(Model = "Lasso"),
-  tidy(fit_ridge) %>% mutate(Model = "Ridge")
-) %>%
-  rename("Variable" = term) %>%
+  tidy(fit_lasso) |> mutate(Model = "Lasso"),
+  tidy(fit_ridge) |> mutate(Model = "Ridge")
+) |>
+  rename("Variable" = term) |>
   ggplot(aes(x = lambda, y = estimate, color = Variable)) +
   geom_line() +
   scale_x_log10() +
   facet_wrap(~Model, scales = "free_x") +
   labs(
     x = "Lambda", y = NULL,
-    title = "Estimated Coefficients paths as a function of the penalty factor"
+    title = "Estimated Coefficients paths as a
+    function of the penalty factor"
   ) +
   theme(legend.position = "none")
 ```
@@ -383,7 +388,7 @@ Cross-validation is a technique that allows us to alleviate this problem. We app
 2.  Obtain predictors $\hat{y}_i(\lambda)$ to denote the predictors for the used parameters $\lambda$.
 3.  Compute $$
     \text{MSPE}(\lambda) = \frac{1}{K} \sum_{k=1}^K \frac{1}{T}\sum_{t=1}^T \left(\hat{y}_t^k(\lambda) - y_t^k\right)^2 
-    $$ With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_\tilde{T}^k$, with $k=1$.
+    $$ With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_{\tilde{T}}^k$, with $k=1$.
 
 How should you pick $K$? Large values of $K$ are preferable because the training data better imitates the original data. However, larger values of $K$ will have much higher computation time.
 `tidymodels` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model`. 
@@ -393,10 +398,10 @@ How should you pick $K$? Large values of $K$ are preferable because the training
 lm_model <- linear_reg(
   penalty = tune(),
   mixture = tune()
-) %>%
+) |>
   set_engine("glmnet")
 
-lm_fit <- lm_fit %>%
+lm_fit <- lm_fit |>
   update_model(lm_model)
 ```
 
@@ -418,7 +423,7 @@ Then, we evaluate the performance for a grid of different penalty values. `tidym
 
 
 ```r
-lm_tune <- lm_fit %>%
+lm_tune <- lm_fit |>
   tune_grid(
     resample = data_folds,
     grid = grid_regular(penalty(), mixture(), levels = c(10, 3)),
@@ -431,9 +436,11 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 
 ```r
 autoplot(lm_tune) +
-  labs(y = "Root mean-squared prediction error",
-       title = "MSPE for Agricultur excess returns",
-       subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization.")
+  labs(
+    y = "Root mean-squared prediction error",
+    title = "MSPE for Manufacturing excess returns",
+    subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization."
+  )
 ```
 
 <img src="40_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-15-1.png" width="672" style="display: block; margin: auto;" />
@@ -451,10 +458,10 @@ First, we define the Lasso model with one tuning parameter.
 lasso_model <- linear_reg(
   penalty = tune(),
   mixture = 1
-) %>%
+) |>
   set_engine("glmnet")
 
-lm_fit <- lm_fit %>%
+lm_fit <- lm_fit |>
   update_model(lasso_model)
 ```
 
@@ -477,7 +484,7 @@ select_variables <- function(input) {
   )
 
   # Model tuning with the Lasso model
-  lm_tune <- lm_fit %>%
+  lm_tune <- lm_fit |>
     tune_grid(
       resample = data_folds,
       grid = grid_regular(penalty(), levels = c(10)),
@@ -485,26 +492,27 @@ select_variables <- function(input) {
     )
 
   # Finalizing: Identify the best model and fit with the training data
-  lasso_lowest_rmse <- lm_tune %>% select_by_one_std_err("rmse")
+  lasso_lowest_rmse <- lm_tune |> select_by_one_std_err("rmse")
   lasso_final <- finalize_workflow(lm_fit, lasso_lowest_rmse)
   lasso_final_fit <- last_fit(lasso_final, split, metrics = metric_set(rmse))
 
   # Extract the estimated coefficients
-  lasso_final_fit %>%
-    extract_fit_parsnip() %>%
-    tidy() %>%
+  lasso_final_fit |>
+    extract_fit_parsnip() |>
+    tidy() |>
     mutate(
-      term = gsub("factor_|macro_|industry_", "", term)
+      term = str_remove_all(term, "factor_|macro_|industry_")
     )
 }
 
 # Parallelization
-plan(multisession, workers = availableCores()) 
+plan(multisession, workers = availableCores())
 
 # Computation by industry
-selected_factors <- data %>%
-  nest(data = -industry) %>% 
-  mutate(selected_variables = future_map(data, select_variables,
+selected_factors <- data |>
+  nest(data = -industry) |>
+  mutate(selected_variables = future_map(
+    data, select_variables,
     .options = furrr_options(seed = TRUE)
   ))
 ```
@@ -514,23 +522,23 @@ Now, we just have to do some housekeeping and keep only variables that Lasso doe
 
 
 ```r
-selected_factors %>%
-  unnest(selected_variables) %>%
+selected_factors |>
+  unnest(selected_variables) |>
   filter(
     term != "(Intercept)",
     estimate != 0
-  ) %>%
-  add_count(term) %>%
+  ) |>
+  add_count(term) |>
   mutate(
-    term = gsub("NA|ff_|q_", "", term),
-    term = gsub("_x_", " ", term),
+    term = str_remove_all(term, "NA|ff_|q_"),
+    term = str_replace_all(term, "_x_", " "),
     term = fct_reorder(as_factor(term), n),
     term = fct_lump_min(term, min = 2),
     selected = 1
-  ) %>%
-  filter(term != "Other") %>%
-  mutate(term = fct_drop(term)) %>%
-  complete(industry, term, fill = list(selected = 0)) %>%
+  ) |>
+  filter(term != "Other") |>
+  mutate(term = fct_drop(term)) |>
+  complete(industry, term, fill = list(selected = 0)) |>
   ggplot(aes(industry,
     term,
     fill = as_factor(selected)

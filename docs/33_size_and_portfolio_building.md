@@ -18,18 +18,21 @@ library(sandwich)
 library(lmtest)
 library(scales)
 library(furrr)
+library(rlang)
 ```
 
 First, we retrieve the relevant data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE)
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+)
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
@@ -42,26 +45,26 @@ The figure shows that the largest 1% of firms cover up to 50% of the total marke
 
 
 ```r
-crsp_monthly %>%
-  group_by(month) %>%
+crsp_monthly |>
+  group_by(month) |>
   mutate(
     top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1L, 0L),
     top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1L, 0L),
     top10 = if_else(mktcap >= quantile(mktcap, 0.90), 1L, 0L),
     top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1L, 0L),
     total_market_cap = sum(mktcap)
-  ) %>%
+  ) |>
   summarize(
     `Largest 1% of stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
     `Largest 5% of stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
     `Largest 10% of stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
     `Largest 25% of stocks` = sum(mktcap[top25 == 1]) / total_market_cap
-  ) %>%
-  pivot_longer(cols = -month) %>%
+  ) |>
+  pivot_longer(cols = -month) |>
   mutate(name = factor(name, levels = c(
     "Largest 1% of stocks", "Largest 5% of stocks",
     "Largest 10% of stocks", "Largest 25% of stocks"
-  ))) %>%
+  ))) |>
   ggplot(aes(x = month, y = value, color = name)) +
   geom_line() +
   scale_y_continuous(labels = percent, limits = c(0, 1)) +
@@ -77,10 +80,10 @@ Next, firm sizes also differ across listing exchanges. Stocks' primary listings 
 
 
 ```r
-crsp_monthly %>%
-  group_by(month, exchange) %>%
-  summarize(mktcap = sum(mktcap)) %>%
-  mutate(share = mktcap / sum(mktcap)) %>%
+crsp_monthly |>
+  group_by(month, exchange) |>
+  summarize(mktcap = sum(mktcap)) |>
+  mutate(share = mktcap / sum(mktcap)) |>
   ggplot(aes(x = month, y = share, fill = exchange, color = exchange)) +
   geom_area(
     position = "stack",
@@ -97,15 +100,15 @@ crsp_monthly %>%
 
 <img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" />
 
-Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The pre-build function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
+Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
 
 The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 
 ```r
 create_summary <- function(data, column_name) {
-  data %>%
-    select(value = {{ column_name }}) %>%
+  data |>
+    select(value = {{ column_name }}) |>
     summarize(
       mean = mean(value),
       sd = sd(value),
@@ -120,13 +123,13 @@ create_summary <- function(data, column_name) {
     )
 }
 
-crsp_monthly %>%
-  filter(month == max(month)) %>%
-  group_by(exchange) %>%
-  create_summary(mktcap) %>%
-  add_row(crsp_monthly %>%
-    filter(month == max(month)) %>%
-    create_summary(mktcap) %>%
+crsp_monthly |>
+  filter(month == max(month)) |>
+  group_by(exchange) |>
+  create_summary(mktcap) |>
+  add_row(crsp_monthly |>
+    filter(month == max(month)) |>
+    create_summary(mktcap) |>
     mutate(exchange = "Overall"))
 ```
 
@@ -145,25 +148,26 @@ crsp_monthly %>%
 
 In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks. 
 
-To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(grepl(exchanges, exchange))`. The function `grepl()` is part of a family of functions on *regular expressions*, which provide various functionalities to work and manipulate character strings. Here, we replace the character string stored in the column `exchange` with a binary variable that indicates if the string matches the pattern specified in the argument `exchanges`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = 'NYSE|NASDAQ|AMEX'`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
+To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
 
 ```r
 assign_portfolio <- function(n_portfolios,
                              exchanges,
                              data) {
-  breakpoints <- data %>%
-    filter(grepl(exchanges, exchange)) %>%
+  breakpoints <- data |>
+    filter(exchange %in% exchanges) |>
     summarize(breakpoint = quantile(
       mktcap_lag,
       probs = seq(0, 1, length.out = n_portfolios + 1),
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval(mktcap_lag, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval(mktcap_lag, 
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 ```
@@ -177,22 +181,25 @@ We implement the two weighting schemes in the function `compute_portfolio_return
 
 ```r
 compute_portfolio_returns <- function(n_portfolios = 10,
-                                      exchanges = "NYSE|NASDAQ|AMEX",
+                                      exchanges = c("NYSE", "NASDAQ", "AMEX"),
                                       value_weighted = TRUE,
                                       data = crsp_monthly) {
-  data %>%
-    group_by(month) %>%
+  data |>
+    group_by(month) |>
     mutate(portfolio = assign_portfolio(
       n_portfolios = n_portfolios,
       exchanges = exchanges,
       data = cur_data()
-    )) %>%
-    group_by(month, portfolio) %>%
+    )) |>
+    group_by(month, portfolio) |>
     summarize(
-      ret = if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess)),
+      ret = if_else(value_weighted, 
+                    weighted.mean(ret_excess, mktcap_lag), 
+                    mean(ret_excess)),
       .groups = "drop_last"
-    ) %>%
-    summarize(size_premium = ret[portfolio == min(portfolio)] - ret[portfolio == max(portfolio)]) %>%
+    ) |>
+    summarize(size_premium = ret[portfolio == min(portfolio)] - 
+                ret[portfolio == max(portfolio)]) |>
     summarize(size_premium = mean(size_premium))
 }
 ```
@@ -203,7 +210,7 @@ To see how the function `compute_portfolio_returns()` works, we consider a simpl
 ```r
 ret_all <- compute_portfolio_returns(
   n_portfolios = 2,
-  exchanges = "NYSE|NASDAQ|AMEX",
+  exchanges = c("NYSE", "NASDAQ", "AMEX"),
   value_weighted = TRUE,
   data = crsp_monthly
 )
@@ -215,15 +222,16 @@ ret_nyse <- compute_portfolio_returns(
   data = crsp_monthly
 )
 
-tibble(Exchanges = c("all", "NYSE"), Premium = as.numeric(c(ret_all, ret_nyse)) * 100)
+tibble(Exchanges = c("NYSE, NASDAQ & AMEX", "NYSE"), 
+       Premium = as.numeric(c(ret_all, ret_nyse)) * 100)
 ```
 
 ```
 ## # A tibble: 2 × 2
-##   Exchanges Premium
-##   <chr>       <dbl>
-## 1 all         0.110
-## 2 NYSE        0.181
+##   Exchanges           Premium
+##   <chr>                 <dbl>
+## 1 NYSE, NASDAQ & AMEX   0.110
+## 2 NYSE                  0.181
 ```
 
 The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
@@ -236,17 +244,18 @@ From a malicious perspective, these modeling choices give the researcher multipl
 
 Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature. 
 
-Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `expand_grid()` produces a table of all possible permutations of its arguments. Notice that we use the argument `data` to exclude financial firms and truncate the time series. 
+Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `expand_grid()` produces a table of all possible permutations of its arguments. Note that we use the argument `data` to exclude financial firms and truncate the time series. 
 
 
 ```r
 p_hacking_setup <- expand_grid(
   n_portfolios = c(2, 5, 10),
-  exchanges = c("NYSE", "NYSE|NASDAQ|AMEX"),
+  exchanges = list("NYSE", c("NYSE", "NASDAQ", "AMEX")),
   value_weighted = c(TRUE, FALSE),
-  data = rlang::parse_exprs('crsp_monthly; crsp_monthly %>% filter(industry != "Finance");
-                             crsp_monthly %>% filter(month < "1990-06-01");
-                             crsp_monthly %>% filter(month >="1990-06-01")')
+  data = parse_exprs(
+  'crsp_monthly; crsp_monthly |> filter(industry != "Finance");
+   crsp_monthly |> filter(month < "1990-06-01");
+   crsp_monthly |> filter(month >="1990-06-01")')
 )
 p_hacking_setup
 ```
@@ -254,12 +263,12 @@ p_hacking_setup
 ```
 ## # A tibble: 48 × 4
 ##   n_portfolios exchanges value_weighted data      
-##          <dbl> <chr>     <lgl>          <list>    
-## 1            2 NYSE      TRUE           <sym>     
-## 2            2 NYSE      TRUE           <language>
-## 3            2 NYSE      TRUE           <language>
-## 4            2 NYSE      TRUE           <language>
-## 5            2 NYSE      FALSE          <sym>     
+##          <dbl> <list>    <lgl>          <list>    
+## 1            2 <chr [1]> TRUE           <sym>     
+## 2            2 <chr [1]> TRUE           <language>
+## 3            2 <chr [1]> TRUE           <language>
+## 4            2 <chr [1]> TRUE           <language>
+## 5            2 <chr [1]> FALSE          <sym>     
 ## # … with 43 more rows
 ```
 
@@ -269,7 +278,7 @@ To speed the computation up we parallelize the (many) different sorting procedur
 ```r
 plan(multisession, workers = availableCores())
 
-p_hacking_setup <- p_hacking_setup %>%
+p_hacking_setup <- p_hacking_setup |>
   mutate(size_premium = future_pmap(
     .l = list(
       n_portfolios,
@@ -281,27 +290,26 @@ p_hacking_setup <- p_hacking_setup %>%
       n_portfolios = ..1,
       exchanges = ..2,
       value_weighted = ..3,
-      data = rlang::eval_tidy(..4)
+      data = eval_tidy(..4)
     )
   ))
 
-p_hacking_results <- p_hacking_setup %>%
-  mutate(data = map_chr(data, deparse)) %>%
-  unnest(size_premium) %>%
-  mutate(data = str_remove(data, "crsp_monthly %>% ")) %>%
+p_hacking_results <- p_hacking_setup |>
+  mutate(data = map_chr(data, deparse)) |>
+  unnest(size_premium) |>
   arrange(desc(size_premium))
 p_hacking_results
 ```
 
 ```
 ## # A tibble: 48 × 5
-##   n_portfolios exchanges        value_weighted data                  size_premium
-##          <dbl> <chr>            <lgl>          <chr>                        <dbl>
-## 1           10 NYSE|NASDAQ|AMEX FALSE          "filter(month >= \"1…       0.0184
-## 2           10 NYSE|NASDAQ|AMEX FALSE          "filter(industry != …       0.0180
-## 3           10 NYSE|NASDAQ|AMEX FALSE          "crsp_monthly"              0.0162
-## 4           10 NYSE|NASDAQ|AMEX FALSE          "filter(month < \"19…       0.0139
-## 5           10 NYSE|NASDAQ|AMEX TRUE           "filter(industry != …       0.0114
+##   n_portfolios exchanges value_weighted data                         size_premium
+##          <dbl> <list>    <lgl>          <chr>                               <dbl>
+## 1           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0184
+## 2           10 <chr [3]> FALSE          "filter(crsp_monthly, indus…       0.0180
+## 3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0162
+## 4           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0139
+## 5           10 <chr [3]> TRUE           "filter(crsp_monthly, indus…       0.0114
 ## # … with 43 more rows
 ```
 
@@ -311,7 +319,7 @@ We provide a graph that shows the different premiums. This plot also shows the r
 
 
 ```r
-p_hacking_results %>%
+p_hacking_results |>
   ggplot(aes(x = size_premium)) +
   geom_histogram(bins = nrow(p_hacking_results)) +
   labs(
@@ -330,7 +338,7 @@ p_hacking_results %>%
 
 ## Exercises
 
-1. We gained several insights on the size distribution above. However, we did not analyse the average size across exchanges and industries. Which exchanges/industries have the largest firms? Plot the average firm size for the three exchanges over time. What do you see?
+1. We gained several insights on the size distribution above. However, we did not analyze the average size across exchanges and industries. Which exchanges/industries have the largest firms? Plot the average firm size for the three exchanges over time. What do you see?
 1. We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.
 1. The returns that we analyse above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_portfolio_returns()` to output the CAPM alpha or beta instead of the average excess return. 
 1. While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.
