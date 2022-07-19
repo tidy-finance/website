@@ -471,7 +471,9 @@ compustat <- funda_db |>
     itcb, # Investment tax credit
     pstkrv, # Preferred stock redemption value
     pstkl, # Preferred stock liquidating value
-    pstk # Preferred stock par value
+    pstk, # Preferred stock par value
+    capx, # Capital investment
+    oancf # Operating cash flow
   ) |>
   collect()
 ```
@@ -543,7 +545,7 @@ ccmxpf_linktable
 ## 2  10015 001001 1983-09-20 1986-07-31
 ## 3  10023 001002 1972-12-14 1973-06-05
 ## 4  10031 001003 1983-12-07 1989-08-16
-## 5  54594 001004 1972-04-24 2022-07-15
+## 5  54594 001004 1972-04-24 2022-07-19
 ## # … with 31,765 more rows
 ```
 

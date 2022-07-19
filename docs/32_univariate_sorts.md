@@ -1,6 +1,6 @@
 # Univariate portfolio sorts
 
-In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
+In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing (e.g., @BaliEngleMurray2016). The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
 We start by introducing univariate portfolio sorts (which sort based on only one characteristic). In a later chapter, we tackle bivariate sorting. 
 
 A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$. 
@@ -15,14 +15,15 @@ The current chapter relies on the following set of packages.
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
-library(sandwich)
-library(lmtest)
 library(scales)
+library(lmtest)
+library(sandwich)
 ```
+Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for estimated coefficients and `sandwich` [@sandwich] for different covariance matrix estimators. 
 
 ## Data preparation
 
-We start with loading the required data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, we use the monthly CRSP sample as our asset universe. 
+We start with loading the required data from our `SQLite`-database introduced in chapters 2-3. In particular, we use the monthly CRSP sample as our asset universe. 
 Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha). 
 `beta` is the tibble with market betas computed in the previous chapter. 
 
@@ -76,7 +77,7 @@ This procedure, however, does not work if there are non-explicit missing values 
 ```r
 beta_lag <- beta |>
   mutate(month = month %m+% months(1)) |>
-  select(permno, month, beta_lag = beta_daily) |>
+  select(permno, month, beta_lag = beta_monthly) |>
   drop_na()
 
 data_for_sorts <- crsp_monthly |>
@@ -133,7 +134,7 @@ beta_longshort <- beta_portfolios |>
   left_join(factors_ff_monthly, by = "month")
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package thanks to @Zeileis2004. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
 
 
 ```r
@@ -145,12 +146,11 @@ coeftest(model_fit, vcov = NeweyWest)
 ## 
 ## t test of coefficients:
 ## 
-##              Estimate Std. Error t value Pr(>|t|)
-## (Intercept) -0.000169   0.001002   -0.17     0.87
+##             Estimate Std. Error t value Pr(>|t|)
+## (Intercept) 0.000164   0.001319    0.12      0.9
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
-
 
 ## Functional programming for portfolio sorts
 
@@ -287,7 +287,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort),
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(>|t|)
-## (Intercept) 0.000739   0.002483     0.3     0.77
+## (Intercept)  0.00212    0.00329    0.64     0.52
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor (@Frazzini2014). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
@@ -303,8 +303,8 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 ## t test of coefficients:
 ## 
 ##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept) -0.00441    0.00262   -1.68    0.093 .  
-## mkt_excess   0.89427    0.10215    8.75   <2e-16 ***
+## (Intercept) -0.00448    0.00256   -1.75    0.081 .  
+## mkt_excess   1.17706    0.09600   12.26   <2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```

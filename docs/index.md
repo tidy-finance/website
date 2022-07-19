@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-07-15"
+date: "2022-07-19"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib, packages.bib]
@@ -50,8 +50,8 @@ The book is currently divided into 5 parts:
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
 * Chapters 2-3 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. We reuse the data from these chapters in all following chapters.
 * Chapters 4-9 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
-* Chapters 10-11 apply machine learning methods to problems in factor selection and option pricing. 
-* Chapters 12-13 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
+* Chapters 10-12 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
+* Chapters 13-14 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
 
 Each chapter is self-contained and can be read individually. Yet the data chapter provides important background necessary for the data management in subsequent chapters. 
 
@@ -178,6 +178,10 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   <tr>
    <td style="text-align:left;"> dplyr </td>
    <td style="text-align:left;"> 1.0.9 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> fixest </td>
+   <td style="text-align:left;"> 0.10.4 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> forcats </td>

@@ -192,7 +192,7 @@ returns |>
 ##  4  2003    0.186       2.34     -8.14     11.3 
 ##  5  2004    0.470       2.55     -5.58     13.2 
 ##  6  2005    0.349       2.45     -9.21      9.12
-##  7  2006    0.0949      2.43     -6.33     11.8 
+##  7  2006    0.0950      2.43     -6.33     11.8 
 ##  8  2007    0.366       2.38     -7.02     10.5 
 ##  9  2008   -0.265       3.67    -17.9      13.9 
 ## 10  2009    0.382       2.14     -5.02      6.76
@@ -230,11 +230,11 @@ ticker
 ## # A tibble: 30 × 8
 ##   symbol company        identifier sedol weight sector shares_held local_currency
 ##   <chr>  <chr>          <chr>      <chr>  <dbl> <chr>        <dbl> <chr>         
-## 1 UNH    UnitedHealth … 91324P10   2917… 0.108  Healt…     5637039 USD           
-## 2 HD     Home Depot In… 43707610   2434… 0.0623 Consu…     5637039 USD           
-## 3 GS     Goldman Sachs… 38141G10   2407… 0.0606 Finan…     5637039 USD           
-## 4 MSFT   Microsoft Cor… 59491810   2588… 0.0547 Infor…     5637039 USD           
-## 5 MCD    McDonald's Co… 58013510   2550… 0.0544 Consu…     5637039 USD           
+## 1 UNH    UnitedHealth … 91324P10   2917… 0.110  Healt…     5630451 USD           
+## 2 GS     Goldman Sachs… 38141G10   2407… 0.0639 Finan…     5630451 USD           
+## 3 HD     Home Depot In… 43707610   2434… 0.0622 Consu…     5630451 USD           
+## 4 MSFT   Microsoft Cor… 59491810   2588… 0.0539 Infor…     5630451 USD           
+## 5 MCD    McDonald's Co… 58013510   2550… 0.0535 Consu…     5630451 USD           
 ## # … with 25 more rows
 ```
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). 
@@ -503,8 +503,8 @@ res |>
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
     title = "Dow Jones asset returns and efficient frontier",
-    subtitle = "Thick dots indicate the location of the minimum variance
-    and efficient tangency portfolio"
+    subtitle = str_c("Thick dots indicate the location of the minimum ",
+                     "variance and efficient tangency portfolio")
   )
 ```
 

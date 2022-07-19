@@ -5,21 +5,21 @@ In this chapter, we continue with portfolio sorts in a univariate setting. Yet, 
 We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. 
 There is arguably a thin line between p-hacking and conducting robustness tests, our purpose here is simply to illustrate the substantial variation which can arise along the evidence generating process.
 
-## Data preparation
-
-The chapter relies on the following set of packages. 
-
+The chapter relies on the following set of packages:
 
 ```r
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
+library(scales)
 library(sandwich)
 library(lmtest)
-library(scales)
 library(furrr)
 library(rlang)
 ```
+Compared to previous chapters, we introduce the `rlang` package [@rlang] for more advanced parsing of functional expressions.  
+
+## Data preparation
 
 First, we retrieve the relevant data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
 

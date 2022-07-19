@@ -12,7 +12,7 @@ library(lubridate)
 
 ## Databases
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*..
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
 
 ```r
