@@ -8,7 +8,8 @@ knitr::opts_chunk$set(
   warning = TRUE,
   cache = FALSE,
   fig.align = "center",
-  width = 81
+  width = 81,
+  comment=""
 )
 
 options(tibble.print_max = 5,
