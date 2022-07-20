@@ -147,7 +147,7 @@ The code chunk above computes the optimal weight in presence of transaction cost
 Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. 
 If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift towards the efficient portfolio, whereas her current portfolio *anchors* her investment. 
 
-```{r}
+```{r, fig.cap = "Portfolio weights for different risk aversion and transaction cost", fig.alt = "The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for increasing transaction costs and for higher risk aversion."}
 transaction_costs |>
   mutate(risk_aversion = as_factor(gamma)) |>
   ggplot(aes(
@@ -178,7 +178,7 @@ The function takes one argument (`meq`) for the number of equality constraints. 
 $$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
 
 Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
-Note that `near` is a safe way to compare if two vectors are pairwise equal. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer while `near` has a built in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
+Note that `near()` is a safe way to compare if two vectors are pairwise equal. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer while `near()` has a built in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
 
 ```{r}
 n_industries <- ncol(industry_returns)
@@ -220,9 +220,9 @@ w_no_short_sale <- solve.QP(
 w_no_short_sale$solution
 ```
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
-You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
+You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
 
-`solve.QP` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum\limits_{i=1}^N |w_i| \leq 1.5$. 
+`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum\limits_{i=1}^N |w_i| \leq 1.5$. 
 The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear constraint. \index{Regulation T}
 Thus, we can no longer rely on `solve.QP()` which is defined to solve quadratic programming problems with linear constraints. 
 Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -256,14 +256,14 @@ w_reg_t <- constrOptim.nl(
 w_reg_t$par
 ```
 
-Note that the function `constrOptim.nl` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective` (subject to the equality constraints `equality_constraints` and the inequality constraints `inequality_constraints`). 
+Note that the function `constrOptim.nl()` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`). 
 In order to initialize the search procedure, a starting point has to be provided. 
 *If* the algorithm identifies a global minimum, the starting point should not matter.
 
 
 The figure below shows the optimal allocation weights across all `r ncol(industry_returns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
-```{r}
+```{r, fig.cap = "Summary of the optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.", fig.alt = "The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicates extreme long and short positions for the efficient portfolio."}
 tibble(
   `No short-sale` = w_no_short_sale$solution,
   `Minimum Variance` = w_mvp,
