@@ -13,7 +13,7 @@ library(scales)
 library(slider)
 library(furrr)
 ```
-Compared to previous chapters, we introduce `slider` [@slider] for sliding window functions and `furrr` [@furrr] to apply mapping functions in parallel.
+Compared to previous chapters, we introduce `slider` [@slider] for sliding window functions, and `furrr` [@furrr] to apply mapping functions in parallel.
 
 ## Estimating beta using monthly returns
 
@@ -54,25 +54,25 @@ summary(fit)
 ```
 
 ```
-## 
-## Call:
-## lm(formula = ret_excess ~ mkt_excess, data = filter(crsp_monthly, 
-##     permno == "14593"))
-## 
-## Residuals:
-##     Min      1Q  Median      3Q     Max 
-## -0.5167 -0.0610  0.0009  0.0643  0.3940 
-## 
-## Coefficients:
-##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)  0.01051    0.00532    1.98    0.049 *  
-## mkt_excess   1.40081    0.11748   11.92   <2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.115 on 478 degrees of freedom
-## Multiple R-squared:  0.229,	Adjusted R-squared:  0.228 
-## F-statistic:  142 on 1 and 478 DF,  p-value: <2e-16
+
+Call:
+lm(formula = ret_excess ~ mkt_excess, data = filter(crsp_monthly, 
+    permno == "14593"))
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.5167 -0.0610  0.0009  0.0643  0.3940 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  0.01051    0.00532    1.98    0.049 *  
+mkt_excess   1.40081    0.11748   11.92   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.115 on 478 degrees of freedom
+Multiple R-squared:  0.229,	Adjusted R-squared:  0.228 
+F-statistic:  142 on 1 and 478 DF,  p-value: <2e-16
 ```
 
 `lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns an overview of the estimated parameters. `coefficients(fit)` would return only the estimated coefficients. The output above indicates that Apple moves excessively with the market as the estimated $\beta_i$ is above one ($\hat\beta_i$ = 1.4). 
@@ -144,15 +144,15 @@ beta_example
 ```
 
 ```
-## # A tibble: 433 × 6
-##   permno month      industry      ret_excess mkt_excess  beta
-##    <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
-## 1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
-## 2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
-## 3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
-## 4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
-## 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
-## # … with 428 more rows
+# A tibble: 433 × 6
+  permno month      industry      ret_excess mkt_excess  beta
+   <dbl> <date>     <chr>              <dbl>      <dbl> <dbl>
+1  14593 1984-12-01 Manufacturing     0.170      0.0184  2.05
+2  14593 1985-01-01 Manufacturing    -0.0108     0.0799  1.90
+3  14593 1985-02-01 Manufacturing    -0.152      0.0122  1.88
+4  14593 1985-03-01 Manufacturing    -0.112     -0.0084  1.89
+5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
+# … with 428 more rows
 ```
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
 
@@ -174,7 +174,7 @@ beta_examples |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-8-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-8-1.png" width="672" />
 
 ## Parallelized rolling-window estimation
 
@@ -193,15 +193,15 @@ crsp_monthly_nested
 ```
 
 ```
-## # A tibble: 29,203 × 3
-##   permno industry      data              
-##    <dbl> <chr>         <list>            
-## 1  10000 Manufacturing <tibble [16 × 3]> 
-## 2  10001 Utilities     <tibble [378 × 3]>
-## 3  10002 Finance       <tibble [324 × 3]>
-## 4  10003 Finance       <tibble [118 × 3]>
-## 5  10005 Mining        <tibble [65 × 3]> 
-## # … with 29,198 more rows
+# A tibble: 29,203 × 3
+  permno industry      data              
+   <dbl> <chr>         <list>            
+1  10000 Manufacturing <tibble [16 × 3]> 
+2  10001 Utilities     <tibble [378 × 3]>
+3  10002 Finance       <tibble [324 × 3]>
+4  10003 Finance       <tibble [118 × 3]>
+5  10005 Mining        <tibble [65 × 3]> 
+# … with 29,198 more rows
 ```
 
 Alternatively, we could have created the same nested data by *excluding* the variables that we *do not* want to nest, as in the following code chunk. However, for most applications it is desirable to explicitly state the variables that are nested into the `data` list-column, so that the reader can track what ends up in there.
@@ -228,15 +228,15 @@ crsp_monthly_nested |>
 ```
 
 ```
-## # A tibble: 1,362 × 3
-##   permno month      beta_monthly
-##    <dbl> <date>            <dbl>
-## 1  10107 1990-03-01         1.39
-## 2  10107 1990-04-01         1.38
-## 3  10107 1990-05-01         1.43
-## 4  10107 1990-06-01         1.43
-## 5  10107 1990-07-01         1.45
-## # … with 1,357 more rows
+# A tibble: 1,362 × 3
+  permno month      beta_monthly
+   <dbl> <date>            <dbl>
+1  10107 1990-03-01         1.39
+2  10107 1990-04-01         1.38
+3  10107 1990-05-01         1.43
+4  10107 1990-06-01         1.43
+5  10107 1990-07-01         1.45
+# … with 1,357 more rows
 ```
 
 However, instead, we want to perform the estimations of rolling betas for different stocks in parallel. If you have a Windows machine, it makes most sense to define `multisession`, which means that separate R processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization in different environments.
@@ -317,15 +317,15 @@ crsp_daily_nested |>
 ```
 
 ```
-## # A tibble: 1,543 × 3
-##   permno month      beta_daily
-##    <dbl> <date>          <dbl>
-## 1  10107 1986-05-01      0.898
-## 2  10107 1986-06-01      0.906
-## 3  10107 1986-07-01      0.822
-## 4  10107 1986-08-01      0.900
-## 5  10107 1986-09-01      1.01 
-## # … with 1,538 more rows
+# A tibble: 1,543 × 3
+  permno month      beta_daily
+   <dbl> <date>          <dbl>
+1  10107 1986-05-01      0.898
+2  10107 1986-06-01      0.906
+3  10107 1986-07-01      0.822
+4  10107 1986-08-01      0.900
+5  10107 1986-09-01      1.01 
+# … with 1,538 more rows
 ```
 
 For the sake of completeness, we tell our session again to use multiple workers for parallelization.
@@ -368,7 +368,7 @@ crsp_monthly |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" />
 
 Next, we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are an extremely rare exception.
 
@@ -391,7 +391,7 @@ beta_monthly |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" />
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks. 
 
@@ -414,10 +414,10 @@ beta |>
 ```
 
 ```
-## Warning: Removed 46 row(s) containing missing values (geom_path).
+Warning: Removed 46 row(s) containing missing values (geom_path).
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-22-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-22-1.png" width="672" />
 
 The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
@@ -456,7 +456,7 @@ beta_long |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-24-1.png" width="672" style="display: block; margin: auto;" />
+<img src="31_beta_files/figure-html/unnamed-chunk-24-1.png" width="672" />
 
 The figure above does not indicate any troubles, so let us move on to the next check. 
 
@@ -483,11 +483,11 @@ beta_long |>
 ```
 
 ```
-## # A tibble: 2 × 11
-##   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
-##   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
-## 1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186316
-## 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
+# A tibble: 2 × 11
+  name          mean    sd   min    q05   q25   q50   q75   q95   max       n
+  <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
+1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186316
+2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
 ```
 
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods).
@@ -500,9 +500,9 @@ beta |>
 ```
 
 ```
-##              beta_daily beta_monthly
-## beta_daily        1.000        0.322
-## beta_monthly      0.322        1.000
+             beta_daily beta_monthly
+beta_daily        1.000        0.322
+beta_monthly      0.322        1.000
 ```
 
 Indeed, we find a positive correlation between our beta estimates. In the subsequent chapters, we mainly use the estimates based on monthly data as most readers should be able to replicate them due to potential memory limitations that might arise with the daily data. 

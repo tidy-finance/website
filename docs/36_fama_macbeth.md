@@ -15,7 +15,7 @@ Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to 
 
 In the second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow @Zaffaroni2022 and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, the regression approach rather captures risk attributes. 
 
-Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are typically estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias (see, e.g., @Shanken1992, @Kim1995, @Chen2015, among others) but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
+Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are typically estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992, @Kim1995, @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
 ## Data preparation
 
@@ -134,13 +134,13 @@ left_join(price_of_risk,
 ```
 
 ```
-## # A tibble: 4 × 4
-##   factor      risk_premium t_statistic t_statistic_newey_west
-##   <chr>              <dbl>       <dbl>                  <dbl>
-## 1 (Intercept)       1.69         6.74                   5.96 
-## 2 beta              0.0122       0.115                  0.103
-## 3 bm                0.126        2.68                   2.33 
-## 4 log_mktcap       -0.115       -3.27                  -2.93
+# A tibble: 4 × 4
+  factor      risk_premium t_statistic t_statistic_newey_west
+  <chr>              <dbl>       <dbl>                  <dbl>
+1 (Intercept)       1.69         6.74                   5.96 
+2 beta              0.0122       0.115                  0.103
+3 bm                0.126        2.68                   2.33 
+4 log_mktcap       -0.115       -3.27                  -2.93 
 ```
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Lastly, the negative value for CAPM betas as characteristics is in line with the well-established betting against beta anomalies, indicating that investors with borrowing constraints tilt their portfolio towards high beta stocks to replicate a levered market portfolio [@Frazzini2014].

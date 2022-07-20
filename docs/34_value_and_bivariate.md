@@ -159,7 +159,7 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.329
+[1] 0.329
 ```
 
 The resulting annualized value premium is 3.936 percent.
@@ -207,7 +207,7 @@ mean(value_premium$value_premium * 100)
 ```
 
 ```
-## [1] 0.265
+[1] 0.265
 ```
 
 The value premium from dependent sorts is 3.18 percent per year.

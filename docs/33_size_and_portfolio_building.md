@@ -2,7 +2,7 @@
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums. Exploiting these ideas to generate favorable results is called p-hacking. 
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking. 
 There is arguably a thin line between p-hacking and conducting robustness tests, our purpose here is simply to illustrate the substantial variation which can arise along the evidence generating process.
 
 The chapter relies on the following set of packages:
@@ -74,7 +74,7 @@ crsp_monthly |>
   )
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" />
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?
 
@@ -98,7 +98,7 @@ crsp_monthly |>
   )
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" />
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
 
@@ -134,14 +134,14 @@ crsp_monthly |>
 ```
 
 ```
-## # A tibble: 5 × 11
-##   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
-##   <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-## 1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
-## 2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-## 3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
-## 4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-## 5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692
+# A tibble: 5 × 11
+  exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
+  <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
+1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
+2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
+3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
+4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
+5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692
 ```
 
 ## Univariate size portfolios with flexible breakpoints
@@ -227,20 +227,21 @@ tibble(Exchanges = c("NYSE, NASDAQ & AMEX", "NYSE"),
 ```
 
 ```
-## # A tibble: 2 × 2
-##   Exchanges           Premium
-##   <chr>                 <dbl>
-## 1 NYSE, NASDAQ & AMEX   0.110
-## 2 NYSE                  0.181
+# A tibble: 2 × 2
+  Exchanges           Premium
+  <chr>                 <dbl>
+1 NYSE, NASDAQ & AMEX   0.110
+2 NYSE                  0.181
 ```
 
 The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
 
 ## P-hacking and non-standard errors
 
-Since the choice of the exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. 
-The intention of this application is to show that the different ways to form portfolios result in different estimated size premia. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022].
-From a malicious perspective, these modeling choices give the researcher multiple *chances* to find statistically significant results. Yet this is considered *p-hacking* which renders the statistical inference due to multiple testing invalid [@Harvey2016].
+Since the choice of the exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. We refer to @Walter2022 for an extensive set of other decision nodes at the discretion of researchers. 
+
+The intention of this application is to show that the different ways to form portfolios result in different estimated size premiums. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022].
+From a malicious perspective, these modeling choices give the researcher multiple *chances* to find statistically significant results. Yet this is considered *p-hacking*, which renders the statistical inference due to multiple testing invalid [@Harvey2016].
 
 Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature. 
 
@@ -261,18 +262,18 @@ p_hacking_setup
 ```
 
 ```
-## # A tibble: 48 × 4
-##   n_portfolios exchanges value_weighted data      
-##          <dbl> <list>    <lgl>          <list>    
-## 1            2 <chr [1]> TRUE           <sym>     
-## 2            2 <chr [1]> TRUE           <language>
-## 3            2 <chr [1]> TRUE           <language>
-## 4            2 <chr [1]> TRUE           <language>
-## 5            2 <chr [1]> FALSE          <sym>     
-## # … with 43 more rows
+# A tibble: 48 × 4
+  n_portfolios exchanges value_weighted data      
+         <dbl> <list>    <lgl>          <list>    
+1            2 <chr [1]> TRUE           <sym>     
+2            2 <chr [1]> TRUE           <language>
+3            2 <chr [1]> TRUE           <language>
+4            2 <chr [1]> TRUE           <language>
+5            2 <chr [1]> FALSE          <sym>     
+# … with 43 more rows
 ```
 
-To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premia possible in our data, in particular when we use equal-weighted portfolios. 
+To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
 
 
 ```r
@@ -302,15 +303,15 @@ p_hacking_results
 ```
 
 ```
-## # A tibble: 48 × 5
-##   n_portfolios exchanges value_weighted data                         size_premium
-##          <dbl> <list>    <lgl>          <chr>                               <dbl>
-## 1           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0184
-## 2           10 <chr [3]> FALSE          "filter(crsp_monthly, indus…       0.0180
-## 3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0162
-## 4           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0139
-## 5           10 <chr [3]> TRUE           "filter(crsp_monthly, indus…       0.0114
-## # … with 43 more rows
+# A tibble: 48 × 5
+  n_portfolios exchanges value_weighted data                         size_premium
+         <dbl> <list>    <lgl>          <chr>                               <dbl>
+1           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0184
+2           10 <chr [3]> FALSE          "filter(crsp_monthly, indus…       0.0180
+3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0162
+4           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0139
+5           10 <chr [3]> TRUE           "filter(crsp_monthly, indus…       0.0114
+# … with 43 more rows
 ```
 
 ## The size-premium variation
@@ -334,7 +335,7 @@ p_hacking_results |>
   scale_x_continuous(labels = percent)
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
+<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-11-1.png" width="672" />
 
 ## Exercises
 

@@ -5,14 +5,14 @@ The aim of this chapter is twofold. From a data science perspective, we introduc
 \index{CAPM}
 
 Such findings question the usefulness of the Capital Asset Pricing Model. 
-In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016 and @Hou2020.
-Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. During recent years, promising methods from the vast field of machine learning (ML) got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure and @Dixon2020 for a detailed treatment of all methodological aspects. 
+In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016, and @Hou2020.
+Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *Do we believe in the relevance of 300+ risk factors?*. During recent years, promising methods from the vast field of machine learning (ML) got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure, and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
 We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions for identifying macro-economic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
 ## Brief theoretical background
 
-This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by @Hastie2009, @Hastie2013 and @DePrado2018. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
+This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by @Hastie2009, @Hastie2013, and @DePrado2018. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
@@ -145,7 +145,10 @@ data |>
   )
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/industryreturns-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig411-1.png" alt="Boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="672" />
+<p class="caption">(\#fig:fig411)Industry excess return. Boxplots indicate monthly dispersion of returns for 10 different industries</p>
+</div>
 
 ## The tidymodels workflow
 
@@ -156,7 +159,7 @@ The `tidymodels` workflow encompasses the main stages of the modeling process: p
 Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
 To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. 
-For that purpose, `tidymodels` provides the function `initial_time_split` from the `rsample` package [@rsample]. 
+For that purpose, `tidymodels` provides the function `initial_time_split()` from the `rsample` package [@rsample]. 
 The split takes the last 20% of the data as a test set, which is not used for any model tuning. 
 We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
 
@@ -172,8 +175,8 @@ split
 ```
 
 ```
-## <Training/Testing/Total>
-## <517/130/647>
+<Training/Testing/Total>
+<517/130/647>
 ```
 
 The object `split` simply keeps track of the observations of the training and the test set. 
@@ -202,7 +205,7 @@ A table of all available recipe steps can be found [here](https://www.tidymodels
 In the example above, it does not make a difference whether you use the input `data = training(split)` or `data = testing(split)`. 
 All that matters at this early stage are the column names and types.
 
-We can apply the recipe to any data with a suitable structure. The code below combines two different functions: `prep` estimates the required parameters from a training set that can be applied to other data sets later. `bake` applies the processed computations to new data.
+We can apply the recipe to any data with a suitable structure. The code below combines two different functions: `prep()` estimates the required parameters from a training set that can be applied to other data sets later. `bake()` applies the processed computations to new data.
 
 
 ```r
@@ -218,32 +221,32 @@ data_bake
 ```
 
 ```
-## # A tibble: 130 × 126
-##   factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
-##          <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
-## 1        -1.92                0.644        0.298          0.947      0.371 
-## 2        -1.88                1.27         0.387          0.607      0.527 
-## 3        -1.88                0.341        1.43           0.836      1.12  
-## 4        -1.88               -1.80        -0.0411        -0.963     -0.0921
-## 5        -1.88               -1.29        -0.627         -1.73      -0.850 
-## # … with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
-## #   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
-## #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
-## #   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
-## #   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
-## #   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
-## #   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
+# A tibble: 130 × 126
+  factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
+         <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
+1        -1.92                0.644        0.298          0.947      0.371 
+2        -1.88                1.27         0.387          0.607      0.527 
+3        -1.88                0.341        1.43           0.836      1.12  
+4        -1.88               -1.80        -0.0411        -0.963     -0.0921
+5        -1.88               -1.29        -0.627         -1.73      -0.850 
+# … with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
+#   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
+#   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
+#   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
+#   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
+#   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
+#   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
 
-You may ask at this stage: Why should I use a recipe instead of simply using the data wrangling commands such as `mutate` or `select`? `tidymodels` beauty is that a lot is happening under the hood. Recall, that for the simple scaling step, you actually have to compute the standard deviation of each column, then *store* this value, and apply the identical transformation to a different dataset, e.g., `testing(split)`. A prepped `recipe` stores these values and hands them on once you `bake` a novel dataset. Easy as pie with `tidymodels`, isn't it?
+You may ask at this stage: Why should I use a recipe instead of simply using the data wrangling commands such as `mutate()` or `select()`? `tidymodels` beauty is that a lot is happening under the hood. Recall, that for the simple scaling step, you actually have to compute the standard deviation of each column, then *store* this value, and apply the identical transformation to a different dataset, e.g., `testing(split)`. A prepped `recipe` stores these values and hands them on once you `bake()` a novel dataset. Easy as pie with `tidymodels`, isn't it?
 
 ### Build a model
 
 \index{Regression}
 Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
-$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow` and use the `fit` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
+$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow()` and use the `fit()` function. A table with all available model APIs is available [here](https://www.tidymodels.org/find/parsnip/).
 For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
 
 
@@ -255,7 +258,7 @@ lm_model <- linear_reg(
   set_engine("glmnet", intercept = FALSE)
 ```
 
-That's it - we are done! The object `lm_model` contains the definition of our model with all required information. Note that `set_engine("glmnet")` indicates the API character of the `tidymodels` workflow: Under the hood, the package `glmnet` is doing the heavy lifting, while `linear_reg` provides a unified framework to collect the inputs. The `workflow`  ends with combining everything necessary for the (serious) data science workflow, namely, a recipe and a model.
+That's it - we are done! The object `lm_model` contains the definition of our model with all required information. Note that `set_engine("glmnet")` indicates the API character of the `tidymodels` workflow: Under the hood, the package `glmnet` is doing the heavy lifting, while `linear_reg()` provides a unified framework to collect the inputs. The `workflow`  ends with combining everything necessary for the (serious) data science workflow, namely, a recipe and a model.
 
 
 ```r
@@ -266,34 +269,34 @@ lm_fit
 ```
 
 ```
-## ══ Workflow ═════════════════════════════════════════════════════════════════════
-## Preprocessor: Recipe
-## Model: linear_reg()
-## 
-## ── Preprocessor ─────────────────────────────────────────────────────────────────
-## 4 Recipe Steps
-## 
-## • step_rm()
-## • step_interact()
-## • step_normalize()
-## • step_center()
-## 
-## ── Model ────────────────────────────────────────────────────────────────────────
-## Linear Regression Model Specification (regression)
-## 
-## Main Arguments:
-##   penalty = 1e-04
-##   mixture = 1
-## 
-## Engine-Specific Arguments:
-##   intercept = FALSE
-## 
-## Computational engine: glmnet
+══ Workflow ═════════════════════════════════════════════════════════════════════
+Preprocessor: Recipe
+Model: linear_reg()
+
+── Preprocessor ─────────────────────────────────────────────────────────────────
+4 Recipe Steps
+
+• step_rm()
+• step_interact()
+• step_normalize()
+• step_center()
+
+── Model ────────────────────────────────────────────────────────────────────────
+Linear Regression Model Specification (regression)
+
+Main Arguments:
+  penalty = 1e-04
+  mixture = 1
+
+Engine-Specific Arguments:
+  intercept = FALSE
+
+Computational engine: glmnet 
 ```
 
 ### Fit a model
 
-With the `workflow` from above, we are ready to use `fit`. Typically, we use training data to fit the model. 
+With the `workflow` from above, we are ready to use `fit()`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
 First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
@@ -339,7 +342,10 @@ predicted_values |>
   )
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig412-1.png" alt="Figure shows the time series of realized and predicted manufacturing industry risk premia. The figure seems to indicate that the predictions capture most of the return dynamics. " width="672" />
+<p class="caption">(\#fig:fig412)Monthly realized and fitted manufacturing industry risk premia. The grey area corresponds to the out of sample period.</p>
+</div>
 
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
@@ -384,13 +390,16 @@ bind_rows(
   facet_wrap(~Model, scales = "free_x") +
   labs(
     x = "Lambda", y = NULL,
-    title = "Estimated Coefficients paths as a
+    title = "Estimated coefficients paths as a
     function of the penalty factor"
   ) +
   theme(legend.position = "none")
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-12-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig413-1.png" alt="Two panels that show how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, Lasso exhibits non-linear behaviour." width="672" />
+<p class="caption">(\#fig:fig413)Estimated coefficient paths for Lasso and Ridge regression as a function of the penalty parameter</p>
+</div>
 
 ::: {.rmdnote}
 One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. 
@@ -414,7 +423,7 @@ Cross-validation is a technique that allows us to alleviate this problem. We app
     $$ With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_{\tilde{T}}^k$, with $k=1$.
 
 How should you pick $K$? Large values of $K$ are preferable because the training data better imitates the original data. However, larger values of $K$ will have much higher computation time.
-`tidymodels` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model`. 
+`tidymodels` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model()`. 
 
 
 ```r
@@ -445,19 +454,19 @@ data_folds
 ```
 
 ```
-## # Time Series Cross Validation Plan 
-## # A tibble: 20 × 2
-##   splits          id     
-##   <list>          <chr>  
-## 1 <split [60/48]> Slice01
-## 2 <split [60/48]> Slice02
-## 3 <split [60/48]> Slice03
-## 4 <split [60/48]> Slice04
-## 5 <split [60/48]> Slice05
-## # … with 15 more rows
+# Time Series Cross Validation Plan 
+# A tibble: 20 × 2
+  splits          id     
+  <list>          <chr>  
+1 <split [60/48]> Slice01
+2 <split [60/48]> Slice02
+3 <split [60/48]> Slice03
+4 <split [60/48]> Slice04
+5 <split [60/48]> Slice05
+# … with 15 more rows
 ```
 
-Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the function `tune_grid` evaluates all the models for each fold.
+Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
 
 
 ```r
@@ -481,7 +490,7 @@ autoplot(lm_tune) +
   )
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-16-1.png" width="672" style="display: block; margin: auto;" />
+<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" />
 
   The figure shows that the cross-validated mean squared prediction error drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE, which exhibits some intermediate level of regularization.
 
@@ -489,7 +498,7 @@ autoplot(lm_tune) +
 
 Our starting point was the question: Which factors determine industry returns? While @Avramov2022b provides a Bayesian analysis related to the research question above, we choose a simplified approach: To illustrate the entire workflow, we now run the penalized regressions for all ten industries. 
 We want to identify relevant variables by fitting Lasso models for each industry returns time series. More specifically, we perform cross-validation for each industry to identify the optimal penalty factor $\lambda$. 
-Then, we use the set of `finalize_*`-functions that take a list or tibble of tuning parameter values and update objects with those values. After determining the best model, we compute the final fit on the entire training set and analyze the estimated coefficients. 
+Then, we use the set of `finalize_*()`-functions that take a list or tibble of tuning parameter values and update objects with those values. After determining the best model, we compute the final fit on the entire training set and analyze the estimated coefficients. 
 
 First, we define the Lasso model with one tuning parameter.
 
@@ -557,7 +566,7 @@ selected_factors <- data |>
   ))
 ```
 
-What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE`  is required to make the cross-validation process reproducible. 
+What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible. 
 Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map.
 
 
@@ -593,7 +602,10 @@ selected_factors |>
   )
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-19-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig414-1.png" alt="The figure shows which factors and macroeconomic predictors the ML selected for the different industries. In general there are not many selected variables. The market excess return got selected across all industries." width="672" />
+<p class="caption">(\#fig:fig414)Selected factor and macroeconomic predictors selected for different industries</p>
+</div>
 
 The heat map conveys two main insights. 
 First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While not even the market factor is selected by Lasso for Utilities (which means the proposed model essentially just contains an intercept), many factors are selected for, e.g., High-Tech and Energy, but they do not coincide at all. 

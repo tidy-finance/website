@@ -38,15 +38,15 @@ prices
 ```
 
 ```
-## # A tibble: 5,659 × 8
-##   symbol date        open  high   low close    volume adjusted
-##   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-## 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.855
-## 2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.782
-## 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.794
-## 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.725
-## 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.760
-## # … with 5,654 more rows
+# A tibble: 5,659 × 8
+  symbol date        open  high   low close    volume adjusted
+  <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
+1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.855
+2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.782
+3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.794
+4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.725
+5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.760
+# … with 5,654 more rows
 ```
 
 \index{Data!YahooFinance} `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. 
@@ -69,10 +69,13 @@ prices |>
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-3-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig100-1.png" alt="Time series of Apple stock prices from 2000 until 2020. Strong upwards trend from 0.85 USD to 1359 USD." width="672" />
+<p class="caption">(\#fig:fig100)Apple stock prices. Prices are in USD, adjusted for divident payments and stock splits. Source: Yahoo!Finance</p>
+</div>
 
 \index{returns} Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
-In that context, the function `lag` is helpful, which returns the previous value in a vector. 
+In that context, the function `lag()` is helpful, which returns the previous value in a vector. 
 
 
 ```r
@@ -84,21 +87,21 @@ returns
 ```
 
 ```
-## # A tibble: 5,659 × 3
-##   symbol date           ret
-##   <chr>  <date>       <dbl>
-## 1 AAPL   2000-01-03 NA     
-## 2 AAPL   2000-01-04 -0.0843
-## 3 AAPL   2000-01-05  0.0146
-## 4 AAPL   2000-01-06 -0.0865
-## 5 AAPL   2000-01-07  0.0474
-## # … with 5,654 more rows
+# A tibble: 5,659 × 3
+  symbol date           ret
+  <chr>  <date>       <dbl>
+1 AAPL   2000-01-03 NA     
+2 AAPL   2000-01-04 -0.0843
+3 AAPL   2000-01-05  0.0146
+4 AAPL   2000-01-06 -0.0865
+5 AAPL   2000-01-07  0.0474
+# … with 5,654 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns (`ret`). 
 Note that the first entry naturally contains a missing value (`NA`) because there is no previous price. 
-Obviously, the use of `lag` would be meaningless if the time series is not ordered by date. 
-The command `arrange` provides a neat way to order observations. 
+Obviously, the use of `lag()` would be meaningless if the time series is not ordered by date. 
+The command `arrange()` provides a neat way to order observations. 
 Additionally, the computations require that the time series is ordered by date. 
 
 For the upcoming examples, we remove missing values as these would require separate treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations. 
@@ -128,11 +131,14 @@ returns |>
     x = NULL,
     y = NULL,
     title = "Distribution of daily AAPL returns (in percent)",
-    subtitle = "The dotted vertical line indicates the historical 5% quantile"
+    subtitle = "The dotted vertical line indicates the historical 5 percent quantile"
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig101-1.png" alt="Histogram of daily returns. Range indicates large negative values. A vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent." width="672" />
+<p class="caption">(\#fig:fig101)Distribution of daily AAPL returns (in percent). The dotted vertical line indicates the historical 5 percent quantile </p>
+</div>
 
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. 
 Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
@@ -154,10 +160,10 @@ returns |>
 ```
 
 ```
-## # A tibble: 1 × 4
-##   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
-##            <dbl>        <dbl>         <dbl>         <dbl>
-## 1          0.123         2.52         -51.9          13.9
+# A tibble: 1 × 4
+  ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
+           <dbl>        <dbl>         <dbl>         <dbl>
+1          0.123         2.52         -51.9          13.9
 ```
 
 We see that the maximum *daily* return was around 13.905 percent. Not surprisingly, perhaps, however, the daily average return is close to but slightly above 0. 
@@ -183,35 +189,35 @@ returns |>
 ```
 
 ```
-## # A tibble: 23 × 5
-##     year daily_mean daily_sd daily_min daily_max
-##    <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
-##  1  2000   -0.346       5.49    -51.9      13.7 
-##  2  2001    0.233       3.93    -17.2      12.9 
-##  3  2002   -0.121       3.05    -15.0       8.46
-##  4  2003    0.186       2.34     -8.14     11.3 
-##  5  2004    0.470       2.55     -5.58     13.2 
-##  6  2005    0.349       2.45     -9.21      9.12
-##  7  2006    0.0950      2.43     -6.33     11.8 
-##  8  2007    0.366       2.38     -7.02     10.5 
-##  9  2008   -0.265       3.67    -17.9      13.9 
-## 10  2009    0.382       2.14     -5.02      6.76
-## 11  2010    0.183       1.69     -4.96      7.69
-## 12  2011    0.104       1.65     -5.59      5.89
-## 13  2012    0.130       1.86     -6.44      8.87
-## 14  2013    0.0472      1.80    -12.4       5.14
-## 15  2014    0.145       1.36     -7.99      8.20
-## 16  2015    0.00199     1.68     -6.12      5.74
-## 17  2016    0.0575      1.47     -6.57      6.50
-## 18  2017    0.164       1.11     -3.88      6.10
-## 19  2018   -0.00573     1.81     -6.63      7.04
-## 20  2019    0.266       1.65     -9.96      6.83
-## 21  2020    0.281       2.94    -12.9      12.0 
-## 22  2021    0.131       1.58     -4.17      5.39
-## 23  2022   -0.170       2.26     -5.64      6.98
+# A tibble: 23 × 5
+    year daily_mean daily_sd daily_min daily_max
+   <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
+ 1  2000   -0.346       5.49    -51.9      13.7 
+ 2  2001    0.233       3.93    -17.2      12.9 
+ 3  2002   -0.121       3.05    -15.0       8.46
+ 4  2003    0.186       2.34     -8.14     11.3 
+ 5  2004    0.470       2.55     -5.58     13.2 
+ 6  2005    0.349       2.45     -9.21      9.12
+ 7  2006    0.0949      2.43     -6.33     11.8 
+ 8  2007    0.366       2.38     -7.02     10.5 
+ 9  2008   -0.265       3.67    -17.9      13.9 
+10  2009    0.382       2.14     -5.02      6.76
+11  2010    0.183       1.69     -4.96      7.69
+12  2011    0.104       1.65     -5.59      5.89
+13  2012    0.130       1.86     -6.44      8.87
+14  2013    0.0472      1.80    -12.4       5.14
+15  2014    0.145       1.36     -7.99      8.20
+16  2015    0.00199     1.68     -6.12      5.74
+17  2016    0.0575      1.47     -6.57      6.50
+18  2017    0.164       1.11     -3.88      6.10
+19  2018   -0.00573     1.81     -6.63      7.04
+20  2019    0.266       1.65     -9.96      6.83
+21  2020    0.281       2.94    -12.9      12.0 
+22  2021    0.131       1.58     -4.17      5.39
+23  2022   -0.170       2.26     -5.64      6.98
 ```
 
-In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The command `print` simply controls the output options for the R console. 
+In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The command `print()` simply controls the output options for the R console. 
 
 ## Scaling up the analysis
 
@@ -227,15 +233,15 @@ ticker
 ```
 
 ```
-## # A tibble: 30 × 8
-##   symbol company        identifier sedol weight sector shares_held local_currency
-##   <chr>  <chr>          <chr>      <chr>  <dbl> <chr>        <dbl> <chr>         
-## 1 UNH    UnitedHealth … 91324P10   2917… 0.110  Healt…     5630451 USD           
-## 2 GS     Goldman Sachs… 38141G10   2407… 0.0639 Finan…     5630451 USD           
-## 3 HD     Home Depot In… 43707610   2434… 0.0622 Consu…     5630451 USD           
-## 4 MSFT   Microsoft Cor… 59491810   2588… 0.0539 Infor…     5630451 USD           
-## 5 MCD    McDonald's Co… 58013510   2550… 0.0535 Consu…     5630451 USD           
-## # … with 25 more rows
+# A tibble: 30 × 8
+  symbol company        identifier sedol weight sector shares_held local_currency
+  <chr>  <chr>          <chr>      <chr>  <dbl> <chr>        <dbl> <chr>         
+1 UNH    UnitedHealth … 91324P10   2917… 0.110  Healt…     5633745 USD           
+2 GS     Goldman Sachs… 38141G10   2407… 0.0659 Finan…     5633745 USD           
+3 HD     Home Depot In… 43707610   2434… 0.0621 Consu…     5633745 USD           
+4 MSFT   Microsoft Cor… 59491810   2588… 0.0537 Infor…     5633745 USD           
+5 MCD    McDonald's Co… 58013510   2550… 0.0531 Consu…     5633745 USD           
+# … with 25 more rows
 ```
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). 
 
@@ -270,11 +276,14 @@ index_prices |>
   theme(legend.position = "none")
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-11-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig103-1.png" alt="Many time series with daily prices. General trend positive for the stocks in the DOW index." width="672" />
+<p class="caption">(\#fig:fig103)DOW index stock prices. Prices in USD, adjusted for dividend payments and stock splits.</p>
+</div>
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
 
-The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest. 
+The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest. 
 
 
 ```r
@@ -300,15 +309,15 @@ all_returns |>
 ```
 
 ```
-## # A tibble: 30 × 5
-##   symbol daily_mean daily_sd daily_min daily_max
-##   <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-## 1 AAPL       0.123      2.52     -51.9      13.9
-## 2 AMGN       0.0483     1.98     -13.4      15.1
-## 3 AXP        0.0514     2.30     -17.6      21.9
-## 4 BA         0.0544     2.23     -23.8      24.3
-## 5 CAT        0.0670     2.04     -14.5      14.7
-## # … with 25 more rows
+# A tibble: 30 × 5
+  symbol daily_mean daily_sd daily_min daily_max
+  <chr>       <dbl>    <dbl>     <dbl>     <dbl>
+1 AAPL       0.123      2.52     -51.9      13.9
+2 AMGN       0.0483     1.98     -13.4      15.1
+3 AXP        0.0514     2.30     -17.6      21.9
+4 BA         0.0544     2.23     -23.8      24.3
+5 CAT        0.0670     2.04     -14.5      14.7
+# … with 25 more rows
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -335,10 +344,13 @@ volume |>
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-13-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig104-1.png" alt="Time series with daily trading volume, ranging from 15 in 2000 to 60 in 2020." width="672" />
+<p class="caption">(\#fig:fig104)Aggregate daily trading volume of DOW constituents in billion USD.</p>
+</div>
 
-The figure indicates a clear upwards trend in aggregated daily trading volume. In particular since the outbreak of COVID-19 pandemic do markets process huge trading volume, as analyzed for instance by @Goldstein2021 
-One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline`, addressing potential differences in the axes' scales.
+The figure indicates a clear upwards trend in aggregated daily trading volume. In particular since the outbreak of COVID-19 pandemic do markets process huge trading volume, as analyzed for instance by @Goldstein2021.
+One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. We add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline()`, addressing potential differences in the axes' scales.
 
 
 ```r
@@ -356,10 +368,13 @@ volume |>
 ```
 
 ```
-## Warning: Removed 1 rows containing missing values (geom_point).
+Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-14-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig105-1.png" alt="A scatterplot which shows that previous day aggregate trading volume and aggregate trading volume neatly line up along a 45 degree line. " width="672" />
+<p class="caption">(\#fig:fig105)Trading volume on Dow Index versus previous day trading volume</p>
+</div>
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
 
@@ -368,7 +383,7 @@ Do you understand where the warning `## Warning: Removed 1 rows containing missi
 In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. 
 Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets.\index{Portfolio Choice} The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor* [@Markowitz1952]. 
 
-\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (the square-root of the variance, i.e., the risk), see, e.g. @Merton1972. 
+\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (the square-root of the variance, i.e., the risk), see, e.g., @Merton1972. 
 We compute and visualize the efficient frontier for several stocks. 
 First, we extract each asset's *monthly* returns. 
 In order to keep things simple, we work with a balanced panel and exclude tickers for which we do not observe a price on every single trading day since 2000.
@@ -391,7 +406,8 @@ returns <- index_prices |>
   select(-price)
 ```
 
-Here, `floor_date` is a function from the `lubridate`package [@lubridate] which provides useful functions to work with dates and time. 
+Here, `floor_date()` is a function from the `lubridate`package [@lubridate] which provides useful functions to work with dates and time. 
+
 Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'$$. 
 We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`.
 We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. 
@@ -414,7 +430,7 @@ Then, we compute the minimum variance portfolio weights $\omega_\text{mvp}$ as w
 \index{Minimum variance portfolio} Recall that the minimum variance portfolio is the vector of portfolio weights that are the solution to 
 $$\omega_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } \sum\limits_{i=1}^Nw_i = 1.$$
 The constraint that weights sum up to one simply implies that all funds have to distributed across the available asset universe, there is no possible to retain cash. 
-It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones and $\Sigma^{-1}$ is the inverse of $\Sigma$. Note, that $\iota'\Sigma^{-1}\iota = \sum\limits_{j=1}^N\sum\limits_{i = 1\\i\neq j}^N \sigma_{ij}$ where $\sigma_{ij}$ is the $(i,j)$-th element of $\Sigma$.
+It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones and $\Sigma^{-1}$ is the inverse of $\Sigma$. Note, that $\iota'\Sigma^{-1}\iota = \sum\limits_{j=1}^N\sum\limits_{i = 1}^N \sigma_{ij}$ where $\sigma_{ij}$ is the $(i,j)$-th element of $\Sigma$.
 
 
 ```r
@@ -430,10 +446,10 @@ tibble(
 ```
 
 ```
-## # A tibble: 1 × 2
-##   expected_ret[,1] volatility[,1]
-##              <dbl>          <dbl>
-## 1          0.00801         0.0314
+# A tibble: 1 × 2
+  expected_ret[,1] volatility[,1]
+             <dbl>          <dbl>
+1          0.00801         0.0314
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  
@@ -454,7 +470,7 @@ D <- as.numeric(t(iota) %*% solve(Sigma) %*% mu)
 E <- as.numeric(t(mu) %*% solve(Sigma) %*% mu)
 
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
-efp_weights <- mvp_weights + 
+efp_weights <- mvp_weights +
   lambda_tilde / 2 * (solve(Sigma) %*% mu - D * mvp_weights)
 ```
 
@@ -495,26 +511,33 @@ res |>
     size = 4
   ) +
   geom_point( # locate the individual assets
-    data = tibble(mu = 12 * 100 * mu, 
-                  sd = 12 * 10 * sqrt(diag(Sigma))),
+    data = tibble(
+      mu = 12 * 100 * mu,
+      sd = 12 * 10 * sqrt(diag(Sigma))
+    ),
     aes(y = mu, x = sd), size = 1
   ) +
   labs(
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
     title = "Dow Jones asset returns and efficient frontier",
-    subtitle = str_c("Thick dots indicate the location of the minimum ",
-                     "variance and efficient tangency portfolio")
+    subtitle = str_c(
+      "Thick dots indicate the location of the minimum ",
+      "variance and efficient tangency portfolio"
+    )
   )
 ```
 
-<img src="10_introduction_files/figure-html/unnamed-chunk-20-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="10_introduction_files/figure-html/fig106-1.png" alt="Figure shows Dow Jones constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="672" />
+<p class="caption">(\#fig:fig106)Efficient frontier for Dow Jones constituents as asset universe</p>
+</div>
 
 The line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
 
 ## Exercises
 
-1. Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `tq_get` from the `tidyquant` package. Plot two time series of the ticker's un-adjusted and adjusted closing prices. Explain the differences.
+1. Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the ticker's un-adjusted and adjusted closing prices. Explain the differences.
 1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5% quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.

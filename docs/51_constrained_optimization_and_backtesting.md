@@ -53,12 +53,12 @@ The solution to the optimal portfolio choice problem is:
 $$\omega^*_{\gamma}  = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.$$
 Empirically, this classical solution imposes many problems. 
 In particular, the estimates of $\mu_t$ are noisy over short horizons, the ($N \times N$) matrix $\Sigma_t$ contains $N(N-1)/2$ distinct elements and thus, estimation error is huge. 
-Seminal papers on the effect of ignoring estimation uncertainty, among others, are @Brown1976, @Jobson1980, @Jorion1986 and @Chopra1993.
+Seminal papers on the effect of ignoring estimation uncertainty, among others, are @Brown1976, @Jobson1980, @Jorion1986, and @Chopra1993.
 
 Even worse, if the asset universe contains more assets than available time periods $(N > T)$, the sample covariance matrix is no longer positive definite such that the inverse $\Sigma^{-1}$ does not exist anymore. 
-To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool, see, e.g., @Ledoit2003, @Ledoit2004, @Ledoit2012 and @Fan2008.
+To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool, see, e.g., @Ledoit2003, @Ledoit2004, @Ledoit2012, and @Fan2008.
 
-Model uncertainty due to multiple feasible data generating processes in the context of portfolio choice is investigated, for instance, by @Wang2005, @Garlappi2007 and @Pflug2012. \index{Transaction costs}
+Model uncertainty due to multiple feasible data generating processes in the context of portfolio choice is investigated, for instance, by @Wang2005, @Garlappi2007, and @Pflug2012. \index{Transaction costs}
 
 On top of the estimation uncertainty, *transaction costs* are a major concern. 
 Rebalancing portfolios is costly, and, therefore, the optimal choice should depend on the investor's current holdings. In the presence of transaction costs, the benefits of reallocating wealth may be smaller than the costs associated with turnover. 
@@ -126,7 +126,7 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
-##  [1]  1.428  0.270 -1.302  0.375  0.308 -0.152  0.544  0.472 -0.167 -0.776
+ [1]  1.428  0.270 -1.302  0.375  0.308 -0.152  0.544  0.472 -0.167 -0.776
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
@@ -174,7 +174,10 @@ transaction_costs |>
   )
 ```
 
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-6-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/fig511-1.png" alt="The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for increasing transaction costs and for higher risk aversion." width="672" />
+<p class="caption">(\#fig:fig511)Portfolio weights for different risk aversion and transaction cost</p>
+</div>
 
 The figure shows that the initial portfolio is always the (sample) minimum variance portfolio and that the higher the transaction costs parameter $\beta$, the smaller is the rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). In addition, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings. 
 
@@ -190,7 +193,7 @@ The function takes one argument (`meq`) for the number of equality constraints. 
 $$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
 
 Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
-Note that `near` is a safe way to compare if two vectors are pairwise equal. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer while `near` has a built in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
+Note that `near()` is a safe way to compare if two vectors are pairwise equal. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer while `near()` has a built in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
 
 
 ```r
@@ -208,7 +211,7 @@ all(near(w_mvp, w_mvp_numerical$solution))
 ```
 
 ```
-## [1] TRUE
+[1] TRUE
 ```
 
 ```r
@@ -224,7 +227,7 @@ all(near(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution))
 ```
 
 ```
-## [1] TRUE
+[1] TRUE
 ```
 
 The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario where we already know the analytic solution. 
@@ -245,13 +248,13 @@ w_no_short_sale$solution
 ```
 
 ```
-##  [1]  6.34e-01 -1.91e-17  1.20e-16 -3.47e-18  6.78e-18 -6.24e-17  1.02e-01
-##  [8]  2.64e-01  3.38e-22 -2.22e-16
+ [1]  6.34e-01 -1.91e-17  1.20e-16 -3.47e-18  6.78e-18 -6.24e-17  1.02e-01
+ [8]  2.64e-01  3.38e-22 -2.22e-16
 ```
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
-You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
+You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
 
-`solve.QP` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum\limits_{i=1}^N |w_i| \leq 1.5$. 
+`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum\limits_{i=1}^N |w_i| \leq 1.5$. 
 The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear constraint. \index{Regulation T}
 Thus, we can no longer rely on `solve.QP()` which is defined to solve quadratic programming problems with linear constraints. 
 Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -287,11 +290,11 @@ w_reg_t$par
 ```
 
 ```
-##  [1]  4.11e-01 -2.07e-02 -9.00e-02  3.37e-02  8.03e-02 -2.25e-08  3.08e-01
-##  [8]  3.52e-01  6.25e-02 -1.37e-01
+ [1]  4.11e-01 -2.07e-02 -9.00e-02  3.37e-02  8.03e-02 -2.25e-08  3.08e-01
+ [8]  3.52e-01  6.25e-02 -1.37e-01
 ```
 
-Note that the function `constrOptim.nl` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective` (subject to the equality constraints `equality_constraints` and the inequality constraints `inequality_constraints`). 
+Note that the function `constrOptim.nl()` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`). 
 In order to initialize the search procedure, a starting point has to be provided. 
 *If* the algorithm identifies a global minimum, the starting point should not matter.
 
@@ -325,14 +328,17 @@ tibble(
   scale_y_continuous(labels = percent)
 ```
 
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-10-1.png" width="672" style="display: block; margin: auto;" />
+<div class="figure">
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" alt="The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicates extreme long and short positions for the efficient portfolio." width="672" />
+<p class="caption">(\#fig:unnamed-chunk-9)Summary of the optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.</p>
+</div>
 
 The results clearly indicate the effect of imposing additional constraints: The extreme holdings the investor would implement if she follows the (theoretically optimal) efficient portfolio vanish under, e.g., the regulation-t constraint.
 You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints. 
 The short answer is: the *efficient portfolio* is only efficient if the true parameters of the data generating process correspond to the estimated parameters $\hat\Sigma$ and $\hat\mu$. 
 Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations which could be the result of *error-maximization* due to estimation uncertainty [@Jagannathan2003].
 
-Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
+Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
 
 
 ```r
@@ -493,12 +499,12 @@ performance |>
 ```
 
 ```
-## # A tibble: 3 × 5
-##   strategy   Mean    SD `Sharpe ratio` Turnover
-##   <chr>     <dbl> <dbl>          <dbl>    <dbl>
-## 1 MV       -0.637  12.4         NA     214.    
-## 2 MV (TC)  12.1    15.1          0.802   0.0311
-## 3 Naive    12.1    15.1          0.801   0.229
+# A tibble: 3 × 5
+  strategy   Mean    SD `Sharpe ratio` Turnover
+  <chr>     <dbl> <dbl>          <dbl>    <dbl>
+1 MV       -0.637  12.4         NA     214.    
+2 MV (TC)  12.1    15.1          0.802   0.0311
+3 Naive    12.1    15.1          0.801   0.229 
 ```
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 

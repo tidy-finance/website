@@ -1,6 +1,6 @@
 # Replicating Fama & French factors
 
-The Fama and French three-factor model (see @Fama1993) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this chapter, we also want to show the main idea of how to replicate these significant factors. 
+The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this chapter, we also want to show the main idea of how to replicate these significant factors. 
 
 The current chapter relies on this set of packages. 
 
@@ -176,24 +176,24 @@ summary(lm(smb ~ smb_replicated, data = test))
 ```
 
 ```
-## 
-## Call:
-## lm(formula = smb ~ smb_replicated, data = test)
-## 
-## Residuals:
-##       Min        1Q    Median        3Q       Max 
-## -0.020320 -0.001501  0.000027  0.001519  0.014615 
-## 
-## Coefficients:
-##                 Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    -0.000143   0.000133   -1.07     0.28    
-## smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.00355 on 712 degrees of freedom
-## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
-## F-statistic: 5.09e+04 on 1 and 712 DF,  p-value: <2e-16
+
+Call:
+lm(formula = smb ~ smb_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.020320 -0.001501  0.000027  0.001519  0.014615 
+
+Coefficients:
+                Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    -0.000143   0.000133   -1.07     0.28    
+smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.00355 on 712 degrees of freedom
+Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
+F-statistic: 5.09e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
 The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 95%. 
@@ -204,24 +204,24 @@ summary(lm(hml ~ hml_replicated, data = test))
 ```
 
 ```
-## 
-## Call:
-## lm(formula = hml ~ hml_replicated, data = test)
-## 
-## Residuals:
-##       Min        1Q    Median        3Q       Max 
-## -0.022250 -0.002933 -0.000101  0.002366  0.027475 
-## 
-## Coefficients:
-##                Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    0.000294   0.000214    1.38     0.17    
-## hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.0057 on 712 degrees of freedom
-## Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 
-## F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
+
+Call:
+lm(formula = hml ~ hml_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.022250 -0.002933 -0.000101  0.002366  0.027475 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    0.000294   0.000214    1.38     0.17    
+hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.0057 on 712 degrees of freedom
+Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 
+F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. 

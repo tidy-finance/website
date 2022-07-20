@@ -25,7 +25,7 @@ end_date <- ymd("2020-12-31")
 
 ## Fama-French data
 
-We start by downloading some famous Fama-French factors (e.g., @Fama1993) and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to easily access the data: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html).
+We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to easily access the data: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html).
 
 
 ```r
@@ -164,7 +164,7 @@ file.remove("data/macro_predictors.xlsx")
 ```
 
 ```
-## [1] TRUE
+[1] TRUE
 ```
 
 ## Other macroeconomic data
@@ -185,7 +185,7 @@ cpi_monthly <- tq_get("CPIAUCNS",
   )
 ```
 
-To download other time series, we just have to it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package @fredr. Note that you need to get an API key to use its functionality, but refer to the package documentation for details. 
+To download other time series, we just have to it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality, but refer to the package documentation for details. 
 
 ## Setting up a database
 
@@ -241,16 +241,16 @@ factors_ff_monthly_db |>
 ```
 
 ```
-## # Source:   SQL [?? x 2]
-## # Database: sqlite 3.38.5 [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
-##   month          rf
-##   <date>      <dbl>
-## 1 1960-01-01 0.0033
-## 2 1960-02-01 0.0029
-## 3 1960-03-01 0.0035
-## 4 1960-04-01 0.0019
-## 5 1960-05-01 0.0027
-## # … with more rows
+# Source:   SQL [?? x 2]
+# Database: sqlite 3.38.5 [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
+  month          rf
+  <date>      <dbl>
+1 1960-01-01 0.0033
+2 1960-02-01 0.0029
+3 1960-03-01 0.0035
+4 1960-04-01 0.0019
+5 1960-05-01 0.0027
+# … with more rows
 ```
 
 If we want to have the whole table in memory, we need to `collect()` it. You will see that we regularly load the data into the memory in the next chapters.
@@ -263,15 +263,15 @@ factors_ff_monthly_db |>
 ```
 
 ```
-## # A tibble: 732 × 2
-##   month          rf
-##   <date>      <dbl>
-## 1 1960-01-01 0.0033
-## 2 1960-02-01 0.0029
-## 3 1960-03-01 0.0035
-## 4 1960-04-01 0.0019
-## 5 1960-05-01 0.0027
-## # … with 727 more rows
+# A tibble: 732 × 2
+  month          rf
+  <date>      <dbl>
+1 1960-01-01 0.0033
+2 1960-02-01 0.0029
+3 1960-03-01 0.0035
+4 1960-04-01 0.0019
+5 1960-05-01 0.0027
+# … with 727 more rows
 ```
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
@@ -348,10 +348,10 @@ dbSendQuery(tidy_finance, "VACUUM")
 ```
 
 ```
-## <SQLiteResult>
-##   SQL  VACUUM
-##   ROWS Fetched: 0 [complete]
-##        Changed: 0
+<SQLiteResult>
+  SQL  VACUUM
+  ROWS Fetched: 0 [complete]
+       Changed: 0
 ```
 
 The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read up in [this tutorial](https://www.sqlitetutorial.net/sqlite-vacuum/). 
@@ -364,14 +364,14 @@ dbListTables(tidy_finance)
 ```
 
 ```
-## Warning: Closing open result set, pending rows
+Warning: Closing open result set, pending rows
 ```
 
 ```
-##  [1] "beta"                  "compustat"             "cpi_monthly"          
-##  [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
-##  [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
-## [10] "macro_predictors"
+ [1] "beta"                  "compustat"             "cpi_monthly"          
+ [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
+ [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
+[10] "macro_predictors"     
 ```
 
 This function comes in handy if you are unsure about the correct naming of the tables in your database. 

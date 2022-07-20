@@ -20,7 +20,7 @@ library(RSQLite)
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", 
+  SQLite(), "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
@@ -112,7 +112,7 @@ names(theta) <- colnames(data_portfolios)[str_detect(
 )]
 ```
 
-The function `compute_portfolio_weights` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value $\theta_0$. Everything happens within a single pipeline, hence we provide a short walk through.
+The function `compute_portfolio_weights()` below computes the portfolio weights $\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}$ according to our parametrization for a given value $\theta_0$. Everything happens within a single pipeline, hence we provide a short walk through.
 
 We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'\hat{x}_{i, t}$ which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio `weight_benchmark`, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. 
 `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt` which deviate from the benchmark portfolio depending on the stock characteristics.
@@ -178,7 +178,7 @@ power_utility <- function(r, gamma = 5) {
 }
 ```
 
-It should be noted, that @Gehrig2020 warn that in the leading case of constant relative risk aversion (CRRA) strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy and the
+It should be noted, that @Gehrig2020 warn that in the leading case of constant relative risk aversion (CRRA) strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy, and the
 parameter space are necessary to obtain a well defined optimization problem.
 
 No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: The original paper @Brandt2009 only cares about expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
@@ -239,32 +239,32 @@ Let us take a look at the different portfolio strategies and evaluation measures
 
 
 ```r
-evaluate_portfolio(weights_crsp) |> 
+evaluate_portfolio(weights_crsp) |>
   print(n = Inf)
 ```
 
 ```
-## # A tibble: 11 × 3
-##    measure                            benchmark     tilt
-##    <chr>                                  <dbl>    <dbl>
-##  1 Expected utility                  -0.249     -0.262  
-##  2 Average return                     6.86      -0.604  
-##  3 SD return                         15.3       21.0    
-##  4 Sharpe ratio                       0.129     -0.00831
-##  5 CAPM alpha                         0.000108  -0.00574
-##  6 Market beta                        0.992      0.927  
-##  7 Absolute weight                    0.0246     0.0631 
-##  8 Max. weight                        3.52       3.65   
-##  9 Min. weight                        0.0000278 -0.145  
-## 10 Avg. sum of negative weights       0         78.0    
-## 11 Avg. fraction of negative weights  0         49.4
+# A tibble: 11 × 3
+   measure                            benchmark     tilt
+   <chr>                                  <dbl>    <dbl>
+ 1 Expected utility                  -0.249     -0.262  
+ 2 Average return                     6.86      -0.604  
+ 3 SD return                         15.3       21.0    
+ 4 Sharpe ratio                       0.129     -0.00831
+ 5 CAPM alpha                         0.000108  -0.00574
+ 6 Market beta                        0.992      0.927  
+ 7 Absolute weight                    0.0246     0.0631 
+ 8 Max. weight                        3.52       3.65   
+ 9 Min. weight                        0.0000278 -0.145  
+10 Avg. sum of negative weights       0         78.0    
+11 Avg. fraction of negative weights  0         49.4    
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
 
 ## Optimal parameter choice
 
-Next, we move to a choice of $\theta$ that actually aims to improve some (or all) of the performance measures. We first define a helper function `compute_objective_function`, which we then pass to an optimizer.
+Next, we move to a choice of $\theta$ that actually aims to improve some (or all) of the performance measures. We first define a helper function `compute_objective_function()`, which we then pass to an optimizer.
 
 
 ```r
@@ -291,7 +291,7 @@ compute_objective_function <- function(theta,
 ```
 
 You may wonder why we return the negative value of the objective function. This is simply due to the common convention for optimization procedures to search for minima as a default. By minimizing the negative value of the objective function, we get the maximum value as a result.
-In its most basic form, R optimization relies on the function `optim`. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of $\hat\theta$, which maximize the hypothetical expected utility of the investor. 
+In its most basic form, R optimization relies on the function `optim()`. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of $\hat\theta$, which maximize the hypothetical expected utility of the investor. 
 
 
 ```r
@@ -308,8 +308,8 @@ optimal_theta$par
 ```
 
 ```
-## momentum_lag     size_lag 
-##        0.189       -2.007
+momentum_lag     size_lag 
+       0.189       -2.007 
 ```
 
 The resulting values of $\hat\theta$ are easy to interpret: Intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
@@ -399,21 +399,21 @@ performance_table |>
 ```
 
 ```
-## # A tibble: 11 × 7
-##    measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op…` `EW  Optimal `
-##    <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
-##  1 Expected uti… -0.250   -2.49e-1       -0.247           -0.247         -0.250  
-##  2 Average retu… 10.5      6.86e+0       14.7             13.4           13.0    
-##  3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
-##  4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
-##  5 CAPM alpha     0.00231  1.08e-4        0.00649          0.00528        0.00440
-##  6 Market beta    1.13     9.92e-1        1.01             1.04           1.14   
-##  7 Absolute wei…  0.0246   2.46e-2        0.0379           0.0246         0.0258 
-##  8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0807 
-##  9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0342 
-## 10 Avg. sum of …  0        0             27.9              0              2.49   
-## 11 Avg. fractio…  0        0             38.8              0              7.84   
-## # … with 1 more variable: `EW (no s.) Optimal ` <dbl>
+# A tibble: 11 × 7
+   measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op…` `EW  Optimal `
+   <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
+ 1 Expected uti… -0.250   -2.49e-1       -0.247           -0.247         -0.250  
+ 2 Average retu… 10.5      6.86e+0       14.7             13.4           13.0    
+ 3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
+ 4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
+ 5 CAPM alpha     0.00231  1.08e-4        0.00649          0.00528        0.00440
+ 6 Market beta    1.13     9.92e-1        1.01             1.04           1.14   
+ 7 Absolute wei…  0.0246   2.46e-2        0.0379           0.0246         0.0258 
+ 8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0807 
+ 9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0342 
+10 Avg. sum of …  0        0             27.9              0              2.49   
+11 Avg. fractio…  0        0             38.8              0              7.84   
+# … with 1 more variable: `EW (no s.) Optimal ` <dbl>
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.
@@ -423,6 +423,6 @@ The results indicate that the average annualized Sharpe ratio of the equal-weigh
 
 1. How do the estimated parameters $\hat\theta$ and the portfolio performance change if your objective is to maximize the Sharpe ratio instead of the hypothetical expected utility?
 1. The code above is very flexible in the sense that you can easily add new firm characteristics. Construct a new characteristic and evaluate the corresponding coefficient $\hat\theta_i$. 
-1. Tweak the function `optimal_theta`such that you can impose additional performance constraints in order to determine $\hat\theta$ which maximizes expected utility under the constraint that the market beta is below 1.
+1. Tweak the function `optimal_theta()`such that you can impose additional performance constraints in order to determine $\hat\theta$ which maximizes expected utility under the constraint that the market beta is below 1.
 1. Does the portfolio performance resemble a realistic out-of-sample backtesting procedure? Verify the robustness of the results by first estimating $\hat\theta$ based on *past data* only. Then, use more recent periods to evaluate the actual portfolio performance. 
 1. By formulating the portfolio problem as a statistical estimation problem, you can easily obtain standard errors for the coefficients of the weight function. @Brandt2009 provide the relevant derivations in their paper in Equation (10). Implement a small function that computes standard errors for $\hat\theta$.
