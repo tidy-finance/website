@@ -4,7 +4,7 @@
 ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
 While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. \index{Supervised learning} The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests \index{Random forests} and neural networks \index{Neural network} to a simple application in option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options \index{Option pricing} without prior knowledge of the theoretical underpinnings of the famous option pricing equation by @Black1976.    
 
-The roadmap is as follows: First, we briefly introduce regression trees, random forests, and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
+The roadmap of this chapter is as follows: First, we briefly introduce regression trees, random forests, and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
 We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
 
 ::: {.rmdnote}
@@ -92,8 +92,10 @@ option_prices <- expand_grid(
 ) |>
   mutate(
     black_scholes = black_scholes_price(S, K, r, T, sigma),
-    observed_price = map(black_scholes, 
-                         function(x) x + rnorm(2, sd = 0.15))
+    observed_price = map(
+      black_scholes,
+      function(x) x + rnorm(2, sd = 0.15)
+    )
   ) |>
   unnest(observed_price)
 ```
@@ -168,9 +170,11 @@ Note that while the `tidymodels` workflow is extremely convenient, more sophisti
 
 ```{r}
 model <- keras_model_sequential() |>
-  layer_dense(input_shape = 5,
-              units = 10, 
-              activation = "sigmoid") |>
+  layer_dense(
+    input_shape = 5,
+    units = 10,
+    activation = "sigmoid"
+  ) |>
   layer_dense(units = 10, activation = "sigmoid") |>
   layer_dense(units = 10, activation = "sigmoid") |>
   layer_dense(units = 1, activation = "linear") |>
@@ -198,8 +202,9 @@ Before we evaluate the results, we implement one more model: In principle, any n
 ```{r} 
 rec_linear <- rec |>
   step_poly(all_predictors(),
-            degree = 5, 
-            options = list(raw = T)) |>
+    degree = 5,
+    options = list(raw = T)
+  ) |>
   step_interact(terms = ~ all_predictors():all_predictors()) |>
   step_lincomb(all_predictors())
 
@@ -217,12 +222,14 @@ lm_fit <- workflow() |>
 Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on ten thousand new data points. Note that for the evaluation, we use the call to `extract_mold()` to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in `forge()`, which provides an easy, consistent, and robust pre-processor at prediction time. 
 
 ```{r}
-out_of_sample_data <- testing(split) |> 
+out_of_sample_data <- testing(split) |>
   slice_sample(n = 10000)
 
 predictive_performance <- model |>
-  predict(forge(out_of_sample_data, 
-                extract_mold(nn_fit)$blueprint)$predictors |> as.matrix()) |>
+  predict(forge(
+    out_of_sample_data,
+    extract_mold(nn_fit)$blueprint
+  )$predictors |> as.matrix()) |>
   as.vector() |>
   tibble("Deep NN" = _) |>
   bind_cols(nn_fit |>
