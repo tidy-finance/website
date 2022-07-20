@@ -7,7 +7,6 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = TRUE,
   cache = FALSE,
-  fig.align = "center",
   width = 81,
   comment=""
 )
