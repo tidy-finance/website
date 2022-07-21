@@ -1,10 +1,6 @@
-<!-- Replace correlation test and t test by regressions and interpret them (+ drop lmtest package?) -->
-<!-- Exercise: create typical table for portfolio sorts for each portfolio used in FF construction -->
-<!-- exercise: compute FF alphas for beta portfolios from chapter 32 -->
-
 # Replicating Fama & French factors
 
-The Fama and French three-factor model (see @Fama1993) is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the factors size and value. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this Chapter we also want to show the main idea on how to replicate these significant factors. 
+The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. In this chapter, we also want to show the main idea of how to replicate these significant factors. 
 
 The current chapter relies on this set of packages. 
 
@@ -16,34 +12,33 @@ library(lubridate)
 
 ## Databases
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. 
-Hence, there is nothing new below.
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 
 
 ```r
-tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
-  extended_types = TRUE
+tidy_finance <- dbConnect(
+  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
 )
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") %>%
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") %>%
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") %>%
+compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
-data_ff <- crsp_monthly %>%
-  left_join(factors_ff_monthly, by = "month") %>%
+data_ff <- crsp_monthly |>
+  left_join(factors_ff_monthly, by = "month") |>
   select(
     permno, gvkey, month, ret_excess, mkt_excess,
     mktcap, mktcap_lag, exchange
-  ) %>%
+  ) |>
   drop_na()
 
-be <- compustat %>%
-  select(gvkey, datadate, be) %>%
+be <- compustat |>
+  select(gvkey, datadate, be) |>
   drop_na()
 ```
 
@@ -57,55 +52,56 @@ To implement all these time lags, we again employ the temporary `sorting_date`-c
 
 
 ```r
-me_ff <- data_ff %>%
-  filter(month(month) == 6) %>%
-  mutate(sorting_date = month %m+% months(1)) %>%
+me_ff <- data_ff |>
+  filter(month(month) == 6) |>
+  mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me_ff = mktcap)
 
-me_ff_dec <- data_ff %>%
-  filter(month(month) == 12) %>%
-  mutate(sorting_date = ymd(paste0(year(month) + 1, "0701)"))) %>%
+me_ff_dec <- data_ff |>
+  filter(month(month) == 12) |>
+  mutate(sorting_date = ymd(str_c(year(month) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, bm_me = mktcap)
 
-bm_ff <- be %>%
-  mutate(sorting_date = ymd(paste0(year(datadate) + 1, "0701"))) %>%
-  select(gvkey, sorting_date, bm_be = be) %>%
-  drop_na() %>%
-  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) %>%
-  mutate(bm_ff = bm_be / bm_me) %>%
+bm_ff <- be |>
+  mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
+  select(gvkey, sorting_date, bm_be = be) |>
+  drop_na() |>
+  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) |>
+  mutate(bm_ff = bm_be / bm_me) |>
   select(permno, sorting_date, bm_ff)
 
-variables_ff <- me_ff %>%
-  inner_join(bm_ff, by = c("permno", "sorting_date")) %>%
-  drop_na() %>%
+variables_ff <- me_ff |>
+  inner_join(bm_ff, by = c("permno", "sorting_date")) |>
+  drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
 ## Portfolio sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function, because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios` we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()`  with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step. 
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step. 
 
 
 ```r
 assign_portfolio <- function(data, var, percentiles) {
-  breakpoints <- data %>%
-    filter(exchange == "NYSE") %>%
+  breakpoints <- data |>
+    filter(exchange == "NYSE") |>
     summarize(breakpoint = quantile(
       {{ var }},
       probs = {{ percentiles }},
       na.rm = TRUE
-    )) %>%
-    pull(breakpoint) %>%
+    )) |>
+    pull(breakpoint) |>
     as.numeric()
 
-  data %>%
-    mutate(portfolio = findInterval({{ var }}, breakpoints, all.inside = TRUE)) %>%
+  data |>
+    mutate(portfolio = findInterval({{ var }},
+                                    breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
 }
 
-portfolios_ff <- variables_ff %>%
-  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) %>%
-  group_by(sorting_date) %>%
+portfolios_ff <- variables_ff |>
+  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) |>
+  group_by(sorting_date) |>
   mutate(
     portfolio_me = assign_portfolio(
       data = cur_data(),
@@ -117,19 +113,19 @@ portfolios_ff <- variables_ff %>%
       var = bm_ff,
       percentiles = c(0, 0.3, 0.7, 1)
     )
-  ) %>%
+  ) |>
   select(permno, sorting_date, portfolio_me, portfolio_bm)
 ```
 
-Next, we merge the portfolios to the return data of the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
+Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 
 ```r
-portfolios_ff <- data_ff %>%
+portfolios_ff <- data_ff |>
   mutate(sorting_date = case_when(
-    month(month) <= 6 ~ ymd(paste0(year(month) - 1, "0701")),
-    month(month) >= 7 ~ ymd(paste0(year(month), "0701"))
-  )) %>%
+    month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
+    month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
+  )) |>
   inner_join(portfolios_ff, by = c("permno", "sorting_date"))
 ```
 
@@ -140,30 +136,32 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 
 
 ```r
-factors_ff_monthly_replicated <- portfolios_ff %>%
-  mutate(portfolio = paste0(portfolio_me, portfolio_bm)) %>%
-  group_by(portfolio, month) %>%
-  summarise(
+factors_ff_monthly_replicated <- portfolios_ff |>
+  mutate(portfolio = str_c(portfolio_me, portfolio_bm)) |>
+  group_by(portfolio, month) |>
+  summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop",
     portfolio_me = unique(portfolio_me),
     portfolio_bm = unique(portfolio_bm)
-  ) %>%
-  group_by(month) %>%
-  summarise(
-    smb_replicated = mean(ret[portfolio_me == 1]) - mean(ret[portfolio_me == 2]),
-    hml_replicated = mean(ret[portfolio_bm == 3]) - mean(ret[portfolio_bm == 1])
+  ) |>
+  group_by(month) |>
+  summarize(
+    smb_replicated = mean(ret[portfolio_me == 1]) - 
+      mean(ret[portfolio_me == 2]),
+    hml_replicated = mean(ret[portfolio_bm == 3]) - 
+      mean(ret[portfolio_bm == 1])
   )
 ```
 
 
 ## Replication evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating high correlation) and an adjusted R-squared close to 1 (indicating high proportion of explained variance).
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 
 ```r
-test <- factors_ff_monthly %>%
-  inner_join(factors_ff_monthly_replicated, by = "month") %>%
+test <- factors_ff_monthly |>
+  inner_join(factors_ff_monthly_replicated, by = "month") |>
   mutate(
     smb_replicated = round(smb_replicated, 4),
     hml_replicated = round(hml_replicated, 4)
@@ -178,27 +176,27 @@ summary(lm(smb ~ smb_replicated, data = test))
 ```
 
 ```
-## 
-## Call:
-## lm(formula = smb ~ smb_replicated, data = test)
-## 
-## Residuals:
-##       Min        1Q    Median        3Q       Max 
-## -0.020313 -0.001488  0.000028  0.001541  0.014304 
-## 
-## Coefficients:
-##                 Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    -0.000145   0.000133   -1.09     0.28    
-## smb_replicated  0.996710   0.004404  226.29   <2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.00354 on 712 degrees of freedom
-## Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
-## F-statistic: 5.12e+04 on 1 and 712 DF,  p-value: <2e-16
+
+Call:
+lm(formula = smb ~ smb_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.020320 -0.001501  0.000027  0.001519  0.014615 
+
+Coefficients:
+                Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    -0.000143   0.000133   -1.07     0.28    
+smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.00355 on 712 degrees of freedom
+Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
+F-statistic: 5.09e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
-The replication of the HML factor is also a success with although at a slightly lower level with coefficient and R-squared around 95%. 
+The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 95%. 
 
 
 ```r
@@ -206,25 +204,25 @@ summary(lm(hml ~ hml_replicated, data = test))
 ```
 
 ```
-## 
-## Call:
-## lm(formula = hml ~ hml_replicated, data = test)
-## 
-## Residuals:
-##       Min        1Q    Median        3Q       Max 
-## -0.022255 -0.002920 -0.000085  0.002378  0.027474 
-## 
-## Coefficients:
-##                Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)    0.000289   0.000214    1.35     0.18    
-## hml_replicated 0.959105   0.007384  129.90   <2e-16 ***
-## ---
-## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-## 
-## Residual standard error: 0.0057 on 712 degrees of freedom
-## Multiple R-squared:  0.96,	Adjusted R-squared:  0.959 
-## F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
+
+Call:
+lm(formula = hml ~ hml_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.022250 -0.002933 -0.000101  0.002366  0.027475 
+
+Coefficients:
+               Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    0.000294   0.000214    1.38     0.17    
+hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.0057 on 712 degrees of freedom
+Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 
+F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
 ```
 
-The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums although we cannot see their underlying code. 
+The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. 
 From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 
