@@ -1,5 +1,7 @@
-# Tidy Finance with R
+# Tidy Finance with R [<img class="logo" src="https://www.tidy-finance.org/cover.jpg" align="right" style="width:250px;" />](https://www.tidy-finance.org)
 
-This is the work-in-progress repo for the book Tidy Finance with R by Christoph Scheuch, Stefan Voigt and Patrick Weiss. It is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+This is the work-in-progress repo for the book **Tidy Finance with R** by [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo). 
 
-Built with [bookdown](https://bookdown.org/).
+The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The book is built with [bookdown](https://bookdown.org/).
+
+Print release with [Chapman & Hall / CRC](https://www.routledge.com/go/chapman-hall?utm_source=tidy-finance.org) in 2023.
