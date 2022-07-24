@@ -1,11 +1,8 @@
 # TRACE and FISD
 
-citations: @Ohara2021 @Edwards2007 @bessembinder2006
+In general, bond markets are far more diverse than stock markets. The bond market features a diverse set of issuers, as corporations, governments, and municipalities issue bonds. Moreover, most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. In this chapter, we dive into the US corporate bond market. This market segment is exciting due to its size (roughly $10 trillion outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. Here, we introduce how to use bond characteristics from Mergent FISD and trade reports from TRACE. We also provide code to download and clean TRACE in R. 
 
-
-In general, bond markets are far more diverse than stock markets. The bond market has a different set of issuers, as corporations, governments, and municipalities issue bonds. Moreover, most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. In this chapter, we dive into the US corporate bond market. This market segment is exciting due to its size (roughly $10 trillion outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. Here, we introduce how to use bond characteristics from Mergent FISD and trade reports from TRACE. We also provide code to download and clean TRACE in R. 
-
-While we touch on bond liquidity, we do not cover computing bond returns from TRACE. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021.
+Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you could compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Furthermore, WRDS includes bond returns computed from TRACE data at a monthly frequency.
 
 The current chapter relies on this set of packages. 
 ```{r}
@@ -18,7 +15,7 @@ library(RPostgres)
 
 ## SQLite-Database and WRDS 
 
-Both bond databases are available on [(WRDS)](https://wrds-www.wharton.upenn.edu/), and we use the `RPostgres`-connection as described in the previous chapter. Additionally, we connect to our `SQLite`-database, which we also introduced in the previous chapters.
+Both bond databases we need are available on [(WRDS)](https://wrds-www.wharton.upenn.edu/), and we use the `RPostgres`-connection as described in the previous chapter. Additionally, we connect to our `SQLite`-database, which we also introduced in the previous chapters.
 
 ```{r}
 wrds <- dbConnect(
@@ -58,7 +55,7 @@ mergent <- tbl(wrds, in_schema("fisd", "fisd_mergedissue")) |>
                      "CMTZ",   # US Corporate MTN Zero
                      "CZ",     # US Corporate Zero,
                      "USBN"),  # US Corporate Bank Note
-    pay_in_kind != "Y",        # Not payable in kind
+    pay_in_kind != "Y",        # not payable in kind
     yankee == "N",             # no foreign issuer
     canadian == "N",           # not Canadian 
     foreign_currency == "N",   # USD
@@ -109,12 +106,14 @@ mergent <- mergent |>
   select(-country_domicile)
 ```
 
-Finally, we save the bond characteristics to our database. This selection constitutes the sample for which we will collect trade reports from TRACE below.
+Finally, we save the bond characteristics to our database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
-# Save to database
 mergent |> 
-  dbWriteTable(tidy_finance, "mergent", _, overwrite = TRUE)
+  copy_to(dest = tidy_finance,
+          df = _,
+          name = "mergent",
+          overwrite = TRUE)
 ```
 
 The Mergent FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [used, e.g., in @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -124,204 +123,46 @@ The Mergent FISD database also contains other data. The issue-based file contain
 
 The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE). In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants; standard and enhanced TRACE. We show how to download and clean enhanced TRACE in R as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties' roles and the direction of the trade report. These items become essential in cleaning the messages.
 
-Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data. We do not go into the cleaning steps here. The code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward in our setting.
+Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data. We do not go into the cleaning steps here. The code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-Remove code to a function in the appendix
+We store the code for cleaning enhanced TRACE in R on the following Github [gist](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4). (https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the [gist](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4), download it, and `source()` the respective R-file. The function takes a vector of CUSIPs (in *cusips*), a connection to WRDS (*connection*) explained in chapter 3, and a start and end date (*start_date* and *end_date*, respectively). 
+
+```{r}
+devtools::source_gist("3a05b3ab281563b2e94858451c2eb3a4")
+```
+
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very slow downloads and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For our application, we only need data one year before and after December 2015, i.e., two years, and download the data in ten sets, which we definedbelow.
 
 ```{r}
 mergent_cusips <- mergent |>
   pull(complete_cusip)
 
-set.seed(1)
-mergent_parts <- split(mergent_cusips, sample(1:100, length(mergent_cusips), replace = T))
+set.seed(123)
+mergent_parts <- split(mergent_cusips, 
+                       sample(1:10, 
+                              length(mergent_cusips), 
+                              replace = T))
 ```
 
-Loop cleaner, 2h and it is done.
+Finally, we run a loop and for each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We give each set a custom name that pastes the part's number to a general name. Thereby, we create ten different datasets, which we merge later.
 
 ```{r}
 for(part in 1:length(mergent_parts)) {
-  cat("\n Starting: ", part, "\n  ->  ", as.character(Sys.time()), "\n")
-  
-  
-  # Select respective part
-  mergent_cusips_part <- gsub(".Rdata", "", mergent_parts[[part]])
-  
-  
-  # Enhanced Trace ----------------------------------------------------------
-  # Main file
-  trace_all <- tbl(wrds, in_schema("trace", "trace_enhanced")) |> 
-    filter(cusip_id %in% mergent_cusips_part) |>
-    select(cusip_id, msg_seq_nb, orig_msg_seq_nb,
-           entrd_vol_qt, rptd_pr, rpt_side_cd, cntra_mp_id,
-           trd_exctn_dt, trd_exctn_tm, trd_rpt_dt, trd_rpt_tm, pr_trd_dt,
-           trc_st, asof_cd, wis_fl, days_to_sttl_ct, stlmnt_dt, spcl_trd_fl) |>
-    collect()
-  
-  # Enhanced Trace: Post 06-02-2012 -----------------------------------------
-  # Trades (trc_st = T) and correction (trc_st = R)
-  trace_post_TR <- trace_all |> 
-    filter((trc_st == "T" | trc_st == "R"),
-           trd_rpt_dt >= as.Date("2012-02-06"))
-  
-  # Cancelations (trc_st = X) and correction cancelations (trc_st = C)
-  trace_post_XC <- trace_all |>
-    filter((trc_st == "X" | trc_st == "C"),
-           trd_rpt_dt >= as.Date("2012-02-06"))
-  
-  # Cleaning corrected and cancelled trades
-  trace_post_TR <- trace_post_TR |>
-    anti_join(trace_post_XC,
-              by = c("cusip_id", "msg_seq_nb", "entrd_vol_qt", 
-                     "rptd_pr", "rpt_side_cd", "cntra_mp_id", 
-                     "trd_exctn_dt", "trd_exctn_tm"))
-  
-  # Reversals (trc_st = Y)
-  trace_post_Y <- trace_all |>
-    filter(trc_st == "Y",
-           trd_rpt_dt >= as.Date("2012-02-06"))
-  
-  # Clean reversals
-  ## match the orig_msg_seq_nb of the Y-message to the msg_seq_nb of the main message
-  trace_post <- trace_post_TR |>
-    anti_join(trace_post_Y,
-              by = c("cusip_id", "msg_seq_nb" = "orig_msg_seq_nb", 
-                     "entrd_vol_qt", "rptd_pr", "rpt_side_cd", 
-                     "cntra_mp_id", "trd_exctn_dt", "trd_exctn_tm"))
-  
-  
-  # Enhanced TRACE: Pre 06-02-2012 ------------------------------------------
-  # Cancelations (trc_st = C)
-  trace_pre_C <- trace_all |>
-    filter(trc_st == "C",
-           trd_rpt_dt < as.Date("2012-02-06"))
-  
-  # Trades w/o cancelations
-  ## match the orig_msg_seq_nb of the C-message to the msg_seq_nb of the main message
-  trace_pre_T <- trace_all |>
-    filter(trc_st == "T",
-           trd_rpt_dt < as.Date("2012-02-06")) |>
-    anti_join(trace_pre_C, 
-              by = c("cusip_id", "msg_seq_nb" = "orig_msg_seq_nb", 
-                     "entrd_vol_qt", "rptd_pr", "rpt_side_cd", 
-                     "cntra_mp_id", "trd_exctn_dt", "trd_exctn_tm"))
-  
-  # Corrections (trc_st = W) - W can also correct a previous W
-  trace_pre_W <- trace_all |>
-    filter(trc_st == "W",
-           trd_rpt_dt < as.Date("2012-02-06"))
-  
-  # Implement corrections in a loop
-  ## Correction control
-  correction_control <- nrow(trace_pre_W)
-  correction_control_last <- nrow(trace_pre_W)
-  
-  ## Correction loop
-  while(correction_control > 0) {
-    # Corrections that correct some msg
-    trace_pre_W_correcting <- trace_pre_W |>
-      semi_join(trace_pre_T, 
-                by = c("cusip_id", "trd_exctn_dt",
-                       "orig_msg_seq_nb" = "msg_seq_nb"))
-    
-    # Corrections that do not correct some msg
-    trace_pre_W <- trace_pre_W |>
-      anti_join(trace_pre_T, 
-                by = c("cusip_id", "trd_exctn_dt",
-                       "orig_msg_seq_nb" = "msg_seq_nb"))
-    
-    # Delete msgs that are corrected and add correction msgs
-    trace_pre_T <- trace_pre_T |>
-      anti_join(trace_pre_W_correcting, 
-                by = c("cusip_id", "trd_exctn_dt",
-                       "msg_seq_nb" = "orig_msg_seq_nb")) |>
-      union_all(trace_pre_W_correcting) 
-    
-    # Escape if no corrections remain or they cannot be matched to a trade
-    correction_control <- nrow(trace_pre_W)
-    if(correction_control == correction_control_last) {
-      correction_control <- 0 
-    }
-    correction_control_last <- nrow(trace_pre_W)
-  }
-  
-  
-  # Clean reversals
-  ## Record reversals
-  trace_pre_R <- trace_pre_T |>
-    filter(asof_cd == 'R') |>
-    group_by(cusip_id, trd_exctn_dt, entrd_vol_qt, 
-             rptd_pr, rpt_side_cd, cntra_mp_id) |>
-    arrange(trd_exctn_tm, trd_rpt_dt, trd_rpt_tm) |>
-    mutate(seq = row_number()) |>
-    ungroup()
-  
-  ## Remove reversals and the reversed trade
-  trace_pre <- trace_pre_T |> 
-    filter(is.na(asof_cd) | !(asof_cd %in% c('R', 'X', 'D'))) |> 
-    group_by(cusip_id, trd_exctn_dt, entrd_vol_qt, 
-             rptd_pr, rpt_side_cd, cntra_mp_id) |> 
-    arrange(trd_exctn_tm, trd_rpt_dt, trd_rpt_tm) |> 
-    mutate(seq = row_number()) |> 
-    ungroup() |> 
-    anti_join(trace_pre_R,
-              by = c("cusip_id", "trd_exctn_dt", "entrd_vol_qt", 
-                     "rptd_pr", "rpt_side_cd", "cntra_mp_id", "seq")) |> 
-    select(-seq)
-  
-  
-  # Agency trades -----------------------------------------------------------
-  # Combine pre and post trades
-  trace_clean <- trace_post |> 
-    union_all(trace_pre)
-  
-  # Keep angency sells and unmatched agency buys
-  ## Agency sells
-  trace_agency_sells <- trace_clean |> 
-    filter(cntra_mp_id == "D",
-           rpt_side_cd == "S")
-  
-  # Agency buys that are unmatched
-  trace_agency_buys_filtered <- trace_clean |> 
-    filter(cntra_mp_id == "D",
-           rpt_side_cd == "B") |> 
-    anti_join(trace_agency_sells, 
-              by = c("cusip_id", "trd_exctn_dt", 
-                     "entrd_vol_qt", "rptd_pr"))
-  
-  # Agency clean
-  trace_clean <- trace_clean |> 
-    filter(cntra_mp_id == "C")  |> 
-    union_all(trace_agency_sells) |> 
-    union_all(trace_agency_buys_filtered) 
-  
-  
-  # Additional Filters ------------------------------------------------------
-  trace_add_filters <- trace_clean |> 
-    mutate(days_to_sttl_ct2 = stlmnt_dt - trd_exctn_dt) |> 
-    filter(is.na(days_to_sttl_ct) | as.numeric(days_to_sttl_ct) <= 7,
-           is.na(days_to_sttl_ct2) | as.numeric(days_to_sttl_ct2) <= 7,
-           wis_fl == "N",
-           is.na(spcl_trd_fl) | spcl_trd_fl == "",
-           is.na(asof_cd) | asof_cd == "")
-  
-  
-  # Collection --------------------------------------------------------------
-  # Only collect necessary columns
-  trace_final <- trace_add_filters |> 
-    arrange(cusip_id, trd_exctn_dt, trd_exctn_tm) |> 
-    select(cusip_id, trd_exctn_dt, trd_exctn_tm, rptd_pr, entrd_vol_qt, rpt_side_cd, cntra_mp_id) |> 
-    mutate(trd_exctn_tm = format(as_datetime(trd_exctn_tm), "%H:%M:%S")) 
+  # Download the TRACE data
+  trace_final <- clean_enhanced_trace(cusips = mergent_parts[[part]],
+                                      connection = wrds,
+                                      start_date = as.Date("2014-12-01"),
+                                      end_date = as.Date("2016-12-31"))
   
   # Save
   trace_final |> 
-    dbWriteTable(conn = tidy_finance, 
-                 name = paste0("trace_", formatC(part, format = "d", width = 4, flag = "0")),
-                 value = _,
-                 overwrite = TRUE)
-
-
-cat("  <- ", as.character(Sys.time()), "\n")
-rm(list = ls()[-which(ls() %in% c("tidy_finance", "wrds", "mergent_parts"))])
+  copy_to(dest = tidy_finance,
+          df = _,
+          name = name = paste0("trace_", 
+                               formatC(part, 
+                                       format = "d", 
+                                       width = 3, 
+                                       flag = "0")),
+          overwrite = TRUE)
 }
 ```
-
