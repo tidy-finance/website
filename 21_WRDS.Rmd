@@ -103,7 +103,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`). Note that we keep market cap in millions of US dollars just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+The first additional variable we create is market capitalization (`mktcap`). Note that we keep market cap in millions of USD just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
@@ -221,7 +221,7 @@ Before we move on to other data sources, let us look at some descriptive statist
 
 The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belongs to the other category.
 
-```{r}
+```{r, fig211, fig.cap = "Monthly number of securities by exchange.", fig.alt = "Line chart of number of securities by exchange from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis."}
 crsp_monthly |>
   count(exchange, date) |>
   ggplot(aes(x = date, y = n, color = exchange, linetype = exchange)) +
@@ -234,9 +234,9 @@ crsp_monthly |>
   scale_y_continuous(labels = comma)
 ```
 
-Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` dollars to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
-```{r}
+```{r, fig212, fig.cap = "Monthly market cap by listing exchange in billions of Dec 2020 USD.", fig.alt = "Line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis."}
 tbl(tidy_finance, "crsp_monthly") |>
   left_join(tbl(tidy_finance, "cpi_monthly"), by = "month") |>
   group_by(month, exchange) |>
@@ -247,11 +247,12 @@ tbl(tidy_finance, "crsp_monthly") |>
   ) |>
   collect() |>
   mutate(month = ymd(month)) |>
-  ggplot(aes(x = month, y = mktcap / 1000, color = exchange, linetype = exchange)) +
+  ggplot(aes(x = month, y = mktcap / 1000, 
+             color = exchange, linetype = exchange)) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market value (billions of Dec 2020 Dollars) by listing exchange"
+    title = "Monthly market cap by listing exchange in billions of Dec 2020 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
@@ -266,7 +267,7 @@ cpi_monthly <- tbl(tidy_finance, "cpi_monthly") %>%
 
 Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is apparently in Manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing Manufacturing at the end of our sample period.
 
-```{r}
+```{r, fig213, fig.cap = "Monthly number of securities by industry.", fig.alt = "Line chart of the number of securities by industry from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis."}
 crsp_monthly_industry <- crsp_monthly |>
   left_join(cpi_monthly, by = "month") |>
   group_by(month, industry) |>
@@ -290,9 +291,9 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-We also compute the market value of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 dollars. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market value.
+We also compute the market cap of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
 
-```{r}
+```{r, fig214, fig.cap = "Monthly total market cap by industry in billions of Dec 2020 USD.", fig.alt = "Line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis."}
 crsp_monthly_industry |>
   ggplot(aes(x = month, 
              y = mktcap / 1000, 
@@ -301,7 +302,7 @@ crsp_monthly_industry |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market value (billions of Dec 2020 Dollars) by industry"
+    title = "Monthly total market cap by industry in billions of Dec 2020 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
@@ -483,7 +484,7 @@ crsp_monthly |>
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample. 
 
-```{r}
+```{r, fig215, fig.cap = "End-of-year share of securities with book equity values by exchange.", fig.alt = "Line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2020 with years on the horizongal axis and the coresponding share on the vertical axis."}
 crsp_monthly |>
   group_by(permno, year = year(month)) |>
   filter(date == max(date)) |>
