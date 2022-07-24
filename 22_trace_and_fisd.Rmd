@@ -144,10 +144,19 @@ mergent_parts <- split(mergent_cusips,
                               replace = T))
 ```
 
-Finally, we run a loop and for each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We give each set a custom name that pastes the part's number to a general name. Thereby, we create ten different datasets, which we merge later.
+Finally, we run a loop in the same style as in Chapter 2 to download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
 
 ```{r}
 for(part in 1:length(mergent_parts)) {
+  # Flag for adding / overwriting
+    if (part == 1) {
+      overwrite <- TRUE
+      append <- FALSE
+    } else {
+      overwrite <- FALSE
+      append <- TRUE
+    }
+  
   # Download the TRACE data
   trace_final <- clean_enhanced_trace(cusips = mergent_parts[[part]],
                                       connection = wrds,
@@ -156,13 +165,10 @@ for(part in 1:length(mergent_parts)) {
   
   # Save
   trace_final |> 
-  copy_to(dest = tidy_finance,
-          df = _,
-          name = name = paste0("trace_", 
-                               formatC(part, 
-                                       format = "d", 
-                                       width = 3, 
-                                       flag = "0")),
-          overwrite = TRUE)
+    dbWriteTable(conn = tidy_finance,
+                 name = "trace_all",
+                 value = _,
+                 overwrite = overwrite, 
+                 append = append)
 }
 ```
