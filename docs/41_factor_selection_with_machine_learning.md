@@ -63,12 +63,12 @@ To get started, we load the required packages and data. The main focus is on the
 ```r
 library(RSQLite)
 library(tidyverse)
-library(tidymodels)
-library(furrr)
-library(glmnet)
-library(broom)
-library(timetk)
 library(scales)
+library(furrr)
+library(broom)
+library(tidymodels)
+library(glmnet)
+library(timetk)
 ```
 
 In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
@@ -147,7 +147,7 @@ data |>
 
 <div class="figure">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig411-1.png" alt="Boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="672" />
-<p class="caption">(\#fig:fig411)Industry excess return. Boxplots indicate monthly dispersion of returns for 10 different industries</p>
+<p class="caption">(\#fig:fig411)Industry excess return distribution. Boxplots indicate monthly dispersion of returns for 10 different industries</p>
 </div>
 
 ## The tidymodels workflow
@@ -319,7 +319,8 @@ predicted_values |>
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted manufacturing industry risk premia"
+    title = "Monthly realized and fitted manufacturing industry risk premia",
+    subtitle = "The grey area corresponds to the out of sample period."
   ) +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), 
@@ -390,8 +391,7 @@ bind_rows(
   facet_wrap(~Model, scales = "free_x") +
   labs(
     x = "Lambda", y = NULL,
-    title = "Estimated coefficients paths as a
-    function of the penalty factor"
+    title = "Estimated coefficients paths as a function of the penalty factor"
   ) +
   theme(legend.position = "none")
 ```

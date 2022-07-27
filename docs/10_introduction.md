@@ -236,11 +236,11 @@ ticker
 # A tibble: 30 × 8
   symbol company        identifier sedol weight sector shares_held local_currency
   <chr>  <chr>          <chr>      <chr>  <dbl> <chr>        <dbl> <chr>         
-1 UNH    UnitedHealth … 91324P10   2917… 0.110  Healt…     5633745 USD           
-2 GS     Goldman Sachs… 38141G10   2407… 0.0659 Finan…     5633745 USD           
-3 HD     Home Depot In… 43707610   2434… 0.0621 Consu…     5633745 USD           
-4 MSFT   Microsoft Cor… 59491810   2588… 0.0537 Infor…     5633745 USD           
-5 MCD    McDonald's Co… 58013510   2550… 0.0531 Consu…     5633745 USD           
+1 UNH    UnitedHealth … 91324P10   2917… 0.109  Healt…     5679861 USD           
+2 GS     Goldman Sachs… 38141G10   2407… 0.0668 Finan…     5679861 USD           
+3 HD     Home Depot In… 43707610   2434… 0.0631 Consu…     5679861 USD           
+4 MSFT   Microsoft Cor… 59491810   2588… 0.0533 Infor…     5679861 USD           
+5 MCD    McDonald's Co… 58013510   2550… 0.0516 Consu…     5679861 USD           
 # … with 25 more rows
 ```
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). 
@@ -340,7 +340,7 @@ volume |>
   geom_line() +
   labs(
     x = NULL, y = NULL,
-    title = "Aggregate daily trading volume (billion USD)"
+    title = "Aggregate daily trading volume in billion USD"
   )
 ```
 
@@ -363,7 +363,7 @@ volume |>
   labs(
     x = "Previous day aggregate trading volume (billion USD)",
     y = "Aggregate trading volume (billion USD)",
-    title = "Persistence of trading volume"
+    title = "Trading volume on Dow Index versus previous day volume"
   )
 ```
 
@@ -373,7 +373,7 @@ Warning: Removed 1 rows containing missing values (geom_point).
 
 <div class="figure">
 <img src="10_introduction_files/figure-html/fig105-1.png" alt="A scatterplot which shows that previous day aggregate trading volume and aggregate trading volume neatly line up along a 45 degree line. " width="672" />
-<p class="caption">(\#fig:fig105)Trading volume on Dow Index versus previous day trading volume</p>
+<p class="caption">(\#fig:fig105)Trading volume on Dow Index versus previous day volume</p>
 </div>
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
@@ -520,7 +520,7 @@ res |>
   labs(
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
-    title = "Dow Jones asset returns and efficient frontier",
+    title = "Efficient frontier for Dow Jones constituents",
     subtitle = str_c(
       "Thick dots indicate the location of the minimum ",
       "variance and efficient tangency portfolio"
@@ -530,7 +530,7 @@ res |>
 
 <div class="figure">
 <img src="10_introduction_files/figure-html/fig106-1.png" alt="Figure shows Dow Jones constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="672" />
-<p class="caption">(\#fig:fig106)Efficient frontier for Dow Jones constituents as asset universe</p>
+<p class="caption">(\#fig:fig106)Efficient frontier for Dow Jones constituents.</p>
 </div>
 
 The line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the blue dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).

@@ -74,7 +74,10 @@ crsp_monthly |>
   )
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-3-1.png" width="672" />
+<div class="figure">
+<img src="33_size_and_portfolio_building_files/figure-html/fig331-1.png" alt="Line chart with percentage of total market capitalization for the largest 1%, 5%, 10%, and 25% of stocks with years on the horizontal axis and the percentage of total market capitalization in these stocks on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig331)Percentage of total market capitalization in largest stocks.</p>
+</div>
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?
 
@@ -98,7 +101,10 @@ crsp_monthly |>
   )
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-4-1.png" width="672" />
+<div class="figure">
+<img src="33_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Stacked area plots of the share of total market capitalization per listing exchange with years on the horizontal axis and the corresponding share on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig332)Share of total market capitalization per listing exchange.</p>
+</div>
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
 
@@ -335,7 +341,10 @@ p_hacking_results |>
   scale_x_continuous(labels = percent)
 ```
 
-<img src="33_size_and_portfolio_building_files/figure-html/unnamed-chunk-11-1.png" width="672" />
+<div class="figure">
+<img src="33_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Histogram of size premiums based on different sorting choices with the size premium on the horizontal axis and the number of premiums per bin on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig333)Size premium over different sorting choices. The dotted vertical line indicates the average Fama-French SMB permium</p>
+</div>
 
 ## Exercises
 

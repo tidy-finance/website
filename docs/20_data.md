@@ -212,17 +212,15 @@ tidy_finance <- dbConnect(
 )
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. Notice that we use the base R pipe placeholder `_` and a named argument to pipe  `factors_ff_monthly` to the argument `value`.
+Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database. Notice that we use the base R pipe placeholder `_` and a named argument to pipe  *factors_ff_monthly* to the argument *df*.
 
 
 ```r
 factors_ff_monthly |>
-  dbWriteTable(
-    tidy_finance, 
-    "factors_ff_monthly", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "factors_ff_monthly", 
+               value = _,     
+               overwrite = TRUE)
 ```
 
 We can use the remote table as an in-memory data frame by building a connection via `tbl()`.
@@ -242,7 +240,7 @@ factors_ff_monthly_db |>
 
 ```
 # Source:   SQL [?? x 2]
-# Database: sqlite 3.38.5 [C:\Users\christoph.scheuch\Documents\GitHub\tidy_finance\data\tidy_finance.sqlite]
+# Database: sqlite 3.38.5 [F:\Dropbox (SentinelConsulting)\A.. Privat\Git\tidy_finance\data\tidy_finance.sqlite]
   month          rf
   <date>      <dbl>
 1 1960-01-01 0.0033
@@ -276,49 +274,39 @@ factors_ff_monthly_db |>
 
 The last couple of code chunks are really all there is to organize a simple database! You can also share the SQLite database across devices and programming languages. 
 
-Before we move on to the next data source, let us also store the other four tables in our new SQLite database. 
+Before we move on to the next data source, let us also store the other five tables in our new SQLite database. 
 
 
 ```r
 factors_ff_daily |>
-  dbWriteTable(
-    tidy_finance, 
-    "factors_ff_daily", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "factors_ff_daily", 
+               value = _, 
+               overwrite = TRUE)
 
 industries_ff_monthly |>
-  dbWriteTable(
-    tidy_finance, 
-    "industries_ff_monthly", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "industries_ff_monthly", 
+               value = _, 
+               overwrite = TRUE)
 
 factors_q_monthly |>
-  dbWriteTable(
-    tidy_finance, 
-    "factors_q_monthly", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "factors_q_monthly", 
+               value = _, 
+               overwrite = TRUE)
 
 macro_predictors |>
-  dbWriteTable(
-    tidy_finance, 
-    "macro_predictors", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "macro_predictors",
+               value = _, 
+               overwrite = TRUE)
 
 cpi_monthly |>
-  dbWriteTable(
-    tidy_finance, 
-    "cpi_monthly", 
-    value = _, 
-    overwrite = TRUE
-  )
+  dbWriteTable(tidy_finance, 
+               "cpi_monthly", 
+               value = _, 
+               overwrite = TRUE)
 ```
 
 From now on, all you need to do to access data that is stored in the database is to follow three steps: (i) Establish the connection to the SQLite database, (ii) call the table you want to extract, and (iii) collect the data. For your convenience, the following steps show all you need in a compact fashion.
@@ -327,11 +315,13 @@ From now on, all you need to do to access data that is stored in the database is
 ```r
 library(tidyverse)
 library(RSQLite)
+
 tidy_finance <- dbConnect(
   SQLite(), 
   "data/tidy_finance.sqlite", 
   extended_types = TRUE
 )
+
 factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly |> collect()
 ```
@@ -371,7 +361,7 @@ Warning: Closing open result set, pending rows
  [1] "beta"                  "compustat"             "cpi_monthly"          
  [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
  [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
-[10] "macro_predictors"     
+[10] "macro_predictors"      "mergent"              
 ```
 
 This function comes in handy if you are unsure about the correct naming of the tables in your database. 

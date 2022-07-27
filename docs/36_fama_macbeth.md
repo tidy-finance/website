@@ -17,17 +17,18 @@ In the second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat
 
 Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are typically estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992, @Kim1995, @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
-## Data preparation
-
 The current chapter relies on this set of packages. 
 
 ```r
 library(tidyverse)
 library(RSQLite)
 library(lubridate)
-library(broom)
 library(sandwich)
+library(broom)
 ```
+Compared to previous chapters, we introduce the `broom` package [@broom] to tidy the estimation output of many estimated linear models. 
+
+## Data preparation
 
 We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
 

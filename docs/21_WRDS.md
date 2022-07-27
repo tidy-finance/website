@@ -156,7 +156,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`). Note that we keep market cap in millions of US dollars just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+The first additional variable we create is market capitalization (`mktcap`). Note that we keep market cap in millions of USD just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
 
 
 ```r
@@ -237,7 +237,9 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+  extended_types = TRUE
 )
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
@@ -269,7 +271,10 @@ Finally, we store the monthly CRSP file in our database.
 
 ```r
 crsp_monthly |>
-  dbWriteTable(tidy_finance, "crsp_monthly", value = _, overwrite = TRUE)
+  dbWriteTable(tidy_finance, 
+               "crsp_monthly", 
+               value = _, 
+               overwrite = TRUE)
 ```
 
 ## First glimpse of the CRSP sample
@@ -292,9 +297,12 @@ crsp_monthly |>
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-18-1.png" width="672" />
+<div class="figure">
+<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Line chart of number of securities by exchange from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig211)Monthly number of securities by exchange.</p>
+</div>
 
-Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` dollars to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
 
 ```r
@@ -308,17 +316,21 @@ tbl(tidy_finance, "crsp_monthly") |>
   ) |>
   collect() |>
   mutate(month = ymd(month)) |>
-  ggplot(aes(x = month, y = mktcap / 1000, color = exchange, linetype = exchange)) +
+  ggplot(aes(x = month, y = mktcap / 1000, 
+             color = exchange, linetype = exchange)) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market value (billions of Dec 2020 Dollars) by listing exchange"
+    title = "Monthly market cap by listing exchange in billions of Dec 2020 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-19-1.png" width="672" />
+<div class="figure">
+<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig212)Monthly market cap by listing exchange in billions of Dec 2020 USD.</p>
+</div>
 
 Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data. 
 
@@ -355,9 +367,12 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-21-1.png" width="672" />
+<div class="figure">
+<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Line chart of the number of securities by industry from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig213)Monthly number of securities by industry.</p>
+</div>
 
-We also compute the market value of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 dollars. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market value.
+We also compute the market cap of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
 
 
 ```r
@@ -369,20 +384,23 @@ crsp_monthly_industry |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market value (billions of Dec 2020 Dollars) by industry"
+    title = "Monthly total market cap by industry in billions of Dec 2020 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-22-1.png" width="672" />
+<div class="figure">
+<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig214)Monthly total market cap by industry in billions of Dec 2020 USD.</p>
+</div>
 
 
 ## Daily CRSP data
 
 Before we turn to accounting data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many 'big data' problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for` loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later.
+There is a solution to this challenge. As with many 'big data' problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
 
 ```r
@@ -545,7 +563,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-07-20
+5  54594 001004 1972-04-24 2022-07-26
 # … with 31,765 more rows
 ```
 
@@ -568,9 +586,9 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 ```r
 crsp_monthly |>
   dbWriteTable(tidy_finance, 
-               "crsp_monthly", 
-               value = _, 
-               overwrite = TRUE)
+                 "crsp_monthly", 
+                 value = _, 
+                 overwrite = TRUE)
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample. 
@@ -595,7 +613,10 @@ crsp_monthly |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="21_WRDS_files/figure-html/unnamed-chunk-33-1.png" width="672" />
+<div class="figure">
+<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2020 with years on the horizongal axis and the coresponding share on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by exchange.</p>
+</div>
 
 ## Some tricks for PostgreSQL databases
 

@@ -174,7 +174,10 @@ beta_examples |>
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-8-1.png" width="672" />
+<div class="figure">
+<img src="31_beta_files/figure-html/fig311-1.png" alt="Time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla." width="672" />
+<p class="caption">(\#fig:fig311)Monthly beta estimates for example stocks using 5 years of data.</p>
+</div>
 
 ## Parallelized rolling-window estimation
 
@@ -364,11 +367,14 @@ crsp_monthly |>
   coord_flip() +
   labs(
     x = NULL, y = NULL,
-    title = "Average beta estimates by industry"
+    title = "Box plots of average firm-specific beta estimates by industry"
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-20-1.png" width="672" />
+<div class="figure">
+<img src="31_beta_files/figure-html/fig312-1.png" alt="Box plots of average firm-specific beta estimates by industry." width="672" />
+<p class="caption">(\#fig:fig312)Box plots of average firm-specific beta estimates by industry.</p>
+</div>
 
 Next, we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are an extremely rare exception.
 
@@ -385,13 +391,15 @@ beta_monthly |>
   ggplot(aes(x = month, y = x, color = as_factor(quantile))) +
   geom_line() +
   labs(
-    x = NULL, y = "Beta", color = NULL,
-    title = "Distribution of estimated betas",
-    subtitle = "Monthly deciles for CRSP cross-section"
+    x = NULL, y = NULL, color = NULL,
+    title = "Monthly deciles of estimated betas",
   )
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-21-1.png" width="672" />
+<div class="figure">
+<img src="31_beta_files/figure-html/fig313-1.png" alt="Time series of deciles of estimated betas to illustrate the distribution of betas over time." width="672" />
+<p class="caption">(\#fig:fig313)Monthly deciles of estimated betas.</p>
+</div>
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks. 
 
@@ -404,6 +412,7 @@ beta <- beta_monthly |>
 beta |>
   inner_join(examples, by = "permno") |>
   pivot_longer(cols = c(beta_monthly, beta_daily)) |>
+  drop_na() |>
   ggplot(aes(x = month, y = value, color = name)) +
   geom_line() +
   facet_wrap(~company, ncol = 1) +
@@ -413,11 +422,10 @@ beta |>
   )
 ```
 
-```
-Warning: Removed 46 row(s) containing missing values (geom_path).
-```
-
-<img src="31_beta_files/figure-html/unnamed-chunk-22-1.png" width="672" />
+<div class="figure">
+<img src="31_beta_files/figure-html/fig314-1.png" alt="Time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla." width="672" />
+<p class="caption">(\#fig:fig314)Comparison of beta estimates using 5 years of monthly and 3 months of daily data.</p>
+</div>
 
 The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
@@ -456,7 +464,10 @@ beta_long |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<img src="31_beta_files/figure-html/unnamed-chunk-24-1.png" width="672" />
+<div class="figure">
+<img src="31_beta_files/figure-html/fig315-1.png" alt="Time series with end-of-year shares of securities with book equity values by exchange from 1960 to 2020." width="672" />
+<p class="caption">(\#fig:fig315)End-of-year share of securities with book equity values by exchange.</p>
+</div>
 
 The figure above does not indicate any troubles, so let us move on to the next check. 
 
@@ -486,7 +497,7 @@ beta_long |>
 # A tibble: 2 × 11
   name          mean    sd   min    q05   q25   q50   q75   q95   max       n
   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>   <int>
-1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186316
+1 beta_daily   0.743 0.925 -43.7 -0.452 0.203 0.679  1.22  2.22  56.6 3186174
 2 beta_monthly 1.10  0.711 -13.0  0.123 0.631 1.03   1.47  2.32  10.3 2071080
 ```
 
