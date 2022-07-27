@@ -15,6 +15,7 @@ library(RSQLite)
 library(lubridate)
 library(fixest)
 ```
+Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed effects regressions, the implementation of standard error clusters, and tidy estimation output.
 
 ## Data preparation
 
