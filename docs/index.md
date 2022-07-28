@@ -48,10 +48,10 @@ We write this book for three audiences:
 The book is currently divided into 5 parts:
 
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
-* Chapters 2-3 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. We reuse the data from these chapters in all following chapters.
-* Chapters 4-9 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
-* Chapters 10-12 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
-* Chapters 13-14 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
+* Chapters 2-4 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all following chapters.
+* Chapters 5-10 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
+* Chapters 11-13 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
+* Chapters 14-15 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
 
 Each chapter is self-contained and can be read individually. Yet the data chapter provides important background necessary for the data management in subsequent chapters. 
 
