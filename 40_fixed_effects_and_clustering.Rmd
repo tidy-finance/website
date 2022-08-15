@@ -18,7 +18,7 @@ Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed eff
 
 ## Data preparation
 
-We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. 
+We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
 tidy_finance <- dbConnect(SQLite(), "data/tidy_finance.sqlite",
@@ -32,7 +32,7 @@ compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 ```
 
-The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms, as well as time-series information for each firm. 
+The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms, as well as time-series information for each firm.\index{Regression!Panel}
 
 ```{r}
 data_investment <- compustat |>
@@ -52,7 +52,7 @@ data_investment <- data_investment |>
             by = c("gvkey", "year"))
 ```
 
-Tobin's q is the ratio of the market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988, @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
+Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988, @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
 
 ```{r}
 data_investment <- data_investment |> 
@@ -66,7 +66,7 @@ data_investment <- data_investment |>
   drop_na() 
 ```
 
-As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.  
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization}
 
 ```{r}
 winsorize <- function(x, cut) {
@@ -84,7 +84,7 @@ data_investment <- data_investment |>
                 ~ winsorize(., 0.01)))
 ```
 
-Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.
+Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.\index{Summary statistics}
 
 ```{r}
 data_investment |>
@@ -106,7 +106,7 @@ data_investment |>
 
 ## Fixed effects 
 
-To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications. We start out with the basic investment regression using the simple model
+To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications.\index{Regression!Fixed effects} We start out with the basic investment regression using the simple model
 $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below - you could also use `lm()`. 
 
@@ -153,7 +153,7 @@ The inclusion of time fixed effects did only marginally affect the R-squared and
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
-Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects. The $t$ statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 ```{r}
 etable(model_ols, model_fe_firm, model_fe_firmyear, 
        coefstat = "tstat")
@@ -163,7 +163,7 @@ etable(model_ols, model_fe_firm, model_fe_firmyear,
 
 Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other. Such dependencies in the residuals invalidate the i.i.d. assumption of OLS and lead to biased standard errors. With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients. 
 
-In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008]. The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
+In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008].\index{Standard errors!Clustered} The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
 
 Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm, as well as two-way clustering by firm and year.
 
