@@ -375,7 +375,7 @@
 \let\@oddfoot\@empty
 \let\@evenfoot\@empty
     \let\@evenhead\even@head
-    \def\@oddhead{\RunningHeadFont\if@mainmatter\ifnum\value{section}>0 \enspace\fi\fi\rightmark\hfill\PageNumFont\thepage}%\odd@head
+    \def\@oddhead{\top@cornermarks\RunningHeadFont\if@mainmatter\ifnum\value{section}>0 \enspace\fi\fi\rightmark\hfill\PageNumFont\thepage}%\odd@head
   \fi
   }
 \else
