@@ -50,22 +50,19 @@ The remote connection to WRDS is very useful. Yet, the database itself contains 
 
 ```{r}
 msf_db <- tbl(wrds, in_schema("crsp", "msf"))
-msf_db
 ```
 
 (ii) the identifying information,
 ```{r}
 msenames_db <- tbl(wrds, in_schema("crsp", "msenames"))
-msenames_db
 ```
 
 and (iii) the delisting information.
 ```{r}
 msedelist_db <- tbl(wrds, in_schema("crsp", "msedelist"))
-msedelist_db
 ```
 
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reasons and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.
+We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.
 
 ```{r}
 crsp_monthly <- msf_db |>
@@ -103,7 +100,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`).\index{Market capitalization} Note that we keep market cap in millions of USD just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns ``ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist and CRSP decides to report the mid quote of the last available orderbook instead. Hence, we take the absolute value of market cap. We also keep market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
@@ -139,7 +136,7 @@ crsp_monthly <- crsp_monthly |>
   ))
 ```
 
-Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries (e.g., by Eugene Fama and Kenneth French) that are commonly used.
+Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries [e.g., @FamaFrench1997] that are commonly used.
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
@@ -159,7 +156,7 @@ crsp_monthly <- crsp_monthly |>
   ))
 ```
 
-We also construct returns adjusted for delistings as described by @BaliEngleMurray2016. After this transformation, we can drop the delisting returns and codes.\index{Returns!Delisting}
+We also construct returns adjusted for delistings as described by @BaliEngleMurray2016. The delisting of a security usually results when a company ceases operations, declares bankruptcy, merges, does not meet listing requirements, or seeks to become private. The adjustment tries to reflect the returns of investors who bought the stock in the month before the delisting and held it until the delisting date. After this transformation, we can drop the delisting returns and codes.\index{Returns!Delisting}
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
@@ -374,7 +371,7 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 funda_db <- tbl(wrds, in_schema("comp", "funda"))
 ```
 
-We follow the typical filter conventions and pull only data that we actually need: (i) we get only industrial fundamental data (i.e., ignore financial services) (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
+We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
 
 ```{r}
 compustat <- funda_db |>
@@ -403,7 +400,7 @@ compustat <- funda_db |>
   collect()
 ```
 
-Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Book equity}\index{Preferred stock}
+Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}
 
 ```{r}
 compustat <- compustat |>

@@ -142,7 +142,6 @@ macro_predictors <- read_xlsx(
   sheet = "Monthly"
 ) |>
   mutate(month = ym(yyyymm)) |>
-  filter(month >= start_date & month <= end_date) |>
   mutate(across(where(is.character), as.numeric)) |>
   mutate(
     IndexDiv = Index + D12,
@@ -160,6 +159,7 @@ macro_predictors <- read_xlsx(
          bm = `b/m`, ntis, tbl, lty, ltr,
          tms, dfy, infl
   ) |>
+  filter(month >= start_date & month <= end_date) |>
   drop_na()
 ```
 
@@ -212,7 +212,7 @@ tidy_finance <- dbConnect(
 )
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database. Notice that we use the base R pipe placeholder `_` and a named argument to pipe `factors_ff_monthly` to the argument `df`.\index{Pipe}
+Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database. Notice that we use the base R pipe placeholder `_` and a named argument to pipe `factors_ff_monthly` to the argument `value`.\index{Pipe}
 
 ```{r}
 factors_ff_monthly |>
@@ -223,6 +223,10 @@ factors_ff_monthly |>
 ```
 
 We can use the remote table as an in-memory data frame by building a connection via `tbl()`.
+
+```{r, echo = FALSE}
+attributes(tidy_finance)$dbname <- "data/tidy_finance.sqlite"
+```
 
 ```{r}
 factors_ff_monthly_db <- tbl(tidy_finance, "factors_ff_monthly")
@@ -318,4 +322,4 @@ This function comes in handy if you are unsure about the correct naming of the t
 ## Exercises
 
 1. Download the monthly Fama-French factors manually from [Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `read_csv()`. Validate that you get the same data as via the `frenchdata` package. 
-1. Download the Fama-French 5 factors using the package. Then, compare the estimates of the three factors that are common to the Three-Factor model. Explain your findings.
+1. Download the Fama-French 5 factors using the `frenchdata` package. Use `get_french_data_list()` to find the corresponding table name. After the successful download and conversion to the column format that we used above, compare the resulting `rf`, `mkt_excess`, `smb` and `hml` columns to `factors_ff_monthly`. Explain any differences you might find. 
