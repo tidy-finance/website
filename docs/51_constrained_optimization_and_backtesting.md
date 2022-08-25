@@ -1,6 +1,6 @@
 # Constrained optimization and backtesting
 
-\index{backtesting} In this chapter, we conduct portfolio backtesting in a more realistic setting by including transaction costs and investment constraints such as no-short-selling rules. \index{short-selling}
+\index{Backtesting} In this chapter, we conduct portfolio backtesting in a more realistic setting by including transaction costs and investment constraints such as no-short-selling rules. \index{Short-selling}
 We start with *standard* mean-variance efficient portfolios. \index{Efficient portfolio}
 Then, we introduce further constraints step-by-step. 
 
@@ -17,7 +17,7 @@ Compared to previous chapters, we introduce the `quadprog` package [@quadprog] t
 
 ## Data preparation
 
-We start by loading the required data from our `SQLite`-database introduced in chapter 2. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry Returns}
+We start by loading the required data from our `SQLite`-database introduced in chapter 2. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 
 ```r
@@ -127,7 +127,7 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
- [1]  1.428  0.270 -1.302  0.375  0.308 -0.152  0.544  0.472 -0.167 -0.776
+ [1]  1.400  0.296 -1.396  0.477  0.364 -0.321  0.544  0.448 -0.134 -0.679
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
@@ -232,7 +232,7 @@ all(near(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution))
 ```
 
 The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario where we already know the analytic solution. 
-For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the wast optimization landscape in R. \index{Numerical optimization}
+For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the wast optimization landscape in R. \index{Optimization}
 
 Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints if the form $w_i >=0$. 
 
@@ -249,8 +249,8 @@ w_no_short_sale$solution
 ```
 
 ```
- [1]  6.34e-01 -1.91e-17  1.20e-16 -3.47e-18  6.78e-18 -6.24e-17  1.02e-01
- [8]  2.64e-01  3.38e-22 -2.22e-16
+ [1]  5.18e-01  3.11e-18 -3.30e-16  7.82e-02  0.00e+00  2.47e-17  1.47e-01
+ [8]  2.56e-01 -7.22e-18  0.00e+00
 ```
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
 You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
@@ -291,8 +291,8 @@ w_reg_t$par
 ```
 
 ```
- [1]  4.11e-01 -2.07e-02 -9.00e-02  3.37e-02  8.03e-02 -2.25e-08  3.08e-01
- [8]  3.52e-01  6.25e-02 -1.37e-01
+ [1]  3.41e-01 -3.68e-06 -1.08e-01  1.39e-01  7.28e-02 -1.01e-02  2.46e-01
+ [8]  3.15e-01  1.34e-01 -1.30e-01
 ```
 
 Note that the function `constrOptim.nl()` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`). 
@@ -476,7 +476,7 @@ for (p in 1:periods) {
 }
 ```
 
-Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations. \index{Sharpe ratio}
+Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations. \index{Sharpe Ratio}
 
 
 ```r
@@ -503,9 +503,9 @@ performance |>
 # A tibble: 3 × 5
   strategy   Mean    SD `Sharpe ratio` Turnover
   <chr>     <dbl> <dbl>          <dbl>    <dbl>
-1 MV       -0.637  12.4         NA     214.    
-2 MV (TC)  12.1    15.1          0.802   0.0311
-3 Naive    12.1    15.1          0.801   0.229 
+1 MV       -0.637  12.5         NA     213.    
+2 MV (TC)  12.3    15.0          0.820   0.0313
+3 Naive    12.3    15.0          0.818   0.230 
 ```
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 

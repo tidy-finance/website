@@ -1,6 +1,6 @@
 # WRDS, CRSP, and Compustat
 
-This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and research typically have access to WRDS through their libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working the WRDS database. 
+This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and research typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working the WRDS database.\index{WRDS}
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -18,19 +18,19 @@ We use the same date range as in the previous chapter to ensure consistency.
 
 ```r
 start_date <- ymd("1960-01-01")
-end_date <- ymd("2020-12-31")
+end_date <- ymd("2021-12-31")
 ```
 
 ## Accessing WRDS
 
-WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with R as SQLite. We use the `RPostgres` package to establish a connection to the WRDS database. Note that you could also use the `odbc` package to connect to a PostgreSQL database, but then you need to install the appropriate drivers yourself. `RPostgres` already contains a suitable driver.
+WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with R as SQLite. We use the `RPostgres` package to establish a connection to the WRDS database [@RPostgres]. Note that you could also use the `odbc` package to connect to a PostgreSQL database, but then you need to install the appropriate drivers yourself. `RPostgres` already contains a suitable driver.\index{Database!PostgreSQL}
 
 
 ```r
 library(RPostgres)
 ```
 
-To establish a connection, you use the function `dbConnect()` with the following arguments. Note that you need to replace the `user` and `password` fields with your own credentials. We defined system variables for the purpose of this book because we obviously do not want to share our credentials with the rest of the world. 
+To establish a connection, you use the function `dbConnect()` with the following arguments. Note that you need to replace the `user` and `password` fields with your own credentials. We defined system variables for the purpose of this book because we obviously do not want (and are not allowed) to share our credentials with the rest of the world. 
 
 
 ```r
@@ -45,79 +45,31 @@ wrds <- dbConnect(
 )
 ```
 
-The remote connection to WRDS is very useful. Yet, the database itself contains many different databases and tables. You can check the WRDS homepage to identify the table's name you are looking for (if you go beyond our exposition). Alternatively, you can also query the data structure with the function `dbSendQuery()`. If you are interested, there is an exercise below that is based on WRDS' tutorial on ["Querying WRDS Data using R"](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/). Furthermore, the penultimate section of this chapter shows how to investigate the structure of databases. 
+The remote connection to WRDS is very useful. Yet, the database itself contains many different tables. You can check the WRDS homepage to identify the table's name you are looking for (if you go beyond our exposition). Alternatively, you can also query the data structure with the function `dbSendQuery()`. If you are interested, there is an exercise below that is based on WRDS' tutorial on ["Querying WRDS Data using R".](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/)  Furthermore, the penultimate section of this chapter shows how to investigate the structure of databases. 
 
 
 ## Downloading and preparing CRSP
 
-[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data. Actually, we need three tables to get the desired data: (i) the CRSP monthly security file,
+\index{Data!CRSP}[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data. Actually, we need three tables to get the desired data: (i) the CRSP monthly security file,
 
 
 ```r
 msf_db <- tbl(wrds, in_schema("crsp", "msf"))
-msf_db
-```
-
-```
-# Source:   table<"crsp"."msf"> [?? x 21]
-# Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-  cusip    permno permco issuno hexcd hsiccd date       bidlo askhi   prc   vol
-  <chr>     <dbl>  <dbl>  <dbl> <dbl>  <dbl> <date>     <dbl> <dbl> <dbl> <dbl>
-1 68391610  10000   7952  10396     3   3990 1985-12-31 NA    NA    NA       NA
-2 68391610  10000   7952  10396     3   3990 1986-01-31 -2.5  -4.44 -4.38  1771
-3 68391610  10000   7952  10396     3   3990 1986-02-28 -3.25 -4.38 -3.25   828
-4 68391610  10000   7952  10396     3   3990 1986-03-31 -3.25 -4.44 -4.44  1078
-5 68391610  10000   7952  10396     3   3990 1986-04-30 -4    -4.31 -4      957
-# … with more rows, and 10 more variables: ret <dbl>, bid <dbl>, ask <dbl>,
-#   shrout <dbl>, cfacpr <dbl>, cfacshr <dbl>, altprc <dbl>, spread <dbl>,
-#   altprcdt <date>, retx <dbl>
 ```
 
 (ii) the identifying information,
 
 ```r
 msenames_db <- tbl(wrds, in_schema("crsp", "msenames"))
-msenames_db
-```
-
-```
-# Source:   table<"crsp"."msenames"> [?? x 21]
-# Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-  permno namedt     nameendt   shrcd exchcd siccd ncusip   ticker comnam   shrcls
-   <dbl> <date>     <date>     <dbl>  <dbl> <dbl> <chr>    <chr>  <chr>    <chr> 
-1  10000 1986-01-07 1986-12-03    10      3  3990 68391610 OMFGA  OPTIMUM… A     
-2  10000 1986-12-04 1987-03-09    10      3  3990 68391610 OMFGA  OPTIMUM… A     
-3  10000 1987-03-10 1987-06-11    10      3  3990 68391610 OMFGA  OPTIMUM… A     
-4  10001 1986-01-09 1993-11-21    11      3  4920 39040610 GFGC   GREAT F… <NA>  
-5  10001 1993-11-22 2004-06-09    11      3  4920 29274A10 EWST   ENERGY … <NA>  
-# … with more rows, and 11 more variables: tsymbol <chr>, naics <chr>,
-#   primexch <chr>, trdstat <chr>, secstat <chr>, permco <dbl>, compno <dbl>,
-#   issuno <dbl>, hexcd <dbl>, hsiccd <dbl>, cusip <chr>
 ```
 
 and (iii) the delisting information.
 
 ```r
 msedelist_db <- tbl(wrds, in_schema("crsp", "msedelist"))
-msedelist_db
 ```
 
-```
-# Source:   table<"crsp"."msedelist"> [?? x 19]
-# Database: postgres  [pweiss@wrds-pgdata.wharton.upenn.edu:9737/wrds]
-  permno dlstdt     dlstcd nwperm nwcomp nextdt      dlamt dlretx  dlprc
-   <dbl> <date>      <dbl>  <dbl>  <dbl> <date>      <dbl>  <dbl>  <dbl>
-1  10000 1987-06-11    560      0      0 1987-06-12  0.219 0      -0.219
-2  10001 2017-08-03    233      0      0 NA         13.1   0.0116  0    
-3  10002 2013-02-15    231  35263   1658 NA          3.01  0.0460  0    
-4  10003 1995-12-15    231  10569   8477 NA          5.45  0.0137  0    
-5  10005 1991-07-11    560      0      0 1991-07-12  0.141 0.125  -0.141
-# … with more rows, and 10 more variables: dlpdt <date>, dlret <dbl>,
-#   permco <dbl>, compno <dbl>, issuno <dbl>, hexcd <dbl>, hsiccd <dbl>,
-#   cusip <chr>, acperm <dbl>, accomp <dbl>
-```
-
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes 10 and 11, and (iii) we keep only months with valid permno-specific information from `msenames`. In addition, we add delisting reasons and returns. You can read up in the great textbook of @BaliEngleMurray2016 (BEM) for an extensive discussion on the filters we apply in the code below.
+We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.
 
 
 ```r
@@ -156,7 +108,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`). Note that we keep market cap in millions of USD just for convenience (we do not want to print huge numbers in our figures and tables). Moreover, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns ``ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist and CRSP decides to report the mid quote of the last available orderbook instead. Hence, we take the absolute value of market cap. We also keep market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
 
 
 ```r
@@ -183,7 +135,7 @@ crsp_monthly <- crsp_monthly |>
 
 If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |> group_by(permno) |> mutate(mktcap_lag = lag(mktcap))`, take a look at the exercises.
 
-Next, we follow BEM in transforming listing exchange codes to explicit exchange names. 
+Next, we follow @BaliEngleMurray2016 in transforming listing exchange codes to explicit exchange names.\index{Exchange!Exchange codes}
 
 ```r
 crsp_monthly <- crsp_monthly |>
@@ -195,7 +147,7 @@ crsp_monthly <- crsp_monthly |>
   ))
 ```
 
-Similarly, we transform industry codes to industry descriptions following BEM. Notice that there are also other categorizations of industries (e.g., by Eugene Fama and Kenneth French) that are commonly used.
+Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries [e.g., @FamaFrench1997] that are commonly used.
 
 
 ```r
@@ -216,7 +168,7 @@ crsp_monthly <- crsp_monthly |>
   ))
 ```
 
-We also construct returns adjusted for delistings as described by BEM. After this transformation, we can drop the delisting returns and codes. 
+We also construct returns adjusted for delistings as described by @BaliEngleMurray2016. The delisting of a security usually results when a company ceases operations, declares bankruptcy, merges, does not meet listing requirements, or seeks to become private. The adjustment tries to reflect the returns of investors who bought the stock in the month before the delisting and held it until the delisting date. After this transformation, we can drop the delisting returns and codes.\index{Returns!Delisting}
 
 
 ```r
@@ -232,7 +184,7 @@ crsp_monthly <- crsp_monthly |>
   select(-c(dlret, dlstcd))
 ```
 
-Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data. As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure that excess returns are bounded by -1 from below as less than -100% return make conceptually no sense. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
+Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure that excess returns are bounded by -1 from below as less than -100% return make conceptually no sense. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
 
 
 ```r
@@ -244,10 +196,7 @@ tidy_finance <- dbConnect(
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
-```
 
-
-```r
 crsp_monthly <- crsp_monthly |>
   left_join(factors_ff_monthly |> select(month, rf), 
             by = "month") |>
@@ -281,7 +230,7 @@ crsp_monthly |>
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belongs to the other category.
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 
 ```r
@@ -291,18 +240,18 @@ crsp_monthly |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly number of securities by exchange"
+    title = "Monthly number of securities by listing exchange in the CRSP sample."
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
 <div class="figure">
-<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Line chart of number of securities by exchange from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig211)Monthly number of securities by exchange.</p>
+<img src="21_wrds_files/figure-html/fig211-1.png" alt="Line chart of number of securities by exchange from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig211)Monthly number of securities by listing exchange.</p>
 </div>
 
-Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `r `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
 
 ```r
@@ -321,18 +270,18 @@ tbl(tidy_finance, "crsp_monthly") |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly market cap by listing exchange in billions of Dec 2020 USD"
+    title = "Monthly market cap by listing exchange in billions of Dec 2021 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
 <div class="figure">
-<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
+<img src="21_wrds_files/figure-html/fig212-1.png" alt="Line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
 <p class="caption">(\#fig:fig212)Monthly market cap by listing exchange in billions of Dec 2020 USD.</p>
 </div>
 
-Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data. 
+Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data.\index{Data!CPI}
 
 
 ```r
@@ -368,7 +317,7 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure">
-<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Line chart of the number of securities by industry from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
+<img src="21_wrds_files/figure-html/fig213-1.png" alt="Line chart of the number of securities by industry from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
 <p class="caption">(\#fig:fig213)Monthly number of securities by industry.</p>
 </div>
 
@@ -384,14 +333,14 @@ crsp_monthly_industry |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market cap by industry in billions of Dec 2020 USD"
+    title = "Monthly total market cap by industry in billions of Dec 2021 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
 <div class="figure">
-<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
+<img src="21_wrds_files/figure-html/fig214-1.png" alt="Line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
 <p class="caption">(\#fig:fig214)Monthly total market cap by industry in billions of Dec 2020 USD.</p>
 </div>
 
@@ -400,11 +349,14 @@ crsp_monthly_industry |>
 
 Before we turn to accounting data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many 'big data' problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
-
+There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
 ```r
 dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
+
+factors_ff_daily <- tbl(tidy_finance, "factors_ff_daily") |>
+  collect()
+
 permnos <- tbl(tidy_finance, "crsp_monthly") |>
   distinct(permno) |>
   pull()
@@ -413,6 +365,7 @@ progress <- txtProgressBar(min = 0,
                            max = length(permnos), 
                            initial = 0, 
                            style = 3)
+
 for (j in 1:length(permnos)) {
   permno_sub <- permnos[j]
   crsp_daily_sub <- dsf_db |>
@@ -450,6 +403,7 @@ for (j in 1:length(permnos)) {
   }
   setTxtProgressBar(progress, j)
 }
+
 close(progress)
 
 crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
@@ -457,7 +411,7 @@ crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
 
 ## Preparing Compustat data
 
-Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence](https://www.spglobal.com/marketintelligence/en/), which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world. For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
+Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence](https://www.spglobal.com/marketintelligence/en/), which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
 
 To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies.
 
@@ -466,7 +420,7 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 funda_db <- tbl(wrds, in_schema("comp", "funda"))
 ```
 
-We follow the typical filter conventions and pull only data that we actually need: (i) we get only industrial fundamental data (i.e., ignore financial services) (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
+We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
 
 
 ```r
@@ -496,7 +450,7 @@ compustat <- funda_db |>
   collect()
 ```
 
-Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html). Note that we set negative or zero equity to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}
 
 
 ```r
@@ -522,7 +476,6 @@ compustat <- compustat |>
 
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
 
-
 ```r
 compustat |>
   dbWriteTable(tidy_finance, 
@@ -533,7 +486,7 @@ compustat |>
 
 ## Merging CRSP with Compustat
 
-Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).
+Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}
 
 
 ```r
@@ -541,7 +494,7 @@ ccmxpf_linktable_db <- tbl(wrds,
                            in_schema("crsp", "ccmxpf_linktable"))
 ```
 
-The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in BEM. Note also that currently active links have no end date, so we just enter the current date via `Sys.Date()`.
+The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via `today()`.
 
 
 ```r
@@ -551,7 +504,7 @@ ccmxpf_linktable <- ccmxpf_linktable_db |>
     usedflag == 1) |>
   select(permno = lpermno, gvkey, linkdt, linkenddt) |>
   collect() |>
-  mutate(linkenddt = replace_na(linkenddt, Sys.Date()))
+  mutate(linkenddt = replace_na(linkenddt, today()))
 ccmxpf_linktable
 ```
 
@@ -563,7 +516,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-07-26
+5  54594 001004 1972-04-24 2022-08-25
 # … with 31,765 more rows
 ```
 
@@ -591,7 +544,7 @@ crsp_monthly |>
                  overwrite = TRUE)
 ```
 
-Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample. 
+Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 
 ```r
@@ -614,13 +567,13 @@ crsp_monthly |>
 ```
 
 <div class="figure">
-<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2020 with years on the horizongal axis and the coresponding share on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by exchange.</p>
+<img src="21_wrds_files/figure-html/fig215-1.png" alt="Line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizongal axis and the coresponding share on the vertical axis." width="672" />
+<p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by listing exchange.</p>
 </div>
 
 ## Some tricks for PostgreSQL databases
 
-As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documetation](https://www.postgresql.org/docs/9.1/ddl-schemas.html). For instance, if you want to find all tables that live in the `crsp` schema, you run
+As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas.\index{Database!Schema} If you wonder what the purpose of schemas is, check out [this documetation.](https://www.postgresql.org/docs/9.1/ddl-schemas.html) For instance, if you want to find all tables that live in the `crsp` schema, you run
 
 ```r
 dbListObjects(wrds, Id(schema = "crsp"))

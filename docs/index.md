@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-07-26"
+date: "2022-08-25"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib, packages.bib]
@@ -14,7 +14,7 @@ github-repo: voigtstefan/tidy_finance
 url: https://www.tidy-finance.org
 cover-image: cover.jpg
 description: |
-  An open-source textbook for empirical finance applications with R. 
+  An open-source textbook on empirical finance applications with R. 
 ---
 
 # Preface {.unnumbered}
@@ -48,19 +48,19 @@ We write this book for three audiences:
 The book is currently divided into 5 parts:
 
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
-* Chapters 2-4 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all following chapters.
+* Chapters 2-4 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all subsequent chapters.
 * Chapters 5-10 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
 * Chapters 11-13 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
 * Chapters 14-15 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
 
-Each chapter is self-contained and can be read individually. Yet the data chapter provides important background necessary for the data management in subsequent chapters. 
+Each chapter is self-contained and can be read individually. Yet the data chapters provide important background necessary for the data management in all other chapters. 
 
 ## What won’t you learn? {.unnumbered}
 
 This book is about empirical work. While we assume only basic knowledge in statistics and econometrics, we do not provide detailed treatments of the underlying theoretical models or methods applied in this book. Instead, you find references to the seminal academic work in journal articles or textbooks for more detailed treatments. 
 We believe that our comparative advantage is to provide a thorough implementation of typical approaches such as portfolio sorts, backtesting procedures, regressions, machine learning methods, or other related topics in empirical finance. We enrich our implementations with discussions of the needy-greedy choices you face while conducting empirical analyses. We hence refrain from deriving theoretical models or extensively discussing the statistical properties of well-established tools.
 
-Our book is thus close in spirit to other books that provide fully reproducible code for financial applications. We view them as complementary to our work and want to highlight the differences: 
+Our book is close in spirit to other books that provide fully reproducible code for financial applications. We view them as complementary to our work and want to highlight the differences: 
 
 * @Regenstein2018 provides an excellent introduction and discussion of different tools for standard applications in finance (e.g., how to compute returns and sample standard deviations of a time series of stock returns). Our book, in contrast, has a clear focus on applications of state-of-the-art for academic research in finance. We thus fill a niche that allows aspiring researchers or instructors to rely on a well-designed code base. 
 * @Coqueret2020 constitutes a great compendium to our book with respect to applications related to return prediction and portfolio formation. The book primarily targets practitioners and has a hands-on focus. Our book, in contrast, relies on the typical databases used in financial research and focuses on the preparation of such datasets for academic applications. In addition, our chapter on machine learning focuses on factor selection instead of return prediction.
@@ -68,8 +68,8 @@ Our book is thus close in spirit to other books that provide fully reproducible 
 Although we emphasizes the importance of reproducible workflow principles, we do not provide introductions to some of the core tools that we relied on to create and maintain this book:
 
 * Version control systems such as [Git](https://git-scm.com/) are vital in managing any programming project. Originally designed to organize the collaboration of software developers, even solo data analysts will benefit from adopting version control. Git also makes it simple to publicly share code and allow others to reproduce your findings. We refer to @Bryan2022 for a gentle introduction into the (sometimes painful) life with Git. 
-* Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open source tools. First, @Wickham2016b provides a highly customizable, yet easy to use system for creating data visualizations. @Wickham2016 provides an intuitive introduction into creating graphics using this approach. Second, in our daily work and to compile this book, we used the markdown-based authoring framework described in @XieAllaireGrolemund2018 and @XieDervieuxRiederer2020. Markdown documents are fully reproducible and support dozens of static and dynamic output formats. Lastly, @Xie2016 tremendously facilitated authoring markdown-based books. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.  
-* Good writing is also important for the presentation of findings. We neither claim to be experts in this domain, nor do we try to sound particularly academic. On the contrary, we deliberately use a more colloquial approach to describe all the methods and results presented in this book in order to allow our readers to connect more easily to the mostly technical content. For those who desire more guidance with respect to proper academic writing for financial economics, we recommend @Kiesling2003, @Cochrane2005, and @Jacobsen2014 who all provide essential tips (condensed to a few pages). 
+* Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open source tools. First, @Wickham2016b provides a highly customizable, yet easy to use system for creating data visualizations. @Wickham2016 provides an intuitive introduction into creating graphics using this approach. Second, in our daily work and to compile this book, we used the markdown-based authoring framework described in @XieAllaireGrolemund2018 and @XieDervieuxRiederer2020. Markdown documents are fully reproducible and support dozens of static and dynamic output formats. Lastly, @Xie2016 tremendously facilitates authoring markdown-based books. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.  
+* Good writing is also important for the presentation of findings. We neither claim to be experts in this domain, nor do we try to sound particularly academic. On the contrary, we deliberately use a more colloquial language to describe all the methods and results presented in this book in order to allow our readers to relate more easily to the mainly technical content. For those who desire more guidance with respect to proper academic writing for financial economics, we recommend @Kiesling2003, @Cochrane2005, and @Jacobsen2014 who all provide essential tips (condensed to a few pages). 
 
 ## Why R? {.unnumbered}
 
@@ -106,7 +106,7 @@ In addition to the data layer, there are also tidy coding principles outlined in
 3. Embrace functional programming.
 4. Design for humans.
 
-In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@tidyverse]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc.
+In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc.
 These core packages contained in the `tidyverse` are: `ggplot2` [@ggplot2], `dplyr` [@dplyr], `tidyr` [@tidyr], `readr` [@readr], `purrr` [@purrr], `tibble` [@tibble], `stringr` [@stringr], and `forcats` [@forcats]. 
 
 ::: {.rmdnote}
@@ -118,7 +118,8 @@ Throughout the book we use the native pipe `|>`, a powerful tool to clearly expr
 Before we continue, make sure you have all the software you need for this book:
 
 - [Install R and RStudio](https://rstudio-education.github.io/hopr/starting.html#starting). To get a walk-through of the installation for every major operating system, follow the steps outlined [in this summary](https://rstudio-education.github.io/hopr/starting.html#starthng). The whole process should be done in a few clicks. If you wonder about the difference: R is an open-source language and environment for statistical computing and graphics, free to download and use. While R runs the computations, RStudio is an integrated development environment that provides an interface by adding many convenient features and tools. We suggest doing all the coding in RStudio.
-- Open RStudio and [install the `tidyverse`](https://tidyverse.tidyverse.org/). Not sure how it works? You find helpful information on how to install packages in this [brief summary](https://rstudio-education.github.io/hopr/packages2.html). 
+- Open RStudio and install the `tidyverse`. Not sure how it works? You find helpful information on how to install packages in this [brief summary](https://rstudio-education.github.io/hopr/packages2.html). 
+
 If you are new to R, we recommend starting with the following sources:
 
 - A very gentle and good introduction into the workings of R can be found in the form of the [weighted dice project](https://rstudio-education.github.io/hopr/project-1-weighted-dice.html). Once you are done setting up R on your machine, try to follow the instructions in this project.
@@ -139,14 +140,13 @@ We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from 
 This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e., public domain](https://creativecommons.org/publicdomain/zero/1.0/).
-
 <!-- ## Acknowledgements {.unnumbered} -->
 
 <!-- ... -->
 
 ## Colophon {.unnumbered}
 
-This book was written in RStudio using `bookdown`. The website is hosted with github pages and automatically updated after every commit. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). 
+This book was written in RStudio using `bookdown`. The website is hosted with GitHub Pages and automatically updated after every commit. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). 
 We generated all plots in this book using `ggplot2` and its classic dark-on-light theme (`theme_bw()`). 
 
 This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looking Kid) and the following packages:
@@ -165,7 +165,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> bookdown </td>
-   <td style="text-align:left;"> 0.27 </td>
+   <td style="text-align:left;"> 0.28 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
@@ -189,7 +189,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> forcats </td>
-   <td style="text-align:left;"> 0.5.1 </td>
+   <td style="text-align:left;"> 0.5.2 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> frenchdata </td>
@@ -197,7 +197,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> furrr </td>
-   <td style="text-align:left;"> 0.3.0 </td>
+   <td style="text-align:left;"> 0.3.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> ggplot2 </td>
@@ -257,7 +257,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> readxl </td>
-   <td style="text-align:left;"> 1.4.0 </td>
+   <td style="text-align:left;"> 1.4.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> renv </td>
@@ -269,7 +269,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
-   <td style="text-align:left;"> 2.14 </td>
+   <td style="text-align:left;"> 2.15 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> RPostgres </td>
@@ -277,7 +277,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> RSQLite </td>
-   <td style="text-align:left;"> 2.2.14 </td>
+   <td style="text-align:left;"> 2.2.16 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> sandwich </td>
@@ -285,7 +285,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> scales </td>
-   <td style="text-align:left;"> 1.2.0 </td>
+   <td style="text-align:left;"> 1.2.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> slider </td>
@@ -293,15 +293,15 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> stringr </td>
-   <td style="text-align:left;"> 1.4.0 </td>
+   <td style="text-align:left;"> 1.4.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tibble </td>
-   <td style="text-align:left;"> 3.1.7 </td>
+   <td style="text-align:left;"> 3.1.8 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidymodels </td>
-   <td style="text-align:left;"> 0.2.0 </td>
+   <td style="text-align:left;"> 1.0.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyquant </td>
@@ -313,7 +313,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> tidyverse </td>
-   <td style="text-align:left;"> 1.3.1 </td>
+   <td style="text-align:left;"> 1.3.2 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> timetk </td>

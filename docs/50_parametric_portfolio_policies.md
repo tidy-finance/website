@@ -16,7 +16,7 @@ library(RSQLite)
 
 ## Data preparation
 
-To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in chapter 2.
+To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in chapters 2-3.\index{Data!CRSP}
 
 
 ```r
@@ -29,14 +29,14 @@ crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 ```
 
-To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas. 
+To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas.\index{Data!Fama-French factors} 
 
 ```r
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
-Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 12$ and $t − 2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
+Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 12$ and $t − 2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
 To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.\index{Data!CRSP}
 
 
@@ -249,15 +249,15 @@ evaluate_portfolio(weights_crsp) |>
    measure                            benchmark     tilt
    <chr>                                  <dbl>    <dbl>
  1 Expected utility                  -0.249     -0.262  
- 2 Average return                     6.86      -0.604  
+ 2 Average return                     7.12      -0.445  
  3 SD return                         15.3       21.0    
- 4 Sharpe ratio                       0.129     -0.00831
- 5 CAPM alpha                         0.000108  -0.00574
- 6 Market beta                        0.992      0.927  
- 7 Absolute weight                    0.0246     0.0631 
- 8 Max. weight                        3.52       3.65   
- 9 Min. weight                        0.0000278 -0.145  
-10 Avg. sum of negative weights       0         78.0    
+ 4 Sharpe ratio                       0.135     -0.00613
+ 5 CAPM alpha                         0.000123  -0.00582
+ 6 Market beta                        0.993      0.930  
+ 7 Absolute weight                    0.0247     0.0632 
+ 8 Max. weight                        3.54       3.67   
+ 9 Min. weight                        0.0000277 -0.145  
+10 Avg. sum of negative weights       0         77.9    
 11 Avg. fraction of negative weights  0         49.4    
 ```
 
@@ -310,7 +310,7 @@ optimal_theta$par
 
 ```
 momentum_lag     size_lag 
-       0.189       -2.007 
+      0.0713      -1.9487 
 ```
 
 The resulting values of $\hat\theta$ are easy to interpret: Intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
@@ -401,20 +401,21 @@ performance_table |>
 
 ```
 # A tibble: 11 × 7
-   measure       `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Op…` `EW  Optimal `
-   <chr>            <dbl>    <dbl>          <dbl>            <dbl>          <dbl>
- 1 Expected uti… -0.250   -2.49e-1       -0.247           -0.247         -0.250  
- 2 Average retu… 10.5      6.86e+0       14.7             13.4           13.0    
- 3 SD return     20.3      1.53e+1       20.6             19.6           22.7    
- 4 Sharpe ratio   0.149    1.29e-1        0.206            0.198          0.166  
- 5 CAPM alpha     0.00231  1.08e-4        0.00649          0.00528        0.00440
- 6 Market beta    1.13     9.92e-1        1.01             1.04           1.14   
- 7 Absolute wei…  0.0246   2.46e-2        0.0379           0.0246         0.0258 
- 8 Max. weight    0.0246   3.52e+0        3.34             2.65           0.0807 
- 9 Min. weight    0.0246   2.78e-5       -0.0327           0             -0.0342 
-10 Avg. sum of …  0        0             27.9              0              2.49   
-11 Avg. fractio…  0        0             38.8              0              7.84   
-# … with 1 more variable: `EW (no s.) Optimal ` <dbl>
+   measure                  `EW    ` `VW    ` VW  Op…¹ VW (no…² EW  Op…³ EW (no…⁴
+   <chr>                       <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl>
+ 1 Expected utility         -0.250   -2.49e-1 -0.246   -0.247   -0.250   -2.50e-1
+ 2 Average return           10.7      7.12e+0 14.9     13.6     13.1      8.14e+0
+ 3 SD return                20.3      1.53e+1 20.5     19.5     22.6      1.70e+1
+ 4 Sharpe ratio              0.152    1.35e-1  0.209    0.202    0.168    1.38e-1
+ 5 CAPM alpha                0.00226  1.23e-4  0.00646  0.00526  0.00428  4.69e-4
+ 6 Market beta               1.13     9.93e-1  1.01     1.04     1.14     1.08e+0
+ 7 Absolute weight           0.0247   2.47e-2  0.0373   0.0247   0.0255   2.47e-2
+ 8 Max. weight               0.0247   3.54e+0  3.37     2.69     0.0672   2.20e-1
+ 9 Min. weight               0.0247   2.77e-5 -0.0283   0       -0.0305   0      
+10 Avg. sum of negative we…  0        0       26.4      0        1.73     0      
+11 Avg. fraction of negati…  0        0       38.7      0        6.27     0      
+# … with abbreviated variable names ¹​`VW  Optimal `, ²​`VW (no s.) Optimal `,
+#   ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.

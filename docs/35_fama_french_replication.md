@@ -10,9 +10,9 @@ library(RSQLite)
 library(lubridate)
 ```
 
-## Databases
+## Data preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*.
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in chapters 2-3.\index{Data!CRSP}\index{Data!Compustat}
 
 
 ```r
@@ -42,11 +42,9 @@ be <- compustat |>
   drop_na()
 ```
 
-## Data preparation
-
 Yet when we start merging our data set for computing the premiums, there are a few differences to the previous chapter. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
-Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
+Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
 
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `distinct()` at the end of the chunk below.
 
@@ -78,7 +76,7 @@ variables_ff <- me_ff |>
 
 ## Portfolio sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step. 
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 
 ```r
@@ -132,7 +130,7 @@ portfolios_ff <- data_ff |>
 
 ## Fama and French factor returns
 
-Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size factor}\index{Value factor}
 
 
 ```r
@@ -156,7 +154,7 @@ factors_ff_monthly_replicated <- portfolios_ff |>
 
 ## Replication evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 
 ```r
@@ -182,18 +180,18 @@ lm(formula = smb ~ smb_replicated, data = test)
 
 Residuals:
       Min        1Q    Median        3Q       Max 
--0.020320 -0.001501  0.000027  0.001519  0.014615 
+-0.020357 -0.001553  0.000007  0.001534  0.014518 
 
 Coefficients:
                 Estimate Std. Error t value Pr(>|t|)    
-(Intercept)    -0.000143   0.000133   -1.07     0.28    
-smb_replicated  0.996413   0.004418  225.55   <2e-16 ***
+(Intercept)    -0.000129   0.000132   -0.98     0.33    
+smb_replicated  0.995116   0.004365  227.99   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-Residual standard error: 0.00355 on 712 degrees of freedom
+Residual standard error: 0.00354 on 724 degrees of freedom
 Multiple R-squared:  0.986,	Adjusted R-squared:  0.986 
-F-statistic: 5.09e+04 on 1 and 712 DF,  p-value: <2e-16
+F-statistic: 5.2e+04 on 1 and 724 DF,  p-value: <2e-16
 ```
 
 The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 95%. 
@@ -210,18 +208,18 @@ lm(formula = hml ~ hml_replicated, data = test)
 
 Residuals:
       Min        1Q    Median        3Q       Max 
--0.022250 -0.002933 -0.000101  0.002366  0.027475 
+-0.022510 -0.002877 -0.000138  0.002296  0.027603 
 
 Coefficients:
                Estimate Std. Error t value Pr(>|t|)    
-(Intercept)    0.000294   0.000214    1.38     0.17    
-hml_replicated 0.958849   0.007376  130.00   <2e-16 ***
+(Intercept)    0.000302   0.000216    1.39     0.16    
+hml_replicated 0.964814   0.007401  130.37   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-Residual standard error: 0.0057 on 712 degrees of freedom
-Multiple R-squared:  0.96,	Adjusted R-squared:  0.96 
-F-statistic: 1.69e+04 on 1 and 712 DF,  p-value: <2e-16
+Residual standard error: 0.00581 on 724 degrees of freedom
+Multiple R-squared:  0.959,	Adjusted R-squared:  0.959 
+F-statistic: 1.7e+04 on 1 and 724 DF,  p-value: <2e-16
 ```
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. 

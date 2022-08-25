@@ -2,14 +2,21 @@
 
 This appendix contains code to clean enhanced TRACE with R. It is also available via the following Github [gist](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4). Hence, you could also source the function with `devtools::source_gist("3a05b3ab281563b2e94858451c2eb3a4")`. We need this function in Chapter 4 to download and clean enhanced TRACE trade messages following @Dick2009 and @Dick2014 for enhanced TRACE specifically. WRDS provides SAS code to clean enhanced TRACE data.
 
-The function takes a vector of CUSIPs (in *cusips*), a connection to WRDS (*connection*) explained in chapter 3, and a start and end date (*start_date* and *end_date*, respectively). Specifying too many CUSIPs will result in very slow downloads and a potential failure due to the size of the request to WRDS. The dates should be within the coverage of TRACE itself, i.e., starting after 2002, and the dates should be supplied using the class date. The output of the function contains all valid trade messages for the selected CUSIPs over the specified period. 
+The function takes a vector of CUSIPs (in `cusips`), a connection to WRDS (`connection`) explained in chapter 3, and a start and end date (`start_date` and `end_date`, respectively). Specifying too many CUSIPs will result in very slow downloads and a potential failure due to the size of the request to WRDS. The dates should be within the coverage of TRACE itself, i.e., starting after 2002, and the dates should be supplied using the class date. The output of the function contains all valid trade messages for the selected CUSIPs over the specified period. 
 
 
 ```r
 clean_enhanced_trace <- function(cusips, 
                                  connection, 
                                  start_date = as.Date("2002-01-01"), 
-                                 end_date = tody()) {
+                                 end_date = today()) {
+  
+  # Packages (required)
+  library(tidyverse)
+  library(lubridate)
+  library(dbplyr)
+  library(RPostgres)
+
   # Function checks ---------------------------------------------------------
   # Input parameters
   ## Cusips
@@ -24,12 +31,6 @@ clean_enhanced_trace <- function(cusips,
   ## Connection
   if(!dbIsValid(connection)) stop("Connection issue.")
   
-  # Packages (required)
-  library(tidyverse)
-  library(lubridate)
-  library(dbplyr)
-  library(RPostgres)
-  
   # Enhanced Trace ----------------------------------------------------------
   # Main file
   trace_all <- tbl(connection, 
@@ -37,7 +38,7 @@ clean_enhanced_trace <- function(cusips,
     filter(cusip_id %in% cusips) |>
     filter(trd_exctn_dt >= start_date & trd_exctn_dt <= end_date) |> 
     select(cusip_id, msg_seq_nb, orig_msg_seq_nb,
-           entrd_vol_qt, rptd_pr, rpt_side_cd, cntra_mp_id,
+           entrd_vol_qt, rptd_pr, yld_pt, rpt_side_cd, cntra_mp_id,
            trd_exctn_dt, trd_exctn_tm, trd_rpt_dt, trd_rpt_tm, 
            pr_trd_dt, trc_st, asof_cd, wis_fl, 
            days_to_sttl_ct, stlmnt_dt, spcl_trd_fl) |>
@@ -198,7 +199,7 @@ clean_enhanced_trace <- function(cusips,
   trace_final <- trace_add_filters |> 
     arrange(cusip_id, trd_exctn_dt, trd_exctn_tm) |> 
     select(cusip_id, trd_exctn_dt, trd_exctn_tm, 
-           rptd_pr, entrd_vol_qt, rpt_side_cd, cntra_mp_id) |> 
+           rptd_pr, entrd_vol_qt, yld_pt, rpt_side_cd, cntra_mp_id) |> 
     mutate(trd_exctn_tm = format(as_datetime(trd_exctn_tm), "%H:%M:%S")) 
   
   # Return
