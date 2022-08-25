@@ -1,8 +1,6 @@
 # Factor selection via machine learning
 
-The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta. 
-\index{factor model}
-\index{CAPM}
+The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the *factor zoo* [@Cochrane2011]. In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta.\index{Factor zoo}\index{Factor model}\index{CAPM}
 
 Such findings question the usefulness of the Capital Asset Pricing Model. 
 In fact, during the last decades, financial economists "discovered" a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016, and @Hou2020.
@@ -82,8 +80,7 @@ Next, we include macroeconomic predictors which may predict the general stock ma
 
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets' cross-section of returns. 
 
-- In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
-
+- In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macro predictors}\index{Data!Industry portfolios}
 
 ```r
 tidy_finance <- dbConnect(
@@ -222,20 +219,20 @@ data_bake
 
 ```
 # A tibble: 130 × 126
-  factor_ff_rf factor_ff_mkt_excess factor_ff_smb factor_ff_hml factor_q_me
-         <dbl>                <dbl>         <dbl>         <dbl>       <dbl>
-1        -1.92                0.644        0.298          0.947      0.371 
-2        -1.88                1.27         0.387          0.607      0.527 
-3        -1.88                0.341        1.43           0.836      1.12  
-4        -1.88               -1.80        -0.0411        -0.963     -0.0921
-5        -1.88               -1.29        -0.627         -1.73      -0.850 
-# … with 125 more rows, and 121 more variables: factor_q_ia <dbl>,
-#   factor_q_roe <dbl>, factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
-#   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>, macro_bm <dbl>,
-#   macro_ntis <dbl>, macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
-#   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
-#   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
-#   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
+  facto…¹ facto…² facto…³ facto…⁴ facto…⁵ facto…⁶ facto…⁷ facto…⁸ macro…⁹ macro…˟
+    <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>
+1   -1.92   0.644  0.298    0.947  0.371    0.162  -0.623  -0.756  -0.827  -0.772
+2   -1.88   1.27   0.387    0.607  0.527    0.582  -0.422  -1.38   -0.978  -0.855
+3   -1.88   0.341  1.43     0.836  1.12     1.35   -1.17   -1.72   -1.01   -0.984
+4   -1.88  -1.80  -0.0411  -0.963 -0.0921  -0.462   0.809   0.428  -0.803  -1.01 
+5   -1.88  -1.29  -0.627   -1.73  -0.850   -1.50    0.279   0.532  -0.669  -0.809
+# … with 125 more rows, 116 more variables: macro_ep <dbl>, macro_de <dbl>,
+#   macro_svar <dbl>, macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
+#   macro_lty <dbl>, macro_ltr <dbl>, macro_tms <dbl>, macro_dfy <dbl>,
+#   macro_infl <dbl>, ret <dbl>, factor_ff_rf_x_macro_dp <dbl>,
+#   factor_ff_rf_x_macro_dy <dbl>, factor_ff_rf_x_macro_ep <dbl>,
+#   factor_ff_rf_x_macro_de <dbl>, factor_ff_rf_x_macro_svar <dbl>,
+#   factor_ff_rf_x_macro_bm <dbl>, factor_ff_rf_x_macro_ntis <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 

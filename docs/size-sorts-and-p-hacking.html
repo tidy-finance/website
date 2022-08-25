@@ -7,7 +7,7 @@
 <title>Chapter 7 Size sorts and p-hacking | Tidy Finance with R</title>
 <meta name="author" content="Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business)">
 <meta name="description" content="In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The...">
-<meta name="generator" content="bookdown 0.27 with bs4_book()">
+<meta name="generator" content="bookdown 0.28 with bs4_book()">
 <meta property="og:title" content="Chapter 7 Size sorts and p-hacking | Tidy Finance with R">
 <meta property="og:type" content="book">
 <meta property="og:url" content="https://www.tidy-finance.org/size-sorts-and-p-hacking.html">
@@ -19,7 +19,7 @@
 <meta name="twitter:image" content="https://www.tidy-finance.org/cover.jpg">
 <!-- JS --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://kit.fontawesome.com/6ecbd6c532.js" crossorigin="anonymous"></script><script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="libs/bootstrap-4.6.0/bootstrap.min.css" rel="stylesheet">
-<script src="libs/bootstrap-4.6.0/bootstrap.bundle.min.js"></script><script src="libs/bs3compat-0.3.1/transition.js"></script><script src="libs/bs3compat-0.3.1/tabs.js"></script><script src="libs/bs3compat-0.3.1/bs3compat.js"></script><link href="libs/bs4_book-1.0.0/bs4_book.css" rel="stylesheet">
+<script src="libs/bootstrap-4.6.0/bootstrap.bundle.min.js"></script><script src="libs/bs3compat-0.4.0/transition.js"></script><script src="libs/bs3compat-0.4.0/tabs.js"></script><script src="libs/bs3compat-0.4.0/bs3compat.js"></script><link href="libs/bs4_book-1.0.0/bs4_book.css" rel="stylesheet">
 <script src="libs/bs4_book-1.0.0/bs4_book.js"></script><script src="libs/kePrint-0.0.1/kePrint.js"></script><link href="libs/lightable-0.0.1/lightable.css" rel="stylesheet">
 <!-- Global site tag (gtag.js) - Google Analytics --><script async src="https://www.googletagmanager.com/gtag/js?id=G-DH3KZSMJ5W"></script><script>
       window.dataLayer = window.dataLayer || [];
@@ -112,11 +112,11 @@
 <h1>
 <span class="header-section-number">7</span> Size sorts and p-hacking<a class="anchor" aria-label="anchor" href="#size-sorts-and-p-hacking"><i class="fas fa-link"></i></a>
 </h1>
-<p>In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, <span class="citation">Fama and French (<a href="references.html#ref-Fama1993" role="doc-biblioref">1993</a>)</span> include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.</p>
+<p>In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, <span class="citation">Eugene F. Fama and French (<a href="references.html#ref-Fama1993" role="doc-biblioref">1993</a>)</span> include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.</p>
 <p>We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums <span class="citation">(see <a href="references.html#ref-Walter2022" role="doc-biblioref">Walter, Weber, and Weiss 2022</a> for more insights into decision nodes and their effect on premiums)</span>. Exploiting these ideas to generate favorable results is called p-hacking.
 There is arguably a thin line between p-hacking and conducting robustness tests, our purpose here is simply to illustrate the substantial variation which can arise along the evidence generating process.</p>
 <p>The chapter relies on the following set of packages:</p>
-<div class="sourceCode" id="cb161"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb157"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://rsqlite.r-dbi.org">RSQLite</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://lubridate.tidyverse.org">lubridate</a></span><span class="op">)</span></span>
@@ -130,8 +130,8 @@ There is arguably a thin line between p-hacking and conducting robustness tests,
 <h2>
 <span class="header-section-number">7.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation-1"><i class="fas fa-link"></i></a>
 </h2>
-<p>First, we retrieve the relevant data from our <code>SQLite</code>-database introduced in our chapter on <em>“Accessing &amp; managing financial data”</em>. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.</p>
-<div class="sourceCode" id="cb162"><pre class="downlit sourceCode r">
+<p>First, we retrieve the relevant data from our <code>SQLite</code>-database introduced in chapters 2-3. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.</p>
+<div class="sourceCode" id="cb158"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tidy_finance</span> <span class="op">&lt;-</span> <span class="fu">dbConnect</span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html">SQLite</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"data/tidy_finance.sqlite"</span>, extended_types <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
@@ -149,7 +149,7 @@ There is arguably a thin line between p-hacking and conducting robustness tests,
 <p>Before we build our size portfolios, we investigate the distribution of the variable <em>firm size</em>. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms.
 Then, we aggregate the firms within each bucket and compute the buckets’ share of total market capitalization.</p>
 <p>The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.</p>
-<div class="sourceCode" id="cb163"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb159"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crsp_monthly</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">month</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span></span>
@@ -184,7 +184,7 @@ FIGURE 7.1: Percentage of total market capitalization in largest stocks.
 </p>
 </div>
 <p>Next, firm sizes also differ across listing exchanges. Stocks’ primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ’s market cap around the year 2000 was?</p>
-<div class="sourceCode" id="cb164"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb160"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">crsp_monthly</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">month</span>, <span class="va">exchange</span><span class="op">)</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span>mktcap <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">mktcap</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -209,7 +209,7 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 </div>
 <p>Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function <code><a href="https://rdrr.io/r/base/summary.html">summary()</a></code> does not include all statistics we are interested in, which is why we create the function <code>create_summary()</code> that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with <code><a href="https://tibble.tidyverse.org/reference/add_row.html">add_row()</a></code> with the overall summary statistics.</p>
 <p>The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.</p>
-<div class="sourceCode" id="cb165"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb161"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">create_summary</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">column_name</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">data</span> <span class="op">|&gt;</span></span>
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span>value <span class="op">=</span> <span class="op">{</span><span class="op">{</span> <span class="va">column_name</span> <span class="op">}</span><span class="op">}</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -238,11 +238,11 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 <pre><code># A tibble: 5 × 11
   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
   &lt;chr&gt;     &lt;dbl&gt;  &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt; &lt;int&gt;
-1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
-2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
-4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692</code></pre>
+1 AMEX       415.  2181.     7.57 1.26e1 3.81e1 7.58e1   213.  1218. 2.57e4   145
+2 NASDAQ    8649. 90038.     7.01 2.91e1 1.31e2 4.28e2  1847. 18781. 2.90e6  2779
+3 NYSE     17858. 48619.    23.9  1.95e2 9.54e2 3.43e3 11629. 80748. 4.73e5  1395
+4 Other    13906.    NA  13906.   1.39e4 1.39e4 1.39e4 13906. 13906. 1.39e4     1
+5 Overall  11348. 77458.     7.01 3.40e1 1.95e2 7.94e2  3909. 40647. 2.90e6  4320</code></pre>
 </div>
 <div id="univariate-size-portfolios-with-flexible-breakpoints" class="section level2" number="7.3">
 <h2>
@@ -250,7 +250,7 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 </h2>
 <p>In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.</p>
 <p>To replicate the NYSE-centered sorting procedure, we introduce <code>exchanges</code> as an argument in our <code>assign_portfolio()</code> function. The exchange-specific argument then enters in the filter <code>filter(exchange %in% exchanges)</code>. For example, if <code>exchanges = 'NYSE'</code> is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify <code>exchanges = c("NYSE", "NASDAQ", "AMEX")</code>, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.</p>
-<div class="sourceCode" id="cb167"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb163"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">assign_portfolio</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_portfolios</span>,</span>
 <span>                             <span class="va">exchanges</span>,</span>
 <span>                             <span class="va">data</span><span class="op">)</span> <span class="op">{</span></span>
@@ -276,7 +276,7 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 </h2>
 <p>Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called <em>value-weighting</em>. The alternative protocol is <em>equal-weighting</em>, which assigns each stock’s return the same weight, i.e., a simple average of the constituents’ returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.</p>
 <p>We implement the two weighting schemes in the function <code>compute_portfolio_returns()</code> that takes a logical argument to weight the returns by firm value. The statement <code>if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))</code> generates value-weighted returns if <code>value_weighted = TRUE</code>. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in the previous chapter.</p>
-<div class="sourceCode" id="cb168"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb164"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_portfolio_returns</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">n_portfolios</span> <span class="op">=</span> <span class="fl">10</span>,</span>
 <span>                                      <span class="va">exchanges</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span><span class="op">)</span>,</span>
 <span>                                      <span class="va">value_weighted</span> <span class="op">=</span> <span class="cn">TRUE</span>,</span>
@@ -300,7 +300,7 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 <span>    <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html">summarize</a></span><span class="op">(</span>size_premium <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">size_premium</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
 <p>To see how the function <code>compute_portfolio_returns()</code> works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.</p>
-<div class="sourceCode" id="cb169"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb165"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ret_all</span> <span class="op">&lt;-</span> <span class="fu">compute_portfolio_returns</span><span class="op">(</span></span>
 <span>  n_portfolios <span class="op">=</span> <span class="fl">2</span>,</span>
 <span>  exchanges <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span><span class="op">)</span>,</span>
@@ -320,20 +320,24 @@ FIGURE 7.2: Share of total market capitalization per listing exchange.
 <pre><code># A tibble: 2 × 2
   Exchanges           Premium
   &lt;chr&gt;                 &lt;dbl&gt;
-1 NYSE, NASDAQ &amp; AMEX   0.110
-2 NYSE                  0.181</code></pre>
+1 NYSE, NASDAQ &amp; AMEX  0.0975
+2 NYSE                 0.166 </code></pre>
 <p>The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.</p>
 </div>
 <div id="p-hacking-and-non-standard-errors" class="section level2" number="7.5">
 <h2>
 <span class="header-section-number">7.5</span> P-hacking and non-standard errors<a class="anchor" aria-label="anchor" href="#p-hacking-and-non-standard-errors"><i class="fas fa-link"></i></a>
 </h2>
-<p>Since the choice of the exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. We refer to <span class="citation">Walter, Weber, and Weiss (<a href="references.html#ref-Walter2022" role="doc-biblioref">2022</a>)</span> for an extensive set of other decision nodes at the discretion of researchers.</p>
-<p>The intention of this application is to show that the different ways to form portfolios result in different estimated size premiums. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process <span class="citation">(<a href="references.html#ref-Menkveld2022" role="doc-biblioref">Menkveld et al. 2021</a>)</span>.
-From a malicious perspective, these modeling choices give the researcher multiple <em>chances</em> to find statistically significant results. Yet this is considered <em>p-hacking</em>, which renders the statistical inference due to multiple testing invalid <span class="citation">(<a href="references.html#ref-Harvey2016" role="doc-biblioref">Harvey, Liu, and Zhu 2016</a>)</span>.</p>
+<p>Since the choice of the listing exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way.
+In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting.
+Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series.
+All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals.
+We refer to <span class="citation">Walter, Weber, and Weiss (<a href="references.html#ref-Walter2022" role="doc-biblioref">2022</a>)</span> for an extensive set of other decision nodes at the discretion of researchers.</p>
+<p>The intention of this application is to show that the different ways to form portfolios result in different estimated size premiums. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process <span class="citation">(<a href="references.html#ref-Menkveld2022" role="doc-biblioref">Menkveld et al. 2021</a>)</span>. The term <em>non-standard errors</em> refers to the variation due to (suitable) choices made by researchers. Interestingly, in a large scale study, <span class="citation">Menkveld et al. (<a href="references.html#ref-Menkveld2022" role="doc-biblioref">2021</a>)</span> find that the magnitude of non-standard errors are similar than the estimation uncertainty based on a chosen model which shows how important it is to adjust for the seemingly innocent choices in the data preparation and evaluation workflow. </p>
+<p>From a malicious perspective, these modeling choices give the researcher multiple <em>chances</em> to find statistically significant results. Yet this is considered <em>p-hacking</em>, which renders the statistical inference due to multiple testing invalid <span class="citation">(<a href="references.html#ref-Harvey2016" role="doc-biblioref">Harvey, Liu, and Zhu 2016</a>)</span>.</p>
 <p>Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as <em>robustness tests</em> and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature.</p>
 <p>Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table <code>p_hacking_setup</code>. The function <code><a href="https://tidyr.tidyverse.org/reference/expand_grid.html">expand_grid()</a></code> produces a table of all possible permutations of its arguments. Note that we use the argument <code>data</code> to exclude financial firms and truncate the time series.</p>
-<div class="sourceCode" id="cb171"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb167"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">p_hacking_setup</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://tidyr.tidyverse.org/reference/expand_grid.html">expand_grid</a></span><span class="op">(</span></span>
 <span>  n_portfolios <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">2</span>, <span class="fl">5</span>, <span class="fl">10</span><span class="op">)</span>,</span>
 <span>  exchanges <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html">list</a></span><span class="op">(</span><span class="st">"NYSE"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span><span class="op">)</span><span class="op">)</span>,</span>
@@ -353,8 +357,8 @@ From a malicious perspective, these modeling choices give the researcher multipl
 4            2 &lt;chr [1]&gt; TRUE           &lt;language&gt;
 5            2 &lt;chr [1]&gt; FALSE          &lt;sym&gt;     
 # … with 43 more rows</code></pre>
-<p>To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios.</p>
-<div class="sourceCode" id="cb173"><pre class="downlit sourceCode r">
+<p>To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 5. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios.</p>
+<div class="sourceCode" id="cb169"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://future.futureverse.org/reference/plan.html">plan</a></span><span class="op">(</span><span class="va">multisession</span>, workers <span class="op">=</span> <span class="fu"><a href="https://parallelly.futureverse.org/reference/availableCores.html">availableCores</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">p_hacking_setup</span> <span class="op">&lt;-</span> <span class="va">p_hacking_setup</span> <span class="op">|&gt;</span></span>
@@ -379,21 +383,21 @@ From a malicious perspective, these modeling choices give the researcher multipl
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/arrange.html">arrange</a></span><span class="op">(</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/desc.html">desc</a></span><span class="op">(</span><span class="va">size_premium</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">p_hacking_results</span></span></code></pre></div>
 <pre><code># A tibble: 48 × 5
-  n_portfolios exchanges value_weighted data                         size_premium
+  n_portfolios exchanges value_weighted data                              size_…¹
          &lt;dbl&gt; &lt;list&gt;    &lt;lgl&gt;          &lt;chr&gt;                               &lt;dbl&gt;
-1           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, month…       0.0184
-2           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, indus…       0.0180
-3           10 &lt;chr [3]&gt; FALSE          "crsp_monthly"                     0.0162
-4           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, month…       0.0139
-5           10 &lt;chr [3]&gt; TRUE           "filter(crsp_monthly, indus…       0.0114
-# … with 43 more rows</code></pre>
+1           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, month &gt;= \…  0.0186
+2           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, industry !…  0.0182
+3           10 &lt;chr [3]&gt; FALSE          "crsp_monthly"                     0.0163
+4           10 &lt;chr [3]&gt; FALSE          "filter(crsp_monthly, month &lt; \"…  0.0139
+5           10 &lt;chr [3]&gt; TRUE           "filter(crsp_monthly, industry !…  0.0115
+# … with 43 more rows, and abbreviated variable name ¹​size_premium</code></pre>
 </div>
 <div id="the-size-premium-variation" class="section level2" number="7.6">
 <h2>
 <span class="header-section-number">7.6</span> The size-premium variation<a class="anchor" aria-label="anchor" href="#the-size-premium-variation"><i class="fas fa-link"></i></a>
 </h2>
 <p>We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.</p>
-<div class="sourceCode" id="cb175"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb171"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">p_hacking_results</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">size_premium</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_histogram.html">geom_histogram</a></span><span class="op">(</span>bins <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html">nrow</a></span><span class="op">(</span><span class="va">p_hacking_results</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
@@ -423,7 +427,7 @@ FIGURE 7.3: Size premium over different sorting choices. The dotted vertical lin
 <li>We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.</li>
 <li>The returns that we analyse above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function <code>compute_portfolio_returns()</code> to output the CAPM alpha or beta instead of the average excess return.</li>
 <li>While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.</li>
-<li>We computed several size premiums, but they do not follow the definition of <span class="citation">Fama and French (<a href="references.html#ref-Fama1993" role="doc-biblioref">1993</a>)</span>. Which of our approaches comes closest to their SMB premium?</li>
+<li>We computed several size premiums, but they do not follow the definition of <span class="citation">Eugene F. Fama and French (<a href="references.html#ref-Fama1993" role="doc-biblioref">1993</a>)</span>. Which of our approaches comes closest to their SMB premium?</li>
 </ol>
 </div>
 </div>
@@ -458,7 +462,7 @@ FIGURE 7.3: Size premium over different sorting choices. The dotted vertical lin
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-07-26.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-08-25.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">
@@ -471,7 +475,7 @@ FIGURE 7.3: Size premium over different sorting choices. The dotted vertical lin
     var script = document.createElement("script");
     script.type = "text/javascript";
     var src = "true";
-    if (src === "" || src === "true") src = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML";
+    if (src === "" || src === "true") src = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/latest.js?config=TeX-MML-AM_CHTML";
     if (location.protocol !== "file:")
       if (/^https?:/.test(src))
         src = src.replace(/^https?:/, '');

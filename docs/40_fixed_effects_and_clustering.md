@@ -19,7 +19,7 @@ Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed eff
 
 ## Data preparation
 
-We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. 
+We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 
 ```r
@@ -34,7 +34,7 @@ compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 ```
 
-The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms, as well as time-series information for each firm. 
+The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms, as well as time-series information for each firm.\index{Regression!Panel}
 
 
 ```r
@@ -55,7 +55,7 @@ data_investment <- data_investment |>
             by = c("gvkey", "year"))
 ```
 
-Tobin's q is the ratio of the market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988, @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
+Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988, @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
 
 
 ```r
@@ -70,7 +70,7 @@ data_investment <- data_investment |>
   drop_na() 
 ```
 
-As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.  
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization}
 
 
 ```r
@@ -89,7 +89,7 @@ data_investment <- data_investment |>
                 ~ winsorize(., 0.01)))
 ```
 
-Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.
+Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.\index{Summary statistics}
 
 
 ```r
@@ -114,15 +114,15 @@ data_investment |>
 # A tibble: 3 × 11
   measure         mean     sd    min      q05      q25    q50    q75   q95    max
   <chr>          <dbl>  <dbl>  <dbl>    <dbl>    <dbl>  <dbl>  <dbl> <dbl>  <dbl>
-1 cash_flows    0.0167 0.261  -1.46  -4.44e-1 -0.00269 0.0653 0.132  0.273  0.481
-2 investment_l… 0.0591 0.0784  0      7.72e-4  0.0126  0.0339 0.0727 0.210  0.470
-3 tobins_q      1.98   1.66    0.571  7.91e-1  1.05    1.38   2.18   5.27  10.7  
+1 cash_flows    0.0145 0.266  -1.50  -4.57e-1 -0.00321 0.0649 0.131  0.273  0.480
+2 investment_l… 0.0584 0.0778  0      7.27e-4  0.0122  0.0333 0.0719 0.208  0.467
+3 tobins_q      1.99   1.69    0.571  7.92e-1  1.05    1.38   2.19   5.33  10.9  
 # … with 1 more variable: n <int>
 ```
 
 ## Fixed effects 
 
-To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications. We start out with the basic investment regression using the simple model
+To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications.\index{Regression!Fixed effects} We start out with the basic investment regression using the simple model
 $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below - you could also use `lm()`. 
 
@@ -138,15 +138,15 @@ model_ols
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 121,241 
+Observations: 124,175 
 Standard-errors: IID 
             Estimate Std. Error t value  Pr(>|t|)    
-(Intercept)  0.04235   0.000350   120.9 < 2.2e-16 ***
-cash_flows   0.05345   0.000867    61.6 < 2.2e-16 ***
-tobins_q     0.00804   0.000136    59.1 < 2.2e-16 ***
+(Intercept)  0.04243   0.000342   124.1 < 2.2e-16 ***
+cash_flows   0.05143   0.000835    61.6 < 2.2e-16 ***
+tobins_q     0.00767   0.000132    58.2 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.076563   Adj. R2: 0.046221
+RMSE: 0.076042   Adj. R2: 0.044433
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -168,16 +168,16 @@ model_fe_firm
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 121,241 
-Fixed-effects: gvkey: 13,691
+Observations: 124,175 
+Fixed-effects: gvkey: 13,899
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
-cash_flows   0.0152   0.000994    15.3 < 2.2e-16 ***
-tobins_q     0.0116   0.000140    82.9 < 2.2e-16 ***
+cash_flows   0.0146   0.000963    15.1 < 2.2e-16 ***
+tobins_q     0.0113   0.000136    82.6 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.050361     Adj. R2: 0.534796
-                 Within R2: 0.061302
+RMSE: 0.05008     Adj. R2: 0.533297
+                Within R2: 0.059427
 ```
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
@@ -198,22 +198,22 @@ model_fe_firmyear
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 121,241 
-Fixed-effects: gvkey: 13,691,  year: 33
+Observations: 124,175 
+Fixed-effects: gvkey: 13,899,  year: 34
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
-cash_flows   0.0189   0.000973    19.4 < 2.2e-16 ***
-tobins_q     0.0105   0.000139    75.4 < 2.2e-16 ***
+cash_flows   0.0182   0.000941    19.3 < 2.2e-16 ***
+tobins_q     0.0102   0.000135    75.5 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.049117     Adj. R2: 0.557364
-                 Within R2: 0.052752
+RMSE: 0.048806     Adj. R2: 0.556613
+                 Within R2: 0.051548
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
-Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects. The $t$ statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 
 ```r
 etable(model_ols, model_fe_firm, model_fe_firmyear, 
@@ -224,17 +224,17 @@ etable(model_ols, model_fe_firm, model_fe_firmyear,
                         model_ols     model_fe_firm model_fe_firmyear
 Dependent Var.:   investment_lead   investment_lead   investment_lead
                                                                      
-(Intercept)     0.0423*** (120.9)                                    
-cash_flows      0.0534*** (61.62) 0.0152*** (15.31) 0.0189*** (19.43)
-tobins_q        0.0080*** (59.09) 0.0116*** (82.92) 0.0105*** (75.44)
+(Intercept)     0.0424*** (124.1)                                    
+cash_flows      0.0514*** (61.56) 0.0146*** (15.14) 0.0182*** (19.29)
+tobins_q        0.0077*** (58.17) 0.0113*** (82.60) 0.0102*** (75.51)
 Fixed-Effects:  ----------------- ----------------- -----------------
 gvkey                          No               Yes               Yes
 year                           No                No               Yes
 _______________ _________________ _________________ _________________
 VCOV type                     IID               IID               IID
-Observations              121,241           121,241           121,241
-R2                        0.04624           0.58733           0.60747
-Within R2                      --           0.06130           0.05275
+Observations              124,175           124,175           124,175
+R2                        0.04445           0.58554           0.60636
+Within R2                      --           0.05943           0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
@@ -243,7 +243,7 @@ Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other. Such dependencies in the residuals invalidate the i.i.d. assumption of OLS and lead to biased standard errors. With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients. 
 
-In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008]. The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
+In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008].\index{Standard errors!Clustered} The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form, i.e., we do not have to assume any parametric form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
 
 Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm, as well as two-way clustering by firm and year.
 
@@ -274,16 +274,16 @@ etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
                 model_fe_firmyear model_cluster_f.. model_cluster_f..
 Dependent Var.:   investment_lead   investment_lead   investment_lead
                                                                      
-cash_flows      0.0189*** (19.43) 0.0189*** (11.31) 0.0189*** (9.599)
-tobins_q        0.0105*** (75.44) 0.0105*** (35.61) 0.0105*** (16.98)
+cash_flows      0.0182*** (19.29) 0.0182*** (11.18) 0.0182*** (9.458)
+tobins_q        0.0102*** (75.51) 0.0102*** (35.63) 0.0102*** (16.36)
 Fixed-Effects:  ----------------- ----------------- -----------------
 gvkey                         Yes               Yes               Yes
 year                          Yes               Yes               Yes
 _______________ _________________ _________________ _________________
 VCOV type                     IID         by: gvkey  by: gvkey & year
-Observations              121,241           121,241           121,241
-R2                        0.60747           0.60747           0.60747
-Within R2                 0.05275           0.05275           0.05275
+Observations              124,175           124,175           124,175
+R2                        0.60636           0.60636           0.60636
+Within R2                 0.05155           0.05155           0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```

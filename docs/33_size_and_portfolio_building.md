@@ -2,7 +2,7 @@
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking. 
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking.
 There is arguably a thin line between p-hacking and conducting robustness tests, our purpose here is simply to illustrate the substantial variation which can arise along the evidence generating process.
 
 The chapter relies on the following set of packages:
@@ -21,7 +21,7 @@ Compared to previous chapters, we introduce the `rlang` package [@rlang] for mor
 
 ## Data preparation
 
-First, we retrieve the relevant data from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
+First, we retrieve the relevant data from our `SQLite`-database introduced in chapters 2-3. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
@@ -38,8 +38,8 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
 
 ## Size distribution
 
-Before we build our size portfolios, we investigate the distribution of the variable *firm size*. Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms. 
-Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization. 
+Before we build our size portfolios, we investigate the distribution of the variable *firm size*.\index{Firm size} Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms. 
+Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization.\index{Market capitalization}
 
 The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
@@ -79,7 +79,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig331)Percentage of total market capitalization in largest stocks.</p>
 </div>
 
-Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?
+Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}
 
 
 ```r
@@ -106,7 +106,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig332)Share of total market capitalization per listing exchange.</p>
 </div>
 
-Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.
+Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.\index{Summary statistics}
 
 The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
@@ -143,16 +143,16 @@ crsp_monthly |>
 # A tibble: 5 × 11
   exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
   <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-1 AMEX       283.  1298.     6.04 1.01e1 3.07e1 6.59e1   158.   535. 1.51e4   147
-2 NASDAQ    8041. 74386.     4.65 2.73e1 1.34e2 4.85e2  2108. 19107. 2.23e6  2300
-3 NYSE     16427. 43130.     5.35 1.54e2 9.16e2 3.34e3 12024. 74922. 4.14e5  1244
-4 Other    10061.    NA  10061.   1.01e4 1.01e4 1.01e4 10061. 10061. 1.01e4     1
-5 Overall  10558. 63975.     4.65 3.10e1 1.85e2 8.72e2  4196. 37064. 2.23e6  3692
+1 AMEX       415.  2181.     7.57 1.26e1 3.81e1 7.58e1   213.  1218. 2.57e4   145
+2 NASDAQ    8649. 90038.     7.01 2.91e1 1.31e2 4.28e2  1847. 18781. 2.90e6  2779
+3 NYSE     17858. 48619.    23.9  1.95e2 9.54e2 3.43e3 11629. 80748. 4.73e5  1395
+4 Other    13906.    NA  13906.   1.39e4 1.39e4 1.39e4 13906. 13906. 1.39e4     1
+5 Overall  11348. 77458.     7.01 3.40e1 1.95e2 7.94e2  3909. 40647. 2.90e6  4320
 ```
 
 ## Univariate size portfolios with flexible breakpoints
 
-In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks. 
+In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
 
 To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
@@ -180,7 +180,7 @@ assign_portfolio <- function(n_portfolios,
 
 ## Weighting schemes for portfolios
 
-Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock's return the same weight, i.e., a simple average of the constituents' returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.
+Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock's return the same weight, i.e., a simple average of the constituents' returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.\index{Weighting!Value}\index{Weighting!Equal}
 
 We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in the previous chapter.
 
@@ -236,20 +236,25 @@ tibble(Exchanges = c("NYSE, NASDAQ & AMEX", "NYSE"),
 # A tibble: 2 × 2
   Exchanges           Premium
   <chr>                 <dbl>
-1 NYSE, NASDAQ & AMEX   0.110
-2 NYSE                  0.181
+1 NYSE, NASDAQ & AMEX  0.0975
+2 NYSE                 0.166 
 ```
 
 The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
 
 ## P-hacking and non-standard errors
 
-Since the choice of the exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. We refer to @Walter2022 for an extensive set of other decision nodes at the discretion of researchers. 
+Since the choice of the listing exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. 
+In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. 
+Further, one may exclude firms that are active in the finance industry or restrict the analysis to some parts of the time series. 
+All of the variations of these choices that we discuss here are part of scholarly articles published in the top finance journals. 
+We refer to @Walter2022 for an extensive set of other decision nodes at the discretion of researchers. 
 
-The intention of this application is to show that the different ways to form portfolios result in different estimated size premiums. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022].
-From a malicious perspective, these modeling choices give the researcher multiple *chances* to find statistically significant results. Yet this is considered *p-hacking*, which renders the statistical inference due to multiple testing invalid [@Harvey2016].
+The intention of this application is to show that the different ways to form portfolios result in different estimated size premiums. Despite the effects of this multitude of choices, there is no correct way. It should also be noted that none of the procedures is wrong, the aim is simply to illustrate the changes that can arise due to the variation in the evidence-generating process [@Menkveld2022]. The term *non-standard errors* refers to the variation due to (suitable) choices made by researchers. Interestingly, in a large scale study, @Menkveld2022 find that the magnitude of non-standard errors are similar than the estimation uncertainty based on a chosen model which shows how important it is to adjust for the seemingly innocent choices in the data preparation and evaluation workflow. \index{Standard errors!Non-standard error}
 
-Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature. 
+From a malicious perspective, these modeling choices give the researcher multiple *chances* to find statistically significant results. Yet this is considered *p-hacking*, which renders the statistical inference due to multiple testing invalid [@Harvey2016].\index{P-hacking} 
+
+Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature.\index{Robustness tests}
 
 Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `expand_grid()` produces a table of all possible permutations of its arguments. Note that we use the argument `data` to exclude financial firms and truncate the time series. 
 
@@ -279,7 +284,7 @@ p_hacking_setup
 # … with 43 more rows
 ```
 
-To speed the computation up we parallelize the (many) different sorting procedures, as in Chapter 3. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
+To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 5. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
 
 
 ```r
@@ -310,19 +315,19 @@ p_hacking_results
 
 ```
 # A tibble: 48 × 5
-  n_portfolios exchanges value_weighted data                         size_premium
+  n_portfolios exchanges value_weighted data                              size_…¹
          <dbl> <list>    <lgl>          <chr>                               <dbl>
-1           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0184
-2           10 <chr [3]> FALSE          "filter(crsp_monthly, indus…       0.0180
-3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0162
-4           10 <chr [3]> FALSE          "filter(crsp_monthly, month…       0.0139
-5           10 <chr [3]> TRUE           "filter(crsp_monthly, indus…       0.0114
-# … with 43 more rows
+1           10 <chr [3]> FALSE          "filter(crsp_monthly, month >= \…  0.0186
+2           10 <chr [3]> FALSE          "filter(crsp_monthly, industry !…  0.0182
+3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0163
+4           10 <chr [3]> FALSE          "filter(crsp_monthly, month < \"…  0.0139
+5           10 <chr [3]> TRUE           "filter(crsp_monthly, industry !…  0.0115
+# … with 43 more rows, and abbreviated variable name ¹​size_premium
 ```
 
 ## The size-premium variation
 
-We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line. 
+We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.\index{Size!Size premium}
 
 
 ```r

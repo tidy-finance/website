@@ -3,7 +3,7 @@
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing [e.g., @BaliEngleMurray2016]. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
 We start by introducing univariate portfolio sorts (which sort based on only one characteristic). In a later chapter, we tackle bivariate sorting. 
 
-A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$. 
+A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$.\index{Portfolio sorts!Univariate}
 Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
 The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. 
 To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
@@ -23,9 +23,9 @@ Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for
 
 ## Data preparation
 
-We start with loading the required data from our `SQLite`-database introduced in chapters 2-3. In particular, we use the monthly CRSP sample as our asset universe. 
-Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha). 
-`beta` is the tibble with market betas computed in the previous chapter. 
+We start with loading the required data from our `SQLite`-database introduced in chapters 2-3. In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
+Once we form our portfolios, we use the Fama-French factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors}
+`beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
 
 
 ```r
@@ -54,7 +54,7 @@ crsp_monthly
 ```
 
 ```
-# A tibble: 3,225,079 × 5
+# A tibble: 3,273,599 × 5
   permno month      ret_excess mkt_excess mktcap_lag
    <dbl> <date>          <dbl>      <dbl>      <dbl>
 1  10000 1986-02-01    -0.262      0.0713       16.1
@@ -62,7 +62,7 @@ crsp_monthly
 3  10000 1986-04-01    -0.104     -0.0131       16.3
 4  10000 1986-05-01    -0.228      0.0462       15.2
 5  10000 1986-06-01    -0.0102     0.0103       11.8
-# … with 3,225,074 more rows
+# … with 3,273,594 more rows
 ```
 
 ## Sorting by market beta
@@ -84,7 +84,7 @@ data_for_sorts <- crsp_monthly |>
   inner_join(beta_lag, by = c("permno", "month"))
 ```
 
-The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. 
+The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.\index{Breakpoints} 
 For simplicity, we start with the median as the single breakpoint. 
 We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in `weighted.mean()`.  
 
@@ -102,7 +102,6 @@ beta_portfolios <- data_for_sorts |>
   group_by(month, portfolio) |>
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
-
 
 ## Performance evaluation
 
@@ -127,7 +126,7 @@ beta_portfolios |>
 <p class="caption">(\#fig:fig321)Monthly beta portfolio excess returns using median as breakpoint.</p>
 </div>
 
-We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.
+We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.\index{Long-short}
 
 
 ```r
@@ -137,7 +136,7 @@ beta_longshort <- beta_portfolios |>
   left_join(factors_ff_monthly, by = "month")
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero.\index{Standard errors!Newey-West} One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
 
 
 ```r
@@ -150,14 +149,14 @@ coeftest(model_fit, vcov = NeweyWest)
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)
-(Intercept) 0.000164   0.001319    0.12      0.9
+(Intercept) 0.000287   0.001312    0.22     0.83
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
 
 ## Functional programming for portfolio sorts
 
-Now we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we employ the [curly-curly](https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-)-operator to give us flexibility concerning which variable to use for the sorting, denoted by `var`. We use `quantile()` to compute breakpoints for `n_portfolios`. Then, we assign portfolios to stocks using the `findInterval()` function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.
+Now we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we employ the [curly-curly](https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-)-operator to give us flexibility concerning which variable to use for the sorting, denoted by `var`.\index{Curly-curly} We use `quantile()` to compute breakpoints for `n_portfolios`. Then, we assign portfolios to stocks using the `findInterval()` function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.\index{Functional programming}
 
 
 ```r
@@ -201,7 +200,7 @@ beta_portfolios <- data_for_sorts |>
 
 ## More performance evaluation
 
-In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns. 
+In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.\index{Performance evaluation}\index{Alpha}\index{CAPM}
 
 
 ```r
@@ -239,10 +238,9 @@ beta_portfolios_summary |>
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
 
-
 ## The security market line and beta portfolios
 
-The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.
+The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.\index{Security market line}
 
 
 ```r
@@ -300,10 +298,10 @@ coeftest(lm(long_short ~ 1, data = beta_longshort),
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)
-(Intercept)  0.00212    0.00329    0.64     0.52
+(Intercept)  0.00232    0.00322    0.72     0.47
 ```
 
-However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor [@Frazzini2014]. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion. 
+However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor [@Frazzini2014]. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.\index{Risk aversion}
 
 
 ```r
@@ -316,8 +314,8 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)    
-(Intercept) -0.00448    0.00256   -1.75    0.081 .  
-mkt_excess   1.17706    0.09600   12.26   <2e-16 ***
+(Intercept) -0.00447    0.00256   -1.75    0.081 .  
+mkt_excess   1.16555    0.09562   12.19   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
