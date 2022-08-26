@@ -213,7 +213,7 @@ crsp_monthly |>
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2,779 stocks on NASDAQ, 1,395 on NYSE, 145 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 ```{r, fig211, fig.cap = "Number of stocks in the CRSP sample listed at each of the US exchanges.", fig.alt = "Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."}
 crsp_monthly |>
@@ -222,7 +222,7 @@ crsp_monthly |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly number of securities by listing exchange in CRSP sample."
+    title = "Monthly number of securities by listing exchange"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
@@ -230,7 +230,7 @@ crsp_monthly |>
 
 Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `r `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
-```{r, fig212, fig.cap = "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.", fig.alt = "Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization, during the most recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."}
+```{r, fig212, fig.cap = "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.", fig.alt = "Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."}
 tbl(tidy_finance, "crsp_monthly") |>
   left_join(tbl(tidy_finance, "cpi_monthly"), by = "month") |>
   group_by(month, exchange) |>
@@ -343,20 +343,12 @@ for (j in 1:length(permnos)) {
       ) |>
       select(permno, date, month, ret_excess)
 
-    if (j == 1) {
-      overwrite <- TRUE
-      append <- FALSE
-    } else {
-      overwrite <- FALSE
-      append <- TRUE
-    }
-
     crsp_daily_sub |>
       dbWriteTable(tidy_finance, 
                    "crsp_daily", 
                    value = _, 
-                   overwrite = overwrite, 
-                   append = append)
+                   overwrite = ifelse(j == 1, TRUE, FALSE), 
+                   append = ifelse(j != 1, TRUE, FALSE))
   }
   setTxtProgressBar(progress, j)
 }
@@ -482,7 +474,7 @@ crsp_monthly |>
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
-```{r, fig215, fig.cap = "End-of-year share of securities with book equity values by listing exchange.", fig.alt = "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries provide information about book equity values in the CRSP sample."}
+```{r, fig215, fig.cap = "End-of-year share of securities with book equity values by listing exchange.", fig.alt = "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."}
 crsp_monthly |>
   group_by(permno, year = year(month)) |>
   filter(date == max(date)) |>
