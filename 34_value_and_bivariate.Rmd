@@ -1,7 +1,7 @@
 
 # Value and bivariate sorts
 
-This chapter extends univariate portfolio analysis to bivariate sorts which means that we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature. Yet, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
+In this chapter we extend univariate portfolio analysis to bivariate sorts which means that we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature. Yet, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
