@@ -176,8 +176,8 @@ transaction_costs |>
 ```
 
 <div class="figure">
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/fig511-1.png" alt="The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for increasing transaction costs and for higher risk aversion." width="672" />
-<p class="caption">(\#fig:fig511)Portfolio weights for different risk aversion and transaction cost</p>
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/fig511-1.png" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion." width="672" />
+<p class="caption">(\#fig:fig511)The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolut deviations of the chosen portfolio from the benchmark.</p>
 </div>
 
 The figure shows that the initial portfolio is always the (sample) minimum variance portfolio and that the higher the transaction costs parameter $\beta$, the smaller is the rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). In addition, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings. 
@@ -256,7 +256,7 @@ As expected, the resulting portfolio weights are all positive (up to numerical p
 You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
 
 `solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [regulation T-constraint](https://en.wikipedia.org/wiki/Regulation_T), which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum\limits_{i=1}^N |w_i| \leq 1.5$. 
-The constraint implies an initial margin requirement of 50% and, therefore, also a non-linear constraint. \index{Regulation T}
+The constraint implies an initial margin requirement of 50 percent and, therefore, also a non-linear constraint. \index{Regulation T}
 Thus, we can no longer rely on `solve.QP()` which is defined to solve quadratic programming problems with linear constraints. 
 Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
 
@@ -323,15 +323,15 @@ tibble(
   geom_bar(position = "dodge", stat = "identity") +
   coord_flip() +
   labs(
-    y = "Allocation weight",
-    title = " Optimal allocations for different investment rules"
+    y = "Allocation weight", fill = NULL,
+    title = "Optimal allocations for different strategies"
   ) +
   scale_y_continuous(labels = percent)
 ```
 
 <div class="figure">
-<img src="51_constrained_optimization_and_backtesting_files/figure-html/unnamed-chunk-9-1.png" alt="The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicates extreme long and short positions for the efficient portfolio." width="672" />
-<p class="caption">(\#fig:unnamed-chunk-9)Summary of the optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.</p>
+<img src="51_constrained_optimization_and_backtesting_files/figure-html/fig512-1.png" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicates extreme long and short positions for the efficient portfolio." width="672" />
+<p class="caption">(\#fig:fig512)Optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.</p>
 </div>
 
 The results clearly indicate the effect of imposing additional constraints: The extreme holdings the investor would implement if she follows the (theoretically optimal) efficient portfolio vanish under, e.g., the regulation-t constraint.
@@ -372,7 +372,7 @@ compute_efficient_weight_L1_TC <- function(mu,
 
 ## Out-of-sample backtesting
 
-For the sake of simplicity, we committed one fundamental error in computing portfolio weights above [@Harvey2019]. We used the full sample of the data to determine the optimal allocation. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2020. \index{Backtesting} \index{Performance evaluation}
+For the sake of simplicity, we committed one fundamental error in computing portfolio weights above [@Harvey2019]. We used the full sample of the data to determine the optimal allocation. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2021. \index{Backtesting} \index{Performance evaluation}
 While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data. 
 The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.
 
@@ -517,7 +517,7 @@ faces an equivalent optimization problem to a framework where portfolio weights 
 $$\min_w \omega'\Sigma \omega \text{ s.t. } \omega'\mu = \bar\mu \text{ and } \iota'\omega = 1. $$ Proof that there is an equivalence between the optimal portfolio weights in both cases. 
 1. Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter $\gamma$ 
 $$\omega_{t+1} ^* :=  \arg\max_{\omega \in \mathbb{R}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega$$
-where $\Sigma$ and $\mu$ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing **and** proportional to stock illiquidity such that 
+where $\Sigma$ and $\mu$ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing *and* proportional to stock illiquidity such that 
 $$\nu_t\left(\omega, B\right) := \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right)$$ where $B = \text{diag}(ill_1, \ldots, ill_N)$ is a diagonal matrix where $ill_1, \ldots, ill_N$. Derive a closed-form solution for the mean-variance efficient portfolio $\omega_{t+1} ^*$ based on the transaction cost specification above. Discuss the effect of illiquidity $ill_i$ on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision. 
 1. Use the solution from the previous exercise to update the function `compute_efficient_weight` such that you can compute optimal weights conditional on a matrix $B$ with illiquidity measures. 
 1. Illustrate the evolution of the *optimal* weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.

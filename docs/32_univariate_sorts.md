@@ -105,27 +105,6 @@ beta_portfolios <- data_for_sorts |>
 
 ## Performance evaluation
 
-The following figure shows the monthly excess returns of the two portfolios.
-
-
-```r
-beta_portfolios |>
-  ggplot(aes(x = month, y = ret, fill = portfolio)) +
-  geom_col() +
-  facet_wrap(~portfolio, ncol = 1) +
-  scale_y_continuous(labels = percent) +
-  labs(
-    x = NULL, y = NULL,
-    title = "Monthly beta portfolio excess returns using median as breakpoint"
-  ) +
-  theme(legend.position = "none")
-```
-
-<div class="figure">
-<img src="32_univariate_sorts_files/figure-html/fig321-1.png" alt="Portfolio excess returns for high and low beta portfolios from 1960 to 2020." width="672" />
-<p class="caption">(\#fig:fig321)Monthly beta portfolio excess returns using median as breakpoint.</p>
-</div>
-
 We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.\index{Long-short}
 
 
@@ -222,7 +201,7 @@ beta_portfolios_summary |>
   ggplot(aes(x = portfolio, y = alpha, fill = portfolio)) +
   geom_bar(stat = "identity") +
   labs(
-    title = "Alphas of beta-sorted portfolios",
+    title = "CAPM alphas of beta-sorted portfolios",
     x = "Portfolio",
     y = "CAPM alpha",
     fill = "Portfolio"
@@ -232,8 +211,8 @@ beta_portfolios_summary |>
 ```
 
 <div class="figure">
-<img src="32_univariate_sorts_files/figure-html/fig322-1.png" alt="Bar chart of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding alpha on the vertical axis. Alphas for low beta portfolios are positive for low beta portfolios, while high beta portfolios show negative alphas." width="672" />
-<p class="caption">(\#fig:fig322)Alphas of beta-sorted portfolios.</p>
+<img src="32_univariate_sorts_files/figure-html/fig322-1.png" alt="Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low beta portfolios are positive, while high beta portfolios show negative alphas." width="672" />
+<p class="caption">(\#fig:fig322)Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period.</p>
 </div>
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
@@ -265,8 +244,8 @@ beta_portfolios_summary |>
 ```
 
 <div class="figure">
-<img src="32_univariate_sorts_files/figure-html/fig323-1.png" alt="Scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data." width="672" />
-<p class="caption">(\#fig:fig323)Average portfolio excess returns and average beta estimates.</p>
+<img src="32_univariate_sorts_files/figure-html/fig323-1.png" alt="Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data." width="672" />
+<p class="caption">(\#fig:fig323)Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dasehd line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.</p>
 </div>
 
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio. 
@@ -320,7 +299,7 @@ mkt_excess   1.16555    0.09562   12.19   <2e-16 ***
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-The plot below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 
+The figure below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 
 
 
 ```r
@@ -344,8 +323,8 @@ beta_longshort |>
 ```
 
 <div class="figure">
-<img src="32_univariate_sorts_files/figure-html/fig324-1.png" alt="Bar chart of annual returns of long, short and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet." width="672" />
-<p class="caption">(\#fig:fig324)Annual returns of beta portfolios.</p>
+<img src="32_univariate_sorts_files/figure-html/fig324-1.png" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods. " width="672" />
+<p class="caption">(\#fig:fig324)We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.</p>
 </div>
 
 Overall, this chapter shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next chapter, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis. 

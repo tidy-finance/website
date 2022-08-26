@@ -4,7 +4,6 @@ This chapter shows how to connect to [Wharton Research Data Services (WRDS)](htt
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
-
 ```r
 library(tidyverse)
 library(lubridate)
@@ -230,7 +229,7 @@ crsp_monthly |>
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2020, there are 2300 stocks on NASDAQ, 1244 on NYSE, 147 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2,779 stocks on NASDAQ, 1,395 on NYSE, 145 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 
 ```r
@@ -240,15 +239,15 @@ crsp_monthly |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly number of securities by listing exchange in the CRSP sample."
+    title = "Monthly number of securities by listing exchange"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
 <div class="figure">
-<img src="21_wrds_files/figure-html/fig211-1.png" alt="Line chart of number of securities by exchange from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig211)Monthly number of securities by listing exchange.</p>
+<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="672" />
+<p class="caption">(\#fig:fig211)Number of stocks in the CRSP sample listed at each of the US exchanges.</p>
 </div>
 
 Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `r `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
@@ -277,15 +276,15 @@ tbl(tidy_finance, "crsp_monthly") |>
 ```
 
 <div class="figure">
-<img src="21_wrds_files/figure-html/fig212-1.png" alt="Line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig212)Monthly market cap by listing exchange in billions of Dec 2020 USD.</p>
+<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="672" />
+<p class="caption">(\#fig:fig212)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
 Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data.\index{Data!CPI}
 
 
 ```r
-cpi_monthly <- tbl(tidy_finance, "cpi_monthly") %>% 
+cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |> 
   collect()
 ```
 
@@ -317,11 +316,11 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure">
-<img src="21_wrds_files/figure-html/fig213-1.png" alt="Line chart of the number of securities by industry from 1960 to 2020 with years on the horizontal axis and the corresponding number on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig213)Monthly number of securities by industry.</p>
+<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is largest in terms of number of listed stocks." width="672" />
+<p class="caption">(\#fig:fig213)Number of stocks in the CRSP sample associated with different industries.</p>
 </div>
 
-We also compute the market cap of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2020 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
+We also compute the market cap of all stocks belonging to the respective industries. All values are again in terms of billions of end of 2021 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Towards the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
 
 
 ```r
@@ -340,8 +339,8 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure">
-<img src="21_wrds_files/figure-html/fig214-1.png" alt="Line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2020 with years on the horizontal axis and the corresponding market capitalization on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig214)Monthly total market cap by industry in billions of Dec 2020 USD.</p>
+<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="672" />
+<p class="caption">(\#fig:fig214)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
 
@@ -386,20 +385,12 @@ for (j in 1:length(permnos)) {
       ) |>
       select(permno, date, month, ret_excess)
 
-    if (j == 1) {
-      overwrite <- TRUE
-      append <- FALSE
-    } else {
-      overwrite <- FALSE
-      append <- TRUE
-    }
-
     crsp_daily_sub |>
       dbWriteTable(tidy_finance, 
                    "crsp_daily", 
                    value = _, 
-                   overwrite = overwrite, 
-                   append = append)
+                   overwrite = ifelse(j == 1, TRUE, FALSE), 
+                   append = ifelse(j != 1, TRUE, FALSE))
   }
   setTxtProgressBar(progress, j)
 }
@@ -463,7 +454,7 @@ compustat <- compustat |>
   )
 ```
 
-We keep only the last available information for each firm-year group. Note that `datadate` defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2020). Therefore, `datadate` is not the date when data was made available to the public. Check out the exercises for more insights into the peculiarities of `datadate`.
+We keep only the last available information for each firm-year group. Note that `datadate` defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2021). Therefore, `datadate` is not the date when data was made available to the public. Check out the exercises for more insights into the peculiarities of `datadate`.
 
 
 ```r
@@ -516,7 +507,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-08-25
+5  54594 001004 1972-04-24 2022-08-26
 # … with 31,765 more rows
 ```
 
@@ -560,14 +551,14 @@ crsp_monthly |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "End-of-year share of securities with book equity values by exchange"
+    title = "Share of securities with book equity values by exchange"
   ) +
   scale_y_continuous(labels = percent) + 
   coord_cartesian(ylim = c(0, 1))
 ```
 
 <div class="figure">
-<img src="21_wrds_files/figure-html/fig215-1.png" alt="Line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizongal axis and the coresponding share on the vertical axis." width="672" />
+<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="672" />
 <p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by listing exchange.</p>
 </div>
 

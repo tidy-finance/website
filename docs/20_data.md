@@ -15,7 +15,8 @@ library(lubridate)
 library(scales)
 ```
 
-The package `scales` [@scales] provides useful scale Functions for visualizations.
+The package `scales` [@scales] provides useful scale Functions for visualizations. The package `lubridate` provides convenient tools to work with dates and time [@lubridate].
+
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you need to adjust these dates. Our data starts with 1960 since most asset pricing studies use data from 1962 on. 
 
 
@@ -26,7 +27,7 @@ end_date <- ymd("2021-12-31")
 
 ## Fama-French data
 
-We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to easily access the data: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)\index{Data!Fama-French factors}
+We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to easily access the data: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) [@frenchdata].\index{Data!Fama-French factors}
 
 
 ```r
@@ -88,7 +89,7 @@ We also need to adjust this data. First, we discard information we will not use 
 
 ```r
 factors_q_monthly_link <- 
-  "http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2020.csv"
+  "http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2021.csv"
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
@@ -100,7 +101,7 @@ factors_q_monthly <- read_csv(factors_q_monthly_link) |>
 
 ## Macroeconomic predictors
 
-Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2020 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) Since the data is a .xlsx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file [@readxl] and `googledrive` for the Google drive connection [@googledrive].\index{Data!Macro predictors}
+Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2021 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) Since the data is a .xlsx-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the .xlsx-file [@readxl] and `googledrive` for the Google drive connection [@googledrive].\index{Data!Macro predictors}
 
 
 ```r
@@ -120,7 +121,7 @@ The `drive_download()` function from the `googledrive` package allows us to down
 
 ```r
 macro_predictors_link <- 
-  "https://drive.google.com/file/d/1ACbhdnIy0VbCWgsnXkjcddiV8HF4feWv/view"
+  "https://docs.google.com/spreadsheets/d/1OArfD2Wv9IvGoLkJ8JyoXS0YMQLDZfY2"
 drive_download(
   macro_predictors_link, 
   path = "data/macro_predictors.xlsx"
@@ -379,10 +380,10 @@ Warning: Closing open result set, pending rows
 ```
 
 ```
- [1] "compustat"             "cpi_monthly"           "crsp_daily"           
- [4] "crsp_monthly"          "factors_ff_daily"      "factors_ff_monthly"   
- [7] "factors_q_monthly"     "industries_ff_monthly" "macro_predictors"     
-[10] "mergent"              
+ [1] "beta"                  "compustat"             "cpi_monthly"          
+ [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
+ [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
+[10] "macro_predictors"      "mergent"               "trace_enhanced"       
 ```
 
 This function comes in handy if you are unsure about the correct naming of the tables in your database. 

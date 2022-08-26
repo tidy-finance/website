@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-08-25"
+date: "2022-08-26"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib, packages.bib]

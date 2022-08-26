@@ -32,13 +32,13 @@ We especially recommend taking a look at the examples section of the documentati
 prices <- tq_get("AAPL",
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2022-06-30"
+  to = "2021-12-31"
 )
 prices
 ```
 
 ```
-# A tibble: 5,659 × 8
+# A tibble: 5,535 × 8
   symbol date        open  high   low close    volume adjusted
   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
 1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.853
@@ -46,7 +46,7 @@ prices
 3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.793
 4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.724
 5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.759
-# … with 5,654 more rows
+# … with 5,530 more rows
 ```
 
 \index{Data!YahooFinance} `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. 
@@ -64,14 +64,13 @@ prices |>
   labs(
     x = NULL,
     y = NULL,
-    title = "AAPL stock prices",
-    subtitle = "Prices in USD, adjusted for dividend payments and stock splits"
+    title = "Adjusted Apple stock prices between beginning of 2000 and end of 2021"
   )
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig100-1.png" alt="Time series of Apple stock prices from 2000 until 2020. Strong upwards trend from 0.85 USD to 1359 USD." width="672" />
-<p class="caption">(\#fig:fig100)Apple stock prices. Prices are in USD, adjusted for divident payments and stock splits. Source: Yahoo!Finance</p>
+<img src="10_introduction_files/figure-html/fig100-1.png" alt="Title: Adjusted Apple stock prices between beginning of 2000 and end of 2021. The figure shows that the adjusted stock price of Apple increased dramatically from about 1 USD to around 125 USD." width="672" />
+<p class="caption">(\#fig:fig100)Prices are in USD, adjusted for divident payments and stock splits.</p>
 </div>
 
 \index{Returns} Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
@@ -87,7 +86,7 @@ returns
 ```
 
 ```
-# A tibble: 5,659 × 3
+# A tibble: 5,535 × 3
   symbol date           ret
   <chr>  <date>       <dbl>
 1 AAPL   2000-01-03 NA     
@@ -95,7 +94,7 @@ returns
 3 AAPL   2000-01-05  0.0146
 4 AAPL   2000-01-06 -0.0865
 5 AAPL   2000-01-07  0.0474
-# … with 5,654 more rows
+# … with 5,530 more rows
 ```
 
 The resulting tibble contains three columns where the last contains the daily returns (`ret`). 
@@ -112,8 +111,8 @@ returns <- returns |>
 ```
 
 Next, we visualize the distribution of daily returns in a histogram. For convenience, we multiply the returns by 100 to get returns in percent for the visualizations. 
-Additionally, we add a dashed red line that indicates the 5\% quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at least 5\%. 
-The 5\% quantile is closely connected to the (historical) Value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for more thorough introduction into stylized facts of returns. 
+Additionally, we add a dashed red line that indicates the 5 percent quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at least 5 percent. 
+The 5 percent quantile is closely connected to the (historical) Value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for more thorough introduction into stylized facts of returns. 
 
 
 ```r
@@ -123,22 +122,21 @@ returns |>
   ggplot(aes(x = ret * 100)) +
   geom_histogram(bins = 100) +
   geom_vline(aes(xintercept = quantile_05),
-    color = "red",
     linetype = "dashed"
   ) +
   labs(
     x = NULL,
     y = NULL,
-    title = "Distribution of daily AAPL returns (in percent)")
+    title = "Distribution of daily Apple stock returns in percent")
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig101-1.png" alt="Histogram of daily returns. Range indicates large negative values. A vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent." width="672" />
-<p class="caption">(\#fig:fig101)Distribution of daily AAPL returns (in percent). The dotted vertical line indicates the historical 5 percent quantile </p>
+<img src="10_introduction_files/figure-html/fig101-1.png" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows an histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed  around 0. The vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent" width="672" />
+<p class="caption">(\#fig:fig101)The dotted vertical line indicates the historical 5 percent quantile.</p>
 </div>
 
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. 
-Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dotted red line that indicates the 5\% quantile of the daily returns. 
+Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns. 
 A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest. 
 
 
@@ -160,7 +158,7 @@ returns |>
 # A tibble: 1 × 4
   ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
            <dbl>        <dbl>         <dbl>         <dbl>
-1          0.123         2.52         -51.9          13.9
+1          0.130         2.52         -51.9          13.9
 ```
 
 We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the daily average return is close to but slightly above 0. 
@@ -186,7 +184,7 @@ returns |>
 ```
 
 ```
-# A tibble: 23 × 5
+# A tibble: 22 × 5
     year daily_mean daily_sd daily_min daily_max
    <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
  1  2000   -0.346       5.49    -51.9      13.7 
@@ -210,8 +208,7 @@ returns |>
 19  2018   -0.00573     1.81     -6.63      7.04
 20  2019    0.266       1.65     -9.96      6.83
 21  2020    0.281       2.94    -12.9      12.0 
-22  2021    0.131       1.58     -4.17      5.39
-23  2022   -0.170       2.26     -5.64      6.98
+22  2021    0.133       1.58     -4.17      5.39
 ```
 \index{Summary statistics} 
 
@@ -234,11 +231,11 @@ ticker
 # A tibble: 30 × 8
   symbol company                      ident…¹ sedol weight sector share…² local…³
   <chr>  <chr>                        <chr>   <chr>  <dbl> <chr>    <dbl> <chr>  
-1 UNH    UnitedHealth Group Incorpor… 91324P… 2917… 0.107  Healt… 5735859 USD    
-2 GS     Goldman Sachs Group Inc.     38141G… 2407… 0.0681 Finan… 5735859 USD    
-3 HD     Home Depot Inc.              437076… 2434… 0.0615 Consu… 5735859 USD    
-4 MSFT   Microsoft Corporation        594918… 2588… 0.0554 Infor… 5735859 USD    
-5 MCD    McDonald's Corporation       580135… 2550… 0.0522 Consu… 5735859 USD    
+1 UNH    UnitedHealth Group Incorpor… 91324P… 2917… 0.107  Healt… 5673273 USD    
+2 GS     Goldman Sachs Group Inc.     38141G… 2407… 0.0686 Finan… 5673273 USD    
+3 HD     Home Depot Inc.              437076… 2434… 0.0613 Consu… 5673273 USD    
+4 MSFT   Microsoft Corporation        594918… 2588… 0.0552 Infor… 5673273 USD    
+5 MCD    McDonald's Corporation       580135… 2550… 0.0520 Consu… 5673273 USD    
 # … with 25 more rows, and abbreviated variable names ¹​identifier, ²​shares_held,
 #   ³​local_currency
 ```
@@ -249,11 +246,11 @@ Conveniently, `tidyquant` provides a function to get all stocks in a stock index
 index_prices <- tq_get(ticker,
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2022-06-30"
+  to = "2022-12-31"
 )
 ```
 
-The resulting file contains 161753 daily observations for 30 different corporations. 
+The resulting file contains 162983 daily observations for 30 different corporations. 
 The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
@@ -269,15 +266,14 @@ index_prices |>
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "DOW index stock prices",
-    subtitle = "Prices in USD, adjusted for dividend payments and stock splits"
+    title = "Stock prices of DOW index constituents"
   ) +
   theme(legend.position = "none")
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig103-1.png" alt="Many time series with daily prices. General trend positive for the stocks in the DOW index." width="672" />
-<p class="caption">(\#fig:fig103)DOW index constituents stock prices. Prices in USD, adjusted for dividend payments and stock splits.</p>
+<img src="10_introduction_files/figure-html/fig103-1.png" alt="Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index." width="672" />
+<p class="caption">(\#fig:fig103)Prices in USD, adjusted for dividend payments and stock splits.</p>
 </div>
 
 Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to properly identify the individual stocks, but it illustrates the point well.
@@ -312,36 +308,36 @@ all_returns |>
 # A tibble: 30 × 5
    symbol daily_mean daily_sd daily_min daily_max
    <chr>       <dbl>    <dbl>     <dbl>     <dbl>
- 1 AAPL       0.123      2.52     -51.9      13.9
- 2 AMGN       0.0483     1.98     -13.4      15.1
- 3 AXP        0.0514     2.30     -17.6      21.9
- 4 BA         0.0544     2.23     -23.8      24.3
- 5 CAT        0.0670     2.04     -14.5      14.7
- 6 CRM        0.117      2.69     -27.1      26.0
- 7 CSCO       0.0300     2.39     -16.2      24.4
- 8 CVX        0.0523     1.76     -22.1      22.7
- 9 DIS        0.0437     1.93     -18.4      16.0
-10 DOW        0.0625     2.69     -21.7      20.9
-11 GS         0.0535     2.33     -19.0      26.5
-12 HD         0.0524     1.94     -28.7      14.1
-13 HON        0.0485     1.95     -17.4      28.2
-14 IBM        0.0272     1.66     -15.5      12.0
-15 INTC       0.0342     2.36     -22.0      20.1
-16 JNJ        0.0414     1.23     -15.8      12.2
-17 JPM        0.0562     2.43     -20.7      25.1
-18 KO         0.0338     1.33     -10.1      13.9
-19 MCD        0.0531     1.48     -15.9      18.1
-20 MMM        0.0393     1.50     -12.9      12.6
-21 MRK        0.0355     1.69     -26.8      13.0
-22 MSFT       0.0533     1.93     -15.6      19.6
-23 NKE        0.0728     1.92     -19.8      15.5
-24 PG         0.0370     1.34     -30.2      12.0
-25 TRV        0.0556     1.84     -20.8      25.6
-26 UNH        0.0998     1.99     -18.6      34.8
-27 V          0.0946     1.91     -13.6      15.0
-28 VZ         0.0282     1.51     -11.8      14.6
-29 WBA        0.0298     1.81     -15.0      16.6
-30 WMT        0.0290     1.50     -11.4      11.7
+ 1 AAPL       0.125      2.51     -51.9      13.9
+ 2 AMGN       0.0479     1.97     -13.4      15.1
+ 3 AXP        0.0534     2.30     -17.6      21.9
+ 4 BA         0.0574     2.23     -23.8      24.3
+ 5 CAT        0.0678     2.04     -14.5      14.7
+ 6 CRM        0.116      2.69     -27.1      26.0
+ 7 CSCO       0.0313     2.38     -16.2      24.4
+ 8 CVX        0.0542     1.76     -22.1      22.7
+ 9 DIS        0.0468     1.94     -18.4      16.0
+10 DOW        0.0662     2.65     -21.7      20.9
+11 GS         0.0551     2.32     -19.0      26.5
+12 HD         0.0536     1.94     -28.7      14.1
+13 HON        0.0504     1.94     -17.4      28.2
+14 IBM        0.0261     1.66     -15.5      12.0
+15 INTC       0.0325     2.36     -22.0      20.1
+16 JNJ        0.0401     1.22     -15.8      12.2
+17 JPM        0.0560     2.43     -20.7      25.1
+18 KO         0.0338     1.32     -10.1      13.9
+19 MCD        0.0535     1.48     -15.9      18.1
+20 MMM        0.0402     1.50     -12.9      12.6
+21 MRK        0.0347     1.68     -26.8      13.0
+22 MSFT       0.0538     1.93     -15.6      19.6
+23 NKE        0.0733     1.92     -19.8      15.5
+24 PG         0.0371     1.34     -30.2      12.0
+25 TRV        0.0555     1.84     -20.8      25.6
+26 UNH        0.0997     1.99     -18.6      34.8
+27 V          0.0943     1.90     -13.6      15.0
+28 VZ         0.0255     1.51     -11.8      14.6
+29 WBA        0.0277     1.81     -15.0      16.6
+30 WMT        0.0305     1.50     -11.4      11.7
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -355,22 +351,21 @@ Thus, we multiply the trading volume with the daily closing price to get a proxy
 
 ```r
 volume <- index_prices |>
-  mutate(volume_usd = volume * close / 1e9) |>
   group_by(date) |>
-  summarize(volume = sum(volume_usd))
+  summarize(volume = sum(volume * close / 1e9))
 
 volume |>
   ggplot(aes(x = date, y = volume)) +
   geom_line() +
   labs(
     x = NULL, y = NULL,
-    title = "Aggregate daily trading volume in billion USD"
+    title = "Aggregate daily trading volume of DOW index constitutens"
   )
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig104-1.png" alt="Time series with daily trading volume, ranging from 15 in 2000 to 60 in 2020." width="672" />
-<p class="caption">(\#fig:fig104)Aggregate daily trading volume of DOW constituents in billion USD.</p>
+<img src="10_introduction_files/figure-html/fig104-1.png" alt="Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100." width="672" />
+<p class="caption">(\#fig:fig104)Total daily trading volume in billion USD.</p>
 </div>
 
 The figure indicates a clear upwards trend in aggregated daily trading volume. In particular since the outbreak of COVID-19 pandemic do markets process huge trading volume, as analyzed for instance by @Goldstein2021.
@@ -382,12 +377,12 @@ volume |>
   ggplot(aes(x = lag(volume), y = volume)) +
   geom_point() +
   geom_abline(aes(intercept = 0, slope = 1),
-    linetype = "dotted"
+    linetype = "dashed"
   ) +
   labs(
-    x = "Previous day aggregate trading volume (billion USD)",
-    y = "Aggregate trading volume (billion USD)",
-    title = "Trading volume on Dow Index versus previous day volume"
+    x = "Previous day aggregate trading volume",
+    y = "Aggregate trading volume",
+    title = "Persistence in daily trading volume of DOW index constituents"
   )
 ```
 
@@ -396,8 +391,8 @@ Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig105-1.png" alt="A scatterplot which shows that previous day aggregate trading volume and aggregate trading volume neatly line up along a 45 degree line. " width="672" />
-<p class="caption">(\#fig:fig105)Trading volume on Dow Index versus previous day volume</p>
+<img src="10_introduction_files/figure-html/fig105-1.png" alt="Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45 degree line. " width="672" />
+<p class="caption">(\#fig:fig105)Total daily trading volume in billion USD.</p>
 </div>
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
@@ -464,16 +459,16 @@ mvp_weights <- solve(Sigma) %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 
 tibble(
-  expected_ret = t(mvp_weights) %*% mu,
-  volatility = sqrt(t(mvp_weights) %*% Sigma %*% mvp_weights)
+  expected_ret = as.numeric(t(mvp_weights) %*% mu),
+  volatility = as.numeric(sqrt(t(mvp_weights) %*% Sigma %*% mvp_weights))
 )
 ```
 
 ```
 # A tibble: 1 × 2
-  expected_ret[,1] volatility[,1]
-             <dbl>          <dbl>
-1          0.00801         0.0314
+  expected_ret volatility
+         <dbl>      <dbl>
+1      0.00798     0.0313
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  
@@ -531,11 +526,11 @@ We compute annualized returns based on the simple assumption that monthly return
 res |>
   ggplot(aes(x = sd, y = mu)) +
   geom_point() +
-  geom_point( # locate the minimum variance and efficient portfolio
+  geom_point(
     data = res |> filter(c %in% c(0, 1)),
     size = 4
   ) +
-  geom_point( # locate the individual assets
+  geom_point( 
     data = tibble(
       mu = 12 * 100 * mu,
       sd = 12 * 10 * sqrt(diag(Sigma))
@@ -545,17 +540,13 @@ res |>
   labs(
     x = "Annualized standard deviation (in percent)",
     y = "Annualized expected return (in percent)",
-    title = "Efficient frontier for Dow Jones constituents",
-    subtitle = str_c(
-      "Thick dots indicate the location of the minimum ",
-      "variance and efficient tangency portfolio"
-    )
+    title = "Efficient frontier for DOW index constituents"
   )
 ```
 
 <div class="figure">
-<img src="10_introduction_files/figure-html/fig106-1.png" alt="Figure shows Dow Jones constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="672" />
-<p class="caption">(\#fig:fig106)Efficient frontier for Dow Jones constituents.</p>
+<img src="10_introduction_files/figure-html/fig106-1.png" alt="Title: Efficient frontier for DOW index constituents. The figure shows DOW index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="672" />
+<p class="caption">(\#fig:fig106)The big dots indicate the location of the minimum variance and efficient tangency portfolios, respectively. The small dots indicate the location of the individual constituents.</p>
 </div>
 
 The line indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
@@ -563,7 +554,7 @@ The line indicates the efficient frontier: the set of portfolios a mean-variance
 ## Exercises
 
 1. Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the ticker's un-adjusted and adjusted closing prices. Explain the differences.
-1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5% quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
+1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
 1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.

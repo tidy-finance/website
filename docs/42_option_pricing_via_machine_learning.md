@@ -1,14 +1,14 @@
 # Option pricing via machine learning
 
+This chapter covers machine learning methods in option pricing. First, we briefly introduce regression trees, random forests, and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
+We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
+
 \index{Machine learning} Machine learning (ML) is seen as a part of artificial intelligence. 
 ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
 While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. \index{Supervised learning} The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests \index{Random forests} and neural networks \index{Neural network} to a simple application in option pricing. More specifically, we are going to create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options \index{Option pricing} without prior knowledge of the theoretical underpinnings of the famous option pricing equation by @Black1976.    
 
-The roadmap of this chapter is as follows: First, we briefly introduce regression trees, random forests, and neural networks. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
-We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `tensorflow` for more complicated network structures. 
-
 ::: {.rmdnote}
-In order to replicate the analysis regarding neural networks in this chapter, you have to install `TensorFlow` on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow [these quick-start instructions](https://tensorflow.rstudio.com/installation/).
+In order to replicate the analysis regarding neural networks in this chapter, you have to install `TensorFlow` on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow [these quick-start instructions.](https://tensorflow.rstudio.com/installation/)
 :::
 
 Throughout this chapter, we need the following packages.
@@ -290,12 +290,12 @@ predictive_performance |>
   labs(
     x = "Moneyness (S - K)", color = NULL,
     y = "Absolut prediction error (USD)",
-    title = "Prediction errors: Call option prices"
+    title = "Prediction errors of call option prices for different models"
   )
 ```
 
 <div class="figure">
-<img src="42_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" alt="Figure that shows the pricing error of the different ML methods for call options for different levels of moneyness (Strike price minus stock price). The figure indicates variation across the models and across moneyness." width="672" />
+<img src="42_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." width="672" />
 <p class="caption">(\#fig:unnamed-chunk-14)Absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that where not used for training.</p>
 </div>
 
@@ -303,7 +303,7 @@ The results can be summarized as follow: i) All ML methods seem to be able to *p
 
 ## Exercises
 
-1. Write a function that takes `y` and a matrix of predictors `X` as inputs and returns a characterization of the relevant parameters of a regression tree with **1** branch. 
+1. Write a function that takes `y` and a matrix of predictors `X` as inputs and returns a characterization of the relevant parameters of a regression tree with 1 branch. 
 1. Create a function that creates predictions for a new matrix of predictors `newX` based on the estimated regression tree. 
 1. Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing.
 1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.

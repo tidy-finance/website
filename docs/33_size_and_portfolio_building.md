@@ -38,20 +38,20 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
 
 ## Size distribution
 
-Before we build our size portfolios, we investigate the distribution of the variable *firm size*.\index{Firm size} Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x% of the firms. 
+Before we build our size portfolios, we investigate the distribution of the variable *firm size*.\index{Firm size} Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x percent of the firms. 
 Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization.\index{Market capitalization}
 
-The figure shows that the largest 1% of firms cover up to 50% of the total market capitalization, and holding just the 25% largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
+The figure shows that the largest 1 percent of firms cover up to 50 percent of the total market capitalization, and holding just the 25 percent largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
 
 ```r
 crsp_monthly |>
   group_by(month) |>
   mutate(
-    top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1L, 0L),
-    top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1L, 0L),
-    top10 = if_else(mktcap >= quantile(mktcap, 0.90), 1L, 0L),
-    top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1L, 0L),
+    top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1, 0),
+    top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1, 0),
+    top10 = if_else(mktcap >= quantile(mktcap, 0.90), 1, 0),
+    top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1, 0),
     total_market_cap = sum(mktcap)
   ) |>
   summarize(
@@ -75,8 +75,8 @@ crsp_monthly |>
 ```
 
 <div class="figure">
-<img src="33_size_and_portfolio_building_files/figure-html/fig331-1.png" alt="Line chart with percentage of total market capitalization for the largest 1%, 5%, 10%, and 25% of stocks with years on the horizontal axis and the percentage of total market capitalization in these stocks on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig331)Percentage of total market capitalization in largest stocks.</p>
+<img src="33_size_and_portfolio_building_files/figure-html/fig331-1.png" alt="Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent." width="672" />
+<p class="caption">(\#fig:fig331)We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.</p>
 </div>
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}
@@ -102,8 +102,8 @@ crsp_monthly |>
 ```
 
 <div class="figure">
-<img src="33_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Stacked area plots of the share of total market capitalization per listing exchange with years on the horizontal axis and the corresponding share on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig332)Share of total market capitalization per listing exchange.</p>
+<img src="33_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline of the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed at NASDAQ. Other exchanges are negligible." width="672" />
+<p class="caption">(\#fig:fig332)Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.</p>
 </div>
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.\index{Summary statistics}
@@ -240,7 +240,7 @@ tibble(Exchanges = c("NYSE, NASDAQ & AMEX", "NYSE"),
 2 NYSE                 0.166 
 ```
 
-The table shows that the size premium is more than 60% larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50% of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
+The table shows that the size premium is more than 60 percent larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
 
 ## P-hacking and non-standard errors
 
@@ -269,19 +269,6 @@ p_hacking_setup <- expand_grid(
    crsp_monthly |> filter(month < "1990-06-01");
    crsp_monthly |> filter(month >="1990-06-01")')
 )
-p_hacking_setup
-```
-
-```
-# A tibble: 48 × 4
-  n_portfolios exchanges value_weighted data      
-         <dbl> <list>    <lgl>          <list>    
-1            2 <chr [1]> TRUE           <sym>     
-2            2 <chr [1]> TRUE           <language>
-3            2 <chr [1]> TRUE           <language>
-4            2 <chr [1]> TRUE           <language>
-5            2 <chr [1]> FALSE          <sym>     
-# … with 43 more rows
 ```
 
 To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 5. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
@@ -336,19 +323,15 @@ p_hacking_results |>
   geom_histogram(bins = nrow(p_hacking_results)) +
   labs(
     x = NULL, y = NULL,
-    title = "Size premium over different sorting choices",
-    subtitle = "The dotted vertical line indicates the average Fama-French SMB permium"
-  ) +
+    title = "Distribution of size premiums for different sorting choices") +
   geom_vline(aes(xintercept = mean(factors_ff_monthly$smb)),
-    color = "red",
-    linetype = "dashed"
-  ) +
+             linetype = "dashed") +
   scale_x_continuous(labels = percent)
 ```
 
 <div class="figure">
-<img src="33_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Histogram of size premiums based on different sorting choices with the size premium on the horizontal axis and the number of premiums per bin on the vertical axis." width="672" />
-<p class="caption">(\#fig:fig333)Size premium over different sorting choices. The dotted vertical line indicates the average Fama-French SMB permium</p>
+<img src="33_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge but the estimated coefficients are positive for all choices." width="672" />
+<p class="caption">(\#fig:fig333)The dashed vertical line indicates the average Fama-French SMB premium.</p>
 </div>
 
 ## Exercises

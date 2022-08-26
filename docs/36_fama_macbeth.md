@@ -1,12 +1,12 @@
 # Fama-MacBeth regressions
 
-The regression approach of @Fama1973 is widely used in empirical asset pricing studies. 
+In this chapter, we present a simple implementation of @Fama1973 to introduce the regression approach of @Fama1973 which is widely used in empirical asset pricing studies. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
+
 Researchers use the two-stage regression approach to estimate risk premiums in various markets, but predominately in the stock market. 
 Essentially, the two-step Fama-MacBeth regressions exploit a linear relationship between expected returns and exposure to (priced) risk factors. 
 The basic idea of the regression approach is to project asset returns on factor exposures or characteristics that resemble exposure to a risk factor in the cross-section in each time period. 
 Then, in the second step, the estimates are then aggregated across time to test if a risk factor is priced. 
 In principle, Fama-MacBeth regressions can be used in the same way as portfolio sorts introduced in previous chapters.
-In this chapter, we present a simple implementation of @Fama1973 to introduce the concept of their regressions. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
 
 \index{Fama-MacBeth} The Fama-MacBeth procedure is a simple two-step approach: 
 The first step uses the exposures (characteristics) as explanatory variables in $T$ cross-sectional regressions, i.e.,
@@ -144,10 +144,10 @@ left_join(price_of_risk,
 4 log_mktcap      -0.114       -3.20                  -2.94  
 ```
 
-Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Lastly, the negative value for CAPM betas as characteristics is in line with the well-established betting against beta anomalies, indicating that investors with borrowing constraints tilt their portfolio towards high beta stocks to replicate a levered market portfolio [@Frazzini2014].
+Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
 ## Exercises
 
 1. Download a sample of test assets from Kenneth French's homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.
-1. Use individual stocks with weighted-least squares based on a firm's size as suggested by @Hou2020. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20% of firms each month. Compare the results of the three approaches. 
+1. Use individual stocks with weighted-least squares based on a firm's size as suggested by @Hou2020. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches. 
 1. Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.

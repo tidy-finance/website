@@ -2,8 +2,9 @@
 
 # Fixed effects and clustered standard errors
 
-When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. 
-In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. We focus on a classical panel regression common to the corporate finance literature [e.g., @Fazzari1988;@Erickson2012;@Gulen2015]: firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.  
+In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. The concepts we introduce in this chapter are designed to adress such concerns.
+
+We focus on a classical panel regression common to the corporate finance literature [e.g., @Fazzari1988;@Erickson2012;@Gulen2015]: firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.  
 
 Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors.  
 
@@ -106,18 +107,18 @@ data_investment |>
             q75 = quantile(value, 0.75),
             q95 = quantile(value, 0.95),
             max = max(value),
-            n = n()) |>
-  ungroup()
+            n = n(),
+            groups = "drop")
 ```
 
 ```
-# A tibble: 3 × 11
+# A tibble: 3 × 12
   measure         mean     sd    min      q05      q25    q50    q75   q95    max
   <chr>          <dbl>  <dbl>  <dbl>    <dbl>    <dbl>  <dbl>  <dbl> <dbl>  <dbl>
 1 cash_flows    0.0145 0.266  -1.50  -4.57e-1 -0.00321 0.0649 0.131  0.273  0.480
 2 investment_l… 0.0584 0.0778  0      7.27e-4  0.0122  0.0333 0.0719 0.208  0.467
 3 tobins_q      1.99   1.69    0.571  7.92e-1  1.05    1.38   2.19   5.33  10.9  
-# … with 1 more variable: n <int>
+# … with 2 more variables: n <int>, groups <chr>
 ```
 
 ## Fixed effects 

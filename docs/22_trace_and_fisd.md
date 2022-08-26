@@ -1,6 +1,6 @@
 # TRACE and FISD
 
-Bond markets are far more diverse than stock markets, as they feature a broad set of issuers, ranging from corporations to governments and municipalities. Moreover, most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. In this chapter, we dive into the US corporate bond market. This market segment is exciting due to its size (roughly $10 trillion outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
+In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as they feature a broad set of issuers, ranging from corporations to governments and municipalities. Moreover, most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly $10 trillion outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
 
 Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you could compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.
 
@@ -124,7 +124,7 @@ mergent |>
                overwrite = TRUE)
 ```
 
-The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @Handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
+The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
 
 ## TRACE
 
@@ -139,7 +139,7 @@ We store the code for cleaning enhanced TRACE with R on the following Github [gi
 source_gist("3a05b3ab281563b2e94858451c2eb3a4")
 ```
 
-The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we only need data one year before and after December 2015, i.e., two years, and download the data in ten sets, which we defined below.
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we defined below.
 
 
 ```r
@@ -150,33 +150,54 @@ set.seed(123)
 mergent_parts <- split(mergent_cusips, 
                        sample(1:10, 
                               length(mergent_cusips), 
-                              replace = T))
+                              replace = TRUE))
 ```
 
 Finally, we run a loop in the same style as in Chapter 2 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
 
 
 ```r
+progress <- txtProgressBar(min = 0, 
+                           max = length(mergent_parts), 
+                           initial = 0, 
+                           style = 3)
+```
+
+```
+  |                                                                               |                                                                       |   0%
+```
+
+```r
 for(j in 1:length(mergent_parts)) {
-    trace_enhanced <- clean_enhanced_trace(
+  trace_enhanced <- clean_enhanced_trace(
     cusips = mergent_parts[[j]],
     connection = wrds,
-    start_date = ymd("2014-12-01"),
-    end_date = ymd("2016-12-31"))
+    start_date = ymd("2014-01-01"),
+    end_date = ymd("2016-11-30")
+  )
     
-    if (j == 1) {
-      overwrite <- TRUE
-      append <- FALSE
-    } else {
-      overwrite <- FALSE
-      append <- TRUE
-    }
-  
   trace_enhanced |> 
     dbWriteTable(conn = tidy_finance,
                  name = "trace_enhanced",
                  value = _,
-                 overwrite = overwrite, 
-                 append = append)
+                 overwrite = ifelse(j == 1, TRUE, FALSE), 
+                 append = ifelse(j != 1, TRUE, FALSE))
+  
+  setTxtProgressBar(progress, j)
 }
 ```
+
+```
+  |                                                                               |=======                                                                |  10%  |                                                                               |==============                                                         |  20%  |                                                                               |=====================                                                  |  30%  |                                                                               |============================                                           |  40%  |                                                                               |====================================                                   |  50%  |                                                                               |===========================================                            |  60%  |                                                                               |==================================================                     |  70%  |                                                                               |=========================================================              |  80%  |                                                                               |================================================================       |  90%  |                                                                               |=======================================================================| 100%
+```
+
+```r
+close(progress)
+```
+
+# Summary statistics
+
+Insights into bonds
+
+Insights into trading activity
+

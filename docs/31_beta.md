@@ -177,8 +177,8 @@ beta_examples |>
 ```
 
 <div class="figure">
-<img src="31_beta_files/figure-html/fig311-1.png" alt="Time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla." width="672" />
-<p class="caption">(\#fig:fig311)Monthly beta estimates for example stocks using 5 years of data.</p>
+<img src="31_beta_files/figure-html/fig311-1.png" alt="Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock." width="672" />
+<p class="caption">(\#fig:fig311)The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.</p>
 </div>
 
 ## Parallelized rolling-window estimation
@@ -369,13 +369,13 @@ crsp_monthly |>
   coord_flip() +
   labs(
     x = NULL, y = NULL,
-    title = "Box plots of average firm-specific beta estimates by industry"
+    title = "Firm-specific beta distributions by industry"
   )
 ```
 
 <div class="figure">
-<img src="31_beta_files/figure-html/fig312-1.png" alt="Box plots of average firm-specific beta estimates by industry." width="672" />
-<p class="caption">(\#fig:fig312)Box plots of average firm-specific beta estimates by industry.</p>
+<img src="31_beta_files/figure-html/fig312-1.png" alt="Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5." width="672" />
+<p class="caption">(\#fig:fig312)The box plots show the average firm-specific beta estimates by industry.</p>
 </div>
 
 Next, we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are a rare exception.
@@ -399,8 +399,8 @@ beta_monthly |>
 ```
 
 <div class="figure">
-<img src="31_beta_files/figure-html/fig313-1.png" alt="Time series of deciles of estimated betas to illustrate the distribution of betas over time." width="672" />
-<p class="caption">(\#fig:fig313)Monthly deciles of estimated betas.</p>
+<img src="31_beta_files/figure-html/fig313-1.png" alt="Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly. " width="672" />
+<p class="caption">(\#fig:fig313)Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.</p>
 </div>
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks. 
@@ -420,13 +420,13 @@ beta |>
   facet_wrap(~company, ncol = 1) +
   labs(
     x = NULL, y = NULL, color = NULL,
-    title = "Beta estimates using monthly and daily data"
+    title = "Comparison of beta estimates using monthly and daily data"
   )
 ```
 
 <div class="figure">
-<img src="31_beta_files/figure-html/fig314-1.png" alt="Time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla." width="672" />
-<p class="caption">(\#fig:fig314)Comparison of beta estimates using 5 years of monthly and 3 months of daily data.</p>
+<img src="31_beta_files/figure-html/fig314-1.png" alt="Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency." width="672" />
+<p class="caption">(\#fig:fig314)CAPM betas are computed using 5 years of monthly or 3 months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.</p>
 </div>
 
 The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
@@ -467,8 +467,8 @@ beta_long |>
 ```
 
 <div class="figure">
-<img src="31_beta_files/figure-html/fig315-1.png" alt="Time series with end-of-year shares of securities with book equity values by exchange from 1960 to 2020." width="672" />
-<p class="caption">(\#fig:fig315)End-of-year share of securities with book equity values by exchange.</p>
+<img src="31_beta_files/figure-html/fig315-1.png" alt="Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or 3 months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta." width="672" />
+<p class="caption">(\#fig:fig315)The two lines show the share of securities with beta estimates using 5 years of monthly or 3 months of daily data.</p>
 </div>
 
 The figure above does not indicate any troubles, so let us move on to the next check. 

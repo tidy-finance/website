@@ -76,7 +76,7 @@ In this analysis, we use four different data sources that we load from our `SQLi
 
 Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to @Cochrane2009 on the role of conditioning information.
 
-- Our set of macroeconomic predictors comes from the paper "A Comprehensive Look at The Empirical Performance of Equity Premium Prediction" [@Goyal2008]. The data has been updated by the authors until 2020 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the Dividend Price Ratio, Earnings Price Ratio, Stock Variance, Net Equity Expansion, Treasury Bill rate, and inflation
+- Our set of macroeconomic predictors comes from the paper "A Comprehensive Look at The Empirical Performance of Equity Premium Prediction" [@Goyal2008]. The data has been updated by the authors until 2021 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the Dividend Price Ratio, Earnings Price Ratio, Stock Variance, Net Equity Expansion, Treasury Bill rate, and inflation
 
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets' cross-section of returns. 
 
@@ -132,19 +132,22 @@ The figure below provides summary statistics for the 10 monthly industry excess 
 ```r
 data |>
   group_by(industry) |>
-  mutate(ret = 100 * ret) |>
+  mutate(ret = ret) |>
   ggplot(aes(x = industry, y = ret)) +
   geom_boxplot() +
   coord_flip() +
   labs(
     x = NULL, y = NULL,
-    title = "Industry excess return distribution (in %)"
+    title = "Excess return distributions by industry in percent"
+  ) +
+   scale_y_continuous(
+    labels = percent
   )
 ```
 
 <div class="figure">
-<img src="41_factor_selection_with_machine_learning_files/figure-html/fig411-1.png" alt="Boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="672" />
-<p class="caption">(\#fig:fig411)Industry excess return distribution. Boxplots indicate monthly dispersion of returns for 10 different industries</p>
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig411-1.png" alt="Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="672" />
+<p class="caption">(\#fig:fig411)The box plots show monthly dispersion of returns for 10 different industries</p>
 </div>
 
 ## The tidymodels workflow
@@ -173,7 +176,7 @@ split
 
 ```
 <Training/Testing/Total>
-<517/130/647>
+<527/132/659>
 ```
 
 The object `split` simply keeps track of the observations of the training and the test set. 
@@ -218,15 +221,15 @@ data_bake
 ```
 
 ```
-# A tibble: 130 × 126
+# A tibble: 132 × 126
   facto…¹ facto…² facto…³ facto…⁴ facto…⁵ facto…⁶ facto…⁷ facto…⁸ macro…⁹ macro…˟
     <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>
-1   -1.92   0.644  0.298    0.947  0.371    0.162  -0.623  -0.756  -0.827  -0.772
-2   -1.88   1.27   0.387    0.607  0.527    0.582  -0.422  -1.38   -0.978  -0.855
-3   -1.88   0.341  1.43     0.836  1.12     1.35   -1.17   -1.72   -1.01   -0.984
-4   -1.88  -1.80  -0.0411  -0.963 -0.0921  -0.462   0.809   0.428  -0.803  -1.01 
-5   -1.88  -1.29  -0.627   -1.73  -0.850   -1.50    0.279   0.532  -0.669  -0.809
-# … with 125 more rows, 116 more variables: macro_ep <dbl>, macro_de <dbl>,
+1   -1.80 1.37      0.132   1.14   0.0289   1.33  -1.63    -1.66    -1.05  -0.911
+2   -1.80 0.333    -0.830   0.128 -0.745    0.450 -0.0117  -1.19    -1.08  -1.03 
+3   -1.80 0.656     0.380   0.287  0.327    0.510 -0.860   -0.905   -1.13  -1.06 
+4   -1.80 0.00426   0.717  -0.767  0.470   -0.296 -0.590   -0.324   -1.10  -1.11 
+5   -1.84 0.529    -0.174  -0.969 -0.390   -0.733  0.383    0.102   -1.14  -1.08 
+# … with 127 more rows, 116 more variables: macro_ep <dbl>, macro_de <dbl>,
 #   macro_svar <dbl>, macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
 #   macro_lty <dbl>, macro_ltr <dbl>, macro_tms <dbl>, macro_dfy <dbl>,
 #   macro_infl <dbl>, ret <dbl>, factor_ff_rf_x_macro_dp <dbl>,
@@ -316,9 +319,7 @@ predicted_values |>
     x = NULL,
     y = NULL,
     color = NULL,
-    title = "Monthly realized and fitted manufacturing industry risk premia",
-    subtitle = "The grey area corresponds to the out of sample period."
-  ) +
+    title = "Monthly realized and fitted manufacturing industry risk premia") +
   scale_x_date(
     breaks = function(x) seq.Date(from = min(x), 
                                   to = max(x), 
@@ -341,8 +342,8 @@ predicted_values |>
 ```
 
 <div class="figure">
-<img src="41_factor_selection_with_machine_learning_files/figure-html/fig412-1.png" alt="Figure shows the time series of realized and predicted manufacturing industry risk premia. The figure seems to indicate that the predictions capture most of the return dynamics. " width="672" />
-<p class="caption">(\#fig:fig412)Monthly realized and fitted manufacturing industry risk premia. The grey area corresponds to the out of sample period.</p>
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig412-1.png" alt="Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premium. The figure seems to indicate that the predictions capture most of the return dynamics. " width="672" />
+<p class="caption">(\#fig:fig412)The grey area corresponds to the out of sample period.</p>
 </div>
 
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
@@ -387,15 +388,15 @@ bind_rows(
   scale_x_log10() +
   facet_wrap(~Model, scales = "free_x") +
   labs(
-    x = "Lambda", y = NULL,
-    title = "Estimated coefficients paths as a function of the penalty factor"
+    x = "Penalty factor (lambda)", y = NULL,
+    title = "Estimated coefficient paths for different penalty factors"
   ) +
   theme(legend.position = "none")
 ```
 
 <div class="figure">
-<img src="41_factor_selection_with_machine_learning_files/figure-html/fig413-1.png" alt="Two panels that show how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, Lasso exhibits non-linear behaviour." width="672" />
-<p class="caption">(\#fig:fig413)Estimated coefficient paths for Lasso and Ridge regression as a function of the penalty parameter</p>
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig413-1.png" alt="Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, Lasso exhibits non-linear behavior." width="672" />
+<p class="caption">(\#fig:fig413)The penalty parameters are choosen iteratively to resemble the path from no penalization to a model that excludes all variables.</p>
 </div>
 
 ::: {.rmdnote}
@@ -481,13 +482,16 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 ```r
 autoplot(lm_tune) +
   labs(
-    y = "Root mean-squared prediction error",
-    title = "MSPE for Manufacturing excess returns",
-    subtitle = "Lasso (1.0), Ridge (0.0), and Elastic Net (0.5) with different levels of regularization."
+    x = "Penalty factor (lambda)",
+    y = "Root MSPE",
+    title = "Root MSPE for different penalty factors"
   )
 ```
 
-<img src="41_factor_selection_with_machine_learning_files/figure-html/unnamed-chunk-14-1.png" width="672" />
+<div class="figure">
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig415-1.png" alt="Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningfull fashion. At some point, the elastic net prediction error drops which indicates the selected model. MSPE increases again for high penalization values." width="672" />
+<p class="caption">(\#fig:fig415)Evaluation of Manufactoring excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net and 0.0 indicates Ridge.</p>
+</div>
 
   The figure shows that the cross-validated mean squared prediction error drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE, which exhibits some intermediate level of regularization.
 
@@ -600,8 +604,8 @@ selected_factors |>
 ```
 
 <div class="figure">
-<img src="41_factor_selection_with_machine_learning_files/figure-html/fig414-1.png" alt="The figure shows which factors and macroeconomic predictors the ML selected for the different industries. In general there are not many selected variables. The market excess return got selected across all industries." width="672" />
-<p class="caption">(\#fig:fig414)Selected factor and macroeconomic predictors selected for different industries</p>
+<img src="41_factor_selection_with_machine_learning_files/figure-html/fig414-1.png" alt="Title: Selected variables for different industries. The figure shows which factors and macroeconomic predictors the Lasso model selected for the different industries. In general, there are not many selected variables. The market excess return is selected across all industries except for utilities." width="672" />
+<p class="caption">(\#fig:fig414)Grey areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero.</p>
 </div>
 
 The heat map conveys two main insights. 
