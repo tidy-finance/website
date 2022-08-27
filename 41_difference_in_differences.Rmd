@@ -1,5 +1,7 @@
 # Difference in differences
 
+In this chapter, we introduce difference in differences designs to evaluate the effects of climate change regulation on the pricing of bonds across firms. 
+
 The current chapter relies on this set of packages. 
 ```{r}
 library(tidyverse)
@@ -8,7 +10,7 @@ library(RSQLite)
 library(fixest)
 ```
 
-December 12, 2015
+Paris Agreement as December 12, 2015
 
 ## Data preparation
 
@@ -21,7 +23,7 @@ tidy_finance <- dbConnect(
   extended_types = TRUE
 )
 
-treatment_date <- as.Date("2015-12-01")
+treatment_date <- as.Date("2015-12-12")
 
 mergent <- tbl(tidy_finance, "mergent") |> 
   collect() |> 
@@ -31,8 +33,6 @@ mergent <- tbl(tidy_finance, "mergent") |>
   filter(time_maturity >= 1) |> 
   select(cusip_id = complete_cusip, 
          time_maturity, offering_amt, sic_code)
-
-# TODO RATINGS
 
 trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
   collect() |> 
@@ -60,25 +60,32 @@ trace_aggregated <- trace_enhanced |>
 add FISD data, identify polluting industries
 
 ```{r}
-data_bond_raw <- trace_aggregated |> 
-  inner_join(mergent, by = "cusip_id")
-# TODO RATING
-```
-
-```{r}
 polluting_industries <- c(49, 13, 45, 29, 28, 33, 40, 20, 
                           26, 42, 10, 53, 32, 99, 37) |> 
   as.character()
 
 data_bond <- trace_aggregated |> 
   inner_join(mergent, by = "cusip_id") |> 
-  mutate(polluter = sic_code %in% polluting_industries,
-         post_period = month > as.Date("2015-11-01"),
-         treated = polluter & post_period,
-         month = as.factor(month),
-         month = relevel(month, ref = 15)) # TODO
+  mutate(polluter = sic_code %in% polluting_industries) |> 
   select(-sic_code)
 ```
+
+
+```{r}
+treatment_date_index <- which(sort(unique(data_bond$month)) ==
+                                floor_date(treatment_date, "months"))
+
+data_bond <- data_bond |> 
+  mutate(post_period = month >= floor_date(treatment_date, "months"),
+         month = as.factor(month),
+         month = fct_rev(relevel(month, ref = treatment_date_index)))
+```
+
+```{r}
+data_bond <- data_bond |> 
+  mutate(treated = polluter & post_period)
+```
+
 
 Before proceeding to any estimations, we tabulate summary statistics of the variables that enter the regression.\index{Summary statistics}
 
@@ -112,9 +119,10 @@ model_diff <- feols(
 model_diff
 ```
 
-```{r}
-model_diff_months <- lm(
-  formula = avg_yield ~ offering_amt + time_maturity + month:polluter,
+```{r, fig411, fig.cap = "The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agrement on bond yields (in %) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of agreement (December 12, 2015).", fig.alt = "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters."}
+model_diff_months <- feols(
+  fml = avg_yield ~ offering_amt + time_maturity + month:polluter,
+  se = "iid",
   data = data_bond
 )
 
@@ -127,13 +135,15 @@ coefficients <- broom::tidy(model_diff_months) |>
 
 
 coefficients |> ggplot(aes(month, color = treatment)) +
+  geom_vline(aes(xintercept = as.Date("2015-12-12")),
+             linetype = "dashed") +
+  geom_hline(aes(yintercept = 0),
+             linetype = "dashed") +
   geom_errorbar(aes(ymin = ci_low, ymax = ci_up),
                 alpha = 0.5) +
   geom_point(aes(y = estimate)) +
-  geom_vline(aes(xintercept = as.Date("2015-12-12")),
-             linetype = "dashed") +
   labs(x = NULL,
        y = "Yield",
-       color = "Polluter?")
+       color = "Polluter?",
+       title = "Polluters respond stronger to Paris Agreement than green firms")
 ```
-
