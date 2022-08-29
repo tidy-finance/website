@@ -7,7 +7,6 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = TRUE,
   cache = FALSE,
-  width = 81,
   comment = ""
 )
 
@@ -26,7 +25,7 @@ if (knitr::is_latex_output()) {
                         out.width = "70%",
                         fig.align = 'center',
                         fig.width = 6,
-                        fig.asp = 0.618,  # 1 / phi
+                        fig.asp = 0.618,
                         fig.show = "hold")
   options(width = 69)
 }
