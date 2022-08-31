@@ -127,7 +127,8 @@ compute_efficient_weight(Sigma, mu)
 ```
 
 ```
- [1]  1.400  0.296 -1.396  0.477  0.364 -0.321  0.544  0.448 -0.134 -0.679
+ [1]  1.400  0.296 -1.396  0.477  0.364 -0.321  0.544  0.448 -0.134
+[10] -0.679
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
@@ -175,7 +176,7 @@ transaction_costs |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="51_constrained_optimization_and_backtesting_files/figure-html/fig511-1.png" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion." width="672" />
 <p class="caption">(\#fig:fig511)The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolut deviations of the chosen portfolio from the benchmark.</p>
 </div>
@@ -249,8 +250,8 @@ w_no_short_sale$solution
 ```
 
 ```
- [1]  5.18e-01  3.11e-18 -3.30e-16  7.82e-02  0.00e+00  2.47e-17  1.47e-01
- [8]  2.56e-01 -7.22e-18  0.00e+00
+ [1]  5.18e-01  3.11e-18 -3.30e-16  7.82e-02  0.00e+00  2.47e-17
+ [7]  1.47e-01  2.56e-01 -7.22e-18  0.00e+00
 ```
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
 You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2` where negative holdings are forbidden. 
@@ -273,11 +274,11 @@ objective <- function(w, gamma = 2) {
 }
 
 inequality_constraints <- function(w, reg_t = 1.5) {
-  return(reg_t - sum(abs(w)))
+  reg_t - sum(abs(w))
 }
 
 equality_constraints <- function(w) {
-  return(sum(w) - 1)
+  sum(w) - 1
 }
 
 w_reg_t <- constrOptim.nl(
@@ -291,8 +292,8 @@ w_reg_t$par
 ```
 
 ```
- [1]  3.41e-01 -3.68e-06 -1.08e-01  1.39e-01  7.28e-02 -1.01e-02  2.46e-01
- [8]  3.15e-01  1.34e-01 -1.30e-01
+ [1]  3.41e-01 -3.68e-06 -1.08e-01  1.39e-01  7.28e-02 -1.01e-02
+ [7]  2.46e-01  3.15e-01  1.34e-01 -1.30e-01
 ```
 
 Note that the function `constrOptim.nl()` requires a starting vector of parameter values, an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`). 
@@ -329,7 +330,7 @@ tibble(
   scale_y_continuous(labels = percent)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="51_constrained_optimization_and_backtesting_files/figure-html/fig512-1.png" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicates extreme long and short positions for the efficient portfolio." width="672" />
 <p class="caption">(\#fig:fig512)Optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.</p>
 </div>

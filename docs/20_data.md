@@ -380,10 +380,12 @@ Warning: Closing open result set, pending rows
 ```
 
 ```
- [1] "beta"                  "compustat"             "cpi_monthly"          
- [4] "crsp_daily"            "crsp_monthly"          "factors_ff_daily"     
- [7] "factors_ff_monthly"    "factors_q_monthly"     "industries_ff_monthly"
-[10] "macro_predictors"      "mergent"               "trace_enhanced"       
+ [1] "beta"                  "compustat"            
+ [3] "cpi_monthly"           "crsp_daily"           
+ [5] "crsp_monthly"          "factors_ff_daily"     
+ [7] "factors_ff_monthly"    "factors_q_monthly"    
+ [9] "industries_ff_monthly" "macro_predictors"     
+[11] "mergent"               "trace_enhanced"       
 ```
 
 This function comes in handy if you are unsure about the correct naming of the tables in your database. 

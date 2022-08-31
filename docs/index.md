@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-08-26"
+date: "2022-08-31"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib, packages.bib]
@@ -26,7 +26,6 @@ This website is the online version of *Tidy Finance with R*, a book currently un
 We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. Additionally, let us know if you found the text helpful. We look forward to hearing from you!
 
 <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="tidyfinance" data-color="#3b9ab2" data-emoji="" data-font="Cookie" data-text="Support tidy finance with a coffee" data-outline-color="#ffffff" data-font-color="#ffffff" data-coffee-color="#e1af00" ></script>
-
 
 ## Why does this book exist? {.unnumbered}
 
@@ -68,7 +67,7 @@ Our book is close in spirit to other books that provide fully reproducible code 
 Although we emphasizes the importance of reproducible workflow principles, we do not provide introductions to some of the core tools that we relied on to create and maintain this book:
 
 * Version control systems such as [Git](https://git-scm.com/) are vital in managing any programming project. Originally designed to organize the collaboration of software developers, even solo data analysts will benefit from adopting version control. Git also makes it simple to publicly share code and allow others to reproduce your findings. We refer to @Bryan2022 for a gentle introduction into the (sometimes painful) life with Git. 
-* Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open source tools. First, @Wickham2016b provides a highly customizable, yet easy to use system for creating data visualizations. @Wickham2016 provides an intuitive introduction into creating graphics using this approach. Second, in our daily work and to compile this book, we used the markdown-based authoring framework described in @XieAllaireGrolemund2018 and @XieDervieuxRiederer2020. Markdown documents are fully reproducible and support dozens of static and dynamic output formats. Lastly, @Xie2016 tremendously facilitates authoring markdown-based books. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.  
+* Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open source tools. First, @ggplot2 provides a highly customizable, yet easy to use system for creating data visualizations. @Wickham2016 provides an intuitive introduction into creating graphics using this approach. Second, in our daily work and to compile this book, we used the markdown-based authoring framework described in @XieAllaireGrolemund2018 and @XieDervieuxRiederer2020. Markdown documents are fully reproducible and support dozens of static and dynamic output formats. Lastly, @Xie2016 tremendously facilitates authoring markdown-based books. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.  
 * Good writing is also important for the presentation of findings. We neither claim to be experts in this domain, nor do we try to sound particularly academic. On the contrary, we deliberately use a more colloquial language to describe all the methods and results presented in this book in order to allow our readers to relate more easily to the mainly technical content. For those who desire more guidance with respect to proper academic writing for financial economics, we recommend @Kiesling2003, @Cochrane2005, and @Jacobsen2014 who all provide essential tips (condensed to a few pages). 
 
 ## Why R? {.unnumbered}
@@ -169,7 +168,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
-   <td style="text-align:left;"> 1.0.0 </td>
+   <td style="text-align:left;"> 1.0.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> dbplyr </td>
@@ -229,7 +228,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> knitr </td>
-   <td style="text-align:left;"> 1.39 </td>
+   <td style="text-align:left;"> 1.40 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> lmtest </td>
@@ -269,7 +268,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
-   <td style="text-align:left;"> 2.15 </td>
+   <td style="text-align:left;"> 2.16 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> RPostgres </td>

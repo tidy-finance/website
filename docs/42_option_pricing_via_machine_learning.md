@@ -71,6 +71,7 @@ The Black-Scholes equation provides a way to compute the arbitrage-free price of
 black_scholes_price <- function(S = 50, K = 70, r = 0, T = 1, sigma = 0.2) {
   d1 <- (log(S / K) + (r + sigma^2 / 2) * T) / (sigma * sqrt(T))
   value <- S * pnorm(d1) - K * exp(-r * T) * pnorm(d1 - sigma * sqrt(T))
+  
   return(value)
 }
 ```
@@ -196,21 +197,18 @@ model
 
 ```
 Model: "sequential_1"
-_________________________________________________________________________________
-Layer (type)                        Output Shape                    Param #      
-=================================================================================
-dense_5 (Dense)                     (None, 10)                      60           
-_________________________________________________________________________________
-dense_4 (Dense)                     (None, 10)                      110          
-_________________________________________________________________________________
-dense_3 (Dense)                     (None, 10)                      110          
-_________________________________________________________________________________
-dense_2 (Dense)                     (None, 1)                       11           
-=================================================================================
+_____________________________________________________________________
+ Layer (type)                  Output Shape               Param #    
+=====================================================================
+ dense_5 (Dense)               (None, 10)                 60         
+ dense_4 (Dense)               (None, 10)                 110        
+ dense_3 (Dense)               (None, 10)                 110        
+ dense_2 (Dense)               (None, 1)                  11         
+=====================================================================
 Total params: 291
 Trainable params: 291
 Non-trainable params: 0
-_________________________________________________________________________________
+_____________________________________________________________________
 ```
 
 To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: Note that `fit()` alters the `keras` model - this is one of the few instances where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
@@ -294,7 +292,7 @@ predictive_performance |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="42_option_pricing_via_machine_learning_files/figure-html/unnamed-chunk-14-1.png" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." width="672" />
 <p class="caption">(\#fig:unnamed-chunk-14)Absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that where not used for training.</p>
 </div>

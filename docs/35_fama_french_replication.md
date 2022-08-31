@@ -1,6 +1,6 @@
 # Replicating Fama & French factors
 
-In this chapter we provide a replication of the famous Fama & French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. 
+In this chapter we provide a replication of the famous Fama & French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short the low book-to-market counterparts. 
 
 The current chapter relies on this set of packages. 
 
@@ -12,34 +12,35 @@ library(lubridate)
 
 ## Data preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in chapters 2-3.\index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+  extended_types = TRUE
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
-  collect()
-
-compustat <- tbl(tidy_finance, "compustat") |>
-  collect()
-
 data_ff <- crsp_monthly |>
-  left_join(factors_ff_monthly, by = "month") |>
   select(
-    permno, gvkey, month, ret_excess, mkt_excess,
+    permno, gvkey, month, ret_excess,
     mktcap, mktcap_lag, exchange
   ) |>
   drop_na()
 
+compustat <- tbl(tidy_finance, "compustat") |>
+  collect()
+
 be <- compustat |>
   select(gvkey, datadate, be) |>
   drop_na()
+
+factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+  collect()
 ```
 
 Yet when we start merging our data set for computing the premiums, there are a few differences to the previous chapter. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
@@ -76,7 +77,7 @@ variables_ff <- me_ff |>
 
 ## Portfolio sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the previous function because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in the previous chapter because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 
 ```r
@@ -91,10 +92,13 @@ assign_portfolio <- function(data, var, percentiles) {
     pull(breakpoint) |>
     as.numeric()
 
-  data |>
+  assigned_portfolios <- data |>
     mutate(portfolio = findInterval({{ var }},
-                                    breakpoints, all.inside = TRUE)) |>
+                                    breakpoints, 
+                                    all.inside = TRUE)) |>
     pull(portfolio)
+  
+  return(assigned_portfolios)
 }
 
 portfolios_ff <- variables_ff |>
@@ -130,7 +134,7 @@ portfolios_ff <- data_ff |>
 
 ## Fama and French factor returns
 
-Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size factor}\index{Value factor}
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size!Size factor}\index{Value factor}
 
 
 ```r
@@ -154,7 +158,7 @@ factors_ff_monthly_replicated <- portfolios_ff |>
 
 ## Replication evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 
 ```r

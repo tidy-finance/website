@@ -231,6 +231,7 @@ evaluate_portfolio <- function(weights_crsp,
       pivot_wider(names_from = model, values_from = value)
     evaluation <- bind_rows(evaluation, weight_evaluation)
   }
+  
   return(evaluation)
 }
 ```
@@ -401,21 +402,21 @@ performance_table |>
 
 ```
 # A tibble: 11 × 7
-   measure                  `EW    ` `VW    ` VW  Op…¹ VW (no…² EW  Op…³ EW (no…⁴
-   <chr>                       <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl>
- 1 Expected utility         -0.250   -2.49e-1 -0.246   -0.247   -0.250   -2.50e-1
- 2 Average return           10.7      7.12e+0 14.9     13.6     13.1      8.14e+0
- 3 SD return                20.3      1.53e+1 20.5     19.5     22.6      1.70e+1
- 4 Sharpe ratio              0.152    1.35e-1  0.209    0.202    0.168    1.38e-1
- 5 CAPM alpha                0.00226  1.23e-4  0.00646  0.00526  0.00428  4.69e-4
- 6 Market beta               1.13     9.93e-1  1.01     1.04     1.14     1.08e+0
- 7 Absolute weight           0.0247   2.47e-2  0.0373   0.0247   0.0255   2.47e-2
- 8 Max. weight               0.0247   3.54e+0  3.37     2.69     0.0672   2.20e-1
- 9 Min. weight               0.0247   2.77e-5 -0.0283   0       -0.0305   0      
-10 Avg. sum of negative we…  0        0       26.4      0        1.73     0      
-11 Avg. fraction of negati…  0        0       38.7      0        6.27     0      
-# … with abbreviated variable names ¹​`VW  Optimal `, ²​`VW (no s.) Optimal `,
-#   ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `
+   measure      `EW    ` `VW    ` VW  Op…¹ VW (no…² EW  Op…³ EW (no…⁴
+   <chr>           <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl>
+ 1 Expected ut… -0.250   -2.49e-1 -0.246   -0.247   -0.250   -2.50e-1
+ 2 Average ret… 10.7      7.12e+0 14.9     13.6     13.1      8.14e+0
+ 3 SD return    20.3      1.53e+1 20.5     19.5     22.6      1.70e+1
+ 4 Sharpe ratio  0.152    1.35e-1  0.209    0.202    0.168    1.38e-1
+ 5 CAPM alpha    0.00226  1.23e-4  0.00646  0.00526  0.00428  4.69e-4
+ 6 Market beta   1.13     9.93e-1  1.01     1.04     1.14     1.08e+0
+ 7 Absolute we…  0.0247   2.47e-2  0.0373   0.0247   0.0255   2.47e-2
+ 8 Max. weight   0.0247   3.54e+0  3.37     2.69     0.0672   2.20e-1
+ 9 Min. weight   0.0247   2.77e-5 -0.0283   0       -0.0305   0      
+10 Avg. sum of…  0        0       26.4      0        1.73     0      
+11 Avg. fracti…  0        0       38.7      0        6.27     0      
+# … with abbreviated variable names ¹​`VW  Optimal `,
+#   ²​`VW (no s.) Optimal `, ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `
 ```
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.

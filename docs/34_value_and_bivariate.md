@@ -18,23 +18,21 @@ library(sandwich)
 
 ## Data preparation
 
-First, we load the necessary data from our `SQLite`-database introduced in chapters 2-3. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we load the necessary data from our `SQLite`-database introduced in chapters 2-4. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+    extended_types = TRUE
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
-  collect()
-
 crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff_monthly, by = "month") |>
-  select(permno, gvkey, month, ret_excess, mkt_excess, 
+  select(permno, gvkey, month, ret_excess, 
          mktcap, mktcap_lag, exchange) |>
   drop_na()
 ```
@@ -108,10 +106,12 @@ assign_portfolio <- function(data, var, n_portfolios, exchanges) {
     pull(breakpoint) |>
     as.numeric()
 
-  data |>
+  assigned_portfolios <- data |>
     mutate(portfolio = findInterval({{ var }}, 
                                     breakpoints, all.inside = TRUE)) |>
     pull(portfolio)
+  
+  return(assigned_portfolios)
 }
 ```
 

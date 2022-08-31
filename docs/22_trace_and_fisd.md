@@ -161,13 +161,7 @@ progress <- txtProgressBar(min = 0,
                            max = length(mergent_parts), 
                            initial = 0, 
                            style = 3)
-```
 
-```
-  |                                                                               |                                                                       |   0%
-```
-
-```r
 for(j in 1:length(mergent_parts)) {
   trace_enhanced <- clean_enhanced_trace(
     cusips = mergent_parts[[j]],
@@ -185,19 +179,13 @@ for(j in 1:length(mergent_parts)) {
   
   setTxtProgressBar(progress, j)
 }
-```
 
-```
-  |                                                                               |=======                                                                |  10%  |                                                                               |==============                                                         |  20%  |                                                                               |=====================                                                  |  30%  |                                                                               |============================                                           |  40%  |                                                                               |====================================                                   |  50%  |                                                                               |===========================================                            |  60%  |                                                                               |==================================================                     |  70%  |                                                                               |=========================================================              |  80%  |                                                                               |================================================================       |  90%  |                                                                               |=======================================================================| 100%
-```
-
-```r
 close(progress)
 ```
 
-# Summary statistics
+<!-- # Summary statistics -->
 
-Insights into bonds
+<!-- Insights into bonds -->
 
-Insights into trading activity
+<!-- Insights into trading activity -->
 

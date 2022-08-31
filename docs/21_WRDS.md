@@ -245,7 +245,7 @@ crsp_monthly |>
   scale_y_continuous(labels = comma)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="672" />
 <p class="caption">(\#fig:fig211)Number of stocks in the CRSP sample listed at each of the US exchanges.</p>
 </div>
@@ -275,7 +275,7 @@ tbl(tidy_finance, "crsp_monthly") |>
   scale_y_continuous(labels = comma)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="672" />
 <p class="caption">(\#fig:fig212)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.</p>
 </div>
@@ -315,7 +315,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is largest in terms of number of listed stocks." width="672" />
 <p class="caption">(\#fig:fig213)Number of stocks in the CRSP sample associated with different industries.</p>
 </div>
@@ -338,7 +338,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = comma)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="672" />
 <p class="caption">(\#fig:fig214)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.</p>
 </div>
@@ -507,7 +507,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-08-26
+5  54594 001004 1972-04-24 2022-08-31
 # … with 31,765 more rows
 ```
 
@@ -557,7 +557,7 @@ crsp_monthly |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="672" />
 <p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by listing exchange.</p>
 </div>

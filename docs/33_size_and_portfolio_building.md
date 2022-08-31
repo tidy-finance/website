@@ -21,12 +21,14 @@ Compared to previous chapters, we introduce the `rlang` package [@rlang] for mor
 
 ## Data preparation
 
-First, we retrieve the relevant data from our `SQLite`-database introduced in chapters 2-3. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we retrieve the relevant data from our `SQLite`-database introduced in chapters 2-4. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), "data/tidy_finance.sqlite", extended_types = TRUE
+  SQLite(), 
+  "data/tidy_finance.sqlite", 
+  extended_types = TRUE
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
@@ -74,7 +76,7 @@ crsp_monthly |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="33_size_and_portfolio_building_files/figure-html/fig331-1.png" alt="Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent." width="672" />
 <p class="caption">(\#fig:fig331)We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.</p>
 </div>
@@ -101,7 +103,7 @@ crsp_monthly |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="33_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline of the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed at NASDAQ. Other exchanges are negligible." width="672" />
 <p class="caption">(\#fig:fig332)Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.</p>
 </div>
@@ -141,18 +143,19 @@ crsp_monthly |>
 
 ```
 # A tibble: 5 × 11
-  exchange   mean     sd      min    q05    q25    q50    q75    q95    max     n
-  <chr>     <dbl>  <dbl>    <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl> <int>
-1 AMEX       415.  2181.     7.57 1.26e1 3.81e1 7.58e1   213.  1218. 2.57e4   145
-2 NASDAQ    8649. 90038.     7.01 2.91e1 1.31e2 4.28e2  1847. 18781. 2.90e6  2779
-3 NYSE     17858. 48619.    23.9  1.95e2 9.54e2 3.43e3 11629. 80748. 4.73e5  1395
-4 Other    13906.    NA  13906.   1.39e4 1.39e4 1.39e4 13906. 13906. 1.39e4     1
-5 Overall  11348. 77458.     7.01 3.40e1 1.95e2 7.94e2  3909. 40647. 2.90e6  4320
+  exchange   mean     sd      min     q05    q25    q50    q75    q95
+  <chr>     <dbl>  <dbl>    <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
+1 AMEX       415.  2181.     7.57    12.6 3.81e1 7.58e1   213.  1218.
+2 NASDAQ    8649. 90038.     7.01    29.1 1.31e2 4.28e2  1847. 18781.
+3 NYSE     17858. 48619.    23.9    195.  9.54e2 3.43e3 11629. 80748.
+4 Other    13906.    NA  13906.   13906.  1.39e4 1.39e4 13906. 13906.
+5 Overall  11348. 77458.     7.01    34.0 1.95e2 7.94e2  3909. 40647.
+# … with 2 more variables: max <dbl>, n <int>
 ```
 
 ## Univariate size portfolios with flexible breakpoints
 
-In the previous chapter, we construct portfolios with a varying number of portfolios and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
+In the previous chapter, we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
 
 To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
@@ -171,10 +174,13 @@ assign_portfolio <- function(n_portfolios,
     pull(breakpoint) |>
     as.numeric()
 
-  data |>
+  assigned_portfolios <- data |>
     mutate(portfolio = findInterval(mktcap_lag, 
-                                    breakpoints, all.inside = TRUE)) |>
+                                    breakpoints, 
+                                    all.inside = TRUE)) |>
     pull(portfolio)
+  return(assigned_portfolios)
+
 }
 ```
 
@@ -271,7 +277,7 @@ p_hacking_setup <- expand_grid(
 )
 ```
 
-To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 5. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
+To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 6. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
 
 
 ```r
@@ -302,13 +308,13 @@ p_hacking_results
 
 ```
 # A tibble: 48 × 5
-  n_portfolios exchanges value_weighted data                              size_…¹
-         <dbl> <list>    <lgl>          <chr>                               <dbl>
-1           10 <chr [3]> FALSE          "filter(crsp_monthly, month >= \…  0.0186
-2           10 <chr [3]> FALSE          "filter(crsp_monthly, industry !…  0.0182
-3           10 <chr [3]> FALSE          "crsp_monthly"                     0.0163
-4           10 <chr [3]> FALSE          "filter(crsp_monthly, month < \"…  0.0139
-5           10 <chr [3]> TRUE           "filter(crsp_monthly, industry !…  0.0115
+  n_portfolios exchanges value_weighted data                  size_…¹
+         <dbl> <list>    <lgl>          <chr>                   <dbl>
+1           10 <chr [3]> FALSE          "filter(crsp_monthly…  0.0186
+2           10 <chr [3]> FALSE          "filter(crsp_monthly…  0.0182
+3           10 <chr [3]> FALSE          "crsp_monthly"         0.0163
+4           10 <chr [3]> FALSE          "filter(crsp_monthly…  0.0139
+5           10 <chr [3]> TRUE           "filter(crsp_monthly…  0.0115
 # … with 43 more rows, and abbreviated variable name ¹​size_premium
 ```
 
@@ -329,7 +335,7 @@ p_hacking_results |>
   scale_x_continuous(labels = percent)
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="33_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge but the estimated coefficients are positive for all choices." width="672" />
 <p class="caption">(\#fig:fig333)The dashed vertical line indicates the average Fama-French SMB premium.</p>
 </div>

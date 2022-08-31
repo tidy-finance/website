@@ -145,7 +145,7 @@ data |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig411-1.png" alt="Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="672" />
 <p class="caption">(\#fig:fig411)The box plots show monthly dispersion of returns for 10 different industries</p>
 </div>
@@ -222,20 +222,20 @@ data_bake
 
 ```
 # A tibble: 132 × 126
-  facto…¹ facto…² facto…³ facto…⁴ facto…⁵ facto…⁶ facto…⁷ facto…⁸ macro…⁹ macro…˟
-    <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>
-1   -1.80 1.37      0.132   1.14   0.0289   1.33  -1.63    -1.66    -1.05  -0.911
-2   -1.80 0.333    -0.830   0.128 -0.745    0.450 -0.0117  -1.19    -1.08  -1.03 
-3   -1.80 0.656     0.380   0.287  0.327    0.510 -0.860   -0.905   -1.13  -1.06 
-4   -1.80 0.00426   0.717  -0.767  0.470   -0.296 -0.590   -0.324   -1.10  -1.11 
-5   -1.84 0.529    -0.174  -0.969 -0.390   -0.733  0.383    0.102   -1.14  -1.08 
-# … with 127 more rows, 116 more variables: macro_ep <dbl>, macro_de <dbl>,
-#   macro_svar <dbl>, macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>,
-#   macro_lty <dbl>, macro_ltr <dbl>, macro_tms <dbl>, macro_dfy <dbl>,
-#   macro_infl <dbl>, ret <dbl>, factor_ff_rf_x_macro_dp <dbl>,
-#   factor_ff_rf_x_macro_dy <dbl>, factor_ff_rf_x_macro_ep <dbl>,
-#   factor_ff_rf_x_macro_de <dbl>, factor_ff_rf_x_macro_svar <dbl>,
-#   factor_ff_rf_x_macro_bm <dbl>, factor_ff_rf_x_macro_ntis <dbl>, …
+  factor_ff…¹ facto…² facto…³ facto…⁴ facto…⁵ facto…⁶ facto…⁷ facto…⁸
+        <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>   <dbl>
+1       -1.80 1.37      0.132   1.14   0.0289   1.33  -1.63    -1.66 
+2       -1.80 0.333    -0.830   0.128 -0.745    0.450 -0.0117  -1.19 
+3       -1.80 0.656     0.380   0.287  0.327    0.510 -0.860   -0.905
+4       -1.80 0.00426   0.717  -0.767  0.470   -0.296 -0.590   -0.324
+5       -1.84 0.529    -0.174  -0.969 -0.390   -0.733  0.383    0.102
+# … with 127 more rows, 118 more variables: macro_dp <dbl>,
+#   macro_dy <dbl>, macro_ep <dbl>, macro_de <dbl>,
+#   macro_svar <dbl>, macro_bm <dbl>, macro_ntis <dbl>,
+#   macro_tbl <dbl>, macro_lty <dbl>, macro_ltr <dbl>,
+#   macro_tms <dbl>, macro_dfy <dbl>, macro_infl <dbl>, ret <dbl>,
+#   factor_ff_rf_x_macro_dp <dbl>, factor_ff_rf_x_macro_dy <dbl>,
+#   factor_ff_rf_x_macro_ep <dbl>, factor_ff_rf_x_macro_de <dbl>, …
 ```
 
 Note that the resulting data contains the 130 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
@@ -269,11 +269,11 @@ lm_fit
 ```
 
 ```
-══ Workflow ═════════════════════════════════════════════════════════════════════
+══ Workflow ═════════════════════════════════════════════════════════
 Preprocessor: Recipe
 Model: linear_reg()
 
-── Preprocessor ─────────────────────────────────────────────────────────────────
+── Preprocessor ─────────────────────────────────────────────────────
 4 Recipe Steps
 
 • step_rm()
@@ -281,7 +281,7 @@ Model: linear_reg()
 • step_normalize()
 • step_center()
 
-── Model ────────────────────────────────────────────────────────────────────────
+── Model ────────────────────────────────────────────────────────────
 Linear Regression Model Specification (regression)
 
 Main Arguments:
@@ -341,7 +341,7 @@ predicted_values |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig412-1.png" alt="Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premium. The figure seems to indicate that the predictions capture most of the return dynamics. " width="672" />
 <p class="caption">(\#fig:fig412)The grey area corresponds to the out of sample period.</p>
 </div>
@@ -394,7 +394,7 @@ bind_rows(
   theme(legend.position = "none")
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig413-1.png" alt="Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, Lasso exhibits non-linear behavior." width="672" />
 <p class="caption">(\#fig:fig413)The penalty parameters are choosen iteratively to resemble the path from no penalization to a model that excludes all variables.</p>
 </div>
@@ -488,7 +488,7 @@ autoplot(lm_tune) +
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig415-1.png" alt="Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningfull fashion. At some point, the elastic net prediction error drops which indicates the selected model. MSPE increases again for high penalization values." width="672" />
 <p class="caption">(\#fig:fig415)Evaluation of Manufactoring excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net and 0.0 indicates Ridge.</p>
 </div>
@@ -547,12 +547,14 @@ select_variables <- function(input) {
   lasso_final_fit <- last_fit(lasso_final, split, metrics = metric_set(rmse))
 
   # Extract the estimated coefficients
-  lasso_final_fit |>
+  estimated_coefficients <- lasso_final_fit |>
     extract_fit_parsnip() |>
     tidy() |>
     mutate(
       term = str_remove_all(term, "factor_|macro_|industry_")
     )
+  
+  return(estimated_coefficients)
 }
 
 # Parallelization
@@ -603,7 +605,7 @@ selected_factors |>
   )
 ```
 
-<div class="figure">
+<div class="figure" style="text-align: center">
 <img src="41_factor_selection_with_machine_learning_files/figure-html/fig414-1.png" alt="Title: Selected variables for different industries. The figure shows which factors and macroeconomic predictors the Lasso model selected for the different industries. In general, there are not many selected variables. The market excess return is selected across all industries except for utilities." width="672" />
 <p class="caption">(\#fig:fig414)Grey areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero.</p>
 </div>
