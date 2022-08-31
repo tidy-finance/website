@@ -7,24 +7,24 @@ knitr::opts_chunk$set(
   message = FALSE,
   warning = TRUE,
   cache = FALSE,
-  comment = ""
+  comment = "",
+  width = 69,
+  fig.align = "center"
 )
 
 options(
   tibble.print_max = 5,
   tibble.print_min = 5,
-  tibble.width = 81,
+  tibble.width = 69,
   htmltools.dir.version = FALSE,
   formatR.indent = 2,
   digits = 3,
-  width = 81
+  width = 69
 )
 
 if (knitr::is_latex_output()) {
-  knitr::opts_chunk$set(width = 69,
-                        out.width = "70%",
-                        fig.align = 'center',
-                        fig.width = 6,
+  knitr::opts_chunk$set(out.width = "70%",
+                        fig.width = 69,
                         fig.asp = 0.618,
                         fig.show = "hold")
   options(width = 69)
