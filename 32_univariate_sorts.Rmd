@@ -34,6 +34,7 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
+  select(permno, month, ret_excess, mktcap_lag) |>
   collect()
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
@@ -41,15 +42,6 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
 
 beta <- tbl(tidy_finance, "beta") |>
   collect()
-```
-
-We keep only relevant data from the CRSP sample.
-
-```{r}
-crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff_monthly, by = "month") |>
-  select(permno, month, ret_excess, mkt_excess, mktcap_lag)
-crsp_monthly
 ```
 
 ## Sorting by market beta
@@ -95,11 +87,10 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 ```{r}
 beta_longshort <- beta_portfolios |>
   pivot_wider(month, names_from = portfolio, values_from = ret) |>
-  mutate(long_short = high - low) |>
-  left_join(factors_ff_monthly, by = "month")
+  mutate(long_short = high - low)
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjust for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero.\index{Standard errors!Newey-West} One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero.\index{Standard errors!Newey-West} One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`. 
 
 ```{r}
 model_fit <- lm(long_short ~ 1, data = beta_longshort)
@@ -187,9 +178,9 @@ These results suggest a negative relation between beta and future stock returns,
 
 ## The security market line and beta portfolios
 
-The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.\index{Security market line}
+The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.\index{Security market line} The figure below illustrates the security market line: We see that (not surprisingly) the high beta portfolio returns have a high correlation with the market returns. However, it seems like the average excess returns for high beta stocks are lower than what the security market line implies would be an "appropriate" compensation for the high market risk. 
 
-```{r, fig323, fig.cap = "Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dasehd line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.", fig.alt = "Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."}
+```{r, fig323, fig.cap = "Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.", fig.alt = "Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."}
 sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 
 beta_portfolios_summary |>
