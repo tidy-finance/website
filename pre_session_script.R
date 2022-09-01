@@ -22,14 +22,6 @@ options(
   width = 69
 )
 
-if (knitr::is_latex_output()) {
-  knitr::opts_chunk$set(out.width = "70%",
-                        fig.width = 69,
-                        fig.asp = 0.618,
-                        fig.show = "hold")
-  options(width = 69)
-}
-
 # ggplot2 global theme
 library(ggplot2)
 theme_set(theme_bw() + theme(legend.position = "bottom"))
