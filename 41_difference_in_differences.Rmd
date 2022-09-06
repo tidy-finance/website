@@ -14,6 +14,7 @@ library(broom)
 
 ## Data preparation
 
+
 We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in chapter 4. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
@@ -31,7 +32,8 @@ trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
 
 ```
 
-We start our analysis by preparing the sample of bonds: we only consider bonds with a time to maturity of more than 1 year to the signing of the Paris Agreement to exclude all bonds that were issued after the agreement and so close to the agreement that the treatment effect could already be priced in. We also consider only the first two digits of the SIC industry code, which we use to identify the polluting industries.
+We start our analysis by preparing the sample of bonds: we only consider bonds with a time to maturity of more than 1 year to the signing of the Paris Agreement to exclude all bonds that were issued after the agreement and so close to the agreement that the treatment effect could already be priced in. 
+We also consider only the first two digits of the SIC industry code, which we use to identify the polluting industries.
 
 ```{r}
 treatment_date <- ymd("2015-12-12")
@@ -51,7 +53,7 @@ bonds <- bonds |>
   mutate(polluter = sic_code %in% polluting_industries)
 ```
 
-Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We only consider transactions with a reported price `rptd_pr` larger than 25 (TODO: WHY??) and only bond-day observations with more than 5 trades on the corresponding day (TODO: WHY??).
+Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields (TODO: EXPLAIN WHY VOLUME WEIGHTED). We only consider transactions with a reported price `rptd_pr` larger than 25 (TODO: WHY??) and only bond-day observations with more than 5 trades on the corresponding day (TODO: WHY??).
 
 ```{r}
 trace_aggregated <- trace_enhanced |> 
@@ -110,7 +112,9 @@ bonds_panel |>
 
 ## Panel regressions
 
-We first run an OLS regression without fixed effects where we simply include the `treated`, `post_period` and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the Paris Agreement compared to non-polluters. 
+The Paris Agreement is a legally binding international treaty on climate change. It was adopted by 196 Parties at COP 21 in Paris, on 12 December 2015 and entered into force on 4 November 2016.
+The Paris Agreement obliges developed countries to support the efforts of building clean, climate-resilient futures. 
+One may thus hypothesize, that the adoption of climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an OLS regression without fixed effects where we simply include the `treated`, `post_period` and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the Paris Agreement compared to non-polluters. 
 
 The second model follows the typical DD regression approach by including individual (`cusip_id`) and time (`month`) fixed effects. In this model, we do not include any other variables from the simple model because they are subsumed by the fixed effects and we are left with the coefficient of our main variable of interest: `treated`. 
 ```{r}
@@ -133,7 +137,7 @@ Both models indicate that polluters have significantly higher yields after the P
 
 ## Visualizing parallel trends
 
-Even though the regressions above indicate that there is an impact of the Paris Agreement on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well defined statistical test for this assumption, visual inspection typically provides decisive evidence.
+Even though the regressions above indicate that there is an impact of the Paris Agreement on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well defined statistical test for this assumption, visual inspection typically provides decisive evidence. (TODO: Is this a quote? If so we should cite it, otherwise I strongly vote in favor of removing the connect between "visual" and "evidence" ;-))
 
 To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators by month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data. 
 ```{r, fig411, fig.cap = "The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agrement on bond yields (in %) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of agreement (December 12, 2015).", fig.alt = "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."}
@@ -151,7 +155,6 @@ model_without_fe_coefs <- tidy(model_without_fe_time) |>
          treatment = str_detect(term, "TRUE"),
          ci_up = estimate + qnorm(0.975)*std.error,
          ci_low = estimate + qnorm(0.025)*std.error)
-
 
 model_without_fe_coefs |> 
   ggplot(aes(month, color = treatment)) +
@@ -176,11 +179,14 @@ bonds_panel_alt <- bonds_panel %>%
     diff_to_treatment = interval(
       floor_date(treatment_date, "month"), month) %/% months(1)
     )
+
 variables <- bonds_panel_alt %>% 
   distinct(diff_to_treatment, month) %>% 
   arrange(month) %>% 
   mutate(variable_name = as.character(NA))
+
 formula <- "avg_yield ~ "
+
 for (j in 1:nrow(variables)) {
   if (variables$diff_to_treatment[j] != 0) {
     old_names <- names(bonds_panel_alt)
@@ -202,29 +208,27 @@ formula <- str_c(formula, "| cusip_id + month")
 model_with_fe_time <- feols(
   fml = as.formula(formula),
   vcov = "iid",
-  data = data_bond_alt
+  data = bonds_panel_alt
 )
 
 model_with_fe_time_coefs <- tidy(model_with_fe_time) |> 
   mutate(term = str_remove(term, "TRUE"),
          ci_up = estimate + qnorm(0.975)*std.error,
          ci_low = estimate + qnorm(0.025)*std.error) %>% 
+  left_join(
+    variables, by = c("term" = "variable_name")
+  ) %>% 
   bind_rows(tibble(
     term = "lag0",
     estimate = 0,
     ci_up = 0,
     ci_low = 0,
-  )) %>% 
-  left_join(
-    variables, by = c("term" = "variable_name")
-  ) %>% 
-  mutate(month = if_else(term == "lag0", 
-                         floor_date(treatment_date, "month"), 
-                         month))
+    month = floor_date(treatment_date, "month")
+  ))
 
 model_with_fe_time_coefs %>% 
   ggplot(aes(x = month, y = estimate)) +
-  geom_vline(aes(xintercept = treatment_date_floor),
+  geom_vline(aes(xintercept = floor_date(treatment_date, "month")),
              linetype = "dashed") +
   geom_hline(aes(yintercept = 0),
              linetype = "dashed") +
