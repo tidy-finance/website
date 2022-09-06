@@ -28,8 +28,8 @@ Once we form our portfolios, we use the Fama-French market factor returns to com
 
 ```{r}
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
@@ -119,7 +119,7 @@ assign_portfolio <- function(data, var, n_portfolios) {
       all.inside = TRUE
     )) |>
     pull(portfolio)
-  
+
   return(assigned_portfolios)
 }
 ```
@@ -138,8 +138,10 @@ beta_portfolios <- data_for_sorts |>
     portfolio = as.factor(portfolio)
   ) |>
   group_by(portfolio, month) |>
-  summarize(ret = weighted.mean(ret_excess, mktcap_lag), 
-            .groups = "drop")
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag),
+    .groups = "drop"
+  )
 ```
 
 
@@ -186,14 +188,20 @@ sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 beta_portfolios_summary |>
   ggplot(aes(x = beta, y = ret, color = portfolio)) +
   geom_point() +
-  geom_abline(intercept = 0, 
-              slope = mean(factors_ff_monthly$mkt_excess), 
-              linetype = "solid") +
-  geom_abline(intercept = sml_capm[1], 
-              slope = sml_capm[2], 
-              linetype = "dashed") +
-  scale_y_continuous(labels = percent, 
-                     limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)) +
+  geom_abline(
+    intercept = 0,
+    slope = mean(factors_ff_monthly$mkt_excess),
+    linetype = "solid"
+  ) +
+  geom_abline(
+    intercept = sml_capm[1],
+    slope = sml_capm[2],
+    linetype = "dashed"
+  ) +
+  scale_y_continuous(
+    labels = percent,
+    limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)
+  ) +
   scale_x_continuous(limits = c(0, 2)) +
   labs(
     x = "Beta", y = "Excess return", color = "Portfolio",
@@ -219,15 +227,17 @@ beta_longshort <- beta_portfolios |>
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 
 
 ```{r}
-coeftest(lm(long_short ~ 1, data = beta_longshort), 
-         vcov = NeweyWest)
+coeftest(lm(long_short ~ 1, data = beta_longshort),
+  vcov = NeweyWest
+)
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor [@Frazzini2014]. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.\index{Risk aversion}
 
 ```{r}
-coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort), 
-         vcov = NeweyWest)
+coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
+  vcov = NeweyWest
+)
 ```
 
 The figure below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 

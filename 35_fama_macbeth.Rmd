@@ -33,8 +33,8 @@ We illustrate @Fama1973 with the monthly CRSP sample and use three characteristi
 
 ```{r}
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
@@ -56,10 +56,11 @@ bm <- compustat |>
   left_join(crsp_monthly, by = c("gvkey", "month")) |>
   left_join(beta, by = c("permno", "month")) |>
   transmute(gvkey,
-            bm = be / mktcap,
-            log_mktcap = log(mktcap),
-            beta = beta_monthly,
-            sorting_date = month %m+% months(6))
+    bm = be / mktcap,
+    log_mktcap = log(mktcap),
+    beta = beta_monthly,
+    sorting_date = month %m+% months(6)
+  )
 
 data_fama_macbeth <- crsp_monthly |>
   left_join(bm, by = c("gvkey", "month" = "sorting_date")) |>
@@ -68,9 +69,10 @@ data_fama_macbeth <- crsp_monthly |>
   fill(c(beta, bm, log_mktcap), .direction = "down") |>
   ungroup() |>
   left_join(crsp_monthly |>
-              select(permno, month, ret_excess_lead = ret) |>
-              mutate(month = month %m-% months(1)),
-            by = c("permno", "month")) |>
+    select(permno, month, ret_excess_lead = ret) |>
+    mutate(month = month %m-% months(1)),
+  by = c("permno", "month")
+  ) |>
   select(permno, month, ret_excess_lead, beta, log_mktcap, bm) |>
   drop_na()
 ```
@@ -83,10 +85,11 @@ By doing so, we get an estimate of the risk premiums $\hat\lambda^{f}_t$ for eac
 
 ```{r}
 risk_premiums <- data_fama_macbeth |>
-  nest(data = c(ret_excess_lead, beta, log_mktcap, bm, permno)) |> 
+  nest(data = c(ret_excess_lead, beta, log_mktcap, bm, permno)) |>
   mutate(estimates = map(
     data,
-    ~tidy(lm(ret_excess_lead ~ beta + log_mktcap + bm, data = .x)))) |> 
+    ~ tidy(lm(ret_excess_lead ~ beta + log_mktcap + bm, data = .x))
+  )) |>
   unnest(estimates)
 ```
 
@@ -124,9 +127,10 @@ price_of_risk_newey_west <- regressions_for_newey_west |>
   )
 
 left_join(price_of_risk,
-          price_of_risk_newey_west |> 
-            select(factor, t_statistic_newey_west),
-          by = "factor")
+  price_of_risk_newey_west |>
+    select(factor, t_statistic_newey_west),
+  by = "factor"
+)
 ```
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.

@@ -32,8 +32,8 @@ wrds <- dbConnect(
 )
 
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 ```
@@ -47,76 +47,87 @@ We use the issue-centered version of FISD to identify the subset of US corporate
 The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly (see, e.g., @Dick2012, @Ohara2021, among many others).
 
 ```{r}
-mergent <- tbl(wrds, 
-               in_schema("fisd", "fisd_mergedissue")) |>
+mergent <- tbl(
+  wrds,
+  in_schema("fisd", "fisd_mergedissue")
+) |>
   filter(
-    security_level == "SEN",   # senior bonds
-    slob == "N",               # secured lease obligation
-    is.na(security_pledge),    # unsecured bonds
-    asset_backed == "N",       # not asset backed
-    defeased == "N",           # not defeased
-    bond_type %in% c("CDEB",   # US Corporate Debentures
-                     "CMTN",   # US Corporate MTN (Medium Term Note)
-                     "CMTZ",   # US Corporate MTN Zero
-                     "CZ",     # US Corporate Zero,
-                     "USBN"),  # US Corporate Bank Note
-    pay_in_kind != "Y",        # not payable in kind
-    yankee == "N",             # no foreign issuer
-    canadian == "N",           # not Canadian 
-    foreign_currency == "N",   # USD
-    coupon_type %in% c("F",    # fixed coupon
-                       "Z"),   # zero coupon
-    is.na(fix_frequency), 
-    coupon_change_indicator == "N", 
-    interest_frequency %in% c("0", # per year
-                              "1", 
-                              "2", 
-                              "4", 
-                              "12"),
-    rule_144a == "N",          # publicly traded
-    private_placement == "N", 
-    defaulted == "N",          # not defaulted
+    security_level == "SEN", # senior bonds
+    slob == "N", # secured lease obligation
+    is.na(security_pledge), # unsecured bonds
+    asset_backed == "N", # not asset backed
+    defeased == "N", # not defeased
+    bond_type %in% c(
+      "CDEB", # US Corporate Debentures
+      "CMTN", # US Corporate MTN (Medium Term Note)
+      "CMTZ", # US Corporate MTN Zero
+      "CZ", # US Corporate Zero,
+      "USBN"
+    ), # US Corporate Bank Note
+    pay_in_kind != "Y", # not payable in kind
+    yankee == "N", # no foreign issuer
+    canadian == "N", # not Canadian
+    foreign_currency == "N", # USD
+    coupon_type %in% c(
+      "F", # fixed coupon
+      "Z"
+    ), # zero coupon
+    is.na(fix_frequency),
+    coupon_change_indicator == "N",
+    interest_frequency %in% c(
+      "0", # per year
+      "1",
+      "2",
+      "4",
+      "12"
+    ),
+    rule_144a == "N", # publicly traded
+    private_placement == "N",
+    defaulted == "N", # not defaulted
     is.na(filing_date),
     is.na(settlement),
-    convertible == "N",        # not convertible
+    convertible == "N", # not convertible
     is.na(exchange),
-    putable == "N",            # not putable
-    unit_deal == "N",          # not issued with another security
-    exchangeable == "N",       # not exchangeable
-    perpetual == "N",          # not perpetual
-    preferred_security == "N")  |> # not preferred
+    putable == "N", # not putable
+    unit_deal == "N", # not issued with another security
+    exchangeable == "N", # not exchangeable
+    perpetual == "N", # not perpetual
+    preferred_security == "N"
+  ) |> # not preferred
   select(
-    complete_cusip, maturity, 
-    offering_amt, offering_date, 
-    dated_date, first_interest_date, 
-    interest_frequency, coupon, 
-    last_interest_date, day_count_basis, 
+    complete_cusip, maturity,
+    offering_amt, offering_date,
+    dated_date, first_interest_date,
+    interest_frequency, coupon,
+    last_interest_date, day_count_basis,
     issue_id, issuer_id
-    ) |> 
+  ) |>
   collect()
 ```
 
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
-mergent_issuer <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) |>  
-  select(issuer_id, sic_code, country_domicile) |> 
+mergent_issuer <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) |>
+  select(issuer_id, sic_code, country_domicile) |>
   collect()
 
-mergent <- mergent |> 
-  inner_join(mergent_issuer, by = "issuer_id")  |> 
-  filter(country_domicile == "USA") |> 
+mergent <- mergent |>
+  inner_join(mergent_issuer, by = "issuer_id") |>
+  filter(country_domicile == "USA") |>
   select(-country_domicile)
 ```
 
 Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
-mergent |> 
-  dbWriteTable(conn = tidy_finance,
-               name = "mergent",
-               value = _,
-               overwrite = TRUE)
+mergent |>
+  dbWriteTable(
+    conn = tidy_finance,
+    name = "mergent",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -140,35 +151,42 @@ mergent_cusips <- mergent |>
   pull(complete_cusip)
 
 set.seed(123)
-mergent_parts <- split(mergent_cusips, 
-                       sample(1:10, 
-                              length(mergent_cusips), 
-                              replace = TRUE))
+mergent_parts <- split(
+  mergent_cusips,
+  sample(1:10,
+    length(mergent_cusips),
+    replace = TRUE
+  )
+)
 ```
 
 Finally, we run a loop in the same style as in Chapter 2 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
 
 ```{r, eval = FALSE}
-progress <- txtProgressBar(min = 0, 
-                           max = length(mergent_parts), 
-                           initial = 0, 
-                           style = 3)
+progress <- txtProgressBar(
+  min = 0,
+  max = length(mergent_parts),
+  initial = 0,
+  style = 3
+)
 
-for(j in 1:length(mergent_parts)) {
+for (j in 1:length(mergent_parts)) {
   trace_enhanced <- clean_enhanced_trace(
     cusips = mergent_parts[[j]],
     connection = wrds,
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
   )
-    
-  trace_enhanced |> 
-    dbWriteTable(conn = tidy_finance,
-                 name = "trace_enhanced",
-                 value = _,
-                 overwrite = ifelse(j == 1, TRUE, FALSE), 
-                 append = ifelse(j != 1, TRUE, FALSE))
-  
+
+  trace_enhanced |>
+    dbWriteTable(
+      conn = tidy_finance,
+      name = "trace_enhanced",
+      value = _,
+      overwrite = ifelse(j == 1, TRUE, FALSE),
+      append = ifelse(j != 1, TRUE, FALSE)
+    )
+
   setTxtProgressBar(progress, j)
 }
 
@@ -180,4 +198,3 @@ close(progress)
 <!-- Insights into bonds -->
 
 <!-- Insights into trading activity -->
-

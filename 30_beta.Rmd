@@ -20,8 +20,8 @@ The estimation procedure is based on a rolling-window estimation where we may us
 
 ```{r}
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
@@ -83,7 +83,7 @@ roll_capm_estimation <- function(data, months, min_obs) {
     .x = data,
     .i = data$month,
     .period = "month",
-    .f = ~estimate_capm(., min_obs),
+    .f = ~ estimate_capm(., min_obs),
     .before = months - 1,
     .complete = FALSE
   )
@@ -162,9 +162,9 @@ Next, we want to apply the `roll_capm_estimation()` function to each stock. This
 crsp_monthly_nested |>
   inner_join(examples, by = "permno") |>
   mutate(beta = map(
-    data, 
-    ~roll_capm_estimation(., months = 60, min_obs = 48))
-    ) |>
+    data,
+    ~ roll_capm_estimation(., months = 60, min_obs = 48)
+  )) |>
   unnest(beta) |>
   select(permno, month, beta_monthly = beta) |>
   drop_na()
@@ -181,8 +181,8 @@ Using eight cores, the estimation for our sample of around 25k stocks takes arou
 ```{r}
 beta_monthly <- crsp_monthly_nested |>
   mutate(beta = future_map(
-    data, ~roll_capm_estimation(., months = 60, min_obs = 48))
-    ) |>
+    data, ~ roll_capm_estimation(., months = 60, min_obs = 48)
+  )) |>
   unnest(c(beta)) |>
   select(permno, month, beta_monthly = beta) |>
   drop_na()
@@ -232,9 +232,9 @@ These restrictions help us to retrieve somewhat smooth coefficient estimates.
 crsp_daily_nested |>
   inner_join(examples, by = "permno") |>
   mutate(beta_daily = map(
-    data, 
-    ~roll_capm_estimation(., months = 3, min_obs = 50))
-    ) |>
+    data,
+    ~ roll_capm_estimation(., months = 3, min_obs = 50)
+  )) |>
   unnest(c(beta_daily)) |>
   select(permno, month, beta_daily = beta) |>
   drop_na()
@@ -251,8 +251,8 @@ The code chunk for beta estimation using daily returns now looks very similar to
 ```{r}
 beta_daily <- crsp_daily_nested |>
   mutate(beta_daily = future_map(
-    data, ~roll_capm_estimation(., months = 3, min_obs = 50))
-    ) |>
+    data, ~ roll_capm_estimation(., months = 3, min_obs = 50)
+  )) |>
   unnest(c(beta_daily)) |>
   select(permno, month, beta_daily = beta) |>
   drop_na()
@@ -322,10 +322,11 @@ Finally, we write the estimates to our database such that we can use them in lat
 
 ```{r}
 beta |>
-  dbWriteTable(tidy_finance, 
-               "beta", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "beta",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. 

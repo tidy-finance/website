@@ -21,17 +21,19 @@ First, we load the necessary data from our `SQLite`-database introduced in chapt
 
 ```{r}
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
-    extended_types = TRUE
+  SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
-  select(permno, gvkey, month, ret_excess, 
-         mktcap, mktcap_lag, exchange) |>
+  select(
+    permno, gvkey, month, ret_excess,
+    mktcap, mktcap_lag, exchange
+  ) |>
   drop_na()
 ```
 
@@ -68,22 +70,25 @@ bm <- be |>
     sorting_date = month %m+% months(6),
     comp_date = sorting_date
   ) |>
-  select(permno, gvkey, sorting_date, comp_date, bm) 
+  select(permno, gvkey, sorting_date, comp_date, bm)
 
 data_for_sorts <- crsp_monthly |>
-  left_join(bm, by = c("permno", 
-                       "gvkey", 
-                       "month" = "sorting_date")) |>
+  left_join(bm, by = c("permno",
+    "gvkey",
+    "month" = "sorting_date"
+  )) |>
   left_join(me, by = c("permno", "month" = "sorting_date")) |>
-  select(permno, gvkey, month, ret_excess, 
-         mktcap_lag, me, bm, exchange, comp_date)
+  select(
+    permno, gvkey, month, ret_excess,
+    mktcap_lag, me, bm, exchange, comp_date
+  )
 
 data_for_sorts <- data_for_sorts |>
   arrange(permno, gvkey, month) |>
   group_by(permno, gvkey) |>
   fill(bm, comp_date) |>
-  filter(comp_date > month %m-% months(12)) |> 
-  select(-comp_date) |> 
+  filter(comp_date > month %m-% months(12)) |>
+  select(-comp_date) |>
   drop_na()
 ```
 
@@ -102,10 +107,12 @@ assign_portfolio <- function(data, var, n_portfolios, exchanges) {
     as.numeric()
 
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval({{ var }}, 
-                                    breakpoints, all.inside = TRUE)) |>
+    mutate(portfolio = findInterval({{ var }},
+      breakpoints,
+      all.inside = TRUE
+    )) |>
     pull(portfolio)
-  
+
   return(assigned_portfolios)
 }
 ```
@@ -150,8 +157,8 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 value_premium <- value_portfolios |>
   group_by(month, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
-  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
-              ret[portfolio_bm == min(portfolio_bm)])
+  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+    ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
@@ -193,8 +200,8 @@ value_portfolios <- data_for_sorts |>
 value_premium <- value_portfolios |>
   group_by(month, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
-  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] - 
-              ret[portfolio_bm == min(portfolio_bm)])
+  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+    ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
