@@ -62,16 +62,16 @@ mergent <- tbl(
       "CMTN", # US Corporate MTN (Medium Term Note)
       "CMTZ", # US Corporate MTN Zero
       "CZ", # US Corporate Zero,
-      "USBN"
-    ), # US Corporate Bank Note
+      "USBN" # US Corporate Bank Note
+    ), 
     pay_in_kind != "Y", # not payable in kind
     yankee == "N", # no foreign issuer
     canadian == "N", # not Canadian
     foreign_currency == "N", # USD
     coupon_type %in% c(
       "F", # fixed coupon
-      "Z"
-    ), # zero coupon
+      "Z" # zero coupon
+    ), 
     is.na(fix_frequency),
     coupon_change_indicator == "N",
     interest_frequency %in% c(
@@ -193,13 +193,71 @@ for (j in 1:length(mergent_parts)) {
 close(progress)
 ```
 
-<!-- # Summary statistics -->
+## Insights into corporate bonds
 
-<!-- Insights into bonds -->
+While information on stocks and the underlying firms is readily provided by many news outlets, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, which is also potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
 
-<!-- Insights into trading activity -->
+We start by looking into the number of bonds outstanding over time. 
+
+```{r, fig221}
+expand_grid("date" = seq(as.Date("1990-01-01"), 
+             as.Date("2018-12-01"), 
+             by = "quarter"), 
+                                 "complete_cusip" = mergent$complete_cusip) |> 
+  left_join(mergent |> select(complete_cusip, 
+                              offering_date,
+                              maturity), 
+            by = "complete_cusip") |> 
+  mutate(offering_date = floor_date(offering_date),
+         maturity = floor_date(maturity)) |> 
+  filter(date >= offering_date & date <= maturity) |> 
+  group_by(date) |> 
+  summarize(outstanding_bonds = n(),
+            .groups = "drop") |>
+  ggplot(aes(x = date, y = outstanding_bonds)) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Number of bonds outstanding each quarter"
+  )
+```
+
+Now that we know how many bonds are outstanding, you might also be interested in the question how many bonds are traded over time. We first also load our TRACE sample data into our session and then count the number of bonds traded each month.
+
+```{r, fig222}
+trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
+  collect()
+
+trace_enhanced |> 
+  mutate(month = floor_date(trd_exctn_dt, "months")) |> 
+  group_by(month) |> 
+  summarize(bonds_traded = length(unique(cusip_id)),
+            .groups = "drop") |>
+  ggplot(aes(x = month, y = bonds_traded)) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Number of bonds traded each month"
+  )
+```
+
+
+Moreover, we also investigate the characteristics of corporate bonds. In particular, we consider the bonds maturity, coupon, and offering amount.
+
+```{r}
+
+```
+
+Finally, let us compute some summary statistics for the trades that take place.
+
+```{r}
+
+```
+
 
 ## Exercises
 
-1. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
-2. Download the TRACE data until the end of September 2021. You want to download the data completely new, rather than adding the new information. Can you find a reason why?
+1. Summarize the amount outstanding over time and describe the resulting graph.
+1. Compute the number of days each bond is traded (accounting for the bonds maturity and issuance). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
+2. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
+3. Download the TRACE data until the end of September 2021. You want to download the data completely new, rather than adding the new information. Can you find a reason why?
