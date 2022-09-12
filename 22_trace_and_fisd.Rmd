@@ -195,12 +195,12 @@ close(progress)
 
 ## Insights into corporate bonds
 
-While information on stocks and the underlying firms is readily provided by many news outlets, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, which is also potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
+While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
 
-We start by looking into the number of bonds outstanding over time. 
+We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter from 1990 until 2018. 
 
-```{r, fig221}
-expand_grid("date" = seq(as.Date("1990-01-01"), 
+```{r}
+bonds_outstanding <- expand_grid("date" = seq(as.Date("1990-01-01"), 
              as.Date("2018-12-01"), 
              by = "quarter"), 
                                  "complete_cusip" = mergent$complete_cusip) |> 
@@ -211,49 +211,89 @@ expand_grid("date" = seq(as.Date("1990-01-01"),
   mutate(offering_date = floor_date(offering_date),
          maturity = floor_date(maturity)) |> 
   filter(date >= offering_date & date <= maturity) |> 
-  group_by(date) |> 
-  summarize(outstanding_bonds = n(),
-            .groups = "drop") |>
-  ggplot(aes(x = date, y = outstanding_bonds)) +
-  geom_line() +
-  labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Number of bonds outstanding each quarter"
-  )
+  count(date) |> 
+  mutate(type = "outstanding")
 ```
 
-Now that we know how many bonds are outstanding, you might also be interested in the question how many bonds are traded over time. We first also load our TRACE sample data into our session and then count the number of bonds traded each month.
+Next, we look at the bonds traded each quarter in our shorter period around the Paris Agreement from 2014 to 2016. Notice that we load the complete trace database of our sample, as we only have a single part of it in the environment from the download.
 
-```{r, fig222}
+```{r}
 trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
   collect()
 
-trace_enhanced |> 
-  mutate(month = floor_date(trd_exctn_dt, "months")) |> 
-  group_by(month) |> 
-  summarize(bonds_traded = length(unique(cusip_id)),
-            .groups = "drop") |>
-  ggplot(aes(x = month, y = bonds_traded)) +
+bonds_traded <- trace_enhanced |> 
+  mutate(date = floor_date(trd_exctn_dt, "quarters")) |> 
+  group_by(date) |> 
+  summarize(n = length(unique(cusip_id)),
+            type = "traded",
+            .groups = "drop") 
+```
+
+Finally, we plot the two time series in the figure below.
+
+```{r, fig221}
+bonds_outstanding |> 
+  bind_rows(bonds_traded) |> 
+  ggplot(aes(x = date, y = n, color = type, linetype = type)) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Number of bonds traded each month"
+    title = "Number of bonds outstanding and traded each quarter"
   )
 ```
 
+We see that the number of bonds outstanding varies over time, with a peak before the turn of the millennium. After 2010, the number steadily increased, eventually surpassing the previous maximum. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 50%. On the flip side, the relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
 
-Moreover, we also investigate the characteristics of corporate bonds. In particular, we consider the bonds maturity, coupon, and offering amount.
-
-```{r}
-
-```
-
-Finally, let us compute some summary statistics for the trades that take place.
+Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD). 
 
 ```{r}
-
+mergent |>
+  mutate(maturity = as.numeric(maturity - offering_date) / 365,
+         offering_amt = offering_amt / 10^3) |> 
+  pivot_longer(cols = c(maturity, coupon, offering_amt),
+               names_to = "measure") |>
+  drop_na() |> 
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q25 = quantile(value, 0.25),
+    q50 = quantile(value, 0.50),
+    q75 = quantile(value, 0.75),
+    q95 = quantile(value, 0.95),
+    max = max(value)
+  )
 ```
 
+We see that the average bond has an offering amount of over 350 million USD, which cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons. 
+
+Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
+
+```{r}
+trace_enhanced |> 
+  group_by(trd_exctn_dt) |> 
+  summarise(trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
+            trade_number = n(),
+            .groups = "drop") |> 
+  pivot_longer(cols = c(trade_size, trade_number),
+               names_to = "measure") |> 
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q25 = quantile(value, 0.25),
+    q50 = quantile(value, 0.50),
+    q75 = quantile(value, 0.75),
+    q95 = quantile(value, 0.95),
+    max = max(value)
+  )
+```
+
+On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
 ## Exercises
 
