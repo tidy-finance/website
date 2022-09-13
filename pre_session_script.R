@@ -9,7 +9,12 @@ knitr::opts_chunk$set(
   cache = FALSE,
   comment = "",
   width = 69,
-  fig.align = "center"
+  dpi = 300,
+  tidy = "styler",
+  out.width = "90%",
+  fig.align = "center",
+  fig.width = 5,
+  fig.height = 7
 )
 
 options(
@@ -19,7 +24,8 @@ options(
   htmltools.dir.version = FALSE,
   formatR.indent = 2,
   digits = 3,
-  width = 69
+  width = 69,
+  crayon.enabled = FALSE
 )
 
 # ggplot2 global theme
@@ -33,7 +39,7 @@ pal <- colorRampPalette(list(
   "#E1AF00",
   "#F21A00"
 ))
-# pal <- colorRampPalette(list("#191919", "#ffffff"))
+pal <- colorRampPalette(list("#525252", "#cccccc"))
 
 scale_colour_continuous <- function(...) {
   scale_color_gradientn(
