@@ -39,7 +39,7 @@ pal <- colorRampPalette(list(
   "#E1AF00",
   "#F21A00"
 ))
-pal <- colorRampPalette(list("#525252", "#cccccc"))
+#pal <- colorRampPalette(list("#525252", "#cccccc"))
 
 scale_colour_continuous <- function(...) {
   scale_color_gradientn(
