@@ -2,9 +2,9 @@
 
 # Accessing & managing financial data
 
-In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects, as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
+In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repository and other macroeconomic time series.\index{API} We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
+This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repository, and other macroeconomic time series.\index{API} We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -15,7 +15,7 @@ library(lubridate)
 library(scales)
 ```
 
-The package `scales` [@scales] provides useful scale Functions for visualizations. The package `lubridate` provides convenient tools to work with dates and time [@lubridate].
+The package `lubridate` provides convenient tools to work with dates and time [@lubridate]. The package `scales` [@scales] provides useful scale Functions for visualizations.
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you need to adjust these dates. Our data starts with 1960 since most asset pricing studies use data from 1962 on. 
 
@@ -88,7 +88,7 @@ We also need to adjust this data. First, we discard information we will not use 
 
 
 ```r
-factors_q_monthly_link <- 
+factors_q_monthly_link <-
   "http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2021.csv"
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
@@ -120,37 +120,36 @@ The `drive_download()` function from the `googledrive` package allows us to down
 
 
 ```r
-macro_predictors_link <- 
+macro_predictors_link <-
   "https://docs.google.com/spreadsheets/d/1OArfD2Wv9IvGoLkJ8JyoXS0YMQLDZfY2"
 drive_download(
-  macro_predictors_link, 
+  macro_predictors_link,
   path = "data/macro_predictors.xlsx"
-  )
+)
 ```
 
-Next, we read in the new data and transform the columns to the variables that we later use. 
-More precisely, we use
+Next, we read in the new data and transform the columns to the variables that we later use:
 
-1. the dividend price ratio (`dp`), the difference between the log of dividends and the log of prices, where dividends are 12-month moving sums of dividends paid on the S&P 500 index, and prices are monthly averages of daily closing prices (@Campbell1988, @Campbell2006). 
-1. dividend yield (`dy`), the difference between the log of dividends and the log of lagged prices [@Ball1978]. 
-1. earnings price ratio (`ep`), the difference between the log of earnings and the log of prices, where earnings are 12-month moving sums of earnings on the S&P 500 index [@Campbell1988]. 
-1. dividend payout ratio (`de`), the difference between the log of dividends and the log of earnings [@Lamont1998]. 
-1. stock variance (`svar`), the sum of squared daily returns on the S&P 500 index [@Guo2006].
-1. book-to-market ratio (`bm`), the ratio of book value to market value for the Dow Jones Industrial Average [@Kothari1997] 
-1. net equity expansion (`ntis`),the ratio of 12-month moving sums of net issues by NYSE listed stocks divided by the total end-of-year market capitalization of NYSE stocks [@Campbell2008].
-1. treasury bills (`tbl`), the 3-Month Treasury Bill: Secondary Market Rate from the economic research data base at the Federal Reserve Bank at St. Louis [@Campbell1987].
-1. long term yield (`lty`), the long-term government bond yield from Ibbotson's Stocks, Bonds, Bills and Inflation Yearbook [@Goyal2008].
-1. long term rate of returns (`ltr`), the long-term government bond returns from Ibbotson's Stocks, Bonds, Bills and Inflation Yearbook [@Goyal2008].
-1. term spread (`tms`), the difference between the long term yield on government bonds and the Treasury bill [@Campbell1987].
-1. default yield spread (`dfy`), the difference between BAA and AAA-rated corporate bond yields [@Fama1989]. 
-1. inflation (`infl`), the Consumer Price Index (All Urban Consumers) from the Bureau of Labor Statistics [@Campbell2004].
+1. The dividend price ratio (`dp`), the difference between the log of dividends and the log of prices, where dividends are 12-month moving sums of dividends paid on the S&P 500 index, and prices are monthly averages of daily closing prices (@Campbell1988, @Campbell2006). 
+1. Dividend yield (`dy`), the difference between the log of dividends and the log of lagged prices [@Ball1978]. 
+1. Earnings price ratio (`ep`), the difference between the log of earnings and the log of prices, where earnings are 12-month moving sums of earnings on the S&P 500 index [@Campbell1988]. 
+1. Dividend payout ratio (`de`), the difference between the log of dividends and the log of earnings [@Lamont1998]. 
+1. Stock variance (`svar`), the sum of squared daily returns on the S&P 500 index [@Guo2006].
+1. Book-to-market ratio (`bm`), the ratio of book value to market value for the Dow Jones Industrial Average [@Kothari1997] 
+1. Net equity expansion (`ntis`),the ratio of 12-month moving sums of net issues by NYSE listed stocks divided by the total end-of-year market capitalization of NYSE stocks [@Campbell2008].
+1. Treasury bills (`tbl`), the 3-Month Treasury Bill: Secondary Market Rate from the economic research data base at the Federal Reserve Bank at St. Louis [@Campbell1987].
+1. Long term yield (`lty`), the long-term government bond yield from Ibbotson's Stocks, Bonds, Bills and Inflation Yearbook [@Goyal2008].
+1. Long term rate of returns (`ltr`), the long-term government bond returns from Ibbotson's Stocks, Bonds, Bills and Inflation Yearbook [@Goyal2008].
+1. Term spread (`tms`), the difference between the long term yield on government bonds and the Treasury bill [@Campbell1987].
+1. Default yield spread (`dfy`), the difference between BAA and AAA-rated corporate bond yields [@Fama1989]. 
+1. Inflation (`infl`), the Consumer Price Index (All Urban Consumers) from the Bureau of Labor Statistics [@Campbell2004].
 			
 You can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145) for variable definitions and the transformations.
 
 
 ```r
 macro_predictors <- read_xlsx(
-  "data/macro_predictors.xlsx", 
+  "data/macro_predictors.xlsx",
   sheet = "Monthly"
 ) |>
   mutate(month = ym(yyyymm)) |>
@@ -168,8 +167,8 @@ macro_predictors <- read_xlsx(
     dfy = BAA - AAA # Default yield spread
   ) |>
   select(month, rp_div, dp, dy, ep, de, svar,
-         bm = `b/m`, ntis, tbl, lty, ltr,
-         tms, dfy, infl
+    bm = `b/m`, ntis, tbl, lty, ltr,
+    tms, dfy, infl
   ) |>
   filter(month >= start_date & month <= end_date) |>
   drop_na()
@@ -196,7 +195,7 @@ library(tidyquant)
 
 cpi_monthly <- tq_get("CPIAUCNS",
   get = "economic.data",
-  from = start_date, 
+  from = start_date,
   to = end_date
 ) |>
   transmute(
@@ -226,8 +225,8 @@ A SQLite database is easily created - the code below is really all there is, you
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 ```
@@ -237,10 +236,11 @@ Next, we create a remote table with the monthly Fama-French factor data. We do s
 
 ```r
 factors_ff_monthly |>
-  dbWriteTable(tidy_finance, 
-               "factors_ff_monthly", 
-               value = _,     
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "factors_ff_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 We can use the remote table as an in-memory data frame by building a connection via `tbl()`.
@@ -262,7 +262,7 @@ factors_ff_monthly_db |>
 
 ```
 # Source:   SQL [?? x 2]
-# Database: sqlite 3.39.2 [data/tidy_finance.sqlite]
+# Database: sqlite 3.39.3 [data/tidy_finance.sqlite]
   month          rf
   <date>      <dbl>
 1 1960-01-01 0.0033
@@ -301,34 +301,39 @@ Before we move on to the next data source, let us also store the other five tabl
 
 ```r
 factors_ff_daily |>
-  dbWriteTable(tidy_finance, 
-               "factors_ff_daily", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "factors_ff_daily",
+    value = _,
+    overwrite = TRUE
+  )
 
 industries_ff_monthly |>
-  dbWriteTable(tidy_finance, 
-               "industries_ff_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "industries_ff_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 
 factors_q_monthly |>
-  dbWriteTable(tidy_finance, 
-               "factors_q_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "factors_q_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 
 macro_predictors |>
-  dbWriteTable(tidy_finance, 
-               "macro_predictors",
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "macro_predictors",
+    value = _,
+    overwrite = TRUE
+  )
 
 cpi_monthly |>
-  dbWriteTable(tidy_finance, 
-               "cpi_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "cpi_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 From now on, all you need to do to access data that is stored in the database is to follow three steps: (i) Establish the connection to the SQLite database, (ii) call the table you want to extract, and (iii) collect the data. For your convenience, the following steps show all you need in a compact fashion.\index{Database!Connection}
@@ -339,8 +344,8 @@ library(tidyverse)
 library(RSQLite)
 
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 

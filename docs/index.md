@@ -4,15 +4,17 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-08-31"
+date: "2022-09-13"
+knit: "bookdown::render_book"
 site: bookdown::bookdown_site
 documentclass: book
 bibliography: [book.bib, packages.bib]
 biblio-style: apalike
 link-citations: yes
+links-as-notes: true
 github-repo: voigtstefan/tidy_finance
 url: https://www.tidy-finance.org
-cover-image: cover.jpg
+cover-image: cover_homepage.jpg
 description: |
   An open-source textbook on empirical finance applications with R. 
 ---
@@ -130,9 +132,9 @@ If you are new to R, we recommend starting with the following sources:
 
 We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from which each of us graduated with a different focus but a shared passion: coding with R. We continue to sharpen our R skills as part of our current occupations:
 
-* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/) where he is responsible for product planning, execution, and monitoring. He also manages a team of data scientists to analyze user behavior and develop new products.
-* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan teaches parts of this book in his courses on empirical finance.
-* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a Post-Doc at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/). His research centers around the intersection between asset pricing and corporate finance. 
+* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/). He is responsible for product planning, execution, and monitoring and manages a team of data scientists to analyze user behavior and develop data-driven products. Christoph is also an external lecturer at the Vienna University of Economics and Business where he teaches finance students how to manage empirical projects. 
+* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan’s research has been published in the leading finance and econometrics journals. He teaches parts of this book in his courses on empirical finance for students and practitioners.
+* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a postdoctoral researcher at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/) and an external lecturer at the [Reykjavik University](https://en.ru.is). His research activity centers around the intersection of empirical asset pricing and corporate finance. Patrick is especially passionate about empirical asset pricing and has published research in a top journal in financial economics. 
 
 ## License {.unnumbered}
 
@@ -164,7 +166,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> bookdown </td>
-   <td style="text-align:left;"> 0.28 </td>
+   <td style="text-align:left;"> 0.29 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
@@ -180,7 +182,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> dplyr </td>
-   <td style="text-align:left;"> 1.0.9 </td>
+   <td style="text-align:left;"> 1.0.10 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> fixest </td>
@@ -264,7 +266,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> rlang </td>
-   <td style="text-align:left;"> 1.0.4 </td>
+   <td style="text-align:left;"> 1.0.5 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
@@ -276,7 +278,7 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> RSQLite </td>
-   <td style="text-align:left;"> 2.2.16 </td>
+   <td style="text-align:left;"> 2.2.17 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> sandwich </td>
@@ -304,11 +306,11 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   </tr>
   <tr>
    <td style="text-align:left;"> tidyquant </td>
-   <td style="text-align:left;"> 1.0.4 </td>
+   <td style="text-align:left;"> 1.0.5 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyr </td>
-   <td style="text-align:left;"> 1.2.0 </td>
+   <td style="text-align:left;"> 1.2.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> tidyverse </td>

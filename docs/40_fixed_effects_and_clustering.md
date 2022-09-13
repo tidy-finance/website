@@ -2,7 +2,7 @@
 
 # Fixed effects and clustered standard errors
 
-In this chapter, we provide an intuitive introduction to the two popular concepts *fixed effects regressions* and *clustered standard errors*. When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. The concepts we introduce in this chapter are designed to adress such concerns.
+In this chapter, we provide an intuitive introduction to the two popular concepts of *fixed effects regressions* and *clustered standard errors*. When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. The concepts we introduce in this chapter are designed to address such concerns.
 
 We focus on a classical panel regression common to the corporate finance literature [e.g., @Fazzari1988;@Erickson2012;@Gulen2015]: firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.  
 
@@ -20,57 +20,62 @@ Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed eff
 
 ## Data preparation
 
-We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in our chapter on *"Accessing & managing financial data"*. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in chapters 2-4. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), 
+  SQLite(),
   "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
-crsp <- tbl(tidy_finance, "crsp_monthly") |> 
+crsp <- tbl(tidy_finance, "crsp_monthly") |>
   collect()
 
 compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 ```
 
-The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms, as well as time-series information for each firm.\index{Regression!Panel}
+The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.\index{Regression!Panel}
 
 
 ```r
 data_investment <- compustat |>
-  mutate(month = floor_date(datadate, "month")) |> 
-  left_join(compustat |> 
-              select(gvkey, year, at_lag = at) |> 
-              mutate(year = year + 1), 
-            by = c("gvkey", "year")) |> 
-  filter(at > 0, at_lag > 0) |> 
-  mutate(investment = capx / at_lag,
-         cash_flows = oancf / at_lag)
+  mutate(month = floor_date(datadate, "month")) |>
+  left_join(compustat |>
+    select(gvkey, year, at_lag = at) |>
+    mutate(year = year + 1),
+  by = c("gvkey", "year")
+  ) |>
+  filter(at > 0, at_lag > 0) |>
+  mutate(
+    investment = capx / at_lag,
+    cash_flows = oancf / at_lag
+  )
 
-data_investment <- data_investment |> 
-  left_join(data_investment |> 
-              select(gvkey, year, investment_lead = investment) |> 
-              mutate(year = year - 1), 
-            by = c("gvkey", "year"))
+data_investment <- data_investment |>
+  left_join(data_investment |>
+    select(gvkey, year, investment_lead = investment) |>
+    mutate(year = year - 1),
+  by = c("gvkey", "year")
+  )
 ```
 
 Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988; @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
 
 
 ```r
-data_investment <- data_investment |> 
-    left_join(crsp |> 
-              select(gvkey, month, mktcap), 
-              by = c("gvkey", "month")) |> 
+data_investment <- data_investment |>
+  left_join(crsp |>
+    select(gvkey, month, mktcap),
+  by = c("gvkey", "month")
+  ) |>
   mutate(tobins_q = (mktcap + at - be + txdb) / at)
 
-data_investment <- data_investment |> 
-  select(gvkey, year, investment_lead, cash_flows, tobins_q) |> 
-  drop_na() 
+data_investment <- data_investment |>
+  select(gvkey, year, investment_lead, cash_flows, tobins_q) |>
+  drop_na()
 ```
 
 As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (´investment´, ´cash_flows´, and ´tobins_q´) at the 1 percent level. 
@@ -78,18 +83,24 @@ As the variable construction typically leads to extreme values that are most lik
 
 ```r
 winsorize <- function(x, cut) {
-  x <- replace(x,
-               x > quantile(x, 1 - cut, na.rm = T),
-               quantile(x, 1 - cut, na.rm = T))
-  x <- replace(x,
-               x < quantile(x, cut, na.rm = T),
-               quantile(x, cut, na.rm = T))
+  x <- replace(
+    x,
+    x > quantile(x, 1 - cut, na.rm = T),
+    quantile(x, 1 - cut, na.rm = T)
+  )
+  x <- replace(
+    x,
+    x < quantile(x, cut, na.rm = T),
+    quantile(x, cut, na.rm = T)
+  )
   return(x)
 }
 
-data_investment <- data_investment |> 
-  mutate(across(c(investment_lead, cash_flows, tobins_q), 
-                ~ winsorize(., 0.01)))
+data_investment <- data_investment |>
+  mutate(across(
+    c(investment_lead, cash_flows, tobins_q),
+    ~ winsorize(., 0.01)
+  ))
 ```
 
 Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.\index{Summary statistics}
@@ -97,30 +108,34 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 
 ```r
 data_investment |>
-  pivot_longer(cols = c(investment_lead, cash_flows, tobins_q), 
-               names_to = "measure") |> 
+  pivot_longer(
+    cols = c(investment_lead, cash_flows, tobins_q),
+    names_to = "measure"
+  ) |>
   group_by(measure) |>
-  summarize(mean = mean(value),
-            sd = sd(value),
-            min = min(value),
-            q05 = quantile(value, 0.05),
-            q25 = quantile(value, 0.25),
-            q50 = quantile(value, 0.50),
-            q75 = quantile(value, 0.75),
-            q95 = quantile(value, 0.95),
-            max = max(value),
-            n = n(),
-            groups = "drop")
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q25 = quantile(value, 0.25),
+    q50 = quantile(value, 0.50),
+    q75 = quantile(value, 0.75),
+    q95 = quantile(value, 0.95),
+    max = max(value),
+    n = n(),
+    .groups = "drop"
+  )
 ```
 
 ```
-# A tibble: 3 × 12
+# A tibble: 3 × 11
   measure    mean     sd    min      q05      q25    q50    q75   q95
   <chr>     <dbl>  <dbl>  <dbl>    <dbl>    <dbl>  <dbl>  <dbl> <dbl>
 1 cash_fl… 0.0145 0.266  -1.50  -4.57e-1 -0.00321 0.0649 0.131  0.273
 2 investm… 0.0584 0.0778  0      7.27e-4  0.0122  0.0333 0.0719 0.208
 3 tobins_q 1.99   1.69    0.571  7.92e-1  1.05    1.38   2.19   5.33 
-# … with 3 more variables: max <dbl>, n <int>, groups <chr>
+# … with 2 more variables: max <dbl>, n <int>
 ```
 
 ## Fixed effects 
@@ -141,7 +156,7 @@ model_ols
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,175 
+Observations: 124,176 
 Standard-errors: IID 
             Estimate Std. Error t value  Pr(>|t|)    
 (Intercept)  0.04243   0.000342   124.1 < 2.2e-16 ***
@@ -149,7 +164,7 @@ cash_flows   0.05143   0.000835    61.6 < 2.2e-16 ***
 tobins_q     0.00767   0.000132    58.2 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.076042   Adj. R2: 0.044433
+RMSE: 0.076041   Adj. R2: 0.044435
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -171,7 +186,7 @@ model_fe_firm
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,175 
+Observations: 124,176 
 Fixed-effects: gvkey: 13,899
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -179,7 +194,7 @@ cash_flows   0.0146   0.000963    15.1 < 2.2e-16 ***
 tobins_q     0.0113   0.000136    82.6 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.05008     Adj. R2: 0.533297
+RMSE: 0.05008     Adj. R2: 0.533298
                 Within R2: 0.059427
 ```
 
@@ -201,7 +216,7 @@ model_fe_firmyear
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,175 
+Observations: 124,176 
 Fixed-effects: gvkey: 13,899,  year: 34
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -209,18 +224,19 @@ cash_flows   0.0182   0.000941    19.3 < 2.2e-16 ***
 tobins_q     0.0102   0.000135    75.5 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.048806     Adj. R2: 0.556613
-                 Within R2: 0.051548
+RMSE: 0.048806     Adj. R2: 0.556614
+                 Within R2: 0.051547
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
-Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 
 ```r
-etable(model_ols, model_fe_firm, model_fe_firmyear, 
-       coefstat = "tstat")
+etable(model_ols, model_fe_firm, model_fe_firmyear,
+  coefstat = "tstat"
+)
 ```
 
 ```
@@ -235,7 +251,7 @@ gvkey                          No               Yes
 year                           No                No
 _______________ _________________ _________________
 VCOV type                     IID               IID
-Observations              124,175           124,175
+Observations              124,176           124,176
 R2                        0.04445           0.58554
 Within R2                      --           0.05943
 
@@ -250,7 +266,7 @@ gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type                     IID
-Observations              124,175
+Observations              124,176
 R2                        0.60636
 Within R2                 0.05155
 ---
@@ -263,7 +279,7 @@ Apart from biased estimators, we usually have to deal with potentially complex d
 
 In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008].\index{Standard errors!Clustered} The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
 
-Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm, as well as two-way clustering by firm and year.
+Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.
 
 
 ```r
@@ -284,8 +300,9 @@ The table below shows the comparison of the different assumptions behind the sta
 
 
 ```r
-etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear, 
-       coefstat = "tstat")
+etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
+  coefstat = "tstat"
+)
 ```
 
 ```
@@ -299,7 +316,7 @@ gvkey                         Yes               Yes
 year                          Yes               Yes
 _______________ _________________ _________________
 VCOV type                     IID         by: gvkey
-Observations              124,175           124,175
+Observations              124,176           124,176
 R2                        0.60636           0.60636
 Within R2                 0.05155           0.05155
 
@@ -313,7 +330,7 @@ gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type        by: gvkey & year
-Observations              124,175
+Observations              124,176
 R2                        0.60636
 Within R2                 0.05155
 ---

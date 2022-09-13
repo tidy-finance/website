@@ -9,7 +9,7 @@ These examples introduce you to our approach of *Tidy Finance*.
 ## Working with stock market data
 
 At the start of each session, we load the required packages. 
-Throughout the entire book, we always use the `tidyverse`.
+Throughout the entire book, we always use the `tidyverse` [@Wickham2019].
 In this chapter, we also load the convenient `tidyquant` package  [@tidyquant] to download price data. This package provides a convenient wrapper to various quantitative functions compatible with the 'tidyverse'.
 
 You typically have to install a package once before you can load it. 
@@ -64,12 +64,12 @@ prices |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Adjusted Apple stock prices between beginning of 2000 and end of 2021"
+    title = "Apple stock prices between beginning of 2000 and end of 2021"
   )
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig100-1.png" alt="Title: Adjusted Apple stock prices between beginning of 2000 and end of 2021. The figure shows that the adjusted stock price of Apple increased dramatically from about 1 USD to around 125 USD." width="672" />
+<img src="10_introduction_files/figure-html/fig100-1.png" alt="Title: Apple stock prices between beginning of 2000 and end of 2021. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD." width="90%" />
 <p class="caption">(\#fig:fig100)Prices are in USD, adjusted for divident payments and stock splits.</p>
 </div>
 
@@ -127,12 +127,13 @@ returns |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Distribution of daily Apple stock returns in percent")
+    title = "Distribution of daily Apple stock returns in percent"
+  )
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig101-1.png" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows an histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed  around 0. The vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent" width="672" />
-<p class="caption">(\#fig:fig101)The dotted vertical line indicates the historical 5 percent quantile.</p>
+<img src="10_introduction_files/figure-html/fig101-1.png" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows an histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed  around 0. The vertical line indicates that the historical 5 % quantile of daily returns was around negative 3 %" width="90%" />
+<p class="caption">(\#fig:fig101)The dotted vertical line indicates the historical 5 % quantile.</p>
 </div>
 
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. 
@@ -161,7 +162,7 @@ returns |>
 1          0.130         2.52         -51.9          13.9
 ```
 
-We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the daily average return is close to but slightly above 0. 
+We see that the maximum *daily* return was 13.905 %. Perhaps not surprisingly, the daily average return is close to but slightly above 0. 
 In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.     
 You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data, defined by year. The summary statistics therefore allow an eyeball analysis of the time-series dynamics of the return distribution. 
 
@@ -231,11 +232,11 @@ ticker
 # A tibble: 30 × 8
   symbol company          ident…¹ sedol weight sector share…² local…³
   <chr>  <chr>            <chr>   <chr>  <dbl> <chr>    <dbl> <chr>  
-1 UNH    UnitedHealth Gr… 91324P… 2917… 0.108  Healt… 5716095 USD    
-2 GS     Goldman Sachs G… 38141G… 2407… 0.0692 Finan… 5716095 USD    
-3 HD     Home Depot Inc.  437076… 2434… 0.0608 Consu… 5716095 USD    
-4 MSFT   Microsoft Corpo… 594918… 2588… 0.0545 Infor… 5716095 USD    
-5 MCD    McDonald's Corp… 580135… 2550… 0.0526 Consu… 5716095 USD    
+1 UNH    UnitedHealth Gr… 91324P… 2917… 0.108  Healt… 5738491 USD    
+2 GS     Goldman Sachs G… 38141G… 2407… 0.0697 Finan… 5738491 USD    
+3 HD     Home Depot Inc.  437076… 2434… 0.0606 Consu… 5738491 USD    
+4 MSFT   Microsoft Corpo… 594918… 2588… 0.0543 Infor… 5738491 USD    
+5 MCD    McDonald's Corp… 580135… 2550… 0.0530 Consu… 5738491 USD    
 # … with 25 more rows, and abbreviated variable names ¹​identifier,
 #   ²​shares_held, ³​local_currency
 ```
@@ -250,7 +251,7 @@ index_prices <- tq_get(ticker,
 )
 ```
 
-The resulting file contains 163073 daily observations for 30 different corporations. 
+The resulting file contains 163313 daily observations for 30 different corporations. 
 The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
@@ -272,7 +273,7 @@ index_prices |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig103-1.png" alt="Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index." width="672" />
+<img src="10_introduction_files/figure-html/fig103-1.png" alt="Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index." width="90%" />
 <p class="caption">(\#fig:fig103)Prices in USD, adjusted for dividend payments and stock splits.</p>
 </div>
 
@@ -308,36 +309,36 @@ all_returns |>
 # A tibble: 30 × 5
    symbol daily_mean daily_sd daily_min daily_max
    <chr>       <dbl>    <dbl>     <dbl>     <dbl>
- 1 AMGN       0.0479     1.97     -13.4      15.1
- 2 AXP        0.0529     2.30     -17.6      21.9
- 3 BA         0.0570     2.23     -23.8      24.3
- 4 CAT        0.0670     2.04     -14.5      14.7
+ 1 AMGN       0.0470     1.97     -13.4      15.1
+ 2 AXP        0.0533     2.30     -17.6      21.9
+ 3 BA         0.0557     2.23     -23.8      24.3
+ 4 CAT        0.0671     2.04     -14.5      14.7
  5 CRM        0.115      2.69     -27.1      26.0
- 6 CSCO       0.0308     2.38     -16.2      24.4
+ 6 CSCO       0.0307     2.38     -16.2      24.4
  7 CVX        0.0537     1.76     -22.1      22.7
- 8 DIS        0.0464     1.94     -18.4      16.0
- 9 DOW        0.0604     2.64     -21.7      20.9
+ 8 DIS        0.0465     1.94     -18.4      16.0
+ 9 DOW        0.0533     2.64     -21.7      20.9
 10 GS         0.0548     2.32     -19.0      26.5
-11 HD         0.0530     1.94     -28.7      14.1
-12 HON        0.0500     1.94     -17.4      28.2
-13 IBM        0.0258     1.66     -15.5      12.0
-14 INTC       0.0315     2.36     -22.0      20.1
+11 HD         0.0526     1.94     -28.7      14.1
+12 HON        0.0496     1.94     -17.4      28.2
+13 IBM        0.0257     1.65     -15.5      12.0
+14 INTC       0.0304     2.36     -22.0      20.1
 15 JNJ        0.0398     1.22     -15.8      12.2
-16 JPM        0.0559     2.43     -20.7      25.1
-17 KO         0.0335     1.32     -10.1      13.9
-18 MCD        0.0532     1.48     -15.9      18.1
-19 MMM        0.0385     1.50     -12.9      12.6
-20 MRK        0.0340     1.68     -26.8      13.0
-21 MSFT       0.0532     1.93     -15.6      19.6
-22 NKE        0.0729     1.92     -19.8      15.5
-23 PG         0.0366     1.34     -30.2      12.0
+16 JPM        0.0563     2.43     -20.7      25.1
+17 KO         0.0331     1.32     -10.1      13.9
+18 MCD        0.0534     1.48     -15.9      18.1
+19 MMM        0.0383     1.50     -12.9      12.6
+20 MRK        0.0342     1.68     -26.8      13.0
+21 MSFT       0.0527     1.93     -15.6      19.6
+22 NKE        0.0731     1.92     -19.8      15.5
+23 PG         0.0365     1.34     -30.2      12.0
 24 TRV        0.0550     1.84     -20.8      25.6
-25 UNH        0.0994     1.99     -18.6      34.8
+25 UNH        0.0991     1.98     -18.6      34.8
 26 V          0.0938     1.90     -13.6      15.0
 27 VZ         0.0250     1.51     -11.8      14.6
-28 WBA        0.0275     1.81     -15.0      16.6
-29 WMT        0.0305     1.50     -11.4      11.7
-30 AAPL       0.125      2.51     -51.9      13.9
+28 WBA        0.0274     1.81     -15.0      16.6
+29 WMT        0.0309     1.50     -11.4      11.7
+30 AAPL       0.124      2.51     -51.9      13.9
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -364,7 +365,7 @@ volume |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig104-1.png" alt="Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100." width="672" />
+<img src="10_introduction_files/figure-html/fig104-1.png" alt="Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100." width="90%" />
 <p class="caption">(\#fig:fig104)Total daily trading volume in billion USD.</p>
 </div>
 
@@ -391,7 +392,7 @@ Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig105-1.png" alt="Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45 degree line. " width="672" />
+<img src="10_introduction_files/figure-html/fig105-1.png" alt="Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45 degree line. " width="90%" />
 <p class="caption">(\#fig:fig105)Total daily trading volume in billion USD.</p>
 </div>
 
@@ -468,7 +469,7 @@ tibble(
 # A tibble: 1 × 2
   expected_ret volatility
          <dbl>      <dbl>
-1      0.00789     0.0313
+1      0.00784     0.0313
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  
@@ -530,7 +531,7 @@ res |>
     data = res |> filter(c %in% c(0, 1)),
     size = 4
   ) +
-  geom_point( 
+  geom_point(
     data = tibble(
       mu = 12 * 100 * mu,
       sd = 12 * 10 * sqrt(diag(Sigma))
@@ -545,7 +546,7 @@ res |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig106-1.png" alt="Title: Efficient frontier for DOW index constituents. The figure shows DOW index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="672" />
+<img src="10_introduction_files/figure-html/fig106-1.png" alt="Title: Efficient frontier for DOW index constituents. The figure shows DOW index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility." width="90%" />
 <p class="caption">(\#fig:fig106)The big dots indicate the location of the minimum variance and efficient tangency portfolios, respectively. The small dots indicate the location of the individual constituents.</p>
 </div>
 

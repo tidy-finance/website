@@ -11,38 +11,36 @@
 The cover of the book is inspired by the fast growing generative art community in R. 
 Generative art refers to art that in whole or in part has been created with the use of an autonomous system. 
 Instead of creating random dynamics we rely on what is core to the book: The evolution of financial markets. 
-Thus, each circle in the logo corresponds to daily market returns within one year of our sample. The colors are determined by the standard deviation of market returns during the particular year. The few lines of code below replicate the entire figure. We use the Wes Andersen color palette (also throughout the entire book), provided by the package ´wesanderson´ [@wesanderson]
+Each circle in the cover figure corresponds to daily market return within one year of our sample. Deviations from the circle line indicate positive or negative returns. 
+The colors are determined by the standard deviation of market returns during the particular year. 
+The few lines of code below replicate the entire figure. 
+We use the Wes Andersen color palette (also throughout the entire book), provided by the package ´wesanderson´ [@wesanderson]
 
 
 ```r
 library(tidyverse)
+library(lubridate)
 library(RSQLite)
 library(wesanderson)
 
-tidy_finance <- dbConnect(SQLite(), 
-                          "data/tidy_finance.sqlite", 
-                          extended_types = TRUE)
-mfac <- tbl(tidy_finance, 
-            "factors_ff_daily") |>
+tidy_finance <- dbConnect(
+  SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
+
+factors_ff_daily <- tbl(
+  tidy_finance,
+  "factors_ff_daily"
+) |>
   collect()
 
-cp <- coord_polar(direction = -1, clip = "on")
-cp$is_free <- function() TRUE
-
-plot_data <- mfac |>
+data_plot <- factors_ff_daily |>
   select(date, mkt_excess) |>
-  group_by(year = lubridate::floor_date(date, "year")) |>
+  group_by(year = floor_date(date, "year")) |>
   mutate(group_id = cur_group_id())
 
-plot_data <- plot_data |>
-  mutate(
-    group_id = if_else(group_id >= 28, group_id + 4, group_id + 0),
-    group_id = if_else(group_id >= 36, group_id + 4, group_id + 0),
-    group_id = if_else(group_id >= 44, group_id + 4, group_id + 0)
-  ) |>
-  bind_rows(plot_data |>
-    filter(group_id %in% c(28:31, 36:39, 44:47)) |>
-    mutate(mkt_excess = NA)) |>
+data_plot <- data_plot |>
   group_by(group_id) |>
   mutate(
     day = 2 * pi * (1:n()) / 252,
@@ -50,26 +48,44 @@ plot_data <- plot_data |>
     ymax = pmax(1 + mkt_excess, 1),
     vola = sd(mkt_excess)
   ) |>
-  filter(year >= "1961-01-01")
+  filter(year >= "1962-01-01")
 
-colors <- wes_palette("Zissou1", n_groups(plot_data), type = "continuous")
-levels <- plot_data |>
+levels <- data_plot |>
   distinct(group_id, vola) |>
   arrange(vola) |>
   pull(vola)
 
-plot <- plot_data |>
+cp <- coord_polar(
+  direction = -1,
+  clip = "on"
+)
+
+cp$is_free <- function() TRUE
+
+colors <- wes_palette("Zissou1",
+  n_groups(data_plot),
+  type = "continuous"
+)
+
+plot <- data_plot |>
   mutate(vola = factor(vola, levels = levels)) |>
-  ggplot() +
-  aes(x = day, y = mkt_excess, group = group_id, fill = vola) +
+  ggplot(aes(
+    x = day,
+    y = mkt_excess,
+    group = group_id,
+    fill = vola
+  )) +
   cp +
   geom_ribbon(aes(
     ymin = ymin,
     ymax = ymax,
-    fill = as_factor(vola)
+    fill = vola
   ), alpha = 0.90) +
   theme_void() +
-  facet_wrap(~group_id, ncol = 8, scales = "free") +
+  facet_wrap(~group_id,
+    ncol = 10,
+    scales = "free"
+  ) +
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
@@ -78,7 +94,10 @@ plot <- plot_data |>
   scale_fill_manual(values = colors)
 
 # ggsave(
-#   plot = plot, width = 8, height = 9,
-#   filename = "cover.jpg", bg = "white"
+#  plot = plot,
+#  width = 10,
+#  height = 6,
+#  filename = "cover.jpg",
+#  bg = "white"
 # )
 ```

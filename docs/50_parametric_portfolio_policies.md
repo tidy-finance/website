@@ -2,9 +2,9 @@
 
 # Parametric portfolio policies
 
-In this chapter, we introduce different portfolio performance measures to evaluate and compare portfolio allocation strategies. 
-For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of @Brandt2009 proposes to parametrize the optimal portfolio weights as a function of stock characteristics directly, instead of estimating the stock's expected return, variance, and covariances with other stocks in a prior step. 
-We chose weights as a function of the characteristics which maximize the expected utility of the investor. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. The review paper @Brandt2010 provides an excellent treatment of related portfolio choice methods.  
+In this chapter, we apply different portfolio performance measures to evaluate and compare portfolio allocation strategies. 
+For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of @Brandt2009 proposes to parametrize the optimal portfolio weights as a function of stock characteristics instead of estimating the stock's expected return, variance, and covariances with other stocks in a prior step. 
+We choose weights as a function of the characteristics, which maximize the expected utility of the investor. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. See the review paper @Brandt2010 for an excellent treatment of related portfolio choice methods.  
 
 The current chapter relies on the following set of packages:
 
@@ -16,7 +16,7 @@ library(RSQLite)
 
 ## Data preparation
 
-To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in chapters 2-3.\index{Data!CRSP}
+To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in chapters 2-4.\index{Data!CRSP}
 
 
 ```r
@@ -37,7 +37,7 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
 ```
 
 Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 12$ and $t − 2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
-To construct the correct lagged values, we use the approach introduced in the chapter on *"Accessing & managing financial data"*.\index{Data!CRSP}
+To construct the correct lagged values, we use the approach introduced in chapter 3.\index{Data!CRSP}
 
 
 ```r
@@ -92,7 +92,7 @@ data_portfolios <- data_portfolios |>
 
 ## Computing portfolio weights
 
-Next, we move to identify optimal choices of $\theta$. We rewrite the optimization problem together with the weight parametrization and can then estimate $\theta$ to maximize the objective function based on our sample 
+Next, we move on to identify optimal choices of $\theta$. We rewrite the optimization problem together with the weight parametrization and can then estimate $\theta$ to maximize the objective function based on our sample 
 $$\begin{aligned}
 E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
 \end{aligned}$$
@@ -118,7 +118,7 @@ The function `compute_portfolio_weights()` below computes the portfolio weights 
 We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'\hat{x}_{i, t}$ which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio `weight_benchmark`, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. 
 `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt` which deviate from the benchmark portfolio depending on the stock characteristics.
 
-The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via the parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again. We do so by  
+The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via the parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again:
 $$w_{i,t}^+ = \frac{\max(0, w_{i,t})}{\sum\limits_{j=1}^{N_t}\max(0, w_{i,t})}.$$
 
 
@@ -156,7 +156,7 @@ compute_portfolio_weights <- function(theta,
 }
 ```
 
-In the next step we compute the portfolio weights for the arbitrary vector $\theta_0$. In the example below, we use the value-weighted portfolio as a benchmark and allow negative portfolio weights.
+In the next step, we compute the portfolio weights for the arbitrary vector $\theta_0$. In the example below, we use the value-weighted portfolio as a benchmark and allow negative portfolio weights.
 
 
 ```r
@@ -179,10 +179,10 @@ power_utility <- function(r, gamma = 5) {
 }
 ```
 
-It should be noted, that @Gehrig2020 warn that in the leading case of constant relative risk aversion (CRRA) strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy, and the
+We want to note that @Gehrig2020 warn that, in the leading case of constant relative risk aversion (CRRA), strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy, and the
 parameter space are necessary to obtain a well defined optimization problem.
 
-No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: The original paper @Brandt2009 only cares about expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
+No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: the original paper @Brandt2009 only cares about expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
 
 
 ```r
@@ -231,7 +231,6 @@ evaluate_portfolio <- function(weights_crsp,
       pivot_wider(names_from = model, values_from = value)
     evaluation <- bind_rows(evaluation, weight_evaluation)
   }
-  
   return(evaluation)
 }
 ```
@@ -314,7 +313,7 @@ momentum_lag     size_lag
       0.0713      -1.9487 
 ```
 
-The resulting values of $\hat\theta$ are easy to interpret: Intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
+The resulting values of $\hat\theta$ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
 
 ## More model specifications
 
@@ -419,13 +418,13 @@ performance_table |>
 #   ²​`VW (no s.) Optimal `, ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `
 ```
 
-The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Imposing no short-sale constraints does not improve the performance of the portfolios in our application.
+The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Finally, imposing no short-sale constraints does not improve the performance of the portfolios in our application.
 
 
 ## Exercises
 
 1. How do the estimated parameters $\hat\theta$ and the portfolio performance change if your objective is to maximize the Sharpe ratio instead of the hypothetical expected utility?
-1. The code above is very flexible in the sense that you can easily add new firm characteristics. Construct a new characteristic and evaluate the corresponding coefficient $\hat\theta_i$. 
-1. Tweak the function `optimal_theta()`such that you can impose additional performance constraints in order to determine $\hat\theta$ which maximizes expected utility under the constraint that the market beta is below 1.
+1. The code above is very flexible in the sense that you can easily add new firm characteristics. Construct a new characteristic of your choice and evaluate the corresponding coefficient $\hat\theta_i$. 
+1. Tweak the function `optimal_theta()` such that you can impose additional performance constraints in order to determine $\hat\theta$ which maximizes expected utility under the constraint that the market beta is below 1.
 1. Does the portfolio performance resemble a realistic out-of-sample backtesting procedure? Verify the robustness of the results by first estimating $\hat\theta$ based on *past data* only. Then, use more recent periods to evaluate the actual portfolio performance. 
 1. By formulating the portfolio problem as a statistical estimation problem, you can easily obtain standard errors for the coefficients of the weight function. @Brandt2009 provide the relevant derivations in their paper in Equation (10). Implement a small function that computes standard errors for $\hat\theta$.

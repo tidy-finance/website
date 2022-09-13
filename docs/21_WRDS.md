@@ -1,6 +1,6 @@
 # WRDS, CRSP, and Compustat
 
-This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and research typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working the WRDS database.\index{WRDS}
+This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -77,15 +77,17 @@ crsp_monthly <- msf_db |>
   inner_join(
     msenames_db |>
       filter(shrcd %in% c(10, 11)) |>
-      select(permno, exchcd, siccd, namedt, nameendt), 
-    by = c("permno")) |>
+      select(permno, exchcd, siccd, namedt, nameendt),
+    by = c("permno")
+  ) |>
   filter(date >= namedt & date <= nameendt) |>
   mutate(month = floor_date(date, "month")) |>
   left_join(
     msedelist_db |>
       select(permno, dlstdt, dlret, dlstcd) |>
-      mutate(month = floor_date(dlstdt, "month")), 
-    by = c("permno", "month")) |>
+      mutate(month = floor_date(dlstdt, "month")),
+    by = c("permno", "month")
+  ) |>
   select(
     permno, # Security identifier
     date, # Date of the observation
@@ -114,9 +116,10 @@ The first additional variable we create is market capitalization (`mktcap`), whi
 crsp_monthly <- crsp_monthly |>
   mutate(
     mktcap = abs(shrout * altprc) / 1000000,
-    mktcap = if_else(mktcap == 0, 
-                     as.numeric(NA), 
-                     mktcap)
+    mktcap = if_else(mktcap == 0,
+      as.numeric(NA),
+      mktcap
+    )
   )
 ```
 
@@ -188,8 +191,8 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```r
 tidy_finance <- dbConnect(
-  SQLite(), 
-  "data/tidy_finance.sqlite", 
+  SQLite(),
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
@@ -197,8 +200,9 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff_monthly |> select(month, rf), 
-            by = "month") |>
+  left_join(factors_ff_monthly |> select(month, rf),
+    by = "month"
+  ) |>
   mutate(
     ret_excess = ret_adj - rf,
     ret_excess = pmax(ret_excess, -1)
@@ -219,10 +223,11 @@ Finally, we store the monthly CRSP file in our database.
 
 ```r
 crsp_monthly |>
-  dbWriteTable(tidy_finance, 
-               "crsp_monthly", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "crsp_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 ## First glimpse of the CRSP sample
@@ -246,7 +251,7 @@ crsp_monthly |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="672" />
+<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="90%" />
 <p class="caption">(\#fig:fig211)Number of stocks in the CRSP sample listed at each of the US exchanges.</p>
 </div>
 
@@ -260,12 +265,14 @@ tbl(tidy_finance, "crsp_monthly") |>
   summarize(
     securities = n_distinct(permno),
     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
-    .groups = 'drop'
+    .groups = "drop"
   ) |>
   collect() |>
   mutate(month = ymd(month)) |>
-  ggplot(aes(x = month, y = mktcap / 1000, 
-             color = exchange, linetype = exchange)) +
+  ggplot(aes(
+    x = month, y = mktcap / 1000,
+    color = exchange, linetype = exchange
+  )) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
@@ -276,7 +283,7 @@ tbl(tidy_finance, "crsp_monthly") |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="672" />
+<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="90%" />
 <p class="caption">(\#fig:fig212)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
@@ -284,7 +291,7 @@ Of course, performing the computation in the database is not really meaningful b
 
 
 ```r
-cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |> 
+cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |>
   collect()
 ```
 
@@ -302,10 +309,12 @@ crsp_monthly_industry <- crsp_monthly |>
   )
 
 crsp_monthly_industry |>
-  ggplot(aes(x = month, 
-             y = securities, 
-             color = industry, 
-             linetype = industry)) +
+  ggplot(aes(
+    x = month,
+    y = securities,
+    color = industry,
+    linetype = industry
+  )) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
@@ -316,7 +325,7 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is largest in terms of number of listed stocks." width="672" />
+<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is largest in terms of number of listed stocks." width="90%" />
 <p class="caption">(\#fig:fig213)Number of stocks in the CRSP sample associated with different industries.</p>
 </div>
 
@@ -325,10 +334,12 @@ We also compute the market cap of all stocks belonging to the respective industr
 
 ```r
 crsp_monthly_industry |>
-  ggplot(aes(x = month, 
-             y = mktcap / 1000, 
-             color = industry, 
-             linetype = industry)) +
+  ggplot(aes(
+    x = month,
+    y = mktcap / 1000,
+    color = industry,
+    linetype = industry
+  )) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
@@ -339,7 +350,7 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="672" />
+<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="90%" />
 <p class="caption">(\#fig:fig214)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
@@ -360,10 +371,12 @@ permnos <- tbl(tidy_finance, "crsp_monthly") |>
   distinct(permno) |>
   pull()
 
-progress <- txtProgressBar(min = 0, 
-                           max = length(permnos), 
-                           initial = 0, 
-                           style = 3)
+progress <- txtProgressBar(
+  min = 0,
+  max = length(permnos),
+  initial = 0,
+  style = 3
+)
 
 for (j in 1:length(permnos)) {
   permno_sub <- permnos[j]
@@ -386,11 +399,12 @@ for (j in 1:length(permnos)) {
       select(permno, date, month, ret_excess)
 
     crsp_daily_sub |>
-      dbWriteTable(tidy_finance, 
-                   "crsp_daily", 
-                   value = _, 
-                   overwrite = ifelse(j == 1, TRUE, FALSE), 
-                   append = ifelse(j != 1, TRUE, FALSE))
+      dbWriteTable(tidy_finance,
+        "crsp_daily",
+        value = _,
+        overwrite = ifelse(j == 1, TRUE, FALSE),
+        append = ifelse(j != 1, TRUE, FALSE)
+      )
   }
   setTxtProgressBar(progress, j)
 }
@@ -469,10 +483,11 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 
 ```r
 compustat |>
-  dbWriteTable(tidy_finance, 
-               "compustat", 
-               value = _, 
-               overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "compustat",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 ## Merging CRSP with Compustat
@@ -481,8 +496,10 @@ Unfortunately, CRSP and Compustat use different keys to identify stocks and firm
 
 
 ```r
-ccmxpf_linktable_db <- tbl(wrds, 
-                           in_schema("crsp", "ccmxpf_linktable"))
+ccmxpf_linktable_db <- tbl(
+  wrds,
+  in_schema("crsp", "ccmxpf_linktable")
+)
 ```
 
 The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via `today()`.
@@ -507,7 +524,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-08-31
+5  54594 001004 1972-04-24 2022-09-13
 # … with 31,765 more rows
 ```
 
@@ -529,10 +546,11 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 ```r
 crsp_monthly |>
-  dbWriteTable(tidy_finance, 
-                 "crsp_monthly", 
-                 value = _, 
-                 overwrite = TRUE)
+  dbWriteTable(tidy_finance,
+    "crsp_monthly",
+    value = _,
+    overwrite = TRUE
+  )
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, the figure below plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
@@ -545,20 +563,22 @@ crsp_monthly |>
   ungroup() |>
   left_join(compustat, by = c("gvkey", "year")) |>
   group_by(exchange, year) |>
-  summarize(share = n_distinct(permno[!is.na(be)]) / n_distinct(permno),
-            .groups = 'drop') |>
+  summarize(
+    share = n_distinct(permno[!is.na(be)]) / n_distinct(permno),
+    .groups = "drop"
+  ) |>
   ggplot(aes(x = year, y = share, color = exchange)) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "Share of securities with book equity values by exchange"
   ) +
-  scale_y_continuous(labels = percent) + 
+  scale_y_continuous(labels = percent) +
   coord_cartesian(ylim = c(0, 1))
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="672" />
+<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="90%" />
 <p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by listing exchange.</p>
 </div>
 
