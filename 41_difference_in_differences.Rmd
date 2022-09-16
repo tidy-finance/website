@@ -153,7 +153,7 @@ Both models indicate that polluters have significantly higher yields after the P
 Even though the regressions above indicate that there is an impact of the PA on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
 
 To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data. 
-```{r, fig411, fig.cap = "The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in %) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).", fig.alt = "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."}
+```{r, fig411, fig.cap = "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).", fig.alt = "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."}
 model_without_fe_time <- feols(
   fml = avg_yield ~ polluter + month:polluter +
     time_to_maturity + log_offering_amt,
@@ -193,17 +193,17 @@ model_without_fe_coefs |>
 We can see that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement. 
 
 Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects. 
-```{r, fig412, fig.cap = "The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in %) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).", fig.alt = "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."}
-bonds_panel_alt <- bonds_panel %>%
+```{r, fig412, fig.cap = "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).", fig.alt = "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."}
+bonds_panel_alt <- bonds_panel |>
   mutate(
     diff_to_treatment = interval(
       floor_date(treatment_date, "month"), month
     ) %/% months(1)
   )
 
-variables <- bonds_panel_alt %>%
-  distinct(diff_to_treatment, month) %>%
-  arrange(month) %>%
+variables <- bonds_panel_alt |>
+  distinct(diff_to_treatment, month) |>
+  arrange(month) |>
   mutate(variable_name = as.character(NA))
 
 formula <- "avg_yield ~ "
@@ -211,7 +211,7 @@ formula <- "avg_yield ~ "
 for (j in 1:nrow(variables)) {
   if (variables$diff_to_treatment[j] != 0) {
     old_names <- names(bonds_panel_alt)
-    bonds_panel_alt <- bonds_panel_alt %>%
+    bonds_panel_alt <- bonds_panel_alt |>
       mutate(new_var = diff_to_treatment == variables$diff_to_treatment[j] & polluter)
     new_var_name <- ifelse(variables$diff_to_treatment[j] < 0,
       str_c("lag", abs(variables$diff_to_treatment[j])),
@@ -241,11 +241,11 @@ model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
     term = str_remove(term, "TRUE"),
     ci_up = estimate + qnorm(0.975) * std.error,
     ci_low = estimate + qnorm(0.025) * std.error
-  ) %>%
+  ) |>
   left_join(
     variables,
     by = c("term" = "variable_name")
-  ) %>%
+  ) |>
   bind_rows(tibble(
     term = "lag0",
     estimate = 0,
@@ -254,7 +254,7 @@ model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
     month = floor_date(treatment_date, "month")
   ))
 
-model_with_fe_time_coefs %>%
+model_with_fe_time_coefs |>
   ggplot(aes(x = month, y = estimate)) +
   geom_vline(aes(xintercept = floor_date(treatment_date, "month")),
     linetype = "dashed"
