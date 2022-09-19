@@ -52,7 +52,7 @@ Next, we merge our sorting variable with the return data. We use the one-month *
 To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. 
 This procedure ensures that month $t$ information is available in month $t+1$. 
 You may be tempted to simply use a call such as `crsp_monthly |> group_by(permno) |> mutate(beta_lag = lag(beta)))` instead. 
-This procedure, however, does not work if there are non-explicit missing values in the time series.
+This procedure, however, does not work correctly if there are non-explicit missing values in the time series.
 
 
 ```r
@@ -66,7 +66,7 @@ data_for_sorts <- crsp_monthly |>
 ```
 
 The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.\index{Breakpoints} 
-For simplicity, we start with the median as the single breakpoint. 
+For simplicity, we start with the median lagged market beta as the single breakpoint. 
 We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in `weighted.mean()`.  
 
 
@@ -213,7 +213,7 @@ beta_portfolios_summary |>
   ggplot(aes(x = beta, y = ret, color = portfolio)) +
   geom_point() +
   geom_abline(
-    intercept = 0,
+    intercept = mean(factors_ff_monthly$rf),
     slope = mean(factors_ff_monthly$mkt_excess),
     linetype = "solid"
   ) +
@@ -325,5 +325,5 @@ Overall, this chapter shows how functional programming can be leveraged to form 
 
 1. Take the two long-short beta strategies based on different numbers of portfolios and compare the returns. Is there a significant difference in returns? How do the Sharpe ratios compare between the strategies? Find one additional portfolio evaluation statistic and compute it.
 1. We plotted the alphas of the ten beta portfolios above. Write a function that tests these estimates for significance. Which portfolios have significant alphas?
-1. The analysis here is based on betas from daily returns. However, we also computed betas from monthly returns. Re-run the analysis and point out differences in the results.
+1. The analysis here is based on betas from monthly returns. However, we also computed betas from daily returns. Re-run the analysis and point out differences in the results.
 1. Given the results in this chapter, can you define a long-short strategy that yields positive abnormal returns (i.e., alphas)? Plot the cumulative excess return of your strategy and the market excess return for comparison.

@@ -88,7 +88,7 @@
 <li><a class="active" href="univariate-portfolio-sorts.html"><span class="header-section-number">7</span> Univariate portfolio sorts</a></li>
 <li><a class="" href="size-sorts-and-p-hacking.html"><span class="header-section-number">8</span> Size sorts and p-hacking</a></li>
 <li><a class="" href="value-and-bivariate-sorts.html"><span class="header-section-number">9</span> Value and bivariate sorts</a></li>
-<li><a class="" href="replicating-fama-french-factors.html"><span class="header-section-number">10</span> Replicating Fama &amp; French factors</a></li>
+<li><a class="" href="replicating-fama-and-french-factors.html"><span class="header-section-number">10</span> Replicating Fama and French factors</a></li>
 <li><a class="" href="fama-macbeth-regressions.html"><span class="header-section-number">11</span> Fama-MacBeth regressions</a></li>
 <li class="book-part">Modeling &amp; machine learning</li>
 <li><a class="" href="fixed-effects-and-clustered-standard-errors.html"><span class="header-section-number">12</span> Fixed effects and clustered standard errors</a></li>
@@ -161,7 +161,7 @@ Once we form our portfolios, we use the Fama-French market factor returns to com
 To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data.
 This procedure ensures that month <span class="math inline">\(t\)</span> information is available in month <span class="math inline">\(t+1\)</span>.
 You may be tempted to simply use a call such as <code>crsp_monthly |&gt; group_by(permno) |&gt; mutate(beta_lag = lag(beta)))</code> instead.
-This procedure, however, does not work if there are non-explicit missing values in the time series.</p>
+This procedure, however, does not work correctly if there are non-explicit missing values in the time series.</p>
 <div class="sourceCode" id="cb145"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_lag</span> <span class="op">&lt;-</span> <span class="va">beta</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>month <span class="op">=</span> <span class="va">month</span> <span class="op"><a href="https://lubridate.tidyverse.org/reference/mplus.html">%m+%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/weekday.POSIXt.html">months</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -171,7 +171,7 @@ This procedure, however, does not work if there are non-explicit missing values 
 <span><span class="va">data_for_sorts</span> <span class="op">&lt;-</span> <span class="va">crsp_monthly</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html">inner_join</a></span><span class="op">(</span><span class="va">beta_lag</span>, by <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"permno"</span>, <span class="st">"month"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.
-For simplicity, we start with the median as the single breakpoint.
+For simplicity, we start with the median lagged market beta as the single breakpoint.
 We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in <code><a href="https://rdrr.io/r/stats/weighted.mean.html">weighted.mean()</a></code>.</p>
 <div class="sourceCode" id="cb146"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">beta_portfolios</span> <span class="op">&lt;-</span> <span class="va">data_for_sorts</span> <span class="op">|&gt;</span></span>
@@ -295,7 +295,7 @@ Figure 7.1: Portfolios are sorted into deciles each month based on their estimat
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/ggplot.html">ggplot</a></span><span class="op">(</span><span class="fu"><a href="https://ggplot2.tidyverse.org/reference/aes.html">aes</a></span><span class="op">(</span>x <span class="op">=</span> <span class="va">beta</span>, y <span class="op">=</span> <span class="va">ret</span>, color <span class="op">=</span> <span class="va">portfolio</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_point.html">geom_point</a></span><span class="op">(</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/geom_abline.html">geom_abline</a></span><span class="op">(</span></span>
-<span>    intercept <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>    intercept <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span><span class="op">$</span><span class="va">rf</span><span class="op">)</span>,</span>
 <span>    slope <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html">mean</a></span><span class="op">(</span><span class="va">factors_ff_monthly</span><span class="op">$</span><span class="va">mkt_excess</span><span class="op">)</span>,</span>
 <span>    linetype <span class="op">=</span> <span class="st">"solid"</span></span>
 <span>  <span class="op">)</span> <span class="op">+</span></span>
@@ -381,14 +381,14 @@ Figure 7.3: We construct portfolios by sorting stocks into high and low based on
 </div>
 <p>Overall, this chapter shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next chapter, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis.</p>
 </div>
-<div id="exercises-5" class="section level2" number="7.7">
+<div id="exercises-6" class="section level2" number="7.7">
 <h2>
-<span class="header-section-number">7.7</span> Exercises<a class="anchor" aria-label="anchor" href="#exercises-5"><i class="fas fa-link"></i></a>
+<span class="header-section-number">7.7</span> Exercises<a class="anchor" aria-label="anchor" href="#exercises-6"><i class="fas fa-link"></i></a>
 </h2>
 <ol style="list-style-type: decimal">
 <li>Take the two long-short beta strategies based on different numbers of portfolios and compare the returns. Is there a significant difference in returns? How do the Sharpe ratios compare between the strategies? Find one additional portfolio evaluation statistic and compute it.</li>
 <li>We plotted the alphas of the ten beta portfolios above. Write a function that tests these estimates for significance. Which portfolios have significant alphas?</li>
-<li>The analysis here is based on betas from daily returns. However, we also computed betas from monthly returns. Re-run the analysis and point out differences in the results.</li>
+<li>The analysis here is based on betas from monthly returns. However, we also computed betas from daily returns. Re-run the analysis and point out differences in the results.</li>
 <li>Given the results in this chapter, can you define a long-short strategy that yields positive abnormal returns (i.e., alphas)? Plot the cumulative excess return of your strategy and the market excess return for comparison.</li>
 </ol>
 </div>
@@ -406,7 +406,7 @@ Figure 7.3: We construct portfolios by sorting stocks into high and low based on
 <li><a class="nav-link" href="#functional-programming-for-portfolio-sorts"><span class="header-section-number">7.4</span> Functional programming for portfolio sorts</a></li>
 <li><a class="nav-link" href="#more-performance-evaluation"><span class="header-section-number">7.5</span> More performance evaluation</a></li>
 <li><a class="nav-link" href="#the-security-market-line-and-beta-portfolios"><span class="header-section-number">7.6</span> The security market line and beta portfolios</a></li>
-<li><a class="nav-link" href="#exercises-5"><span class="header-section-number">7.7</span> Exercises</a></li>
+<li><a class="nav-link" href="#exercises-6"><span class="header-section-number">7.7</span> Exercises</a></li>
 </ul>
 
       <div class="book-extra">
@@ -424,7 +424,7 @@ Figure 7.3: We construct portfolios by sorting stocks into high and low based on
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-09-13.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-09-19.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

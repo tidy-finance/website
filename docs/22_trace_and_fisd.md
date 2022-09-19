@@ -19,7 +19,7 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 
 ## Bond data from WRDS 
 
-Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres`-connection described in the previous chapter. Additionally, we connect to our local `SQLite`-database, which we also introduced in the previous chapters.\index{WRDS}
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in the previous chapter. Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
 
 
 ```r
@@ -44,9 +44,10 @@ tidy_finance <- dbConnect(
 
 For research on US corporate bonds, the Mergent Fixed Income Securities Database (FISD) is the primary resource for bond characteristics.\index{Data!FISD} There is a [detailed manual](https://wrds-www.wharton.upenn.edu/documents/1364/FixedIncome_Securities_Master_Database_User_Guide_v4.pdf) on WRDS, so we only cover the necessary subjects here. FISD data comes in two main variants, namely, centered on issuers or issues. In either case, the most useful identifiers are [CUSIPs.](https://www.cusip.com/index.html) 9-digit CUSIPs identify securities issued by issuers. The issuers can be identified from the first six digits of a security CUSIP, which is also called 6-digit CUSIP. Both stocks and bonds have CUSIPs.\index{CUSIP} This connection would, in principle, allow matching them easily, but due to changing issuer details, this approach only yields small coverage.
 
-We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria [@bessembinder2006]. The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. As mentioned in the introduction of this chapter, corporate bonds are very diverse, and details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures. 
+We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria [@bessembinder2006]. The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. 
+Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures. 
 
-The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly (see, e.g., @Dick2012, @Ohara2021, among many others).
+The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly [see, e.g., @Dick2012; @Ohara2021, among many others].
 
 
 ```r
@@ -100,9 +101,9 @@ mergent <- tbl(
   select(
     complete_cusip, maturity,
     offering_amt, offering_date,
-    dated_date, first_interest_date,
+    dated_date, 
     interest_frequency, coupon,
-    last_interest_date, day_count_basis,
+    last_interest_date, 
     issue_id, issuer_id
   ) |>
   collect()
@@ -126,11 +127,10 @@ Finally, we save the bond characteristics to our local database. This selection 
 
 
 ```r
-mergent |>
   dbWriteTable(
     conn = tidy_finance,
     name = "mergent",
-    value = _,
+    value = mergent,
     overwrite = TRUE
   )
 ```
@@ -143,41 +143,31 @@ The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting
 
 Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-We store the code for cleaning enhanced TRACE with R on the following Github [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{Github!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the [gist](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4), download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in Chapter 3, and a start and end date, respectively.
+We store code for cleaning enhanced TRACE with R on the following Github [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{Github!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in Chapter 3, and a start and end date, respectively.
 
 
 ```r
 source_gist("3a05b3ab281563b2e94858451c2eb3a4")
 ```
 
-The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we defined below.\index{Paris (Climate) Agreement}
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
 
 ```r
 mergent_cusips <- mergent |>
   pull(complete_cusip)
 
-set.seed(123)
 mergent_parts <- split(
   mergent_cusips,
-  sample(1:10,
-    length(mergent_cusips),
-    replace = TRUE
-  )
+  rep(1:10, 
+      length.out = length(mergent_cusips))
 )
 ```
 
-Finally, we run a loop in the same style as in Chapter 2 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
+Finally, we run a loop in the same style as in Chapter 3 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
 
 
 ```r
-progress <- txtProgressBar(
-  min = 0,
-  max = length(mergent_parts),
-  initial = 0,
-  style = 3
-)
-
 for (j in 1:length(mergent_parts)) {
   trace_enhanced <- clean_enhanced_trace(
     cusips = mergent_parts[[j]],
@@ -186,19 +176,15 @@ for (j in 1:length(mergent_parts)) {
     end_date = ymd("2016-11-30")
   )
 
-  trace_enhanced |>
-    dbWriteTable(
+  dbWriteTable(
       conn = tidy_finance,
       name = "trace_enhanced",
-      value = _,
+      value = trace_enhanced,
       overwrite = ifelse(j == 1, TRUE, FALSE),
       append = ifelse(j != 1, TRUE, FALSE)
     )
 
-  setTxtProgressBar(progress, j)
 }
-
-close(progress)
 ```
 
 ## Insights into corporate bonds
@@ -209,9 +195,9 @@ We start by looking into the number of bonds outstanding over time and compare i
 
 
 ```r
-bonds_outstanding <- expand_grid("date" = seq(as.Date("1990-01-01"), 
-             as.Date("2018-12-01"), 
-             by = "quarter"), 
+bonds_outstanding <- expand_grid("date" = seq(as.Date("1990-01-01"),
+                                              as.Date("2018-12-01"), 
+                                              by = "quarter"), 
                                  "complete_cusip" = mergent$complete_cusip) |> 
   left_join(mergent |> select(complete_cusip, 
                               offering_date,
@@ -275,21 +261,19 @@ mergent |>
     sd = sd(value),
     min = min(value),
     q05 = quantile(value, 0.05),
-    q25 = quantile(value, 0.25),
     q50 = quantile(value, 0.50),
-    q75 = quantile(value, 0.75),
     q95 = quantile(value, 0.95),
     max = max(value)
   )
 ```
 
 ```
-# A tibble: 3 × 10
-  measure    mean     sd   min   q05   q25    q50   q75    q95    max
-  <chr>     <dbl>  <dbl> <dbl> <dbl> <dbl>  <dbl> <dbl>  <dbl>  <dbl>
-1 coupon     6.21   2.43 0     2.25   4.8    6.38   7.5 9.86e0    39 
-2 maturity  10.1    9.13 0.252 1.26   5.01   8.02  10.0 3.00e1   100.
-3 offerin… 357.   545.   0.001 0.875 11.3  200    500   1.25e3 15000 
+# A tibble: 3 × 8
+  measure        mean     sd   min   q05    q50     q95    max
+  <chr>         <dbl>  <dbl> <dbl> <dbl>  <dbl>   <dbl>  <dbl>
+1 coupon         6.21   2.43 0     2.25    6.38    9.86    39 
+2 maturity      10.1    9.13 0.252 1.26    8.02   30.0    100.
+3 offering_amt 357.   545.   0.001 0.875 200    1250    15000 
 ```
 
 We see that the average bond has an offering amount of over 350 million USD, which cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons. 
@@ -300,7 +284,7 @@ Finally, let us compute some summary statistics for the trades in this market. T
 ```r
 trace_enhanced |> 
   group_by(trd_exctn_dt) |> 
-  summarise(trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
+  summarize(trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
             trade_number = n(),
             .groups = "drop") |> 
   pivot_longer(cols = c(trade_size, trade_number),
@@ -311,28 +295,25 @@ trace_enhanced |>
     sd = sd(value),
     min = min(value),
     q05 = quantile(value, 0.05),
-    q25 = quantile(value, 0.25),
     q50 = quantile(value, 0.50),
-    q75 = quantile(value, 0.75),
     q95 = quantile(value, 0.95),
     max = max(value)
   )
 ```
 
 ```
-# A tibble: 2 × 10
-  measure        mean    sd   min    q05    q25    q50    q75    q95
-  <chr>         <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
-1 trade_number 25921. 5460. 438   17851. 23202  26025  29097  34458.
-2 trade_size   12968. 3574.  17.2  6138. 11106. 13408. 15333. 17851.
-# … with 1 more variable: max <dbl>
+# A tibble: 2 × 8
+  measure        mean    sd   min    q05    q50    q95    max
+  <chr>         <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
+1 trade_number 25921. 5460. 438   17851. 26025  34458. 40889 
+2 trade_size   12968. 3574.  17.2  6138. 13408. 17851. 20905.
 ```
 
 On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
 ## Exercises
 
-1. Summarize the amount outstanding over time and describe the resulting graph.
+1. Summarize the amount outstanding of all bonds over time and describe the resulting graph. 
 1. Compute the number of days each bond is traded (accounting for the bonds maturity and issuance). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
 2. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
-3. Download the TRACE data until the end of September 2021. You want to download the data completely new, rather than adding the new information. Can you find a reason why?
+3. Download the TRACE data until the end of September 2021. Hint: You want to download the data completely new, rather than adding the new information. Can you find a reason why?

@@ -16,7 +16,7 @@ library(RSQLite)
 
 ## Data preparation
 
-To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in chapters 2-4.\index{Data!CRSP}
+To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}
 
 
 ```r
@@ -37,7 +37,7 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
 ```
 
 Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t − 12$ and $t − 2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
-To construct the correct lagged values, we use the approach introduced in chapter 3.\index{Data!CRSP}
+To construct the correct lagged values, we use the approach introduced in Chapter 3.\index{Data!CRSP}
 
 
 ```r
@@ -119,7 +119,7 @@ We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'
 `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt` which deviate from the benchmark portfolio depending on the stock characteristics.
 
 The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via the parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again:
-$$w_{i,t}^+ = \frac{\max(0, w_{i,t})}{\sum\limits_{j=1}^{N_t}\max(0, w_{i,t})}.$$
+$$w_{i,t}^+ = \frac{\max(0, w_{i,t})}{\sum_{j=1}^{N_t}\max(0, w_{i,t})}.$$
 
 
 The following function computes the optimal portfolio weights in the way just described.  
@@ -170,6 +170,7 @@ weights_crsp <- compute_portfolio_weights(theta,
 
 ## Portfolio performance
 
+\index{Performance evaluation}
 Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.\index{Power utility}
 
 

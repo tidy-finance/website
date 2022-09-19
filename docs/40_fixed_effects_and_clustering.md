@@ -62,7 +62,7 @@ data_investment <- data_investment |>
   )
 ```
 
-Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988; @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the report book value of assets is strictly positive.
+Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988; @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the reported book value of assets is strictly positive.
 
 
 ```r
@@ -118,9 +118,7 @@ data_investment |>
     sd = sd(value),
     min = min(value),
     q05 = quantile(value, 0.05),
-    q25 = quantile(value, 0.25),
     q50 = quantile(value, 0.50),
-    q75 = quantile(value, 0.75),
     q95 = quantile(value, 0.95),
     max = max(value),
     n = n(),
@@ -129,13 +127,12 @@ data_investment |>
 ```
 
 ```
-# A tibble: 3 × 11
-  measure    mean     sd    min      q05      q25    q50    q75   q95
-  <chr>     <dbl>  <dbl>  <dbl>    <dbl>    <dbl>  <dbl>  <dbl> <dbl>
-1 cash_fl… 0.0145 0.266  -1.50  -4.57e-1 -0.00321 0.0649 0.131  0.273
-2 investm… 0.0584 0.0778  0      7.27e-4  0.0122  0.0333 0.0719 0.208
-3 tobins_q 1.99   1.69    0.571  7.92e-1  1.05    1.38   2.19   5.33 
-# … with 2 more variables: max <dbl>, n <int>
+# A tibble: 3 × 9
+  measure      mean     sd    min      q05    q50   q95    max      n
+  <chr>       <dbl>  <dbl>  <dbl>    <dbl>  <dbl> <dbl>  <dbl>  <int>
+1 cash_flows 0.0145 0.266  -1.50  -4.57e-1 0.0649 0.273  0.480 124178
+2 investmen… 0.0584 0.0778  0      7.27e-4 0.0333 0.208  0.467 124178
+3 tobins_q   1.99   1.69    0.571  7.92e-1 1.38   5.33  10.9   124178
 ```
 
 ## Fixed effects 
@@ -156,7 +153,7 @@ model_ols
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,176 
+Observations: 124,178 
 Standard-errors: IID 
             Estimate Std. Error t value  Pr(>|t|)    
 (Intercept)  0.04243   0.000342   124.1 < 2.2e-16 ***
@@ -164,14 +161,14 @@ cash_flows   0.05143   0.000835    61.6 < 2.2e-16 ***
 tobins_q     0.00767   0.000132    58.2 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.076041   Adj. R2: 0.044435
+RMSE: 0.076041   Adj. R2: 0.044434
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
 
 One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects* - i.e., model parameters that are fixed for specific groups [e.g., @Wooldridge2010]. In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
 $$ \text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
-where $\alpha_i$ is the firm-specific mean investment across all years. In fact, you could also compute firms' investments as deviations from the firms' average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm's average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
+where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms' investments as deviations from the firms' average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm's average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
 
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 
@@ -186,7 +183,7 @@ model_fe_firm
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,176 
+Observations: 124,178 
 Fixed-effects: gvkey: 13,899
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -194,7 +191,7 @@ cash_flows   0.0146   0.000963    15.1 < 2.2e-16 ***
 tobins_q     0.0113   0.000136    82.6 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.05008     Adj. R2: 0.533298
+RMSE: 0.05008     Adj. R2: 0.533303
                 Within R2: 0.059427
 ```
 
@@ -216,7 +213,7 @@ model_fe_firmyear
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,176 
+Observations: 124,178 
 Fixed-effects: gvkey: 13,899,  year: 34
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -224,8 +221,8 @@ cash_flows   0.0182   0.000941    19.3 < 2.2e-16 ***
 tobins_q     0.0102   0.000135    75.5 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.048806     Adj. R2: 0.556614
-                 Within R2: 0.051547
+RMSE: 0.048805     Adj. R2: 0.556619
+                 Within R2: 0.051548
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
@@ -251,7 +248,7 @@ gvkey                          No               Yes
 year                           No                No
 _______________ _________________ _________________
 VCOV type                     IID               IID
-Observations              124,176           124,176
+Observations              124,178           124,178
 R2                        0.04445           0.58554
 Within R2                      --           0.05943
 
@@ -259,15 +256,15 @@ Within R2                      --           0.05943
 Dependent Var.:   investment_lead
                                  
 (Intercept)                      
-cash_flows      0.0182*** (19.29)
+cash_flows      0.0182*** (19.30)
 tobins_q        0.0102*** (75.51)
 Fixed-Effects:  -----------------
 gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type                     IID
-Observations              124,176
-R2                        0.60636
+Observations              124,178
+R2                        0.60637
 Within R2                 0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
@@ -279,7 +276,7 @@ Apart from biased estimators, we usually have to deal with potentially complex d
 
 In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* [@Petersen2008].\index{Standard errors!Clustered} The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form. As the number of clusters grows, the cluster-robust standard errors become consistent [@Lang2007;@Wooldridge2010]. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient [@Cameron2011].
 
-Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.
+Instead of relying on the iid assumption, we can use the cluster option in the `feols`-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.
 
 
 ```r
@@ -296,6 +293,7 @@ model_cluster_firmyear <- feols(
 )
 ```
 
+\index{Robustness tests}
 The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin's q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin's q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$ statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 
@@ -309,29 +307,29 @@ etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
                 model_fe_firmyear model_cluster_f..
 Dependent Var.:   investment_lead   investment_lead
                                                    
-cash_flows      0.0182*** (19.29) 0.0182*** (11.18)
+cash_flows      0.0182*** (19.30) 0.0182*** (11.18)
 tobins_q        0.0102*** (75.51) 0.0102*** (35.63)
 Fixed-Effects:  ----------------- -----------------
 gvkey                         Yes               Yes
 year                          Yes               Yes
 _______________ _________________ _________________
 VCOV type                     IID         by: gvkey
-Observations              124,176           124,176
-R2                        0.60636           0.60636
+Observations              124,178           124,178
+R2                        0.60637           0.60637
 Within R2                 0.05155           0.05155
 
                 model_cluster_f..
 Dependent Var.:   investment_lead
                                  
-cash_flows      0.0182*** (9.458)
+cash_flows      0.0182*** (9.459)
 tobins_q        0.0102*** (16.36)
 Fixed-Effects:  -----------------
 gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type        by: gvkey & year
-Observations              124,176
-R2                        0.60636
+Observations              124,178
+R2                        0.60637
 Within R2                 0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1

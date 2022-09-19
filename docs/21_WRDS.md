@@ -2,7 +2,7 @@
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
 
-First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
+First, we load the packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
 ```r
 library(tidyverse)
@@ -116,10 +116,7 @@ The first additional variable we create is market capitalization (`mktcap`), whi
 crsp_monthly <- crsp_monthly |>
   mutate(
     mktcap = abs(shrout * altprc) / 1000000,
-    mktcap = if_else(mktcap == 0,
-      as.numeric(NA),
-      mktcap
-    )
+    mktcap = na_if(mktcap, 0)
   )
 ```
 
@@ -222,10 +219,9 @@ Finally, we store the monthly CRSP file in our database.
 
 
 ```r
-crsp_monthly |>
   dbWriteTable(tidy_finance,
     "crsp_monthly",
-    value = _,
+    value = crsp_monthly,
     overwrite = TRUE
   )
 ```
@@ -234,7 +230,7 @@ crsp_monthly |>
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ exhibits a considerable large number of stocks. The number of stocks on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2,779 stocks on NASDAQ, 1,395 on NYSE, 145 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerable large number of stocks. The number of stocks listed on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2,779 stocks with primary listing on NASDAQ, 1,395 on NYSE, 145 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 
 ```r
@@ -255,7 +251,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig211)Number of stocks in the CRSP sample listed at each of the US exchanges.</p>
 </div>
 
-Next, we look at the aggregate market capitalization of the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of `r `year(end_date)` USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization grouped by the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of 2021 USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
 
 
 ```r
@@ -295,7 +291,7 @@ cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |>
   collect()
 ```
 
-Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is apparently in Manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing Manufacturing at the end of our sample period.
+Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is apparently in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
 
 
 ```r
@@ -357,7 +353,7 @@ crsp_monthly_industry |>
 
 ## Daily CRSP data
 
-Before we turn to accounting data, we also want to provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
+Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
@@ -387,7 +383,7 @@ for (j in 1:length(permnos)) {
     collect() |>
     drop_na()
 
-  if (nrow(crsp_daily_sub)) {
+  if (nrow(crsp_daily_sub) > 0) {
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
       left_join(factors_ff_daily |>
@@ -398,10 +394,9 @@ for (j in 1:length(permnos)) {
       ) |>
       select(permno, date, month, ret_excess)
 
-    crsp_daily_sub |>
-      dbWriteTable(tidy_finance,
+    dbWriteTable(tidy_finance,
         "crsp_daily",
-        value = _,
+        value = crsp_daily_sub,
         overwrite = ifelse(j == 1, TRUE, FALSE),
         append = ifelse(j != 1, TRUE, FALSE)
       )
@@ -416,7 +411,7 @@ crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
 
 ## Preparing Compustat data
 
-Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence](https://www.spglobal.com/marketintelligence/en/), which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
+Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence,](https://www.spglobal.com/marketintelligence/en/) which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
 
 To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies.
 
@@ -482,10 +477,9 @@ compustat <- compustat |>
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
 
 ```r
-compustat |>
   dbWriteTable(tidy_finance,
     "compustat",
-    value = _,
+    value = compustat,
     overwrite = TRUE
   )
 ```
@@ -524,7 +518,7 @@ ccmxpf_linktable
 2  10015 001001 1983-09-20 1986-07-31
 3  10023 001002 1972-12-14 1973-06-05
 4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-09-13
+5  54594 001004 1972-04-24 2022-09-19
 # … with 31,765 more rows
 ```
 
@@ -545,10 +539,9 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 
 ```r
-crsp_monthly |>
   dbWriteTable(tidy_finance,
     "crsp_monthly",
-    value = _,
+    value = crsp_monthly,
     overwrite = TRUE
   )
 ```
@@ -609,4 +602,4 @@ dbListObjects(wrds)
 1. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?
 1. `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by *month* of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
 1. Go back to the original Compustat data in `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
-1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, used the matched sample to plot book equity against market capitalization. How are these two variables related?
+1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, use the matched sample to plot book equity against market capitalization. How are these two variables related?

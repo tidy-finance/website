@@ -2,7 +2,7 @@
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking.
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Hasler2021, @Soebhag2022, and @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking.
 There is arguably a thin line between p-hacking and conducting robustness tests. Our purpose here is to illustrate the substantial variation that can arise along the evidence-generating process.
 
 The chapter relies on the following set of packages:
@@ -110,7 +110,7 @@ crsp_monthly |>
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.\index{Summary statistics}
 
-The resulting table shows that firms listed on NYSE are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
+The resulting table shows that firms listed on NYSE in December 2021 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 
 ```r
@@ -122,9 +122,7 @@ create_summary <- function(data, column_name) {
       sd = sd(value),
       min = min(value),
       q05 = quantile(value, 0.05),
-      q25 = quantile(value, 0.25),
       q50 = quantile(value, 0.50),
-      q75 = quantile(value, 0.75),
       q95 = quantile(value, 0.95),
       max = max(value),
       n = n()
@@ -142,22 +140,21 @@ crsp_monthly |>
 ```
 
 ```
-# A tibble: 5 × 11
-  exchange   mean     sd      min     q05    q25    q50    q75    q95
-  <chr>     <dbl>  <dbl>    <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
-1 AMEX       415.  2181.     7.57    12.6 3.81e1 7.58e1   213.  1218.
-2 NASDAQ    8649. 90038.     7.01    29.1 1.31e2 4.28e2  1847. 18781.
-3 NYSE     17858. 48619.    23.9    195.  9.54e2 3.43e3 11629. 80748.
-4 Other    13906.    NA  13906.   13906.  1.39e4 1.39e4 13906. 13906.
-5 Overall  11348. 77458.     7.01    34.0 1.95e2 7.94e2  3909. 40647.
-# … with 2 more variables: max <dbl>, n <int>
+# A tibble: 5 × 9
+  exchange   mean     sd      min     q05     q50    q95    max     n
+  <chr>     <dbl>  <dbl>    <dbl>   <dbl>   <dbl>  <dbl>  <dbl> <int>
+1 AMEX       415.  2181.     7.57    12.6    75.8  1218. 2.57e4   145
+2 NASDAQ    8649. 90038.     7.01    29.1   428.  18781. 2.90e6  2779
+3 NYSE     17858. 48619.    23.9    195.   3434.  80748. 4.73e5  1395
+4 Other    13906.    NA  13906.   13906.  13906.  13906. 1.39e4     1
+5 Overall  11348. 77458.     7.01    34.0   794.  40647. 2.90e6  4320
 ```
 
 ## Univariate size portfolios with flexible breakpoints
 
 In the previous chapter, we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
 
-To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks from NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
+To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
 
 ```r
@@ -274,9 +271,10 @@ p_hacking_setup <- expand_grid(
   exchanges = list("NYSE", c("NYSE", "NASDAQ", "AMEX")),
   value_weighted = c(TRUE, FALSE),
   data = parse_exprs(
-    'crsp_monthly; crsp_monthly |> filter(industry != "Finance");
-   crsp_monthly |> filter(month < "1990-06-01");
-   crsp_monthly |> filter(month >="1990-06-01")'
+    'crsp_monthly; 
+     crsp_monthly |> filter(industry != "Finance");
+     crsp_monthly |> filter(month < "1990-06-01");
+     crsp_monthly |> filter(month >="1990-06-01")'
   )
 )
 ```
@@ -348,7 +346,7 @@ p_hacking_results |>
 
 ## Exercises
 
-1. We gained several insights on the size distribution above. However, we did not analyze the average size across exchanges and industries. Which exchanges/industries have the largest firms? Plot the average firm size for the three exchanges over time. What do you see?
+1. We gained several insights on the size distribution above. However, we did not analyze the average size across listing exchanges and industries. Which listing exchanges/industries have the largest firms? Plot the average firm size for the three listing exchanges over time. What do you conclude?
 1. We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.
 1. The returns that we analyse above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_portfolio_returns()` to output the CAPM alpha or beta instead of the average excess return. 
 1. While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.

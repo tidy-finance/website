@@ -1,7 +1,7 @@
 
 # Value and bivariate sorts
 
-In this chapter, we extend univariate portfolio analysis to bivariate sorts, which means we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature and are the basis for the Fama & French three factors. However, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
+In this chapter, we extend univariate portfolio analysis to bivariate sorts, which means we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature and are the basis for the Fama and French three factors. However, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required, which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
@@ -18,7 +18,7 @@ library(sandwich)
 
 ## Data preparation
 
-First, we load the necessary data from our `SQLite`-database introduced in chapters 2-4. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we load the necessary data from our `SQLite`-database introduced in Chapters 2-4. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
@@ -39,7 +39,7 @@ crsp_monthly <- crsp_monthly |>
   drop_na()
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is *Compustat*. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.
+Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.\index{Data!Compustat}
 
 
 ```r
@@ -56,7 +56,7 @@ be <- compustat |>
 
 A fundamental problem in handling accounting data is the *look-ahead bias* - we must not include data in forming a portfolio that is not public knowledge at the time. Of course, researchers have more information when looking into the past than agents had at that moment. However, abnormal excess returns from a trading strategy should not rely on an information advantage because the differential cannot be the result of informed agents' trades. Hence, we have to lag accounting information.
 
-We continue to lag market capitalization and firm size by one month.\index{Market capitalization}\index{Firm size} Then, we compute the book-to-market ratio, which relates a firm's book equity to its market equity.\index{Book equity}\index{Book-to-market ratio} Firms with high (low) book-to-market are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.^[The definition of a time lag is another choice a researcher has to make, similar to breakpoint choices as we describe in the section on p-hacking.]
+We continue to lag market capitalization and firm size by one month.\index{Market capitalization}\index{Firm size} Then, we compute the book-to-market ratio, which relates a firm's book equity to its market equity.\index{Book equity}\index{Book-to-market ratio} Firms with high (low) book-to-market ratio are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.^[The definition of a time lag is another choice a researcher has to make, similar to breakpoint choices as we describe in the section on p-hacking.]
 
 Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fill()`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `group_by()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
@@ -128,7 +128,7 @@ After these data preparation steps, we present bivariate portfolio sorts on an i
 
 Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms.\index{Value premium} The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
 
-To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_bm`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
+To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_me`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 
 ```r
@@ -174,7 +174,7 @@ mean(value_premium$value_premium * 100)
 [1] 0.384
 ```
 
-The resulting annualized value premium is 3.936 percent.
+The resulting annualized value premium is 4.608 percent.
 
 ## Dependent sorts
 
@@ -222,7 +222,7 @@ mean(value_premium$value_premium * 100)
 [1] 0.329
 ```
 
-The value premium from dependent sorts is 3.18 percent per year.
+The value premium from dependent sorts is 3.948 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the line of the previous chapter, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

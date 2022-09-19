@@ -435,10 +435,9 @@ Finally, we write the estimates to our database such that we can use them in lat
 
 
 ```r
-beta |>
   dbWriteTable(tidy_finance,
     "beta",
-    value = _,
+    value = beta,
     overwrite = TRUE
   )
 ```
@@ -487,9 +486,7 @@ beta_long |>
     sd = sd(value),
     min = min(value),
     q05 = quantile(value, 0.05),
-    q25 = quantile(value, 0.25),
     q50 = quantile(value, 0.50),
-    q75 = quantile(value, 0.75),
     q95 = quantile(value, 0.95),
     max = max(value),
     n = n()
@@ -497,11 +494,11 @@ beta_long |>
 ```
 
 ```
-# A tibble: 2 × 11
-  name   mean    sd   min    q05   q25   q50   q75   q95   max      n
-  <chr> <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>  <int>
-1 beta… 0.749 0.926 -43.7 -0.447 0.207 0.686  1.22  2.23  56.6 3.23e6
-2 beta… 1.10  0.713 -13.0  0.125 0.634 1.03   1.47  2.32  10.3 2.10e6
+# A tibble: 2 × 9
+  name          mean    sd   min    q05   q50   q95   max       n
+  <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl>   <int>
+1 beta_daily   0.749 0.926 -43.7 -0.447 0.686  2.23  56.6 3233745
+2 beta_monthly 1.10  0.713 -13.0  0.125 1.03   2.32  10.3 2102936
 ```
 
 The summary statistics also look plausible for the two estimation procedures. 
@@ -529,3 +526,8 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 1. Compute beta estimates based on monthly data using 5 years of data and impose different numbers of minimum observations. How does the share of permno-month observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
 1. Instead of using `future_map()`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
 1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? 
+1. Compute beta estimates for multi-factor models such as the Fama-French 3 factor model. For that purpose, you extend your regression 
+$$
+r_{i, t} - r_{f, t} = \alpha_i + \sum\limits_{j=1}^k\beta_{i,k}(r_{j, t}-r_{f,t})+\varepsilon_{i, t}
+$$
+where $r_{j, t}$ are the $k$ factor returns. Thus, you estimate 4 parameters ($alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors. 

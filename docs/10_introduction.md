@@ -2,15 +2,13 @@
 
 # Introduction to Tidy Finance
 
-The main aim of this chapter is to familiarize yourself with the `tidyverse`. 
-We start by downloading and visualizing stock data before moving to a simple portfolio choice problem. 
-These examples introduce you to our approach of *Tidy Finance*.
+The main aim of this chapter is to familiarize yourself with the tidyverse. We start by downloading and visualizing stock data from Yahoo!Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with stock market data
 
 At the start of each session, we load the required packages. 
 Throughout the entire book, we always use the `tidyverse` [@Wickham2019].
-In this chapter, we also load the convenient `tidyquant` package  [@tidyquant] to download price data. This package provides a convenient wrapper to various quantitative functions compatible with the 'tidyverse'.
+In this chapter, we also load the convenient `tidyquant` package  [@tidyquant] to download price data. This package provides a convenient wrapper to various quantitative functions compatible with the `tidyverse`.
 
 You typically have to install a package once before you can load it. 
 In case you have not done this yet, call `install.packages("tidyquant")`. \index{tidyquant} 
@@ -54,7 +52,7 @@ The function returns a tibble with eight quite self-explanatory columns: `symbol
 The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. 
 These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.  
 
-Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices. This package takes care of visualization tasks based on the principles of the Grammar of Graphics [@Wilkinson2012].
+Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices. This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].
 
 
 ```r
@@ -73,7 +71,7 @@ prices |>
 <p class="caption">(\#fig:fig100)Prices are in USD, adjusted for divident payments and stock splits.</p>
 </div>
 
-\index{Returns} Instead of analyzing prices, we compute daily returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
+\index{Returns} Instead of analyzing prices, we compute daily net returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
 In that context, the function `lag()` is helpful, which returns the previous value in a vector. 
 
 
@@ -116,7 +114,7 @@ The 5 percent quantile is closely connected to the (historical) Value-at-risk, a
 
 
 ```r
-quantile_05 <- quantile(returns |> pull(ret) * 100, 0.05)
+quantile_05 <- quantile(returns |> pull(ret) * 100, probs = 0.05)
 
 returns |>
   ggplot(aes(x = ret * 100)) +
@@ -132,8 +130,8 @@ returns |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig101-1.png" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows an histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed  around 0. The vertical line indicates that the historical 5 % quantile of daily returns was around negative 3 %" width="90%" />
-<p class="caption">(\#fig:fig101)The dotted vertical line indicates the historical 5 % quantile.</p>
+<img src="10_introduction_files/figure-html/fig101-1.png" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows an histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed  around 0. The vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent" width="90%" />
+<p class="caption">(\#fig:fig101)The dotted vertical line indicates the historical 5 percent quantile.</p>
 </div>
 
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. 
@@ -162,7 +160,7 @@ returns |>
 1          0.130         2.52         -51.9          13.9
 ```
 
-We see that the maximum *daily* return was 13.905 %. Perhaps not surprisingly, the daily average return is close to but slightly above 0. 
+We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the daily average return is close to but slightly above 0. 
 In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.     
 You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data, defined by year. The summary statistics therefore allow an eyeball analysis of the time-series dynamics of the return distribution. 
 
@@ -232,15 +230,15 @@ ticker
 # A tibble: 30 × 8
   symbol company          ident…¹ sedol weight sector share…² local…³
   <chr>  <chr>            <chr>   <chr>  <dbl> <chr>    <dbl> <chr>  
-1 UNH    UnitedHealth Gr… 91324P… 2917… 0.108  Healt… 5738491 USD    
-2 GS     Goldman Sachs G… 38141G… 2407… 0.0697 Finan… 5738491 USD    
-3 HD     Home Depot Inc.  437076… 2434… 0.0606 Consu… 5738491 USD    
-4 MSFT   Microsoft Corpo… 594918… 2588… 0.0543 Infor… 5738491 USD    
-5 MCD    McDonald's Corp… 580135… 2550… 0.0530 Consu… 5738491 USD    
+1 UNH    UnitedHealth Gr… 91324P… 2917… 0.111  Healt… 5738247 USD    
+2 GS     Goldman Sachs G… 38141G… 2407… 0.0698 Finan… 5738247 USD    
+3 HD     Home Depot Inc.  437076… 2434… 0.0590 Consu… 5738247 USD    
+4 MCD    McDonald's Corp… 580135… 2550… 0.0545 Consu… 5738247 USD    
+5 MSFT   Microsoft Corpo… 594918… 2588… 0.0523 Infor… 5738247 USD    
 # … with 25 more rows, and abbreviated variable names ¹​identifier,
 #   ²​shares_held, ³​local_currency
 ```
-Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). 
+Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on NASDAQ exchange). \index{Exchange!NASDAQ}
 
 
 ```r
@@ -251,8 +249,8 @@ index_prices <- tq_get(ticker,
 )
 ```
 
-The resulting file contains 163313 daily observations for 30 different corporations. 
-The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative geoms could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
+The resulting tibble contains 163403 daily observations for 30 different corporations. 
+The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
 ```r
@@ -310,34 +308,34 @@ all_returns |>
    symbol daily_mean daily_sd daily_min daily_max
    <chr>       <dbl>    <dbl>     <dbl>     <dbl>
  1 AMGN       0.0470     1.97     -13.4      15.1
- 2 AXP        0.0533     2.30     -17.6      21.9
- 3 BA         0.0557     2.23     -23.8      24.3
- 4 CAT        0.0671     2.04     -14.5      14.7
- 5 CRM        0.115      2.69     -27.1      26.0
- 6 CSCO       0.0307     2.38     -16.2      24.4
- 7 CVX        0.0537     1.76     -22.1      22.7
- 8 DIS        0.0465     1.94     -18.4      16.0
- 9 DOW        0.0533     2.64     -21.7      20.9
-10 GS         0.0548     2.32     -19.0      26.5
-11 HD         0.0526     1.94     -28.7      14.1
-12 HON        0.0496     1.94     -17.4      28.2
-13 IBM        0.0257     1.65     -15.5      12.0
-14 INTC       0.0304     2.36     -22.0      20.1
-15 JNJ        0.0398     1.22     -15.8      12.2
-16 JPM        0.0563     2.43     -20.7      25.1
-17 KO         0.0331     1.32     -10.1      13.9
-18 MCD        0.0534     1.48     -15.9      18.1
-19 MMM        0.0383     1.50     -12.9      12.6
-20 MRK        0.0342     1.68     -26.8      13.0
-21 MSFT       0.0527     1.93     -15.6      19.6
-22 NKE        0.0731     1.92     -19.8      15.5
-23 PG         0.0365     1.34     -30.2      12.0
-24 TRV        0.0550     1.84     -20.8      25.6
-25 UNH        0.0991     1.98     -18.6      34.8
-26 V          0.0938     1.90     -13.6      15.0
-27 VZ         0.0250     1.51     -11.8      14.6
-28 WBA        0.0274     1.81     -15.0      16.6
-29 WMT        0.0309     1.50     -11.4      11.7
+ 2 AXP        0.0527     2.30     -17.6      21.9
+ 3 BA         0.0549     2.23     -23.8      24.3
+ 4 CAT        0.0663     2.04     -14.5      14.7
+ 5 CRM        0.114      2.69     -27.1      26.0
+ 6 CSCO       0.0301     2.38     -16.2      24.4
+ 7 CVX        0.0533     1.76     -22.1      22.7
+ 8 DIS        0.0457     1.94     -18.4      16.0
+ 9 DOW        0.0483     2.64     -21.7      20.9
+10 GS         0.0545     2.32     -19.0      26.5
+11 HD         0.0522     1.94     -28.7      14.1
+12 HON        0.0486     1.94     -17.4      28.2
+13 IBM        0.0255     1.65     -15.5      12.0
+14 INTC       0.0300     2.36     -22.0      20.1
+15 JNJ        0.0403     1.22     -15.8      12.2
+16 JPM        0.0562     2.43     -20.7      25.1
+17 KO         0.0328     1.32     -10.1      13.9
+18 MCD        0.0532     1.48     -15.9      18.1
+19 MMM        0.0375     1.50     -12.9      12.6
+20 MRK        0.0344     1.68     -26.8      13.0
+21 MSFT       0.0519     1.93     -15.6      19.6
+22 NKE        0.0725     1.92     -19.8      15.5
+23 PG         0.0363     1.34     -30.2      12.0
+24 TRV        0.0549     1.84     -20.8      25.6
+25 UNH        0.0992     1.98     -18.6      34.8
+26 V          0.0925     1.90     -13.6      15.0
+27 VZ         0.0246     1.51     -11.8      14.6
+28 WBA        0.0268     1.81     -15.0      16.6
+29 WMT        0.0305     1.50     -11.4      11.7
 30 AAPL       0.124      2.51     -51.9      13.9
 ```
 
@@ -347,7 +345,7 @@ Note that you are now also equipped with all tools to download price data for *e
 
 Of course, aggregation across other variables than `symbol` can make sense as well. For instance, suppose you are interested in answering the question: are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow Jones constituents in USD. 
 Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume}
-Thus, we multiply the trading volume with the daily closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e9` denotes daily trading volume in billion USD.  
+Thus, we multiply the trading volume with the daily closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e9` (R can handle scientific notation) denotes daily trading volume in billion USD.  
 
 
 ```r
@@ -401,12 +399,12 @@ Do you understand where the warning `## Warning: Removed 1 rows containing missi
 ## Portfolio choice problems
 
 In the previous part, we show how to download stock market data and inspect it with graphs and summary statistics. 
-Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets.\index{Portfolio Choice} The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor* [@Markowitz1952]. 
+Now, we move to a typical question in Finance, namely, how to optimally allocate wealth across different assets.\index{Portfolio choice} The standard framework for optimal portfolio selection considers investors that prefer higher future returns but dislike future return volatility (defined as the square root of the return variance): the *mean-variance investor* [@Markowitz1952]. 
 
 \index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfy the condition that no other portfolio exists with a higher expected return but with the same volatility (the square-root of the variance, i.e., the risk), see, e.g., @Merton1972. 
 We compute and visualize the efficient frontier for several stocks. 
 First, we extract each asset's *monthly* returns. 
-In order to keep things simple, we work with a balanced panel and exclude DOW constituents for which we do not observe a price on every single trading day since 2000.
+In order to keep things simple, we work with a balanced panel and exclude DOW constituents for which we do not observe a price on every single trading day since the year 2000.
 
 
 ```r
@@ -428,7 +426,7 @@ returns <- index_prices |>
 
 Here, `floor_date()` is a function from the `lubridate` package [@lubridate] which provides useful functions to work with dates and time. 
 
-Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ 
+Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ 
 We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`.
 We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. 
 Thus, for simplicity we refer to $\Sigma$ and $\mu$ instead of explictly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account. 
@@ -450,7 +448,7 @@ Then, we compute the minimum variance portfolio weights $\omega_\text{mvp}$ as w
 \index{Minimum variance portfolio} Recall that the minimum variance portfolio is the vector of portfolio weights that are the solution to 
 $$\omega_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } \sum\limits_{i=1}^Nw_i = 1.$$
 The constraint that weights sum up to one simply implies that all funds are distributed across the available asset universe, there is no possibility to retain cash. 
-It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones and $\Sigma^{-1}$ is the inverse of $\Sigma$. Note, that $\iota'\Sigma^{-1}\iota = \sum\limits_{j=1}^N\sum\limits_{i = 1}^N \sigma_{ij}$ where $\sigma_{ij}$ is the $(i,j)$-th element of $\Sigma$.
+It is easy to show analytically, that $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$ where $\iota$ is a vector of ones and $\Sigma^{-1}$ is the inverse of $\Sigma$. 
 
 
 ```r
@@ -460,22 +458,22 @@ mvp_weights <- solve(Sigma) %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 
 tibble(
-  expected_ret = as.numeric(t(mvp_weights) %*% mu),
+  average_ret = as.numeric(t(mvp_weights) %*% mu),
   volatility = as.numeric(sqrt(t(mvp_weights) %*% Sigma %*% mvp_weights))
 )
 ```
 
 ```
 # A tibble: 1 × 2
-  expected_ret volatility
-         <dbl>      <dbl>
-1      0.00784     0.0313
+  average_ret volatility
+        <dbl>      <dbl>
+1     0.00780     0.0313
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!
 
-Next, we set out to find the weights for a portfolio that achieves three times the expected return of the minimum variance portfolio. 
+Next, we set out to find the weights for a portfolio that achieves, as an example, three times the expected return of the minimum variance portfolio. 
 However, mean-variance investors are not interested in any portfolio that achieves the required return but rather in the efficient portfolio, i.e., the portfolio with the lowest standard deviation. 
 If you wonder where the solution $\omega_\text{eff}$ comes from: \index{Efficient portfolio} The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum acceptable expected return* $\bar{\mu}$. Hence, their objective function is to choose $\omega_\text{eff}$ as the solution to
 $$\omega_\text{eff}(\bar{\mu}) = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
@@ -497,7 +495,7 @@ efp_weights <- mvp_weights +
 
 ## The efficient frontier 
 
-\index{Separation theorem} The two mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $w_{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{eff}(\bar{\mu})$ like above), we can characterize the entire efficient frontier by combining these two portfolios. 
+\index{Separation theorem} The two mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $w_{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{eff}(\bar{\mu})$, we can characterize the entire efficient frontier by combining these two portfolios. 
 That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. 
 \index{Efficient frontier} The code below implements the construction of the *efficient frontier*, which characterizes the highest expected return achievable at each level of risk. To understand the code better, make sure to familiarize yourself with the inner workings of the `for` loop.
 
@@ -520,7 +518,7 @@ for (i in seq_along(c)) {
 The code above proceeds in two steps: First, we compute a vector of combination weights $c$ and then we evaluate the resulting linear combination with $c\in\mathbb{R}$:   
 $$w^* = cw_\text{eff}(\bar\mu) + (1-c)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{c\bar\mu + (1-c)\tilde\mu - D/C}{E-D^2/C}$. 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one, powerful figure using `ggplot2`. We also add the individual stocks in the same call. 
-We compute annualized returns based on the simple assumption that monthly returns are iid distributed. Thus, the average annualized return is just 12 times the expected monthly return.  
+We compute annualized returns based on the simple assumption that monthly returns are independent and identically distributed. Thus, the average annualized return is just 12 times the expected monthly return.  
 
 
 ```r
@@ -558,6 +556,6 @@ The line indicates the efficient frontier: the set of portfolios a mean-variance
 1. Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed red line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
-1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns, visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
+1. Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
 1. In the portfolio choice analysis, we restricted our sample to all assets that were trading on every single day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
 1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk, i.e., standard deviation. Identify the portfolio with the highest expected return per standard deviation. Hint: the ratio of expected return to standard deviation is an important concept in Finance. 

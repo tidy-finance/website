@@ -6,16 +6,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <title>Chapter 17 Constrained optimization and backtesting | Tidy Finance with R</title>
 <meta name="author" content="Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business)">
-<meta name="description" content="In this chapter, we conduct portfolio backtesting in a more realistic setting compared to the previous chapter by including transaction costs and investment constraints such as no-short-selling...">
+<meta name="description" content="In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard...">
 <meta name="generator" content="bookdown 0.29 with bs4_book()">
 <meta property="og:title" content="Chapter 17 Constrained optimization and backtesting | Tidy Finance with R">
 <meta property="og:type" content="book">
 <meta property="og:url" content="https://www.tidy-finance.org/constrained-optimization-and-backtesting.html">
 <meta property="og:image" content="https://www.tidy-finance.org/cover_homepage.jpg">
-<meta property="og:description" content="In this chapter, we conduct portfolio backtesting in a more realistic setting compared to the previous chapter by including transaction costs and investment constraints such as no-short-selling...">
+<meta property="og:description" content="In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard...">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Chapter 17 Constrained optimization and backtesting | Tidy Finance with R">
-<meta name="twitter:description" content="In this chapter, we conduct portfolio backtesting in a more realistic setting compared to the previous chapter by including transaction costs and investment constraints such as no-short-selling...">
+<meta name="twitter:description" content="In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard...">
 <meta name="twitter:image" content="https://www.tidy-finance.org/cover_homepage.jpg">
 <!-- JS --><script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.6/clipboard.min.js" integrity="sha256-inc5kl9MA1hkeYUt+EC3BhlIgyp/2jDIyBLS6k3UxPI=" crossorigin="anonymous"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.4.6/fuse.js" integrity="sha512-zv6Ywkjyktsohkbp9bb45V6tEMoWhzFzXis+LrMehmJZZSys19Yxf1dopHx7WzIKxr5tK2dVcYmaCk2uqdjF4A==" crossorigin="anonymous"></script><script src="https://kit.fontawesome.com/6ecbd6c532.js" crossorigin="anonymous"></script><script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script><meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 <link href="libs/bootstrap-4.6.0/bootstrap.min.css" rel="stylesheet">
@@ -88,7 +88,7 @@
 <li><a class="" href="univariate-portfolio-sorts.html"><span class="header-section-number">7</span> Univariate portfolio sorts</a></li>
 <li><a class="" href="size-sorts-and-p-hacking.html"><span class="header-section-number">8</span> Size sorts and p-hacking</a></li>
 <li><a class="" href="value-and-bivariate-sorts.html"><span class="header-section-number">9</span> Value and bivariate sorts</a></li>
-<li><a class="" href="replicating-fama-french-factors.html"><span class="header-section-number">10</span> Replicating Fama &amp; French factors</a></li>
+<li><a class="" href="replicating-fama-and-french-factors.html"><span class="header-section-number">10</span> Replicating Fama and French factors</a></li>
 <li><a class="" href="fama-macbeth-regressions.html"><span class="header-section-number">11</span> Fama-MacBeth regressions</a></li>
 <li class="book-part">Modeling &amp; machine learning</li>
 <li><a class="" href="fixed-effects-and-clustered-standard-errors.html"><span class="header-section-number">12</span> Fixed effects and clustered standard errors</a></li>
@@ -114,8 +114,8 @@
 <h1>
 <span class="header-section-number">17</span> Constrained optimization and backtesting<a class="anchor" aria-label="anchor" href="#constrained-optimization-and-backtesting"><i class="fas fa-link"></i></a>
 </h1>
-<p> In this chapter, we conduct portfolio backtesting in a more realistic setting compared to the previous chapter by including transaction costs and investment constraints such as no-short-selling rules.
-We start with <em>standard</em> mean-variance efficient portfolios an introduce the constraints in a step-by-step manner. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
+<p> In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules.
+We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
 <p>Throughout this chapter, we use the following packages:</p>
 <div class="sourceCode" id="cb291"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://tidyverse.tidyverse.org">tidyverse</a></span><span class="op">)</span></span>
@@ -128,7 +128,7 @@ We start with <em>standard</em> mean-variance efficient portfolios an introduce 
 <h2>
 <span class="header-section-number">17.1</span> Data preparation<a class="anchor" aria-label="anchor" href="#data-preparation-9"><i class="fas fa-link"></i></a>
 </h2>
-<p>We start by loading the required data from our <code>SQLite</code>-database introduced in chapters 2-4. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
+<p>We start by loading the required data from our <code>SQLite</code>-database introduced in Chapters 2-4. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
 <div class="sourceCode" id="cb292"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tidy_finance</span> <span class="op">&lt;-</span> <span class="fu">dbConnect</span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rsqlite.r-dbi.org/reference/SQLite.html">SQLite</a></span><span class="op">(</span><span class="op">)</span>,</span>
@@ -156,15 +156,15 @@ where <span class="math inline">\(\Sigma\)</span> is the <span class="math inlin
 <span><span class="va">w_mvp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/vector.html">as.vector</a></span><span class="op">(</span><span class="va">w_mvp</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">w_mvp</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Next, consider an investor who aims to achieve minimum variance <em>given a required expected portfolio return</em> <span class="math inline">\(\bar{\mu}\)</span> such that she chooses
 <span class="math display">\[w_\text{eff}({\bar{\mu}}) =\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.\]</span>
-We leave it as an Exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor <span class="math inline">\(\gamma\)</span>. The investor aims to choose portfolio weights such that
+We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor <span class="math inline">\(\gamma\)</span>. That means the investor aims to choose portfolio weights as the solution to
 <span class="math display">\[ w^*_\gamma = \arg\max w' \mu - \frac{\gamma}{2}w'\Sigma w\quad \text{ s.t. } w'\iota = 1.\]</span>
 The solution to the optimal portfolio choice problem is:
 <span class="math display">\[\omega^*_{\gamma}  = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.\]</span>
 Empirically, this classical solution imposes many problems.
-In particular, the estimates of <span class="math inline">\(\mu_t\)</span> are noisy over short horizons, the (<span class="math inline">\(N \times N\)</span>) matrix <span class="math inline">\(\Sigma_t\)</span> contains <span class="math inline">\(N(N-1)/2\)</span> distinct elements and thus, estimation error is huge.
+In particular, the estimates of <span class="math inline">\(\mu\)</span> are noisy over short horizons, the (<span class="math inline">\(N \times N\)</span>) matrix <span class="math inline">\(\Sigma\)</span> contains <span class="math inline">\(N(N-1)/2\)</span> distinct elements and thus, estimation error is huge.
 Seminal papers on the effect of ignoring estimation uncertainty, among others, are <span class="citation">Brown (<a href="references.html#ref-Brown1976" role="doc-biblioref">1976</a>)</span>, <span class="citation">Jobson and Korkie (<a href="references.html#ref-Jobson1980" role="doc-biblioref">1980</a>)</span>, <span class="citation">Jorion (<a href="references.html#ref-Jorion1986" role="doc-biblioref">1986</a>)</span>, and <span class="citation">Chopra and Ziemba (<a href="references.html#ref-Chopra1993" role="doc-biblioref">1993</a>)</span>.</p>
 <p>Even worse, if the asset universe contains more assets than available time periods <span class="math inline">\((N &gt; T)\)</span>, the sample covariance matrix is no longer positive definite such that the inverse <span class="math inline">\(\Sigma^{-1}\)</span> does not exist anymore.
-To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool <span class="citation">Fan, Fan, and Lv (<a href="references.html#ref-Fan2008" role="doc-biblioref">2008</a>)</span>.</p>
+To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool <span class="citation">(see, e.g., <a href="references.html#ref-Ledoit2003" role="doc-biblioref">Ledoit and Wolf 2003</a>, <a href="references.html#ref-Ledoit2004" role="doc-biblioref">2004</a>, <a href="references.html#ref-Ledoit2012" role="doc-biblioref">2012</a>; <a href="references.html#ref-Fan2008" role="doc-biblioref">Fan, Fan, and Lv 2008</a>)</span>.</p>
 <p>While the uncertainty associated with estimated parameters itself is challenging, the data generating process itself is also unknown to the investor. In other words, model uncertainty reflects that it is ex-ante not even clear which parameters require estimation (for instance, if returns are driven by a factor model, selecting the universe of relevant factors imposes model uncertainty). <span class="citation">Wang (<a href="references.html#ref-Wang2005" role="doc-biblioref">2005</a>)</span> and <span class="citation">Garlappi, Uppal, and Wang (<a href="references.html#ref-Garlappi2007" role="doc-biblioref">2007</a>)</span> provide theoretical analysis on optimal portfolio choice under model <em>and</em> estimation uncertainty. In the most extreme case, <span class="citation">Pflug, Pichler, and Wozabal (<a href="references.html#ref-Pflug2012" role="doc-biblioref">2012</a>)</span> shows that the naive portfolio which allocates equal wealth to all assets is the optimal choice for an investor averse to model uncertainty.</p>
 <p>On top of the estimation uncertainty, <em>transaction costs</em> are a major concern.
 Rebalancing portfolios is costly, and, therefore, the optimal choice should depend on the investor’s current holdings. In the presence of transaction costs, the benefits of reallocating wealth may be smaller than the costs associated with turnover. This aspect has been investigated theoretically, among others, for one risky asset by <span class="citation">Magill and Constantinides (<a href="references.html#ref-Magill1976" role="doc-biblioref">1976</a>)</span> and <span class="citation">Davis and Norman (<a href="references.html#ref-Davis1990" role="doc-biblioref">1990</a>)</span>. Subsequent extensions to the case with multiple assets have been proposed by <span class="citation">Balduzzi and Lynch (<a href="references.html#ref-Balduzzi1999" role="doc-biblioref">1999</a>)</span> and <span class="citation">Balduzzi and Lynch (<a href="references.html#ref-Balduzzi2000" role="doc-biblioref">2000</a>)</span>. More recent papers on empirical approaches which explicitly account for transaction costs include <span class="citation">Gârleanu and Pedersen (<a href="references.html#ref-Garleanu2013" role="doc-biblioref">2013</a>)</span>, and <span class="citation">DeMiguel, Nogales, and Uppal (<a href="references.html#ref-DeMiguel2014" role="doc-biblioref">2014</a>)</span>, and <span class="citation">DeMiguel, Martín-Utrera, and Nogales (<a href="references.html#ref-DeMiguel2015" role="doc-biblioref">2015</a>)</span>.</p>
@@ -173,15 +173,14 @@ Rebalancing portfolios is costly, and, therefore, the optimal choice should depe
 <h2>
 <span class="header-section-number">17.3</span> Estimation uncertainty and transaction costs<a class="anchor" aria-label="anchor" href="#estimation-uncertainty-and-transaction-costs"><i class="fas fa-link"></i></a>
 </h2>
-<p>The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates <span class="math inline">\(\hat \mu_t\)</span> and <span class="math inline">\(\hat \Sigma_t\)</span> can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of <span class="math inline">\(\Sigma\)</span>, rely on Bayesian priors inspired by theoretical asset pricing models <span class="citation">(<a href="references.html#ref-Kan2007" role="doc-biblioref">Kan and Zhou 2007</a>)</span> or use high-frequency data to improve forecasting <span class="citation">(<a href="references.html#ref-Hautsch2015" role="doc-biblioref">Hautsch, Kyj, and Malec 2015</a>)</span>.
+<p>The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates <span class="math inline">\(\hat \mu\)</span> and <span class="math inline">\(\hat \Sigma\)</span> can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of <span class="math inline">\(\Sigma\)</span>, rely on Bayesian priors inspired by theoretical asset pricing models <span class="citation">(<a href="references.html#ref-Kan2007" role="doc-biblioref">Kan and Zhou 2007</a>)</span> or use high-frequency data to improve forecasting <span class="citation">(<a href="references.html#ref-Hautsch2015" role="doc-biblioref">Hautsch, Kyj, and Malec 2015</a>)</span>.
 One unifying framework that works easily, effectively (even for large dimensions), and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs <span class="citation">(<a href="references.html#ref-Hautsch2019" role="doc-biblioref">Hautsch and Voigt 2019</a>)</span>.</p>
 <p>Assume that returns are from a multivariate normal distribution with mean <span class="math inline">\(\mu\)</span> and variance-covariance matrix <span class="math inline">\(\Sigma\)</span>, <span class="math inline">\(N(\mu,\Sigma)\)</span>. Additionally, we assume quadratic transaction costs which penalize rebalancing such that <span class="math display">\[
 \begin{aligned}
 \nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) := \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned}\]</span>
-with cost parameter <span class="math inline">\(\beta&gt;0\)</span> and <span class="math inline">\(\omega_{t^+} := {\omega_t \circ (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}\)</span>.
+with cost parameter <span class="math inline">\(\beta&gt;0\)</span> and <span class="math inline">\(\omega_{t^+} := {\omega_t \circ (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}\)</span>. <span class="math inline">\(\omega_{t^+}\)</span> denotes the portfolio weights just before rebalancing. Note that <span class="math inline">\(\omega_{t^+}\)</span> differs mechanically from <span class="math inline">\(\omega_t\)</span> due to the returns in the past period.
 Intuitively, transaction costs penalize portfolio performance when the portfolio is shifted from the current holdings <span class="math inline">\(\omega_{t^+}\)</span> to a new allocation <span class="math inline">\(\omega_{t+1}\)</span>.
-In this setup, transaction costs do not increase linearly such that larger rebalancing is penalized more heavily than small adjustments.
-Note that <span class="math inline">\(\omega_{t^+}\)</span> differs mechanically from <span class="math inline">\(\omega_t\)</span> due to the returns in the past period.<br>
+In this setup, transaction costs do not increase linearly. Instead, larger rebalancing is penalized more heavily than small adjustments.
 Then, the optimal portfolio choice for an investor with mean variance preferences is
 <span class="math display">\[\begin{aligned}\omega_{t+1} ^* &amp;:=  \arg\max \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \text{ s.t. } \iota'\omega = 1\\
 &amp;=\arg\max
@@ -199,7 +198,7 @@ The optimal weights correspond to a mean-variance portfolio where the vector of 
 <span class="header-section-number">17.4</span> Optimal portfolio choice<a class="anchor" aria-label="anchor" href="#optimal-portfolio-choice"><i class="fas fa-link"></i></a>
 </h2>
 <p>The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation).
-For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>,<code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
+For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>, <code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
 <div class="sourceCode" id="cb294"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_efficient_weight</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">Sigma</span>,</span>
 <span>                                     <span class="va">mu</span>,</span>
@@ -249,7 +248,7 @@ What is the effect of transaction costs or different levels of risk aversion on 
 <span>  <span class="op">)</span></span></code></pre></div>
 <p>The code chunk above computes the optimal weight in presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio.
 Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences.
-If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift towards the efficient portfolio, whereas her current portfolio <em>anchors</em> her investment.</p>
+If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift towards the efficient portfolio, whereas her current portfolio anchors her investment.</p>
 <div class="sourceCode" id="cb297"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">transaction_costs</span> <span class="op">|&gt;</span></span>
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html">mutate</a></span><span class="op">(</span>risk_aversion <span class="op">=</span> <span class="fu"><a href="https://forcats.tidyverse.org/reference/as_factor.html">as_factor</a></span><span class="op">(</span><span class="va">gamma</span><span class="op">)</span><span class="op">)</span> <span class="op">|&gt;</span></span>
@@ -271,14 +270,15 @@ If transaction costs would be absent, the investor would simply implement the me
 Figure 17.1: The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolut deviations of the chosen portfolio from the benchmark.
 </p>
 </div>
-<p>The figure shows that the initial portfolio is always the (sample) minimum variance portfolio and that the higher the transaction costs parameter <span class="math inline">\(\beta\)</span>, the smaller is the rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). In addition, if risk aversion <span class="math inline">\(\gamma\)</span> increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.</p>
+<p>The figure shows rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example).
+The higher the transaction costs parameter <span class="math inline">\(\beta\)</span>, the smaller is the rebalancing from the initial portfolio. In addition, if risk aversion <span class="math inline">\(\gamma\)</span> increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings.</p>
 </div>
 <div id="constrained-optimization" class="section level2" number="17.5">
 <h2>
 <span class="header-section-number">17.5</span> Constrained optimization<a class="anchor" aria-label="anchor" href="#constrained-optimization"><i class="fas fa-link"></i></a>
 </h2>
 <p>Next, we introduce constraints to the above optimization procedure.
-Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (Short-selling restrictions simply imply that negative weights are not allowed such that we require that <span class="math inline">\(w_i \geq 0 \forall i\)</span>).
+Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that <span class="math inline">\(w_i \geq 0 \forall i\)</span>).
 However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> function from the package <code>quadprog</code>.</p>
 <p>The function <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> delivers numerical solutions to quadratic programming problems of the form
 <span class="math display">\[\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega &gt;= b_0.\]</span>
@@ -326,7 +326,7 @@ For more complex optimization routines, <a href="https://cran.r-project.org/web/
  [8] 2.56e-01 8.74e-18 0.00e+00</code></pre>
 <p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case.
 You can verify that <code>sum(w_no_short_sale$solution)</code> returns 1. In other words: <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code> where negative holdings are forbidden.</p>
-<p><code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation T-constraint</a>, which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum\limits_{i=1}^N |w_i| \leq 1.5\)</span>.
+<p><code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation T-constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |w_i| \leq 1.5\)</span>.
 The constraint enforces that maximum 50 percent of the allocated wealth can be allocated to short positions and thus implies an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting, because the margin constraints imply a non-linear constraint on the portfolio weights.
 Thus, we can no longer rely on <code><a href="https://rdrr.io/pkg/quadprog/man/solve.QP.html">solve.QP()</a></code> which is defined to solve quadratic programming problems with linear constraints.
 Instead, we rely on the package <code>alabama</code>, which requires a separate definition of objective and constraint functions.</p>
@@ -360,7 +360,7 @@ Instead, we rely on the package <code>alabama</code>, which requires a separate 
 <pre><code> [1]  3.41e-01 -1.81e-06 -1.08e-01  1.40e-01  7.30e-02 -1.08e-02
  [7]  2.46e-01  3.14e-01  1.35e-01 -1.30e-01</code></pre>
 <p>Note that the function <code><a href="https://rdrr.io/pkg/alabama/man/constrOptim.nl.html">constrOptim.nl()</a></code> requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, <code>alamaba</code> performs numerical optimization by searching for a local minimum of the function <code>objective()</code> (subject to the equality constraints <code>equality_constraints()</code> and the inequality constraints <code>inequality_constraints()</code>).
-Note that the starting point should not matter <em>if</em> the algorithm identifies a global minimum.</p>
+Note that the starting point should not matter if the algorithm identifies a global minimum.</p>
 <p>The figure below shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.</p>
 <div class="sourceCode" id="cb306"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://tibble.tidyverse.org/reference/tibble.html">tibble</a></span><span class="op">(</span></span>
@@ -396,7 +396,7 @@ Figure 17.2: Optimal allocation weights for the 10 industry portfolios and the 4
 You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints.
 The short answer is: the <em>efficient portfolio</em> is only efficient if the true parameters of the data generating process correspond to the estimated parameters <span class="math inline">\(\hat\Sigma\)</span> and <span class="math inline">\(\hat\mu\)</span>.
 Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations which could be the result of <em>error-maximization</em> due to estimation uncertainty <span class="citation">(<a href="references.html#ref-Jagannathan2003" role="doc-biblioref">Jagannathan and Ma 2003</a>)</span>.</p>
-<p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form <span class="math inline">\(\beta\sum\limits_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
+<p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form <span class="math inline">\(\beta\sum_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
 <div class="sourceCode" id="cb307"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">compute_efficient_weight_L1_TC</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">mu</span>,</span>
 <span>                                           <span class="va">Sigma</span>,</span>
@@ -547,9 +547,9 @@ Note that we use the sample variance covariance matrix and ignore estimation of 
 3 Naive    12.3    15.0          0.818   0.230 </code></pre>
 <p>The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a <em>negative</em> annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: <em>MV (TC)</em> effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters <span class="math inline">\(\hat\mu_t\)</span> and <span class="math inline">\(\hat\Sigma_t\)</span>indicate that the current allocation is too far away from the optimal theoretical portfolio.</p>
 </div>
-<div id="exercises-15" class="section level2" number="17.7">
+<div id="exercises-16" class="section level2" number="17.7">
 <h2>
-<span class="header-section-number">17.7</span> Exercises<a class="anchor" aria-label="anchor" href="#exercises-15"><i class="fas fa-link"></i></a>
+<span class="header-section-number">17.7</span> Exercises<a class="anchor" aria-label="anchor" href="#exercises-16"><i class="fas fa-link"></i></a>
 </h2>
 <ol style="list-style-type: decimal">
 <li>We argue that an investor with a quadratic utility function with certainty equivalent <span class="math display">\[\max_w CE(w) = \omega'\mu - \frac{\gamma}{2} \omega'\Sigma \omega \text{ s.t. } \iota'\omega = 1\]</span>
@@ -581,7 +581,7 @@ where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">
 <li><a class="nav-link" href="#optimal-portfolio-choice"><span class="header-section-number">17.4</span> Optimal portfolio choice</a></li>
 <li><a class="nav-link" href="#constrained-optimization"><span class="header-section-number">17.5</span> Constrained optimization</a></li>
 <li><a class="nav-link" href="#out-of-sample-backtesting"><span class="header-section-number">17.6</span> Out-of-sample backtesting</a></li>
-<li><a class="nav-link" href="#exercises-15"><span class="header-section-number">17.7</span> Exercises</a></li>
+<li><a class="nav-link" href="#exercises-16"><span class="header-section-number">17.7</span> Exercises</a></li>
 </ul>
 
       <div class="book-extra">
@@ -599,7 +599,7 @@ where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">
 <footer class="bg-primary text-light mt-5"><div class="container"><div class="row">
 
   <div class="col-12 col-md-6 mt-3">
-    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-09-13.</p>
+    <p>"<strong>Tidy Finance with R</strong>" was written by Christoph Scheuch (wikifolio Financial Technologies) and Stefan Voigt (University of Copenhagen and Danish Finance Institute) and Patrick Weiss (Vienna University of Economics and Business). It was last built on 2022-09-19.</p>
   </div>
 
   <div class="col-12 col-md-6 mt-3">

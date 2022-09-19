@@ -2,9 +2,9 @@
 
 # Accessing & managing financial data
 
-In this chapter, we propose a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects as well as across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
+In this chapter, we suggest a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value stores. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects and across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
-This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google drive repository, and other macroeconomic time series.\index{API} We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
+This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV files, an XLSX file stored in a public Google Drive repository, and other macroeconomic time series.\index{API} We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
 
 First, we load the global packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
@@ -15,7 +15,7 @@ library(lubridate)
 library(scales)
 ```
 
-The package `lubridate` provides convenient tools to work with dates and time [@lubridate]. The package `scales` [@scales] provides useful scale Functions for visualizations.
+The package `lubridate` provides convenient tools to work with dates and time [@lubridate]. The package `scales` [@scales] provides useful scale functions for visualizations.
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you need to adjust these dates. Our data starts with 1960 since most asset pricing studies use data from 1962 on. 
 
@@ -34,7 +34,7 @@ We start by downloading some famous Fama-French factors [e.g., @Fama1993] and po
 library(frenchdata)
 ```
 
-We can use the main function of the package to download monthly Fama-French factors. The set *3 Factors* includes the return time series of the market, size, and value factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) directly. If you are on the site, check the raw data files to appreciate the time you can save thanks to `frenchdata`.
+We can use the main function of the package to download monthly Fama-French factors. The set *3 Factors* includes the return time series of the market, size, and value factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French finance data library directly. If you are on the site, check the raw data files to appreciate the time you can save thanks to `frenchdata`.
 
 
 ```r
@@ -84,12 +84,13 @@ It is worth taking a look at all available portfolio return time series from Ken
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors' homepage from within `read_csv()`.\index{Data!q-factors}
 
-We also need to adjust this data. First, we discard information we will not use here. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lower case. You can try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)
+We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lower case. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)
 
 
 ```r
 factors_q_monthly_link <-
   "http://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2021.csv"
+
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
@@ -122,6 +123,7 @@ The `drive_download()` function from the `googledrive` package allows us to down
 ```r
 macro_predictors_link <-
   "https://docs.google.com/spreadsheets/d/1OArfD2Wv9IvGoLkJ8JyoXS0YMQLDZfY2"
+
 drive_download(
   macro_predictors_link,
   path = "data/macro_predictors.xlsx"
@@ -130,7 +132,7 @@ drive_download(
 
 Next, we read in the new data and transform the columns to the variables that we later use:
 
-1. The dividend price ratio (`dp`), the difference between the log of dividends and the log of prices, where dividends are 12-month moving sums of dividends paid on the S&P 500 index, and prices are monthly averages of daily closing prices (@Campbell1988, @Campbell2006). 
+1. The dividend price ratio (`dp`), the difference between the log of dividends and the log of prices, where dividends are 12-month moving sums of dividends paid on the S&P 500 index, and prices are monthly averages of daily closing prices [@Campbell1988; @Campbell2006]. 
 1. Dividend yield (`dy`), the difference between the log of dividends and the log of lagged prices [@Ball1978]. 
 1. Earnings price ratio (`ep`), the difference between the log of earnings and the log of prices, where earnings are 12-month moving sums of earnings on the S&P 500 index [@Campbell1988]. 
 1. Dividend payout ratio (`de`), the difference between the log of dividends and the log of earnings [@Lamont1998]. 
@@ -144,7 +146,7 @@ Next, we read in the new data and transform the columns to the variables that we
 1. Default yield spread (`dfy`), the difference between BAA and AAA-rated corporate bond yields [@Fama1989]. 
 1. Inflation (`infl`), the Consumer Price Index (All Urban Consumers) from the Bureau of Labor Statistics [@Campbell2004].
 			
-You can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145) for variable definitions and the transformations.
+You can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145) for variable definitions and the required data transformations.
 
 
 ```r
@@ -204,13 +206,13 @@ cpi_monthly <- tq_get("CPIAUCNS",
   )
 ```
 
-To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality, but refer to the package documentation for details. 
+To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the produce price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality. We refer to the package documentation for details. 
 
 ## Setting up a database
 
 Now that we have downloaded some (freely available) data from the web into the memory of our R session, let us set up a database to store that information for future use. We will use the data stored in this database throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code. 
 
-There are many ways to set up and organize a database, depending on the use case. For our purpose, the most efficient way is to use an [SQLite](https://www.sqlite.org/index.html) database, which is the C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine. Note that [SQL](https://en.wikipedia.org/wiki/SQL) (Structured Query Language) is a standard language for accessing and manipulating databases, and is heavily inspired the `dplyr` functions. We refer to [this tutorial](https://www.w3schools.com/sql/sql_intro.asp) for more information on SQL.\index{Database!SQLite}
+There are many ways to set up and organize a database, depending on the use case. For our purpose, the most efficient way is to use an [SQLite](https://www.sqlite.org/index.html) database, which is the C-language library that implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine. Note that [SQL](https://en.wikipedia.org/wiki/SQL) (Structured Query Language) is a standard language for accessing and manipulating databases, and heavily inspired the `dplyr` functions. We refer to [this tutorial](https://www.w3schools.com/sql/sql_intro.asp) for more information on SQL.\index{Database!SQLite}
 
 There are two packages that make working with SQLite in R very simple: `RSQLite` [@RSQLite] embeds the SQLite database engine in R and `dbplyr` [@dbplyr] is the database back-end for `dplyr`. These packages allow to set up a database to remotely store tables and use these remote database tables as if they are in-memory data frames by automatically converting `dplyr` into SQL. Check out the [`RSQLite`](https://cran.r-project.org/web/packages/RSQLite/vignettes/RSQLite.html) and [`dbplyr`](https://db.rstudio.com/databases/sqlite/) vignettes for more information.
 
@@ -231,14 +233,13 @@ tidy_finance <- dbConnect(
 )
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database. Notice that we use the base R pipe placeholder `_` and a named argument to pipe `factors_ff_monthly` to the argument `value`.\index{Pipe}
+Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database.
 
 
 ```r
-factors_ff_monthly |>
   dbWriteTable(tidy_finance,
     "factors_ff_monthly",
-    value = _,
+    value = factors_ff_monthly,
     overwrite = TRUE
   )
 ```
@@ -300,38 +301,33 @@ Before we move on to the next data source, let us also store the other five tabl
 
 
 ```r
-factors_ff_daily |>
   dbWriteTable(tidy_finance,
     "factors_ff_daily",
-    value = _,
+    value = factors_ff_daily,
     overwrite = TRUE
   )
 
-industries_ff_monthly |>
   dbWriteTable(tidy_finance,
     "industries_ff_monthly",
-    value = _,
+    value = industries_ff_monthly,
     overwrite = TRUE
   )
 
-factors_q_monthly |>
   dbWriteTable(tidy_finance,
     "factors_q_monthly",
-    value = _,
+    value = factors_q_monthly,
     overwrite = TRUE
   )
 
-macro_predictors |>
   dbWriteTable(tidy_finance,
     "macro_predictors",
-    value = _,
+    value = macro_predictors,
     overwrite = TRUE
   )
 
-cpi_monthly |>
   dbWriteTable(tidy_finance,
     "cpi_monthly",
-    value = _,
+    value = cpi_monthly,
     overwrite = TRUE
   )
 ```

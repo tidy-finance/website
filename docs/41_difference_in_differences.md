@@ -2,9 +2,9 @@
 
 In this chapter, we illustrate the concept of *difference in differences* (DD) estimators by evaluating the effects of climate change regulation on the pricing of bonds across firms. DD estimators are typically used to recover the treatment effects of natural or quasi-natural experiments that trigger sharp changes in the environment of a specific group. Instead of looking at differences in just one group (e.g., the effect in the treated group), DD investigates the treatment effects by looking at the difference between differences in two groups. Such experiments are usually exploited to address endogeneity concerns [e.g., @RobertsWhited2013]. The identifying assumption is that the outcome variable would change equally in both groups without the treatment. This assumption is also often referred to as the assumption of parallel trends. Moreover, we would ideally also want a random assignment to the treatment and control groups. Due to lobbying or other activities, this randomness is often violated in (financial) economics.\index{Difference in differences}
 
-In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discussed in the previous chapter. We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.\index{Paris (Climate) Agreement}
+In the context of our setting, we investigate the impact of the Paris Agreement, signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discussed in the previous chapter. We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.\index{Paris (Climate) Agreement}
 
-The approach we use here replicates the results of @Seltzer2022 partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on ESG effects in corporate bond markets is already large but continues to grow [for recent examples, see, e.g., @Halling2021;@Handler2022;@Huynh2021; among many others].
+The approach we use here replicates the results of @Seltzer2022 partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on ESG effects in corporate bond markets is already large but continues to grow (for recent examples, see, e.g., @Halling2021, @Handler2022, @Huynh2021, among many others).
 
 The current chapter relies on this set of packages. 
 
@@ -64,7 +64,7 @@ bonds <- bonds |>
   mutate(polluter = sic_code %in% polluting_industries)
 ```
 
-Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} 
+Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
 
 
 ```r
@@ -94,7 +94,7 @@ bonds_panel <- bonds |>
   drop_na()
 ```
 
-Before we can run the first regression, we need to define the `treated` indicator, which is a product of the `post_period` (i.e., all months after the signing of the PA) and the `polluter` indicator defined above.\index{Regression!Fixed effects} 
+Before we can run the first regression, we need to define the `treated` indicator, which is the product of the `post_period` (i.e., all months after the signing of the PA) and the `polluter` indicator defined above.\index{Regression!Fixed effects} 
 
 
 ```r
@@ -120,9 +120,7 @@ bonds_panel |>
     sd = sd(value),
     min = min(value),
     q05 = quantile(value, 0.05),
-    q25 = quantile(value, 0.25),
     q50 = quantile(value, 0.50),
-    q75 = quantile(value, 0.75),
     q95 = quantile(value, 0.95),
     max = max(value),
     n = n(),
@@ -131,18 +129,17 @@ bonds_panel |>
 ```
 
 ```
-# A tibble: 3 × 11
-  measure       mean    sd    min   q05   q25   q50   q75   q95   max
-  <chr>        <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl> <dbl> <dbl>
-1 avg_yield     4.08 4.21  0.0595  1.27  2.24  3.37  4.67  8.07 128. 
-2 log_offerin… 13.3  0.823 4.64   12.2  12.8  13.2  13.8  14.5   16.5
-3 time_to_mat…  8.54 8.41  1.01    1.50  3.34  5.81  8.93 27.4  101. 
-# … with 1 more variable: n <int>
+# A tibble: 3 × 9
+  measure           mean    sd    min   q05   q50   q95   max      n
+  <chr>            <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl>  <int>
+1 avg_yield         4.08 4.21  0.0595  1.27  3.37  8.07 128.  127428
+2 log_offering_amt 13.3  0.823 4.64   12.2  13.2  14.5   16.5 127428
+3 time_to_maturity  8.54 8.41  1.01    1.50  5.81 27.4  101.  127428
 ```
 
 ## Panel regressions
 
-The PA is a legally binding international treaty on climate change. It was adopted by 196 Parties at COP 21 in Paris on 12 December 2015 and entered into force on 4 November 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an OLS regression without fixed effects where we include the `treated`, `post_period`, and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.\index{Regression!Yields}\index{Regression!Panel}
+The Paris Agreement is a legally binding international treaty on climate change. It was adopted by 196 Parties at COP 21 in Paris on 12 December 2015 and entered into force on 4 November 2016. The Paris Agreement obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an OLS regression without fixed effects where we include the `treated`, `post_period`, and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the Paris Agreement compared to non-polluters.\index{Regression!Yields}\index{Regression!Panel}
 
 The second model follows the typical DD regression approach by including individual (`cusip_id`) and time (`month`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
 
@@ -186,11 +183,11 @@ Within R2                         --           0.00713
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
+Both models indicate that polluters have significantly higher yields after the Paris Agreement than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
 
 ## Visualizing parallel trends
 
-Even though the regressions above indicate that there is an impact of the PA on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
+Even though the regressions above indicate that there is an impact of the Paris Agreement on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
 
 To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data. 
 
@@ -234,23 +231,23 @@ model_without_fe_coefs |>
 
 <div class="figure" style="text-align: center">
 <img src="41_difference_in_differences_files/figure-html/fig411-1.png" alt="Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016." width="90%" />
-<p class="caption">(\#fig:fig411)The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in %) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).</p>
+<p class="caption">(\#fig:fig411)The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).</p>
 </div>
 We can see that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement. 
 
 Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects. 
 
 ```r
-bonds_panel_alt <- bonds_panel %>%
+bonds_panel_alt <- bonds_panel |>
   mutate(
     diff_to_treatment = interval(
       floor_date(treatment_date, "month"), month
     ) %/% months(1)
   )
 
-variables <- bonds_panel_alt %>%
-  distinct(diff_to_treatment, month) %>%
-  arrange(month) %>%
+variables <- bonds_panel_alt |>
+  distinct(diff_to_treatment, month) |>
+  arrange(month) |>
   mutate(variable_name = as.character(NA))
 
 formula <- "avg_yield ~ "
@@ -258,8 +255,9 @@ formula <- "avg_yield ~ "
 for (j in 1:nrow(variables)) {
   if (variables$diff_to_treatment[j] != 0) {
     old_names <- names(bonds_panel_alt)
-    bonds_panel_alt <- bonds_panel_alt %>%
-      mutate(new_var = diff_to_treatment == variables$diff_to_treatment[j] & polluter)
+    bonds_panel_alt <- bonds_panel_alt |>
+      mutate(new_var = diff_to_treatment == variables$diff_to_treatment[j] & 
+               polluter)
     new_var_name <- ifelse(variables$diff_to_treatment[j] < 0,
       str_c("lag", abs(variables$diff_to_treatment[j])),
       str_c("lead", variables$diff_to_treatment[j])
@@ -288,11 +286,11 @@ model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
     term = str_remove(term, "TRUE"),
     ci_up = estimate + qnorm(0.975) * std.error,
     ci_low = estimate + qnorm(0.025) * std.error
-  ) %>%
+  ) |>
   left_join(
     variables,
     by = c("term" = "variable_name")
-  ) %>%
+  ) |>
   bind_rows(tibble(
     term = "lag0",
     estimate = 0,
@@ -301,7 +299,7 @@ model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
     month = floor_date(treatment_date, "month")
   ))
 
-model_with_fe_time_coefs %>%
+model_with_fe_time_coefs |>
   ggplot(aes(x = month, y = estimate)) +
   geom_vline(aes(xintercept = floor_date(treatment_date, "month")),
     linetype = "dashed"
@@ -322,14 +320,15 @@ model_with_fe_time_coefs %>%
 
 <div class="figure" style="text-align: center">
 <img src="41_difference_in_differences_files/figure-html/fig412-1.png" alt="Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again." width="90%" />
-<p class="caption">(\#fig:fig412)The figure shows the coefficient estimates and 95%-confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in %) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).</p>
+<p class="caption">(\#fig:fig412)The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).</p>
 </div>
 
+\index{Robustness tests}
 The resulting figure confirms the main conclusion of the previous image: polluters' yield patterns show a considerable anticipation effect starting towards the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
 
-Notice that during the year after the PA was signed, the 45th President of the United States was elected on November 8, 2016. During his campaign there were some indications of intentions to withdraw the US from the PA, which ultimately happened on November 4, 2020. Hence, reversal effects are potentially driven by these actions.
+Notice that during the year after the Paris Agreement was signed, the 45th President of the United States was elected on November 8, 2016. During his campaign there were some indications of intentions to withdraw the US from the PA, which ultimately happened on November 4, 2020. Hence, reversal effects are potentially driven by these actions.
 
 ## Exercises
 
-1. The 46th president of the US rejoined the PA in February 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
+1. The 46th president of the US rejoined the Paris Agreement in February 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
 2. Based on the exercise on ratings in Chapter 4, include ratings as a control variable in the analysis above. Do the results change?

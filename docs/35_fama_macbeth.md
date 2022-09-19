@@ -1,6 +1,6 @@
 # Fama-MacBeth regressions
 
-In this chapter, we present a simple implementation of @Fama1973 to introduce the regression approach of @Fama1973, which is widely used in empirical asset pricing studies. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
+In this chapter, we present a simple implementation of @Fama1973, a regression approach commonly called Fama-MacBeth regressions. Fama-MacBeth regressions are widely used in empirical asset pricing studies. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
 
 Researchers use the two-stage regression approach to estimate risk premiums in various markets, but predominately in the stock market. 
 Essentially, the two-step Fama-MacBeth regressions exploit a linear relationship between expected returns and exposure to (priced) risk factors. 
@@ -8,14 +8,14 @@ The basic idea of the regression approach is to project asset returns on factor 
 Then, in the second step, the estimates are aggregated across time to test if a risk factor is priced. 
 In principle, Fama-MacBeth regressions can be used in the same way as portfolio sorts introduced in previous chapters.
 
-\index{Fama-MacBeth} The Fama-MacBeth procedure is a simple two-step approach: 
+\index{Regression!Fama-MacBeth}\index{Fama-MacBeth} The Fama-MacBeth procedure is a simple two-step approach: 
 The first step uses the exposures (characteristics) as explanatory variables in $T$ cross-sectional regressions. For example, if $r_{i,t+1}$ denote the excess returns of asset $i$ in month $t+1$, then the famous Fama-French three factor model implies the following return generating process (see also @Campbell1998):
 $$\begin{aligned}r_{i,t+1} = \alpha_i + \lambda^{M}_t \beta^M_{i,t}  + \lambda^{SMB}_t \beta^{SMB}_{i,t} + \lambda^{HML}_t \beta^{HML}_{i,t} + \epsilon_{i,t}\text{, for each t}.\end{aligned}$$ 
 Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to each risk factor $\beta^{f}_{i,t}$ at each time point, i.e., the risk premium. Note the terminology: $\beta^{f}_{i,t}$ is a asset-specific characteristic, e.g., a factor exposure or an accounting variable. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., $\lambda_t^{f}\neq0$. 
 
-In the second step, the time-series average $\frac{1}{T}\sum\limits_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow @Zaffaroni2022 and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, the regression approach rather captures risk attributes. 
+In the second step, the time-series average $\frac{1}{T}\sum_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow @Zaffaroni2022 and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, the regression approach rather captures risk attributes. 
 
-Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are typically estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
+Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
 The current chapter relies on this set of packages. 
 
@@ -30,7 +30,7 @@ Compared to previous chapters, we introduce the `broom` package [@broom] to tidy
 
 ## Data preparation
 
-We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
+We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
 
 
 ```r
@@ -50,11 +50,11 @@ beta <- tbl(tidy_finance, "beta") |>
   collect()
 ```
 We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization.\index{Book-to-market ratio}\index{Market capitalization} 
-Furthermore, we also use the CAPM betas based on daily returns we computed in the previous chapters.\index{Beta}\index{CAPM}
+Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.\index{Beta}\index{CAPM}
 
 
 ```r
-bm <- compustat |>
+characteristics <- compustat |>
   mutate(month = floor_date(ymd(datadate), "month")) |>
   left_join(crsp_monthly, by = c("gvkey", "month")) |>
   left_join(beta, by = c("permno", "month")) |>
@@ -66,7 +66,7 @@ bm <- compustat |>
   )
 
 data_fama_macbeth <- crsp_monthly |>
-  left_join(bm, by = c("gvkey", "month" = "sorting_date")) |>
+  left_join(characteristics, by = c("gvkey", "month" = "sorting_date")) |>
   group_by(permno) |>
   arrange(month) |>
   fill(c(beta, bm, log_mktcap), .direction = "down") |>
@@ -111,7 +111,7 @@ price_of_risk <- risk_premiums |>
   )
 ```
 
-It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in chapter 5, the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`.\index{Standard errors!Newey-West}
+It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in Chapter 7, the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`.\index{Standard errors!Newey-West}
 
 
 ```r

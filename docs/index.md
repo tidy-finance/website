@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-09-13"
+date: "2022-09-19"
 knit: "bookdown::render_book"
 site: bookdown::bookdown_site
 documentclass: book
@@ -41,7 +41,7 @@ This book aims to lift the curtain on reproducible finance by providing a fully 
 We write this book for three audiences:
 
 * Students who want to acquire the basic tools required to conduct financial research ranging from undergrad to graduate level. The book's structure is simple enough such that the material is sufficient for self-study purposes.
-* Instructors who look for materials to teach courses in empirical finance or financial economics. We provide plenty of examples and focus on intuitive explanations that can easily be adjusted or expanded.
+* Instructors who look for materials to teach courses in empirical finance or financial economics. We provide plenty of examples and focus on intuitive explanations that can easily be adjusted or expanded. At the end of each chapter we provide exercises which we hope inspire students to dig deeper.
 * Data analysts or statisticians who work on issues dealing with financial data and who need practical tools to succeed.
 
 ## What will you learn? {.unnumbered}
@@ -49,10 +49,10 @@ We write this book for three audiences:
 The book is currently divided into 5 parts:
 
 * Chapter 1 introduces you to important concepts around which our approach to Tidy Finance revolves. 
-* Chapters 2-4 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare the two most popular data in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all subsequent chapters.
-* Chapters 5-10 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
-* Chapters 11-13 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
-* Chapters 14-15 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
+* Chapters 2-4 provide tools to organize your data and prepare the most common data sets used in financial research. Although many important data are behind paywalls, we start by describing different open source data and how to download them. We then move on to prepare two of the most popular datasets in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all subsequent chapters. Chapter 5 contains an overview over common alternative data provides for which direct access vie R packages exist.
+* Chapters 6-11 deal with key concepts of empirical asset pricing such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions. 
+* Chapters 12-15 apply linear models to panel data and machine learning methods to problems in factor selection and option pricing. 
+* Chapters 16-17 provide approaches for parametric, constrained portfolio optimization, and backtesting procedures.  
 
 Each chapter is self-contained and can be read individually. Yet the data chapters provide important background necessary for the data management in all other chapters. 
 
@@ -66,9 +66,9 @@ Our book is close in spirit to other books that provide fully reproducible code 
 * @Regenstein2018 provides an excellent introduction and discussion of different tools for standard applications in finance (e.g., how to compute returns and sample standard deviations of a time series of stock returns). Our book, in contrast, has a clear focus on applications of state-of-the-art for academic research in finance. We thus fill a niche that allows aspiring researchers or instructors to rely on a well-designed code base. 
 * @Coqueret2020 constitutes a great compendium to our book with respect to applications related to return prediction and portfolio formation. The book primarily targets practitioners and has a hands-on focus. Our book, in contrast, relies on the typical databases used in financial research and focuses on the preparation of such datasets for academic applications. In addition, our chapter on machine learning focuses on factor selection instead of return prediction.
 
-Although we emphasizes the importance of reproducible workflow principles, we do not provide introductions to some of the core tools that we relied on to create and maintain this book:
+Although we emphasize the importance of reproducible workflow principles, we do not provide introductions to some of the core tools that we relied on to create and maintain this book:
 
-* Version control systems such as [Git](https://git-scm.com/) are vital in managing any programming project. Originally designed to organize the collaboration of software developers, even solo data analysts will benefit from adopting version control. Git also makes it simple to publicly share code and allow others to reproduce your findings. We refer to @Bryan2022 for a gentle introduction into the (sometimes painful) life with Git. 
+* Version control systems such as [Git](https://git-scm.com/) are vital in managing any programming project. Originally designed to organize the collaboration of software developers, even solo data analysts will benefit from adopting version control. Git also makes it simple to publicly share code and allow others to reproduce your findings. We refer to @Bryan2022 for a gentle introduction into the (sometimes painful) life with Git. \index{Github}
 * Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open source tools. First, @ggplot2 provides a highly customizable, yet easy to use system for creating data visualizations. @Wickham2016 provides an intuitive introduction into creating graphics using this approach. Second, in our daily work and to compile this book, we used the markdown-based authoring framework described in @XieAllaireGrolemund2018 and @XieDervieuxRiederer2020. Markdown documents are fully reproducible and support dozens of static and dynamic output formats. Lastly, @Xie2016 tremendously facilitates authoring markdown-based books. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.  
 * Good writing is also important for the presentation of findings. We neither claim to be experts in this domain, nor do we try to sound particularly academic. On the contrary, we deliberately use a more colloquial language to describe all the methods and results presented in this book in order to allow our readers to relate more easily to the mainly technical content. For those who desire more guidance with respect to proper academic writing for financial economics, we recommend @Kiesling2003, @Cochrane2005, and @Jacobsen2014 who all provide essential tips (condensed to a few pages). 
 
@@ -98,7 +98,7 @@ In its essence, tidy data follows these three principles:
 2. Every row is an observation.
 3. Every cell is a single value.
 
-Throughout this book, we try to follow these principles as best as we can. If you want to learn more about tidy data principles in an informal manner, we refer you to [this vignette](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html) as part of [@tidyr].
+Throughout this book, we try to follow these principles as best as we can. If you want to learn more about tidy data principles in an informal manner, we refer you to [this vignette](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html) as part of @tidyr.
 
 In addition to the data layer, there are also tidy coding principles outlined in [the tidy tools manifesto](https://tidyverse.tidyverse.org/articles/manifesto.html) that we try to follow: 
 
@@ -107,34 +107,35 @@ In addition to the data layer, there are also tidy coding principles outlined in
 3. Embrace functional programming.
 4. Design for humans.
 
-In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company RStudio, Inc.
+In particular, we heavily draw on a set of packages called the [`tidyverse`](https://tidyverse.tidyverse.org/index.html) [@Wickham2019]. The `tidyverse` is a consistent set of packages for all data analysis tasks, ranging from importing and wrangling to visualizing and modeling data with the same grammar. In addition to explicit tidy principles, the `tidyverse` has further benefits: (i) if you master one package, it is easier to master others, and (ii) the core packages are developed and maintained by the Public Benefit Company Posit.
 These core packages contained in the `tidyverse` are: `ggplot2` [@ggplot2], `dplyr` [@dplyr], `tidyr` [@tidyr], `readr` [@readr], `purrr` [@purrr], `tibble` [@tibble], `stringr` [@stringr], and `forcats` [@forcats]. 
 
 ::: {.rmdnote}
 Throughout the book we use the native pipe `|>`, a powerful tool to clearly express a sequence of operations. Readers familiar with the `tidyverse` may be used to the predecessor `%>%` that is part of the `magrittr` package. For all our applications, the native and `magrittr` pipe behave identically, so we opt for the one that is simpler and part of base R. For a more thorough discussion on the subtle differences between the two pipes, we refer to the [second edition](https://r4ds.hadley.nz/workflow-pipes.html) of @Wickham2016. 
 :::
+\index{Pipe}
 
 ## Prerequisites {.unnumbered}
 
 Before we continue, make sure you have all the software you need for this book:
 
-- [Install R and RStudio](https://rstudio-education.github.io/hopr/starting.html#starting). To get a walk-through of the installation for every major operating system, follow the steps outlined [in this summary](https://rstudio-education.github.io/hopr/starting.html#starthng). The whole process should be done in a few clicks. If you wonder about the difference: R is an open-source language and environment for statistical computing and graphics, free to download and use. While R runs the computations, RStudio is an integrated development environment that provides an interface by adding many convenient features and tools. We suggest doing all the coding in RStudio.
+- [Install R and RStudio.](https://rstudio-education.github.io/hopr/starting.html#starting) To get a walk-through of the installation for every major operating system, follow the steps outlined [in this summary.](https://rstudio-education.github.io/hopr/starting.html#starthng) The whole process should be done in a few clicks. If you wonder about the difference: R is an open-source language and environment for statistical computing and graphics, free to download and use. While R runs the computations, RStudio is an integrated development environment that provides an interface by adding many convenient features and tools. We suggest doing all the coding in RStudio.
 - Open RStudio and install the `tidyverse`. Not sure how it works? You find helpful information on how to install packages in this [brief summary](https://rstudio-education.github.io/hopr/packages2.html). 
 
 If you are new to R, we recommend starting with the following sources:
 
 - A very gentle and good introduction into the workings of R can be found in the form of the [weighted dice project](https://rstudio-education.github.io/hopr/project-1-weighted-dice.html). Once you are done setting up R on your machine, try to follow the instructions in this project.
 - The main book on the `tidyverse`, @Wickham2016 is available online and for free: [R for Data Science](https://r4ds.had.co.nz/introduction.html) explains the majority of the tools we use in our book. 
-- If you are an instructor searching for effectively teach R and data science methods, we recommend to take a look on the excellent [data science toolbox](https://datasciencebox.org/) by [Mine Cetinkaya-Rundel](https://mine-cr.com/about/).
+- If you are an instructor searching for effectively teach R and data science methods, we recommend to take a look on the excellent [data science toolbox](https://datasciencebox.org/) by [Mine Cetinkaya-Rundel.](https://mine-cr.com/about/)
 - RStudio provides a range of excellent [cheat sheets](https://www.rstudio.com/resources/cheatsheets/) with extensive information on how to use the `tidyverse` packages.
 
 ## About the authors {.unnumbered}
 
 We met at the [Vienna Graduate School of Finance](https://www.vgsf.ac.at/) from which each of us graduated with a different focus but a shared passion: coding with R. We continue to sharpen our R skills as part of our current occupations:
 
-* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com](https://www.wikifolio.com/). He is responsible for product planning, execution, and monitoring and manages a team of data scientists to analyze user behavior and develop data-driven products. Christoph is also an external lecturer at the Vienna University of Economics and Business where he teaches finance students how to manage empirical projects. 
-* [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute](https://danishfinanceinstitute.dk/). His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan’s research has been published in the leading finance and econometrics journals. He teaches parts of this book in his courses on empirical finance for students and practitioners.
-* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a postdoctoral researcher at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/) and an external lecturer at the [Reykjavik University](https://en.ru.is). His research activity centers around the intersection of empirical asset pricing and corporate finance. Patrick is especially passionate about empirical asset pricing and has published research in a top journal in financial economics. 
+* [Christoph Scheuch](https://christophscheuch.github.io/) is the Director of Product at the social trading platform [wikifolio.com.](https://www.wikifolio.com/) He is responsible for product planning, execution, and monitoring and manages a team of data scientists to analyze user behavior and develop data-driven products. Christoph is also an external lecturer at the Vienna University of Economics and Business where he teaches finance students how to manage empirical projects. 
+* [Stefan Voigt](https://voigtstefan.me/) is Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute.](https://danishfinanceinstitute.dk/) His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan’s research has been published in the leading finance and econometrics journals. He teaches parts of this book in his courses on empirical finance for students and practitioners.
+* [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is a postdoctoral researcher at the [Vienna University of Economics and Business](https://www.wu.ac.at/en/) and an external lecturer at the [Reykjavik University.](https://en.ru.is) His research activity centers around the intersection of empirical asset pricing and corporate finance. Patrick is especially passionate about empirical asset pricing and has published research in a top journal in financial economics. 
 
 ## License {.unnumbered}
 
@@ -147,7 +148,7 @@ The code samples in this book are licensed under [Creative Commons CC0 1.0 Unive
 
 ## Colophon {.unnumbered}
 
-This book was written in RStudio using `bookdown`. The website is hosted with GitHub Pages and automatically updated after every commit. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). 
+This book was written in RStudio using `bookdown` [@Xie2016]. The website is hosted with GitHub Pages. The complete source is [available from GitHub](www.github.com/voigtstefan/tidy_finance). 
 We generated all plots in this book using `ggplot2` and its classic dark-on-light theme (`theme_bw()`). 
 
 This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looking Kid) and the following packages:
