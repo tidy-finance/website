@@ -249,7 +249,7 @@ index_prices <- tq_get(ticker,
 )
 ```
 
-The resulting tibble contains 163403 daily observations for 30 different corporations. 
+The resulting tibble contains 163433 daily observations for 30 different corporations. 
 The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
@@ -308,34 +308,34 @@ all_returns |>
    symbol daily_mean daily_sd daily_min daily_max
    <chr>       <dbl>    <dbl>     <dbl>     <dbl>
  1 AMGN       0.0470     1.97     -13.4      15.1
- 2 AXP        0.0527     2.30     -17.6      21.9
- 3 BA         0.0549     2.23     -23.8      24.3
- 4 CAT        0.0663     2.04     -14.5      14.7
+ 2 AXP        0.0530     2.30     -17.6      21.9
+ 3 BA         0.0550     2.23     -23.8      24.3
+ 4 CAT        0.0666     2.04     -14.5      14.7
  5 CRM        0.114      2.69     -27.1      26.0
  6 CSCO       0.0301     2.38     -16.2      24.4
  7 CVX        0.0533     1.76     -22.1      22.7
- 8 DIS        0.0457     1.94     -18.4      16.0
- 9 DOW        0.0483     2.64     -21.7      20.9
-10 GS         0.0545     2.32     -19.0      26.5
-11 HD         0.0522     1.94     -28.7      14.1
-12 HON        0.0486     1.94     -17.4      28.2
-13 IBM        0.0255     1.65     -15.5      12.0
-14 INTC       0.0300     2.36     -22.0      20.1
-15 JNJ        0.0403     1.22     -15.8      12.2
-16 JPM        0.0562     2.43     -20.7      25.1
-17 KO         0.0328     1.32     -10.1      13.9
-18 MCD        0.0532     1.48     -15.9      18.1
+ 8 DIS        0.0458     1.94     -18.4      16.0
+ 9 DOW        0.0490     2.64     -21.7      20.9
+10 GS         0.0547     2.32     -19.0      26.5
+11 HD         0.0525     1.94     -28.7      14.1
+12 HON        0.0488     1.94     -17.4      28.2
+13 IBM        0.0256     1.65     -15.5      12.0
+14 INTC       0.0301     2.36     -22.0      20.1
+15 JNJ        0.0401     1.22     -15.8      12.2
+16 JPM        0.0564     2.43     -20.7      25.1
+17 KO         0.0329     1.32     -10.1      13.9
+18 MCD        0.0534     1.48     -15.9      18.1
 19 MMM        0.0375     1.50     -12.9      12.6
-20 MRK        0.0344     1.68     -26.8      13.0
+20 MRK        0.0342     1.68     -26.8      13.0
 21 MSFT       0.0519     1.93     -15.6      19.6
-22 NKE        0.0725     1.92     -19.8      15.5
+22 NKE        0.0730     1.92     -19.8      15.5
 23 PG         0.0363     1.34     -30.2      12.0
-24 TRV        0.0549     1.84     -20.8      25.6
-25 UNH        0.0992     1.98     -18.6      34.8
-26 V          0.0925     1.90     -13.6      15.0
+24 TRV        0.0551     1.84     -20.8      25.6
+25 UNH        0.0993     1.98     -18.6      34.8
+26 V          0.0924     1.90     -13.6      15.0
 27 VZ         0.0246     1.51     -11.8      14.6
-28 WBA        0.0268     1.81     -15.0      16.6
-29 WMT        0.0305     1.50     -11.4      11.7
+28 WBA        0.0267     1.81     -15.0      16.6
+29 WMT        0.0306     1.50     -11.4      11.7
 30 AAPL       0.124      2.51     -51.9      13.9
 ```
 
@@ -467,7 +467,7 @@ tibble(
 # A tibble: 1 × 2
   average_ret volatility
         <dbl>      <dbl>
-1     0.00780     0.0313
+1     0.00781     0.0313
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  

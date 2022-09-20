@@ -7,7 +7,7 @@ In this short chapter, we aim to provide an overview of common alternative data 
 In our non-exhaustive list below, we restrict ourselves to listing data sources accessed through easy-to-use R packages. For further inspiration on potential data sources, we recommend reading the [R task view empirical finance.](https://cran.r-project.org/web/views/Finance.html) Further inspiration (on more general social sciences) can be found [here.](https://cengel.github.io/gearup2016/SULdataAccess.html)
 
 ::: {.rmdnote}
-Should you feel like we miss out on a fantastic financial data source, just edit the table table below or get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) or  - thank you very much for your support!
+Should you feel like we miss out on a fantastic financial data source, just edit the table table below or get in touch with us via [contact@tidy-finance.org](mailto:contact@tidy-finance.org) - thank you very much for your support!
 :::
 
 | Source | Description  | R packages                                       |

@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-09-19"
+date: "2022-09-20"
 knit: "bookdown::render_book"
 site: bookdown::bookdown_site
 documentclass: book
@@ -21,7 +21,7 @@ description: |
 
 # Preface {.unnumbered}
 
-[![Buy hardcover version](cover.jpg){.cover width="250"}]()
+[![Buy hardcover version](cover_homepage.jpg){.cover width="250"}]()
 
 This website is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release via [Chapman & Hall/CRC](https://www.routledge.com/go/chapman-hall?utm_source=tidy-finance.org). The book is the result of a joint effort of [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance.org), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance.org), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance.org). 
 
