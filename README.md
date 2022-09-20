@@ -1,4 +1,4 @@
-# Tidy Finance with R [<img class="logo" src="https://www.tidy-finance.org/cover.jpg" align="right" style="width:250px;" />](https://www.tidy-finance.org)
+# Tidy Finance with R [<img class="logo" src="https://www.tidy-finance.org/cover_homepage.jpg" align="right" style="width:250px;" />](https://www.tidy-finance.org)
 
 This is the work-in-progress repo for the book **Tidy Finance with R** by [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo). 
 
