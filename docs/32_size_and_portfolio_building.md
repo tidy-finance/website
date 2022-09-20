@@ -2,7 +2,7 @@
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Hasler2021, @Soebhag2022, and @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking.
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums (see @Hasler2021, @Soebhag2022, and @Walter2022 for more insights into decision nodes and their effect on premiums). Exploiting these ideas to generate favorable results is called p-hacking.
 There is arguably a thin line between p-hacking and conducting robustness tests. Our purpose here is to illustrate the substantial variation that can arise along the evidence-generating process.
 
 The chapter relies on the following set of packages:
