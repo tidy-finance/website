@@ -71,7 +71,7 @@ prices |>
 <p class="caption">(\#fig:fig100)Prices are in USD, adjusted for divident payments and stock splits.</p>
 </div>
 
-\index{Returns} Instead of analyzing prices, we compute daily net returns defined as $(p_t - p_{t-1}) / p_{t-1} = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
+\index{Returns} Instead of analyzing prices, we compute daily net returns defined as $r_t = p_t / p_{t-1} - 1$ where $p_t$ is the adjusted day $t$ price. 
 In that context, the function `lag()` is helpful, which returns the previous value in a vector. 
 
 
@@ -317,7 +317,7 @@ all_returns |>
  8 CVX        0.0519     1.76     -22.1      22.7
  9 DIS        0.0442     1.94     -18.4      16.0
 10 DOW        0.0418     2.63     -21.7      20.9
-11 GS         0.0529     2.32     -19.0      26.5
+11 GS         0.0532     2.32     -19.0      26.5
 12 HD         0.0519     1.94     -28.7      14.1
 13 HON        0.0480     1.94     -17.4      28.2
 14 IBM        0.0249     1.65     -15.5      12.0
@@ -390,7 +390,7 @@ Warning: Removed 1 rows containing missing values (geom_point).
 ```
 
 <div class="figure" style="text-align: center">
-<img src="10_introduction_files/figure-html/fig105-1.png" alt="Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45 degree line. " width="90%" />
+<img src="10_introduction_files/figure-html/fig105-1.png" alt="Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45 degree line." width="90%" />
 <p class="caption">(\#fig:fig105)Total daily trading volume in billion USD.</p>
 </div>
 

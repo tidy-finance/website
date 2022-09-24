@@ -353,7 +353,7 @@ crsp_monthly_industry |>
 
 ## Daily CRSP data
 
-Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: You cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
+Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
@@ -507,19 +507,6 @@ ccmxpf_linktable <- ccmxpf_linktable_db |>
   select(permno = lpermno, gvkey, linkdt, linkenddt) |>
   collect() |>
   mutate(linkenddt = replace_na(linkenddt, today()))
-ccmxpf_linktable
-```
-
-```
-# A tibble: 31,770 × 4
-  permno gvkey  linkdt     linkenddt 
-   <dbl> <chr>  <date>     <date>    
-1  25881 001000 1970-11-13 1978-06-30
-2  10015 001001 1983-09-20 1986-07-31
-3  10023 001002 1972-12-14 1973-06-05
-4  10031 001003 1983-12-07 1989-08-16
-5  54594 001004 1972-04-24 2022-09-24
-# … with 31,765 more rows
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 

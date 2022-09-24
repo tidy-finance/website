@@ -78,7 +78,7 @@ data_investment <- data_investment |>
   drop_na()
 ```
 
-As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (´investment´, ´cash_flows´, and ´tobins_q´) at the 1 percent level. 
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the 1 percent level. 
 
 
 ```r
@@ -139,7 +139,7 @@ data_investment |>
 
 To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications.\index{Regression!Fixed effects} We start out with the basic investment regression using the simple model
 $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
-where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below - you could also use `lm()`. 
+where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below, but you could also use `lm()`. 
 
 
 ```r

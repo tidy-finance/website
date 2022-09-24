@@ -1,6 +1,6 @@
 # TRACE and FISD
 
-In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly $10 trillion outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
+In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly 10 trillion USD outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
 
 Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you can compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.
 
@@ -157,10 +157,9 @@ mergent_parts <- split(
 )
 ```
 
-Finally, we run a loop in the same style as in Chapter 3 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataframe for batch two and all following batches.
+Finally, we run a loop in the same style as in Chapter 3 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
 
 ```{r, eval = FALSE}
-
 for (j in 1:length(mergent_parts)) {
   trace_enhanced <- clean_enhanced_trace(
     cusips = mergent_parts[[j]],
@@ -185,11 +184,11 @@ for (j in 1:length(mergent_parts)) {
 
 While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
 
-We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter from 1990 until 2018. 
+We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
 
 ```{r}
-bonds_outstanding <- expand_grid("date" = seq(as.Date("1990-01-01"),
-                                              as.Date("2018-12-01"), 
+bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
+                                              ymd("2016-11-30"), 
                                               by = "quarter"), 
                                  "complete_cusip" = mergent$complete_cusip) |> 
   left_join(mergent |> select(complete_cusip, 
@@ -203,7 +202,7 @@ bonds_outstanding <- expand_grid("date" = seq(as.Date("1990-01-01"),
   mutate(type = "outstanding")
 ```
 
-Next, we look at the bonds traded each quarter in our shorter period around the Paris Agreement from 2014 to 2016. Notice that we load the complete trace database of our sample, as we only have a single part of it in the environment from the download.
+Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop from above.
 
 ```{r}
 trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
@@ -219,7 +218,7 @@ bonds_traded <- trace_enhanced |>
 
 Finally, we plot the two time series in the figure below.
 
-```{r, fig221, fig.cap = "The number of corporate bonds outstanding each quarter is from 1990 until 2018, as reported by Mergent FISD. The number of traded bonds from enhanced TRACE per quarter is from 2014 until 2016.", fig.alt = "Title:Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases until 2000, when it starts decreasing. From 2010 onwards, it increases monotonically until the sample's end. On the other hand, the number of bonds traded from 2014 to 2018 represents only a fraction of roughly 60%, which does not change dramatically over the two years."}
+```{r, fig221, fig.cap = "The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.", fig.alt = "Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60%, which peaks around the third quarter of 2016."}
 bonds_outstanding |> 
   bind_rows(bonds_traded) |> 
   ggplot(aes(x = date, y = n, color = type, linetype = type)) +
@@ -230,7 +229,7 @@ bonds_outstanding |>
   )
 ```
 
-We see that the number of bonds outstanding varies over time, with a peak before the turn of the millennium. After 2010, the number steadily increased, eventually surpassing the previous maximum. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. On the flip side, the relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
+We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
 Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD). 
 
 ```{r}
@@ -252,7 +251,7 @@ mergent |>
   )
 ```
 
-We see that the average bond has an offering amount of over 350 million USD, which cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons. 
+We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons. 
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
@@ -276,11 +275,11 @@ trace_enhanced |>
   )
 ```
 
-On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
+On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
 ## Exercises
 
 1. Summarize the amount outstanding of all bonds over time and describe the resulting graph. 
 1. Compute the number of days each bond is traded (accounting for the bonds maturity and issuance). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
-2. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
-3. Download the TRACE data until the end of September 2021. Hint: You want to download the data completely new, rather than adding the new information. Can you find a reason why?
+1. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
+1. Download the TRACE data until the end of September 2021. Hint: you want to download the data completely new, rather than adding the new information. Can you find a reason why?
