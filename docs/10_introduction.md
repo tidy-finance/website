@@ -230,11 +230,11 @@ ticker
 # A tibble: 30 × 8
   symbol company          ident…¹ sedol weight sector share…² local…³
   <chr>  <chr>            <chr>   <chr>  <dbl> <chr>    <dbl> <chr>  
-1 UNH    UnitedHealth Gr… 91324P… 2917… 0.111  Healt… 5738247 USD    
-2 GS     Goldman Sachs G… 38141G… 2407… 0.0698 Finan… 5738247 USD    
+1 UNH    UnitedHealth Gr… 91324P… 2917… 0.113  Healt… 5738247 USD    
+2 GS     Goldman Sachs G… 38141G… 2407… 0.0686 Finan… 5738247 USD    
 3 HD     Home Depot Inc.  437076… 2434… 0.0590 Consu… 5738247 USD    
-4 MCD    McDonald's Corp… 580135… 2550… 0.0545 Consu… 5738247 USD    
-5 MSFT   Microsoft Corpo… 594918… 2588… 0.0523 Infor… 5738247 USD    
+4 MCD    McDonald's Corp… 580135… 2550… 0.0543 Consu… 5738247 USD    
+5 MSFT   Microsoft Corpo… 594918… 2588… 0.0528 Infor… 5738247 USD    
 # … with 25 more rows, and abbreviated variable names ¹​identifier,
 #   ²​shares_held, ³​local_currency
 ```
@@ -249,7 +249,7 @@ index_prices <- tq_get(ticker,
 )
 ```
 
-The resulting tibble contains 163433 daily observations for 30 different corporations. 
+The resulting tibble contains 163553 daily observations for 30 different corporations. 
 The figure below illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes). 
 
 
@@ -307,36 +307,36 @@ all_returns |>
 # A tibble: 30 × 5
    symbol daily_mean daily_sd daily_min daily_max
    <chr>       <dbl>    <dbl>     <dbl>     <dbl>
- 1 AMGN       0.0470     1.97     -13.4      15.1
- 2 AXP        0.0530     2.30     -17.6      21.9
- 3 BA         0.0550     2.23     -23.8      24.3
- 4 CAT        0.0666     2.04     -14.5      14.7
- 5 CRM        0.114      2.69     -27.1      26.0
- 6 CSCO       0.0301     2.38     -16.2      24.4
- 7 CVX        0.0533     1.76     -22.1      22.7
- 8 DIS        0.0458     1.94     -18.4      16.0
- 9 DOW        0.0490     2.64     -21.7      20.9
-10 GS         0.0547     2.32     -19.0      26.5
-11 HD         0.0525     1.94     -28.7      14.1
-12 HON        0.0488     1.94     -17.4      28.2
-13 IBM        0.0256     1.65     -15.5      12.0
-14 INTC       0.0301     2.36     -22.0      20.1
-15 JNJ        0.0401     1.22     -15.8      12.2
-16 JPM        0.0564     2.43     -20.7      25.1
-17 KO         0.0329     1.32     -10.1      13.9
-18 MCD        0.0534     1.48     -15.9      18.1
-19 MMM        0.0375     1.50     -12.9      12.6
-20 MRK        0.0342     1.68     -26.8      13.0
-21 MSFT       0.0519     1.93     -15.6      19.6
-22 NKE        0.0730     1.92     -19.8      15.5
-23 PG         0.0363     1.34     -30.2      12.0
-24 TRV        0.0551     1.84     -20.8      25.6
-25 UNH        0.0993     1.98     -18.6      34.8
-26 V          0.0924     1.90     -13.6      15.0
-27 VZ         0.0246     1.51     -11.8      14.6
-28 WBA        0.0267     1.81     -15.0      16.6
-29 WMT        0.0306     1.50     -11.4      11.7
-30 AAPL       0.124      2.51     -51.9      13.9
+ 1 AAPL       0.123      2.51     -51.9      13.9
+ 2 AMGN       0.0467     1.97     -13.4      15.1
+ 3 AXP        0.0512     2.30     -17.6      21.9
+ 4 BA         0.0533     2.23     -23.8      24.3
+ 5 CAT        0.0647     2.04     -14.5      14.7
+ 6 CRM        0.113      2.69     -27.1      26.0
+ 7 CSCO       0.0290     2.38     -16.2      24.4
+ 8 CVX        0.0519     1.76     -22.1      22.7
+ 9 DIS        0.0442     1.94     -18.4      16.0
+10 DOW        0.0418     2.63     -21.7      20.9
+11 GS         0.0529     2.32     -19.0      26.5
+12 HD         0.0519     1.94     -28.7      14.1
+13 HON        0.0480     1.94     -17.4      28.2
+14 IBM        0.0249     1.65     -15.5      12.0
+15 INTC       0.0289     2.36     -22.0      20.1
+16 JNJ        0.0401     1.22     -15.8      12.2
+17 JPM        0.0550     2.43     -20.7      25.1
+18 KO         0.0325     1.32     -10.1      13.9
+19 MCD        0.0526     1.48     -15.9      18.1
+20 MMM        0.0369     1.50     -12.9      12.6
+21 MRK        0.0342     1.68     -26.8      13.0
+22 MSFT       0.0514     1.93     -15.6      19.6
+23 NKE        0.0713     1.92     -19.8      15.5
+24 PG         0.0360     1.34     -30.2      12.0
+25 TRV        0.0541     1.84     -20.8      25.6
+26 UNH        0.0989     1.98     -18.6      34.8
+27 V          0.0910     1.90     -13.6      15.0
+28 VZ         0.0238     1.51     -11.8      14.6
+29 WBA        0.0260     1.81     -15.0      16.6
+30 WMT        0.0301     1.50     -11.4      11.7
 ```
 
 Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
@@ -467,7 +467,7 @@ tibble(
 # A tibble: 1 × 2
   average_ret volatility
         <dbl>      <dbl>
-1     0.00781     0.0313
+1     0.00773     0.0314
 ```
 
 The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).  

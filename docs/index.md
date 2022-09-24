@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Vienna University of Economics and Business)
-date: "2022-09-20"
+date: "2022-09-24"
 knit: "bookdown::render_book"
 site: bookdown::bookdown_site
 documentclass: book
@@ -320,10 +320,6 @@ This version of the book was built with R version 4.2.1 (2022-06-23, Funny-Looki
   <tr>
    <td style="text-align:left;"> timetk </td>
    <td style="text-align:left;"> 2.8.1 </td>
-  </tr>
-  <tr>
-   <td style="text-align:left;"> wesanderson </td>
-   <td style="text-align:left;"> 0.3.6 </td>
   </tr>
 </tbody>
 </table>

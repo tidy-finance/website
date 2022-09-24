@@ -93,11 +93,11 @@ plot <- data_plot |>
   ) +
   scale_fill_manual(values = colors)
 
-# ggsave(
-#  plot = plot,
-#  width = 10,
-#  height = 6,
-#  filename = "cover.jpg",
-#  bg = "white"
-# )
+ggsave(
+ plot = plot,
+ width = 10,
+ height = 6,
+ filename = "cover.jpg",
+ bg = "white"
+)
 ```

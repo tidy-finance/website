@@ -18,7 +18,7 @@ library(sandwich)
 
 ## Data preparation
 
-First, we load the necessary data from our `SQLite`-database introduced in Chapters 2-4. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in the previous chapter.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we load the necessary data from our `SQLite`-database introduced in Chapters 2-4. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in Chapter 8.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
@@ -224,10 +224,10 @@ mean(value_premium$value_premium * 100)
 
 The value premium from dependent sorts is 3.948 percent per year.
 
-Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the line of the previous chapter, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
+Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of Chapter 8, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 
 ## Exercises
 
-1. In the previous chapter, we examined the distribution of market equity. Repeat this analysis for book equity and the book-to-market ratio (alongside a plot of the breakpoints, i.e., deciles).
+1. In Chapter 8, we examine the distribution of market equity. Repeat this analysis for book equity and the book-to-market ratio (alongside a plot of the breakpoints, i.e., deciles).
 1. When we investigate the portfolios, we focus on the returns exclusively. However, it is also of interest to understand the characteristics of the portfolios. Write a function to compute the average characteristics for size and book-to-market across the 25 independently and dependently sorted portfolios.
-1. As for the size premium, also the value premium constructed here does not follow @Fama1993. Implement a p-hacking setup as in the previous chapter to find a premium that comes closest to their HML premium.
+1. As for the size premium, also the value premium constructed here does not follow @Fama1993. Implement a p-hacking setup as in Chapter 8 to find a premium that comes closest to their HML premium.

@@ -1,6 +1,6 @@
 # Replicating Fama and French factors
 
-In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in the previous chapter, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
+In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
 
 The current chapter relies on this set of packages. 
 
@@ -12,7 +12,7 @@ library(lubridate)
 
 ## Data preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
 
 ```r
@@ -43,7 +43,7 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
-Yet when we start merging our data set for computing the premiums, there are a few differences to the previous chapter. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
+Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
 
@@ -77,7 +77,7 @@ variables_ff <- me_ff |>
 
 ## Portfolio sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in the previous chapter because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 
 ```r

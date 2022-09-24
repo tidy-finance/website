@@ -17,7 +17,7 @@ Compared to previous chapters, we introduce `slider` [@slider] for sliding windo
 
 ## Estimating beta using monthly returns
 
-The estimation procedure is based on a rolling-window estimation where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our `SQLite`-database introduced in the previous chapters 2-4.\index{Data!CRSP}\index{Data!Fama-French factors}
+The estimation procedure is based on a rolling-window estimation where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our `SQLite`-database introduced in the previous Chapters 2-4.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
@@ -287,7 +287,7 @@ factors_ff_daily <- tbl(tidy_finance, "factors_ff_daily") |>
 ```
 
 We make sure to keep only relevant data to save memory space. 
-However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops as in chapter 3. 
+However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops as in Chapter 3. 
 
 
 ```r
