@@ -8,7 +8,7 @@
 
 # Cover design
 
-The cover of the book is inspired by the fast growing generative art community in R. 
+The cover of the book is inspired by the fast growing generative art community in R.\index{Generative art}
 Generative art refers to art that in whole or in part has been created with the use of an autonomous system. 
 Instead of creating random dynamics we rely on what is core to the book: The evolution of financial markets. 
 Each circle in the cover figure corresponds to daily market return within one year of our sample. Deviations from the circle line indicate positive or negative returns. 

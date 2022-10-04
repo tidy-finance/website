@@ -201,15 +201,12 @@ model
 ```
 Model: "sequential_1"
 _____________________________________________________________________
-Layer (type)                   Output Shape               Param #    
+ Layer (type)                  Output Shape               Param #    
 =====================================================================
-dense_5 (Dense)                (None, 10)                 60         
-_____________________________________________________________________
-dense_4 (Dense)                (None, 10)                 110        
-_____________________________________________________________________
-dense_3 (Dense)                (None, 10)                 110        
-_____________________________________________________________________
-dense_2 (Dense)                (None, 1)                  11         
+ dense_5 (Dense)               (None, 10)                 60         
+ dense_4 (Dense)               (None, 10)                 110        
+ dense_3 (Dense)               (None, 10)                 110        
+ dense_2 (Dense)               (None, 1)                  11         
 =====================================================================
 Total params: 291
 Trainable params: 291
@@ -283,32 +280,38 @@ predictive_performance <- model |>
   )
 ```
 
-In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model. 
+In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model.\index{Graph!Prediction error}
 
 
 ```r
 predictive_performance |>
-  ggplot(aes(x = moneyness, y = pricing_error, color = Model)) +
+  ggplot(aes(
+    x = moneyness, 
+    y = pricing_error, 
+    color = Model,
+    linetype = Model
+    )) +
   geom_jitter(alpha = 0.05) +
   geom_smooth(se = FALSE, method = "gam") +
   labs(
     x = "Moneyness (S - K)", color = NULL,
     y = "Absolut prediction error (USD)",
-    title = "Prediction errors of call option prices for different models"
+    title = "Prediction errors of call option prices for different models",
+    linetype = NULL
   )
 ```
 
 <div class="figure" style="text-align: center">
 <img src="43_option_pricing_via_machine_learning_files/figure-html/fig431-1.png" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." width="90%" />
-<p class="caption">(\#fig:fig431)Absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that where not used for training.</p>
+<p class="caption">(\#fig:fig431)Absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.</p>
 </div>
 
 The results can be summarized as follows:
 
 1. All ML methods seem to be able to price call options after observing the training test set.
-1. The average prediction errors increase for far in-the money options. 
+1. The average prediction errors increase for far in-the-money options. 
 1. Random forest and the Lasso seem to perform consistently worse in prediction option prices than the neural networks.
-1. The complexity of the deep neural network relative to the single layer neural network does not result in better out-of-sample predictions.
+1. The complexity of the deep neural network relative to the single-layer neural network does not result in better out-of-sample predictions.
 
 ## Exercises
 

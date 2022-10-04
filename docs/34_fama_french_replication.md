@@ -185,12 +185,12 @@ lm(formula = smb ~ smb_replicated, data = test)
 
 Residuals:
       Min        1Q    Median        3Q       Max 
--0.020352 -0.001590  0.000007  0.001563  0.014636 
+-0.020352 -0.001590  0.000006  0.001563  0.014636 
 
 Coefficients:
                 Estimate Std. Error t value Pr(>|t|)    
 (Intercept)    -0.000129   0.000131   -0.98     0.33    
-smb_replicated  0.995395   0.004341  229.31   <2e-16 ***
+smb_replicated  0.995393   0.004341  229.31   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

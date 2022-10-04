@@ -177,7 +177,7 @@ beta_portfolios_summary <- beta_portfolios |>
   )
 ```
 
-The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.
+The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.\index{Graph!Bar chart}
 
 
 ```r
@@ -210,10 +210,14 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 
 beta_portfolios_summary |>
-  ggplot(aes(x = beta, y = ret, color = portfolio)) +
+  ggplot(aes(
+    x = beta, 
+    y = ret, 
+    color = portfolio
+  )) +
   geom_point() +
   geom_abline(
-    intercept = mean(factors_ff_monthly$rf),
+    intercept = 0,
     slope = mean(factors_ff_monthly$mkt_excess),
     linetype = "solid"
   ) +
@@ -315,7 +319,7 @@ beta_longshort |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="31_univariate_sorts_files/figure-html/fig324-1.png" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods. " width="90%" />
+<img src="31_univariate_sorts_files/figure-html/fig324-1.png" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods. " width="90%" />
 <p class="caption">(\#fig:fig324)We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.</p>
 </div>
 

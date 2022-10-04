@@ -67,11 +67,15 @@ crsp_monthly |>
     "Largest 1% of stocks", "Largest 5% of stocks",
     "Largest 10% of stocks", "Largest 25% of stocks"
   ))) |>
-  ggplot(aes(x = month, y = value, color = name)) +
+  ggplot(aes(
+    x = month, 
+    y = value, 
+    color = name,
+    linetype = name)) +
   geom_line() +
   scale_y_continuous(labels = percent, limits = c(0, 1)) +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "Percentage of total market capitalization in largest stocks"
   )
 ```
@@ -81,7 +85,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig331)We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.</p>
 </div>
 
-Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}
+Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}\index{Graph!Area graph}
 
 
 ```r
@@ -89,7 +93,11 @@ crsp_monthly |>
   group_by(month, exchange) |>
   summarize(mktcap = sum(mktcap)) |>
   mutate(share = mktcap / sum(mktcap)) |>
-  ggplot(aes(x = month, y = share, fill = exchange, color = exchange)) +
+  ggplot(aes(
+    x = month, 
+    y = share, 
+    fill = exchange, 
+    color = exchange)) +
   geom_area(
     position = "stack",
     stat = "identity",
@@ -104,7 +112,7 @@ crsp_monthly |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="32_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline of the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed at NASDAQ. Other exchanges are negligible." width="90%" />
+<img src="32_size_and_portfolio_building_files/figure-html/fig332-1.png" alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible." width="90%" />
 <p class="caption">(\#fig:fig332)Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.</p>
 </div>
 
@@ -322,7 +330,7 @@ p_hacking_results
 
 ## The size-premium variation
 
-We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.\index{Size!Size premium}
+We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.\index{Size!Size premium}\index{Graph!Bar chart}
 
 
 ```r
@@ -340,7 +348,7 @@ p_hacking_results |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="32_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge but the estimated coefficients are positive for all choices." width="90%" />
+<img src="32_size_and_portfolio_building_files/figure-html/fig333-1.png" alt="Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge, but the estimated coefficients are positive for all choices." width="90%" />
 <p class="caption">(\#fig:fig333)The dashed vertical line indicates the average Fama-French SMB premium.</p>
 </div>
 

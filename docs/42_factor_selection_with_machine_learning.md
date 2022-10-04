@@ -4,7 +4,7 @@ The aim of this chapter is twofold. From a data science perspective, we introduc
 
 In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta.\index{Factor zoo}\index{Factor model}\index{CAPM} 
 Such findings question the usefulness of the Capital Asset Pricing Model. 
-In fact, during the last decades, financial economists discovered a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role for pricing applications). The search for factors that explain the cross section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016, and @Hou2020.
+In fact, during the last decades, financial economists discovered a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role in pricing applications). The search for factors that explain the cross-section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016, and @Hou2020.
 Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *do we believe in the relevance of 300+ risk factors?* During recent years, promising methods from the field of ML got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure, and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
 ## Brief theoretical background
@@ -124,7 +124,7 @@ data <- industries_ff_monthly |>
 ```
 
 Our data contains 22 columns of regressors with the 13 macro variables and 8 factor returns for each month. 
-The figure below provides summary statistics for the 10 monthly industry excess returns in percent.
+The figure below provides summary statistics for the 10 monthly industry excess returns in percent.\index{Graph!Box plot}
 
 
 ```r
@@ -144,8 +144,8 @@ data |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="42_factor_selection_with_machine_learning_files/figure-html/fig421-1.png" alt="Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="90%" />
-<p class="caption">(\#fig:fig421)The box plots show monthly dispersion of returns for 10 different industries</p>
+<img src="42_factor_selection_with_machine_learning_files/figure-html/fig421-1.png" alt="Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry's excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis." width="90%" />
+<p class="caption">(\#fig:fig421)The box plots show the monthly dispersion of returns for 10 different industries</p>
 </div>
 
 ## The tidymodels workflow
@@ -315,12 +315,18 @@ predicted_values <- lm_fit |>
 
 ```r
 predicted_values |>
-  ggplot(aes(x = month, y = value, color = Variable)) +
+  ggplot(aes(
+    x = month, 
+    y = value, 
+    color = Variable,
+    linetype = Variable
+    )) +
   geom_line() +
   labs(
     x = NULL,
     y = NULL,
     color = NULL,
+    linetype = NULL,
     title = "Monthly realized and fitted manufacturing industry risk premia"
   ) +
   scale_x_date(
@@ -353,7 +359,7 @@ predicted_values |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="42_factor_selection_with_machine_learning_files/figure-html/fig422-1.png" alt="Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premium. The figure seems to indicate that the predictions capture most of the return dynamics. " width="90%" />
+<img src="42_factor_selection_with_machine_learning_files/figure-html/fig422-1.png" alt="Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premiums. The figure seems to indicate that the predictions capture most of the return dynamics. " width="90%" />
 <p class="caption">(\#fig:fig422)The grey area corresponds to the out of sample period.</p>
 </div>
 
@@ -385,7 +391,7 @@ fit_ridge <- glmnet(
 )
 ```
 
-The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. The figure below illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
+The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. The figure below illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.\index{Graph!ML prediction path}
 
 
 ```r
@@ -406,8 +412,8 @@ bind_rows(
 ```
 
 <div class="figure" style="text-align: center">
-<img src="42_factor_selection_with_machine_learning_files/figure-html/fig423-1.png" alt="Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, Lasso exhibits non-linear behavior." width="90%" />
-<p class="caption">(\#fig:fig423)The penalty parameters are choosen iteratively to resemble the path from no penalization to a model that excludes all variables.</p>
+<img src="42_factor_selection_with_machine_learning_files/figure-html/fig423-1.png" alt="Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, and Lasso exhibits non-linear behavior." width="90%" />
+<p class="caption">(\#fig:fig423)The penalty parameters are chosen iteratively to resemble the path from no penalization to a model that excludes all variables.</p>
 </div>
 
 ::: {.rmdnote}
@@ -491,7 +497,9 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 
 
 ```r
-autoplot(lm_tune) +
+autoplot(lm_tune) + 
+  aes(linetype = `Proportion of Lasso Penalty`) + 
+  guides(linetype = "none") +
   labs(
     x = "Penalty factor (lambda)",
     y = "Root MSPE",
@@ -500,8 +508,8 @@ autoplot(lm_tune) +
 ```
 
 <div class="figure" style="text-align: center">
-<img src="42_factor_selection_with_machine_learning_files/figure-html/fig425-1.png" alt="Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningfull fashion. At some point, the Elastic Net prediction error drops which indicates the selected model. MSPE increases again for high penalization values." width="90%" />
-<p class="caption">(\#fig:fig425)Evaluation of Manufactoring excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net and 0.0 indicates Ridge.</p>
+<img src="42_factor_selection_with_machine_learning_files/figure-html/fig425-1.png" alt="Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values." width="90%" />
+<p class="caption">(\#fig:fig425)Evaluation of Manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net and 0.0 indicates Ridge.</p>
 </div>
 
 The figure shows that the cross-validated MSPE drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE.
@@ -581,7 +589,7 @@ selected_factors <- data |>
 ```
 
 What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible. 
-Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map.
+Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map.\index{Graph!Heat map}
 
 
 ```r

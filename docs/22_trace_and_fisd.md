@@ -2,7 +2,7 @@
 
 In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly 10 trillion USD outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
 
-Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you can compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.
+Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you can compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.\index{Corporate bonds}
 
 The current chapter relies on this set of packages. 
 
@@ -189,7 +189,7 @@ for (j in 1:length(mergent_parts)) {
 
 ## Insights into corporate bonds
 
-While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
+While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.\index{Summary statistics}
 
 We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
 
@@ -207,7 +207,7 @@ bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
          maturity = floor_date(maturity)) |> 
   filter(date >= offering_date & date <= maturity) |> 
   count(date) |> 
-  mutate(type = "outstanding")
+  mutate(type = "Outstanding")
 ```
 
 Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop from above.
@@ -221,7 +221,7 @@ bonds_traded <- trace_enhanced |>
   mutate(date = floor_date(trd_exctn_dt, "quarters")) |> 
   group_by(date) |> 
   summarize(n = length(unique(cusip_id)),
-            type = "traded",
+            type = "Traded",
             .groups = "drop") 
 ```
 
@@ -231,7 +231,12 @@ Finally, we plot the two time series in the figure below.
 ```r
 bonds_outstanding |> 
   bind_rows(bonds_traded) |> 
-  ggplot(aes(x = date, y = n, color = type, linetype = type)) +
+  ggplot(aes(
+    x = date, 
+    y = n, 
+    color = type, 
+    linetype = type
+  )) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
@@ -240,12 +245,12 @@ bonds_outstanding |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="22_trace_and_fisd_files/figure-html/fig221-1.png" alt="Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60%, which peaks around the third quarter of 2016." width="90%" />
+<img src="22_trace_and_fisd_files/figure-html/fig221-1.png" alt="Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016." width="90%" />
 <p class="caption">(\#fig:fig221)The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.</p>
 </div>
 
 We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
-Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD). 
+Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
 
 
 ```r
@@ -276,7 +281,7 @@ mergent |>
 3 offering_amt 357.   545.   0.001 0.875 200    1250    15000 
 ```
 
-We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons. 
+We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons.
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
@@ -314,6 +319,6 @@ On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 
 ## Exercises
 
 1. Summarize the amount outstanding of all bonds over time and describe the resulting graph. 
-1. Compute the number of days each bond is traded (accounting for the bonds maturity and issuance). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
+1. Compute the number of days each bond is traded (accounting for the bonds' maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
 1. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
 1. Download the TRACE data until the end of September 2021. Hint: you want to download the data completely new, rather than adding the new information. Can you find a reason why?

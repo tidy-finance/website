@@ -44,7 +44,7 @@ wrds <- dbConnect(
 )
 ```
 
-The remote connection to WRDS is very useful. Yet, the database itself contains many different tables. You can check the WRDS homepage to identify the table's name you are looking for (if you go beyond our exposition). Alternatively, you can also query the data structure with the function `dbSendQuery()`. If you are interested, there is an exercise below that is based on WRDS' tutorial on ["Querying WRDS Data using R".](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/)  Furthermore, the penultimate section of this chapter shows how to investigate the structure of databases. 
+The remote connection to WRDS is very useful. Yet, the database itself contains many different tables. You can check the WRDS homepage to identify the table's name you are looking for (if you go beyond our exposition). Alternatively, you can also query the data structure with the function `dbSendQuery()`. If you are interested, there is an exercise below that is based on WRDS' tutorial on ["Querying WRDS Data using R".](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/)  Furthermore, the penultimate section of this chapter shows how to investigate the structure of databases.
 
 
 ## Downloading and preparing CRSP
@@ -68,7 +68,7 @@ and (iii) the delisting information.
 msedelist_db <- tbl(wrds, in_schema("crsp", "msedelist"))
 ```
 
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.
+We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.\index{Permno}
 
 
 ```r
@@ -109,7 +109,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns ``ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist and CRSP decides to report the mid quote of the last available orderbook instead. Hence, we take the absolute value of market cap. We also keep market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns ``ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist, and CRSP decides to report the mid-quote of the last available order book instead. Hence, we take the absolute value of the market cap. We also keep the market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 
 ```r
@@ -120,7 +120,7 @@ crsp_monthly <- crsp_monthly |>
   )
 ```
 
-The next variable we frequently use is the one-month *lagged* market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data. 
+The next variable we frequently use is the one-month *lagged* market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.\index{Weighting!Value}
 
 
 ```r
@@ -183,7 +183,7 @@ crsp_monthly <- crsp_monthly |>
   select(-c(dlret, dlstcd))
 ```
 
-Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure that excess returns are bounded by -1 from below as less than -100% return make conceptually no sense. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
+Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
 
 
 ```r
@@ -230,7 +230,7 @@ Finally, we store the monthly CRSP file in our database.
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns. 
 
-The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerable large number of stocks. The number of stocks listed on AMEX is decreasing steadily over the last couple of decades. By the end of 2021, there are 2,779 stocks with primary listing on NASDAQ, 1,395 on NYSE, 145 on AMEX and only 1 belongs to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
+The figure below shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerably large number of stocks. The number of stocks listed on AMEX decreased steadily over the last couple of decades. By the end of 2021, there were 2,779 stocks with a primary listing on NASDAQ, 1,395 on NYSE, 145 on AMEX, and only one belonged to the other category.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 
 ```r
@@ -247,11 +247,11 @@ crsp_monthly |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with of number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="90%" />
+<img src="21_WRDS_files/figure-html/fig211-1.png" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role." width="90%" />
 <p class="caption">(\#fig:fig211)Number of stocks in the CRSP sample listed at each of the US exchanges.</p>
 </div>
 
-Next, we look at the aggregate market capitalization grouped by the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if it were in memory. All values are in end of 2021 USD to ensure inter-temporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks. 
+Next, we look at the aggregate market capitalization grouped by the respective listing exchanges. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if they were in memory. All values are at the end of 2021 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
 
 
 ```r
@@ -279,7 +279,7 @@ tbl(tidy_finance, "crsp_monthly") |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD of Dec 2021. The figure shows a line chart of total market capitalization of all stocks aggregated by listing exchange from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. During the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="90%" />
+<img src="21_WRDS_files/figure-html/fig212-1.png" alt="Title: Monthly market cap by listing exchange in billion USD as of Dec 2021. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2021, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." width="90%" />
 <p class="caption">(\#fig:fig212)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
@@ -291,7 +291,7 @@ cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |>
   collect()
 ```
 
-Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is apparently in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
+Next, we look at the same descriptive statistics by industry. The figure below plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
 
 
 ```r
@@ -321,7 +321,7 @@ crsp_monthly_industry |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is largest in terms of number of listed stocks." width="90%" />
+<img src="21_WRDS_files/figure-html/fig213-1.png" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is the largest in terms of the number of listed stocks." width="90%" />
 <p class="caption">(\#fig:fig213)Number of stocks in the CRSP sample associated with different industries.</p>
 </div>
 
@@ -339,14 +339,14 @@ crsp_monthly_industry |>
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly total market cap by industry in billions of Dec 2021 USD"
+    title = "Monthly total market cap by industry in billions as of Dec 2021 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="90%" />
+<img src="21_WRDS_files/figure-html/fig214-1.png" alt="Title: Monthly total market cap by industry in billions as of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. " width="90%" />
 <p class="caption">(\#fig:fig214)Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.</p>
 </div>
 
@@ -355,7 +355,7 @@ crsp_monthly_industry |>
 
 Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
+There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use `txtProgressBar()`. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
 ```r
 dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
@@ -420,7 +420,7 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 funda_db <- tbl(wrds, in_schema("comp", "funda"))
 ```
 
-We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.
+We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, (ii) in the standard format (i.e., consolidated information in standard presentation), and (iii) only data in the desired time window.\index{Gvkey}
 
 
 ```r
@@ -486,7 +486,7 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 
 ## Merging CRSP with Compustat
 
-Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}
+Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table}
 
 
 ```r
@@ -547,7 +547,12 @@ crsp_monthly |>
     share = n_distinct(permno[!is.na(be)]) / n_distinct(permno),
     .groups = "drop"
   ) |>
-  ggplot(aes(x = year, y = share, color = exchange)) +
+  ggplot(aes(
+    x = year, 
+    y = share, 
+    color = exchange,
+    linetype = exchange
+    )) +
   geom_line() +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
@@ -558,7 +563,7 @@ crsp_monthly |>
 ```
 
 <div class="figure" style="text-align: center">
-<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the coresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="90%" />
+<img src="21_WRDS_files/figure-html/fig215-1.png" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat." width="90%" />
 <p class="caption">(\#fig:fig215)End-of-year share of securities with book equity values by listing exchange.</p>
 </div>
 
@@ -570,7 +575,7 @@ As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. 
 dbListObjects(wrds, Id(schema = "crsp"))
 ```
 
-This operation returns a list of all tables that belong to the `crsp` family on WRSD, e.g. `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
+This operation returns a list of all tables that belong to the `crsp` family on WRDS, e.g., `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
 
 ```r
 dbListObjects(wrds, Id(schema = "comp"))

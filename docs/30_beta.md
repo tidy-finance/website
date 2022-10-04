@@ -81,7 +81,7 @@ F-statistic:  145 on 1 and 490 DF,  p-value: <2e-16
 
 ## Rolling-window estimation
 
-After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rollwing-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
+After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
 
 
 ```r
@@ -168,10 +168,14 @@ beta_examples <- crsp_monthly |>
   drop_na()
 
 beta_examples |>
-  ggplot(aes(x = month, y = beta, color = company)) +
+  ggplot(aes(
+    x = month, 
+    y = beta, 
+    color = company,
+    linetype = company)) +
   geom_line() +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "Monthly beta estimates for example stocks using 5 years of data"
   )
 ```
@@ -355,7 +359,7 @@ beta_daily <- crsp_daily_nested |>
 
 ## Comparing beta estimates
 
-What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. The first figure below shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.
+What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. The first figure below shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
 
 
 ```r
@@ -390,16 +394,21 @@ beta_monthly |>
     quantile = 100 * seq(0.1, 0.9, 0.1),
     .groups = "drop"
   ) |>
-  ggplot(aes(x = month, y = x, color = as_factor(quantile))) +
+  ggplot(aes(
+    x = month, 
+    y = x, 
+    color = as_factor(quantile),
+    linetype = as_factor(quantile)
+    )) +
   geom_line() +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "Monthly deciles of estimated betas",
   )
 ```
 
 <div class="figure" style="text-align: center">
-<img src="30_beta_files/figure-html/fig313-1.png" alt="Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly. " width="90%" />
+<img src="30_beta_files/figure-html/fig313-1.png" alt="Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly." width="90%" />
 <p class="caption">(\#fig:fig313)Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.</p>
 </div>
 
@@ -415,11 +424,16 @@ beta |>
   inner_join(examples, by = "permno") |>
   pivot_longer(cols = c(beta_monthly, beta_daily)) |>
   drop_na() |>
-  ggplot(aes(x = month, y = value, color = name)) +
+  ggplot(aes(
+    x = month, 
+    y = value, 
+    color = name, 
+    linetype = name
+    )) +
   geom_line() +
   facet_wrap(~company, ncol = 1) +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL, y = NULL, color = NULL, linetype = NULL, 
     title = "Comparison of beta estimates using monthly and daily data"
   )
 ```
@@ -456,11 +470,16 @@ beta_long <- crsp_monthly |>
 beta_long |>
   group_by(month, name) |>
   summarize(share = sum(!is.na(value)) / n()) |>
-  ggplot(aes(x = month, y = share, color = name)) +
+  ggplot(aes(
+    x = month, 
+    y = share, 
+    color = name,
+    linetype = name
+    )) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "End-of-month share of securities with beta estimates"
   ) +
   coord_cartesian(ylim = c(0, 1))

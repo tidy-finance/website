@@ -189,7 +189,7 @@ Both models indicate that polluters have significantly higher yields after the P
 
 Even though the regressions above indicate that there is an impact of the PA on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
 
-To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data. 
+To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data.\index{Graph!Diff-in-diff graph} 
 
 ```r
 model_without_fe_time <- feols(
@@ -210,7 +210,12 @@ model_without_fe_coefs <- tidy(model_without_fe_time) |>
   )
 
 model_without_fe_coefs |>
-  ggplot(aes(month, color = treatment)) +
+  ggplot(aes(
+    month, 
+    color = treatment,
+    linetype = treatment,
+    shape = treatment
+    )) +
   geom_vline(aes(xintercept = floor_date(treatment_date, "month")),
     linetype = "dashed"
   ) +
@@ -220,10 +225,12 @@ model_without_fe_coefs |>
   geom_errorbar(aes(ymin = ci_low, ymax = ci_up),
     alpha = 0.5
   ) +
+  guides(linetype = "none") + 
   geom_point(aes(y = estimate)) +
   labs(
     x = NULL,
     y = "Yield",
+    shape = "Polluter?",
     color = "Polluter?",
     title = "Polluters respond stronger to Paris Agreement than green firms"
   )
@@ -235,7 +242,7 @@ model_without_fe_coefs |>
 </div>
 We can see that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement. 
 
-Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects. 
+Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects.\index{Graph!Diff-in-diff graph}
 
 ```r
 bonds_panel_alt <- bonds_panel |>
