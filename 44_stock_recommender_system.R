@@ -2,6 +2,10 @@ library(tidyverse)
 library(scales)
 library(recommenderlab)
 
+# TODO: compare to recommendation based on MSCI world
+# TODO: discuss how this relates to modern portfolio theory
+# TODO: check out Santander data
+
 # Prepare data ------------------------------------------------------------
 # TODO: check whether we can use wikifolio data and how to host it (maybe pin?)
 wikifolio_portfolios <- read_rds("data/wikifolio_portfolios.rds") %>%
