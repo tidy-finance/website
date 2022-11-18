@@ -1,4 +1,4 @@
-# Factor selection via machine learning
+# Factor Selection via Machine Learning
 
 The aim of this chapter is twofold. From a data science perspective, we introduce `tidymodels`, a collection of packages for modeling and machine learning (ML) using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the notion of *factor zoo* [@Cochrane2011] using ML methods. We introduce Lasso and Ridge regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `tidymodels` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions for identifying macroeconomic variables and asset pricing factors that help explain a cross-section of industry portfolios.
 
@@ -7,11 +7,11 @@ Such findings question the usefulness of the Capital Asset Pricing Model.
 In fact, during the last decades, financial economists discovered a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role in pricing applications). The search for factors that explain the cross-section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Mclean2016, and @Hou2020.
 Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *do we believe in the relevance of 300+ risk factors?* During recent years, promising methods from the field of ML got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure, and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
-## Brief theoretical background
+## Brief Theoretical Background
 
 This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by @Hastie2009, @Hastie2013, and @DePrado2018. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `tidymodels` workflow.
 
-To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$ where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
+To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$, where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
 \index{Regression!OLS}
 
@@ -32,7 +32,7 @@ MSE &=E((y-\hat{f}(x))^2)=E((f(x)+\epsilon-\hat{f}(x))^2)\\
 
 \index{Regression!Ridge}
 
-One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$ the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here $c\geq 0$ is a constant that depends on the choice of $\lambda$. The larger $\lambda$, the smaller $c$ (technically speaking, there is a one-to-one relationship between $\lambda$, which corresponds to the Lagrangian of the minimization problem above and $c$).  Here, $X = \left(x_1  \ldots  x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.$$ A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: a larger value of $\lambda$ implies *shrinkage* of the regression coefficient towards 0, a smaller value of $\lambda$ reduces the bias of the resulting estimator.     
+One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$ the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here $c\geq 0$ is a constant that depends on the choice of $\lambda$. The larger $\lambda$, the smaller $c$ (technically speaking, there is a one-to-one relationship between $\lambda$, which corresponds to the Lagrangian of the minimization problem above and $c$).  Here, $X = \left(x_1  \ldots  x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.$$ A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: a larger value of $\lambda$ implies *shrinkage* of the regression coefficient toward 0, a smaller value of $\lambda$ reduces the bias of the resulting estimator.     
 
 ::: {.rmdnote}
 Note, that $X$ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that $y$ is simply demeaned before computing $\hat\beta^\text{ridge}$.
@@ -49,9 +49,9 @@ The main difference to Ridge regression is that Lasso does not only *shrink* coe
 
 ### Elastic Net
 
-The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages a grouping effect where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: $$\hat\beta^\text{EN} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda(1-\rho)\sum\limits_{k=1}^K|\beta_k| +\frac{1}{2}\lambda\rho\sum\limits_{k=1}^K\beta_k^2$$ Now, we have to chose two hyperparameters: the *shrinkage* factor $\lambda$ and the *weighting parameter* $\rho$. The Elastic Net resembles Lasso for $\rho = 1$ and Ridge regression for $\rho = 0$. While the R package `glmnet` provides efficient algorithms to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use the `glmnet` package or the `tidymodels` back-end.
+The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages a grouping effect, where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: $$\hat\beta^\text{EN} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda(1-\rho)\sum\limits_{k=1}^K|\beta_k| +\frac{1}{2}\lambda\rho\sum\limits_{k=1}^K\beta_k^2$$ Now, we have to chose two hyperparameters: the *shrinkage* factor $\lambda$ and the *weighting parameter* $\rho$. The Elastic Net resembles Lasso for $\rho = 1$ and Ridge regression for $\rho = 0$. While the R package `glmnet` provides efficient algorithms to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use the `glmnet` package or the `tidymodels` back-end.
 
-## Data preparation
+## Data Preparation
 
 To get started, we load the required packages and data. The main focus is on the workflow behind the `tidymodels` package collection [@tidymodels]. 
 @Kuhn2022 provide a thorough introduction into all `tidymodels` components. `glmnet` [@glmnet] was developed and released in sync with @Tibshirani1996 and provides an R implementation of Elastic Net estimation. The package `timetk` [@timetk] provides useful tools for time series data wrangling. 
@@ -121,9 +121,9 @@ data <- industries_ff_monthly |>
 ```
 
 Our data contains `r ncol(data)-2` columns of regressors with the `r ncol(macro_predictors) - 1` macro variables and `r ncol(factors_ff_monthly) + ncol(factors_q_monthly)-2` factor returns for each month. 
-The figure below provides summary statistics for the `r industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent.\index{Graph!Box plot}
+Figure 14.1 provides summary statistics for the `r industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent.\index{Graph!Box plot}
 
-```{r, fig421, fig.cap = "The box plots show the monthly dispersion of returns for 10 different industries", fig.alt = "Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry's excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis."}
+```{r, fig421, fig.cap = "The box plots show the monthly dispersion of returns for 10 different industries.", fig.alt = "Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry's excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis."}
 data |>
   group_by(industry) |>
   mutate(ret = ret) |>
@@ -139,7 +139,7 @@ data |>
   )
 ```
 
-## The tidymodels workflow
+## The tidymodels Workflow
 
 To illustrate penalized linear regressions, we employ the `tidymodels` collection of packages for modeling and ML using `tidyverse` principles. You can simply use `install.packages("tidymodels")` to get access to all the related packages. We recommend checking out the work of @Kuhn2022: They  continuously write on their great book ['Tidy Modeling with R'](https://www.tmwr.org/) using tidy principles.
 
@@ -233,7 +233,7 @@ lm_fit
 
 With the `workflow` from above, we are ready to use `fit()`. Typically, we use training data to fit the model. 
 The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ The figure below illustrates the projections for the *entire* time series of the Manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ Figure 14.2 illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 ```{r}
 predicted_values <- lm_fit |>
@@ -319,7 +319,7 @@ fit_ridge <- glmnet(
 )
 ```
 
-The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. The figure below illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.\index{Graph!ML prediction path}
+The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. Figure 14.3 illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.\index{Graph!ML prediction path}
 
 ```{r, fig423, fig.cap = "The penalty parameters are chosen iteratively to resemble the path from no penalization to a model that excludes all variables.", fig.alt = "Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, and Lasso exhibits non-linear behavior."}
 bind_rows(
@@ -401,7 +401,7 @@ lm_tune <- lm_fit |>
 
 After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. The figure illustrates the average validation set's root mean-squared error for each value of $\lambda$ and $\rho$.
 
-```{r, fig425, fig.cap = "Evaluation of Manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net and 0.0 indicates Ridge.", fig.alt = "Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values."}
+```{r, fig425, fig.cap = "Evaluation of manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net, and 0.0 indicates Ridge.", fig.alt = "Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values."}
 autoplot(lm_tune) + 
   aes(linetype = `Proportion of Lasso Penalty`) + 
   guides(linetype = "none") +
