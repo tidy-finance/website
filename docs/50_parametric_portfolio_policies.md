@@ -1,6 +1,6 @@
-# (PART\*) Portfolio optimization {.unnumbered}
+# (PART\*) Portfolio Optimization {.unnumbered}
 
-# Parametric portfolio policies
+# Parametric Portfolio Policies
 
 In this chapter, we apply different portfolio performance measures to evaluate and compare portfolio allocation strategies. 
 For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of @Brandt2009 proposes to parametrize the optimal portfolio weights as a function of stock characteristics instead of estimating the stock's expected return, variance, and covariances with other stocks in a prior step. 
@@ -14,7 +14,7 @@ library(lubridate)
 library(RSQLite)
 ```
 
-## Data preparation
+## Data Preparation
 
 To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}
 
@@ -36,32 +36,32 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
-Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t-12$ and $t-2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
+Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t-13$ and $t-2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
 To construct the correct lagged values, we use the approach introduced in Chapter 3.\index{Data!CRSP}
 
 
 ```r
 crsp_monthly_lags <- crsp_monthly |>
   transmute(permno,
-    month_12 = month %m+% months(12),
+    month_13 = month %m+% months(13),
     mktcap
   )
 
 crsp_monthly <- crsp_monthly |>
   inner_join(crsp_monthly_lags,
-    by = c("permno", "month" = "month_12"),
-    suffix = c("", "_12")
+    by = c("permno", "month" = "month_13"),
+    suffix = c("", "_13")
   )
 
 data_portfolios <- crsp_monthly |>
   mutate(
-    momentum_lag = mktcap_lag / mktcap_12,
+    momentum_lag = mktcap_lag / mktcap_13,
     size_lag = log(mktcap_lag)
   ) |>
   drop_na(contains("lag"))
 ```
 
-## Parametric portfolio policies
+## Parametric Portfolio Policies
 
 The basic idea of parametric portfolio weights is as follows. Suppose that at each date $t$ we have $N_t$ stocks in the investment universe, where each stock $i$ has a return of $r_{i, t+1}$ and is associated with a vector of firm characteristics $x_{i, t}$ such as time-series momentum or the market capitalization. The investor's problem is to choose portfolio weights $w_{i,t}$ to maximize the expected utility of the portfolio return:
 $$\begin{aligned}
@@ -90,7 +90,7 @@ data_portfolios <- data_portfolios |>
   select(-mktcap_lag, -altprc)
 ```
 
-## Computing portfolio weights
+## Computing Portfolio Weights
 
 Next, we move on to identify optimal choices of $\theta$. We rewrite the optimization problem together with the weight parametrization and can then estimate $\theta$ to maximize the objective function based on our sample 
 $$\begin{aligned}
@@ -167,8 +167,7 @@ weights_crsp <- compute_portfolio_weights(theta,
 )
 ```
 
-
-## Portfolio performance
+## Portfolio Performance
 
 \index{Performance evaluation}
 Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $u_\gamma(r) = \frac{(1 + r)^\gamma}{1-\gamma}$, where $\gamma$ is the risk aversion factor.\index{Power utility}
@@ -204,7 +203,7 @@ evaluate_portfolio <- function(weights_crsp,
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(12 * portfolio_return),
       "SD return" = 100 * sqrt(12) * sd(portfolio_return),
-      "Sharpe ratio" = mean(portfolio_return) / sd(portfolio_return),
+      "Sharpe ratio" = sqrt(12) * mean(portfolio_return) / sd(portfolio_return),
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
       "Market beta" = coefficients(lm(portfolio_return ~ mkt_excess))[2]
     )) |>
@@ -248,22 +247,22 @@ evaluate_portfolio(weights_crsp) |>
 # A tibble: 11 × 3
    measure                            benchmark     tilt
    <chr>                                  <dbl>    <dbl>
- 1 Expected utility                  -0.249     -0.262  
- 2 Average return                     7.12      -0.445  
- 3 SD return                         15.3       21.0    
- 4 Sharpe ratio                       0.135     -0.00613
- 5 CAPM alpha                         0.000123  -0.00582
- 6 Market beta                        0.993      0.930  
- 7 Absolute weight                    0.0247     0.0632 
- 8 Max. weight                        3.54       3.67   
+ 1 Expected utility                  -0.249     -0.261  
+ 2 Average return                     7.08       0.167  
+ 3 SD return                         15.3       20.9    
+ 4 Sharpe ratio                       0.463      0.00796
+ 5 CAPM alpha                         0.000129  -0.00538
+ 6 Market beta                        0.992      0.950  
+ 7 Absolute weight                    0.0249     0.0637 
+ 8 Max. weight                        3.55       3.68   
  9 Min. weight                        0.0000277 -0.145  
 10 Avg. sum of negative weights       0         77.9    
-11 Avg. fraction of negative weights  0         49.4    
+11 Avg. fraction of negative weights  0         49.5    
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions. 
 
-## Optimal parameter choice
+## Optimal Parameter Choice
 
 Next, we move to a choice of $\theta$ that actually aims to improve some (or all) of the performance measures. We first define a helper function `compute_objective_function()`, which we then pass to an optimizer.
 
@@ -310,12 +309,12 @@ optimal_theta$par
 
 ```
 momentum_lag     size_lag 
-      0.0713      -1.9487 
+       0.312       -1.986 
 ```
 
-The resulting values of $\hat\theta$ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio towards smaller stocks (negative coefficient for size) and towards past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
+The resulting values of $\hat\theta$ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio toward smaller stocks (negative coefficient for size) and toward past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
 
-## More model specifications
+## More Model Specifications
 
 How does the portfolio perform for different model specifications? For this purpose, we compute the performance of a number of different modeling choices based on the entire CRSP sample. The next code chunk performs all the heavy lifting.
 
@@ -343,7 +342,7 @@ full_model_grid <- expand_grid(
   ))
 ```
 
-Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted towards maximizing expected utility. 
+Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted toward maximizing expected utility. 
 
 
 ```r
@@ -404,16 +403,16 @@ performance_table |>
    measure      `EW    ` `VW    ` VW  Op…¹ VW (no…² EW  Op…³ EW (no…⁴
    <chr>           <dbl>    <dbl>    <dbl>    <dbl>    <dbl>    <dbl>
  1 Expected ut… -0.250   -2.49e-1 -0.246   -0.247   -0.250   -2.50e-1
- 2 Average ret… 10.7      7.12e+0 14.9     13.6     13.1      8.14e+0
- 3 SD return    20.3      1.53e+1 20.5     19.5     22.6      1.70e+1
- 4 Sharpe ratio  0.152    1.35e-1  0.209    0.202    0.168    1.38e-1
- 5 CAPM alpha    0.00226  1.23e-4  0.00646  0.00526  0.00428  4.69e-4
- 6 Market beta   1.13     9.93e-1  1.01     1.04     1.14     1.08e+0
- 7 Absolute we…  0.0247   2.47e-2  0.0373   0.0247   0.0255   2.47e-2
- 8 Max. weight   0.0247   3.54e+0  3.37     2.69     0.0672   2.20e-1
- 9 Min. weight   0.0247   2.77e-5 -0.0283   0       -0.0305   0      
-10 Avg. sum of…  0        0       26.4      0        1.73     0      
-11 Avg. fracti…  0        0       38.7      0        6.27     0      
+ 2 Average ret… 10.7      7.08e+0 14.9     13.6     13.1      8.09e+0
+ 3 SD return    20.3      1.53e+1 20.5     19.5     22.5      1.70e+1
+ 4 Sharpe ratio  0.525    4.63e-1  0.727    0.698    0.584    4.76e-1
+ 5 CAPM alpha    0.00231  1.29e-4  0.00659  0.00531  0.00437  4.76e-4
+ 6 Market beta   1.13     9.92e-1  1.01     1.04     1.13     1.08e+0
+ 7 Absolute we…  0.0249   2.49e-2  0.0381   0.0249   0.0260   2.49e-2
+ 8 Max. weight   0.0249   3.55e+0  3.37     2.69     0.157    2.21e-1
+ 9 Min. weight   0.0249   2.77e-5 -0.0353   0       -0.0331   0      
+10 Avg. sum of…  0        0       27.4      0        2.27     0      
+11 Avg. fracti…  0        0       38.6      0        7.40     0      
 # … with abbreviated variable names ¹​`VW  Optimal `,
 #   ²​`VW (no s.) Optimal `, ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `
 ```

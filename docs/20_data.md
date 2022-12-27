@@ -1,6 +1,6 @@
-# (PART\*) Financial data {.unnumbered}
+# (PART\*) Financial Data {.unnumbered}
 
-# Accessing & managing financial data
+# Accessing & Managing Financial Data
 
 In this chapter, we suggest a way to organize your financial data. Everybody, who has experience with data, is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value storage. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects and across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages. 
 
@@ -25,7 +25,7 @@ start_date <- ymd("1960-01-01")
 end_date <- ymd("2021-12-31")
 ```
 
-## Fama-French data
+## Fama-French Data
 
 We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to access the data easily: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) [@frenchdata].\index{Data!Fama-French factors} \index{Kenneth French homepage}
 
@@ -78,9 +78,9 @@ industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
   filter(month >= start_date & month <= end_date)
 ```
 
-It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`.
+It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`. For an alternative to download Fama-French data, check out the `FFdownload` package by [Sebastian Stöckl](https://github.com/sstoeckl/ffdownload).
 
-## q-factors
+## q-Factors
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors' homepage from within `read_csv()`.\index{Data!q-factors}\index{Factor!q-factors}
 
@@ -100,7 +100,7 @@ factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   filter(month >= start_date & month <= end_date)
 ```
 
-## Macroeconomic predictors
+## Macroeconomic Predictors
 
 Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2021 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) Since the data is an XLSX-file stored on a public Google drive location, we need additional packages to access the data directly from our R session. Therefore, we load `readxl` to read the XLSX-file [@readxl] and `googledrive` for the Google drive connection [@googledrive].\index{Data!Macro predictors}
 
@@ -187,7 +187,7 @@ file.remove("data/macro_predictors.xlsx")
 [1] TRUE
 ```
 
-## Other macroeconomic data
+## Other Macroeconomic Data
 
 The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `tidyquant` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
 
@@ -208,7 +208,7 @@ cpi_monthly <- tq_get("CPIAUCNS",
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality. We refer to the package documentation for details. 
 
-## Setting up a database
+## Setting Up a Database
 
 Now that we have downloaded some (freely available) data from the web into the memory of our R session let us set up a database to store that information for future use. We will use the data stored in this database throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code. 
 
@@ -263,7 +263,7 @@ factors_ff_monthly_db |>
 
 ```
 # Source:   SQL [?? x 2]
-# Database: sqlite 3.39.3 [data/tidy_finance.sqlite]
+# Database: sqlite 3.40.0 [data/tidy_finance.sqlite]
   month          rf
   <date>      <dbl>
 1 1960-01-01 0.0033
@@ -349,7 +349,7 @@ factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly")
 factors_q_monthly <- factors_q_monthly |> collect()
 ```
 
-## Managing SQLite databases
+## Managing SQLite Databases
 
 Finally, at the end of our data chapter, we revisit the SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for future uses. As a result, the database file always grows in size.\index{Database!Management}
 

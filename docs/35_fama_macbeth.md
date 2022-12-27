@@ -1,4 +1,4 @@
-# Fama-MacBeth regressions
+# Fama-MacBeth Regressions
 
 In this chapter, we present a simple implementation of @Fama1973, a regression approach commonly called Fama-MacBeth regressions. Fama-MacBeth regressions are widely used in empirical asset pricing studies. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
 
@@ -15,7 +15,7 @@ Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to 
 
 In the second step, the time-series average $\frac{1}{T}\sum_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow @Zaffaroni2022 and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, then the regression approach  captures risk attributes rather than risk premiums. 
 
-Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased towards small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
+Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
 The current chapter relies on this set of packages. 
 
@@ -28,7 +28,7 @@ library(broom)
 ```
 Compared to previous chapters, we introduce the `broom` package [@broom] to tidy the estimation output of many estimated linear models. 
 
-## Data preparation
+## Data Preparation
 
 We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
 
@@ -80,7 +80,7 @@ data_fama_macbeth <- crsp_monthly |>
   drop_na()
 ```
 
-## Cross-sectional regression
+## Cross-sectional Regression
 
 Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month.  
 We regress the returns of the test assets at a particular time point on the characteristisc of each asset. 
@@ -97,7 +97,7 @@ risk_premiums <- data_fama_macbeth |>
   unnest(estimates)
 ```
 
-## Time-series aggregation
+## Time-Series Aggregation
 
 Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the $t$-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests. 
 
@@ -144,7 +144,7 @@ left_join(price_of_risk,
   factor      risk_premium t_statistic t_statistic_newey_west
   <chr>              <dbl>       <dbl>                  <dbl>
 1 (Intercept)      1.70         6.68                   5.76  
-2 beta             0.00763      0.0730                 0.0651
+2 beta             0.00766      0.0734                 0.0654
 3 bm               0.141        3.03                   2.59  
 4 log_mktcap      -0.114       -3.20                  -2.94  
 ```

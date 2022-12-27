@@ -1,4 +1,4 @@
-# Univariate portfolio sorts
+# Univariate Portfolio Sorts
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing [e.g., @BaliEngleMurray2016]. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
 We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in Chapter 9. 
@@ -21,7 +21,7 @@ library(sandwich)
 ```
 Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for estimated coefficients, and `sandwich` [@sandwich] for different covariance matrix estimators. 
 
-## Data preparation
+## Data Preparation
 
 We start with loading the required data from our `SQLite`-database introduced in Chapters 2-4. In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
 Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors}
@@ -46,7 +46,7 @@ beta <- tbl(tidy_finance, "beta") |>
   collect()
 ```
 
-## Sorting by market beta
+## Sorting by Market Beta
 
 Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. 
 To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. 
@@ -84,7 +84,7 @@ beta_portfolios <- data_for_sorts |>
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
 ```
 
-## Performance evaluation
+## Performance Evaluation
 
 We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.\index{Long-short}
 
@@ -113,7 +113,7 @@ t test of coefficients:
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
 
-## Functional programming for portfolio sorts
+## Functional Programming for Portfolio Sorts
 
 Now we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we employ the [curly-curly](https://www.tidyverse.org/blog/2019/06/rlang-0-4-0/#a-simpler-interpolation-pattern-with-)-operator to give us flexibility concerning which variable to use for the sorting, denoted by `var`.\index{Curly-curly} We use `quantile()` to compute breakpoints for `n_portfolios`. Then, we assign portfolios to stocks using the `findInterval()` function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.\index{Functional programming}
 
@@ -160,8 +160,7 @@ beta_portfolios <- data_for_sorts |>
   )
 ```
 
-
-## More performance evaluation
+## More Performance Evaluation
 
 In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.\index{Performance evaluation}\index{Alpha}\index{CAPM}
 
@@ -177,7 +176,7 @@ beta_portfolios_summary <- beta_portfolios |>
   )
 ```
 
-The figure below illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.\index{Graph!Bar chart}
+Figure 7.1 illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.\index{Graph!Bar chart}
 
 
 ```r
@@ -201,9 +200,9 @@ beta_portfolios_summary |>
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
 
-## The security market line and beta portfolios
+## The Security Market Line and Beta Portfolios
 
-The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.\index{Security market line} The figure below illustrates the security market line: We see that (not surprisingly) the high beta portfolio returns have a high correlation with the market returns. However, it seems like the average excess returns for high beta stocks are lower than what the security market line implies would be an "appropriate" compensation for the high market risk. 
+The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time.\index{Security market line} Figure 7.2 illustrates the security market line: We see that (not surprisingly) the high beta portfolio returns have a high correlation with the market returns. However, it seems like the average excess returns for high beta stocks are lower than what the security market line implies would be an "appropriate" compensation for the high market risk. 
 
 
 ```r
@@ -295,7 +294,7 @@ mkt_excess   1.16555    0.09562   12.19   <2e-16 ***
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-The figure below shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 
+Figure 7.3 shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns. 
 
 
 ```r

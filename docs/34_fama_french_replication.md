@@ -1,4 +1,4 @@
-# Replicating Fama and French factors
+# Replicating Fama and French Factors
 
 In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
 
@@ -10,7 +10,7 @@ library(RSQLite)
 library(lubridate)
 ```
 
-## Data preparation
+## Data Preparation
 
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
@@ -75,7 +75,7 @@ variables_ff <- me_ff |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
-## Portfolio sorts
+## Portfolio Sorts
 
 Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
@@ -133,7 +133,7 @@ portfolios_ff <- data_ff |>
 ```
 
 
-## Fama and French factor returns
+## Fama and French Factor Returns
 
 Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size!Size factor}\index{Value factor}
 
@@ -156,8 +156,7 @@ factors_ff_monthly_replicated <- portfolios_ff |>
   )
 ```
 
-
-## Replication evaluation
+## Replication Evaluation
 
 In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
@@ -213,12 +212,12 @@ lm(formula = hml ~ hml_replicated, data = test)
 
 Residuals:
       Min        1Q    Median        3Q       Max 
--0.023350 -0.002984 -0.000091  0.002280  0.028783 
+-0.023349 -0.002984 -0.000091  0.002281  0.028783 
 
 Coefficients:
                Estimate Std. Error t value Pr(>|t|)    
 (Intercept)    0.000318   0.000219    1.45     0.15    
-hml_replicated 0.965370   0.007478  129.09   <2e-16 ***
+hml_replicated 0.965367   0.007478  129.09   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

@@ -1,4 +1,4 @@
-# Size sorts and p-hacking
+# Size Sorts and p-Hacking
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
@@ -19,7 +19,7 @@ library(rlang)
 ```
 Compared to previous chapters, we introduce the `rlang` package [@rlang] for more advanced parsing of functional expressions.  
 
-## Data preparation
+## Data Preparation
 
 First, we retrieve the relevant data from our `SQLite`-database introduced in Chapters 2-4. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
@@ -38,12 +38,12 @@ factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
   collect()
 ```
 
-## Size distribution
+## Size Distribution
 
-Before we build our size portfolios, we investigate the distribution of the variable *firm size*.\index{Firm size} Visualizing the data is a valuable starting point to understand the input to the analysis. The figure below shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x percent of the firms. 
+Before we build our size portfolios, we investigate the distribution of the variable *firm size*.\index{Firm size} Visualizing the data is a valuable starting point to understand the input to the analysis. Figure 8.1 shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x percent of the firms. 
 Then, we aggregate the firms within each bucket and compute the buckets' share of total market capitalization.\index{Market capitalization}
 
-The figure shows that the largest 1 percent of firms cover up to 50 percent of the total market capitalization, and holding just the 25 percent largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
+Figure 8.1 shows that the largest 1 percent of firms cover up to 50 percent of the total market capitalization, and holding just the 25 percent largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
 
 ```r
@@ -85,7 +85,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig331)We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.</p>
 </div>
 
-Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. The graph below shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}\index{Graph!Area graph}
+Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. Figure 8.2 shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}\index{Graph!Area graph}
 
 
 ```r
@@ -158,7 +158,7 @@ crsp_monthly |>
 5 Overall  11348. 77458.     7.01    34.0   794.  40647. 2.90e6  4320
 ```
 
-## Univariate size portfolios with flexible breakpoints
+## Univariate Size Portfolios with Flexible Breakpoints
 
 In Chapter 7, we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
 
@@ -189,7 +189,7 @@ assign_portfolio <- function(n_portfolios,
 }
 ```
 
-## Weighting schemes for portfolios
+## Weighting Schemes for Portfolios
 
 Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock's return the same weight, i.e., a simple average of the constituents' returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.\index{Weighting!Value}\index{Weighting!Equal}
 
@@ -256,7 +256,7 @@ tibble(
 
 The table shows that the size premium is more than 60 percent larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.  
 
-## P-hacking and non-standard errors
+## P-Hacking and Non-standard Errors
 
 Since the choice of the listing exchange has a significant impact, the next step is to investigate the effect of other data processing decisions researchers have to make along the way. 
 In particular, any portfolio sort analysis has to decide at least on the number of portfolios, the listing exchanges to form breakpoints, and equal- or value-weighting. 
@@ -328,9 +328,9 @@ p_hacking_results
 # … with 43 more rows, and abbreviated variable name ¹​size_premium
 ```
 
-## The size-premium variation
+## The Size-Premium Variation
 
-We provide a graph that shows the different premiums. This plot also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.\index{Size!Size premium}\index{Graph!Bar chart}
+We provide a graph in Figure 8.3 that shows the different premiums. Figure 8.3 also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.\index{Size!Size premium}\index{Graph!Bar chart}
 
 
 ```r

@@ -17,7 +17,7 @@ library(devtools)
 
 Compared to previous chapters, we load the `devtools` package [@devtools] to source code that we provided to the public via [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists)
 
-## Bond data from WRDS 
+## Bond Data from WRDS 
 
 Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in the previous chapter. Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
 
@@ -187,7 +187,7 @@ for (j in 1:length(mergent_parts)) {
 }
 ```
 
-## Insights into corporate bonds
+## Insights into Corporate Bonds
 
 While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.\index{Summary statistics}
 
@@ -225,7 +225,7 @@ bonds_traded <- trace_enhanced |>
             .groups = "drop") 
 ```
 
-Finally, we plot the two time series in the figure below.
+Finally, we plot the two time series in Figure 4.1.
 
 
 ```r

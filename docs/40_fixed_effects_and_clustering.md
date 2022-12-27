@@ -1,6 +1,6 @@
-# (PART\*) Modeling & machine learning {.unnumbered}
+# (PART\*) Modeling & Machine Learning {.unnumbered}
 
-# Fixed effects and clustered standard errors
+# Fixed Effects and Clustered Standard Errors
 
 In this chapter, we provide an intuitive introduction to the two popular concepts of *fixed effects regressions* and *clustered standard errors*. When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. The concepts we introduce in this chapter are designed to address such concerns.
 
@@ -18,7 +18,7 @@ library(fixest)
 ```
 Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed effects regressions, the implementation of standard error clusters, and tidy estimation output.
 
-## Data preparation
+## Data Preparation
 
 We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in Chapters 2-4. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
@@ -130,12 +130,12 @@ data_investment |>
 # A tibble: 3 × 9
   measure      mean     sd    min      q05    q50   q95    max      n
   <chr>       <dbl>  <dbl>  <dbl>    <dbl>  <dbl> <dbl>  <dbl>  <int>
-1 cash_flows 0.0145 0.266  -1.50  -4.57e-1 0.0649 0.273  0.480 124179
-2 investmen… 0.0584 0.0778  0      7.27e-4 0.0333 0.208  0.467 124179
-3 tobins_q   1.99   1.69    0.571  7.92e-1 1.38   5.33  10.9   124179
+1 cash_flows 0.0145 0.266  -1.50  -4.57e-1 0.0649 0.273  0.480 124181
+2 investmen… 0.0584 0.0778  0      7.27e-4 0.0333 0.208  0.467 124181
+3 tobins_q   1.99   1.69    0.571  7.92e-1 1.38   5.33  10.9   124181
 ```
 
-## Fixed effects 
+## Fixed Effects 
 
 To illustrate fixed effects regressions, we use the `fixest` package, which is both computationally powerful and flexible with respect to model specifications.\index{Regression!Fixed effects} We start out with the basic investment regression using the simple model
 $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
@@ -153,15 +153,15 @@ model_ols
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,179 
+Observations: 124,181 
 Standard-errors: IID 
             Estimate Std. Error t value  Pr(>|t|)    
-(Intercept)  0.04243   0.000342   124.1 < 2.2e-16 ***
+(Intercept)  0.04242   0.000342   124.1 < 2.2e-16 ***
 cash_flows   0.05143   0.000835    61.6 < 2.2e-16 ***
 tobins_q     0.00767   0.000132    58.2 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.076041   Adj. R2: 0.044436
+RMSE: 0.07604   Adj. R2: 0.044445
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -183,7 +183,7 @@ model_fe_firm
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,179 
+Observations: 124,181 
 Fixed-effects: gvkey: 13,899
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -191,8 +191,8 @@ cash_flows   0.0146   0.000963    15.1 < 2.2e-16 ***
 tobins_q     0.0113   0.000136    82.6 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.05008     Adj. R2: 0.533298
-                Within R2: 0.059424
+RMSE: 0.05008     Adj. R2: 0.533294
+                Within R2: 0.059427
 ```
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
@@ -213,7 +213,7 @@ model_fe_firmyear
 
 ```
 OLS estimation, Dep. Var.: investment_lead
-Observations: 124,179 
+Observations: 124,181 
 Fixed-effects: gvkey: 13,899,  year: 34
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(>|t|)    
@@ -221,14 +221,14 @@ cash_flows   0.0182   0.000941    19.3 < 2.2e-16 ***
 tobins_q     0.0102   0.000135    75.5 < 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.048805     Adj. R2: 0.556615
-                 Within R2: 0.051545
+RMSE: 0.048805     Adj. R2: 0.556618
+                 Within R2: 0.051549
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
-Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the `etable()` provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
 
 ```r
 etable(model_ols, model_fe_firm, model_fe_firmyear,
@@ -240,22 +240,22 @@ etable(model_ols, model_fe_firm, model_fe_firmyear,
                         model_ols     model_fe_firm
 Dependent Var.:   investment_lead   investment_lead
                                                    
-(Intercept)     0.0424*** (124.1)                  
-cash_flows      0.0514*** (61.56) 0.0146*** (15.14)
-tobins_q        0.0077*** (58.17) 0.0113*** (82.60)
+Constant        0.0424*** (124.1)                  
+cash_flows      0.0514*** (61.57) 0.0146*** (15.14)
+tobins_q        0.0077*** (58.18) 0.0113*** (82.60)
 Fixed-Effects:  ----------------- -----------------
 gvkey                          No               Yes
 year                           No                No
 _______________ _________________ _________________
 VCOV type                     IID               IID
-Observations              124,179           124,179
-R2                        0.04445           0.58554
-Within R2                      --           0.05942
+Observations              124,181           124,181
+R2                        0.04446           0.58553
+Within R2                      --           0.05943
 
                 model_fe_firmyear
 Dependent Var.:   investment_lead
                                  
-(Intercept)                      
+Constant                         
 cash_flows      0.0182*** (19.30)
 tobins_q        0.0102*** (75.51)
 Fixed-Effects:  -----------------
@@ -263,14 +263,14 @@ gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type                     IID
-Observations              124,179
-R2                        0.60636
+Observations              124,181
+R2                        0.60637
 Within R2                 0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-## Clustering standard errors
+## Clustering Standard Errors
 
 Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other. Such dependencies in the residuals invalidate the i.i.d. assumption of OLS and lead to biased standard errors. With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients. 
 
@@ -307,30 +307,30 @@ etable(model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
                 model_fe_firmyear model_cluster_f..
 Dependent Var.:   investment_lead   investment_lead
                                                    
-cash_flows      0.0182*** (19.30) 0.0182*** (11.18)
+cash_flows      0.0182*** (19.30) 0.0182*** (11.19)
 tobins_q        0.0102*** (75.51) 0.0102*** (35.63)
 Fixed-Effects:  ----------------- -----------------
 gvkey                         Yes               Yes
 year                          Yes               Yes
 _______________ _________________ _________________
 VCOV type                     IID         by: gvkey
-Observations              124,179           124,179
-R2                        0.60636           0.60636
+Observations              124,181           124,181
+R2                        0.60637           0.60637
 Within R2                 0.05155           0.05155
 
-                model_cluster_f..
-Dependent Var.:   investment_lead
-                                 
-cash_flows      0.0182*** (9.459)
-tobins_q        0.0102*** (16.36)
-Fixed-Effects:  -----------------
-gvkey                         Yes
-year                          Yes
-_______________ _________________
-VCOV type        by: gvkey & year
-Observations              124,179
-R2                        0.60636
-Within R2                 0.05155
+                model_cluster_f...1
+Dependent Var.:     investment_lead
+                                   
+cash_flows        0.0182*** (9.461)
+tobins_q          0.0102*** (16.36)
+Fixed-Effects:    -----------------
+gvkey                           Yes
+year                            Yes
+_______________   _________________
+VCOV type          by: gvkey & year
+Observations                124,181
+R2                          0.60637
+Within R2                   0.05155
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```

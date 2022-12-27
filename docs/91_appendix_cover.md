@@ -6,7 +6,7 @@
 
 # (APPENDIX) Appendix {-} 
 
-# Cover design
+# Cover Design
 
 The cover of the book is inspired by the fast growing generative art community in R.\index{Generative art}
 Generative art refers to art that in whole or in part has been created with the use of an autonomous system. 

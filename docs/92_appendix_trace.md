@@ -1,4 +1,4 @@
-# Clean enhanced TRACE with R
+# Clean Enhanced TRACE with R
 
 This appendix contains code to clean enhanced TRACE with R. It is also available via the following Github [gist](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4).\index{Github!Gist} Hence, you could also source the function with `devtools::source_gist("3a05b3ab281563b2e94858451c2eb3a4")`. We need this function in Chapter 4 to download and clean enhanced TRACE trade messages following @Dick2009 and @Dick2014 for enhanced TRACE specifically. WRDS provides SAS code to clean enhanced TRACE data.
 

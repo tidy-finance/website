@@ -1,4 +1,4 @@
-# Difference in differences
+# Difference in Differences
 
 In this chapter, we illustrate the concept of *difference in differences* (DD) estimators by evaluating the effects of climate change regulation on the pricing of bonds across firms. DD estimators are typically used to recover the treatment effects of natural or quasi-natural experiments that trigger sharp changes in the environment of a specific group. Instead of looking at differences in just one group (e.g., the effect in the treated group), DD investigates the treatment effects by looking at the difference between differences in two groups. Such experiments are usually exploited to address endogeneity concerns [e.g., @RobertsWhited2013]. The identifying assumption is that the outcome variable would change equally in both groups without the treatment. This assumption is also often referred to as the assumption of parallel trends. Moreover, we would ideally also want a random assignment to the treatment and control groups. Due to lobbying or other activities, this randomness is often violated in (financial) economics.\index{Difference in differences}
 
@@ -17,7 +17,7 @@ library(fixest)
 library(broom)
 ```
 
-## Data preparation
+## Data Preparation
 
 We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in Chapters 2-4. \index{Data!TRACE}\index{Data!FISD}
 
@@ -137,7 +137,7 @@ bonds_panel |>
 3 time_to_maturity  8.54 8.41  1.01    1.50  5.81 27.4  101.  127428
 ```
 
-## Panel regressions
+## Panel Regressions
 
 The PA is a legally binding international treaty on climate change. It was adopted by 196 Parties at COP 21 in Paris on 12 December 2015 and entered into force on 4 November 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an OLS regression without fixed effects where we include the `treated`, `post_period`, and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.\index{Regression!Yields}\index{Regression!Panel}
 
@@ -165,7 +165,7 @@ etable(model_without_fe, model_with_fe, coefstat = "tstat")
                     model_without_fe     model_with_fe
 Dependent Var.:            avg_yield         avg_yield
                                                       
-(Intercept)         10.66*** (56.60)                  
+Constant            10.66*** (56.60)                  
 treatedTRUE        0.4610*** (9.284) 0.9807*** (29.43)
 post_periodTRUE  -0.1747*** (-5.940)                  
 polluterTRUE       0.4745*** (15.05)                  
@@ -185,7 +185,7 @@ Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
 
-## Visualizing parallel trends
+## Visualizing Parallel Trends
 
 Even though the regressions above indicate that there is an impact of the PA on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
 
@@ -240,7 +240,7 @@ model_without_fe_coefs |>
 <img src="41_difference_in_differences_files/figure-html/fig411-1.png" alt="Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016." width="90%" />
 <p class="caption">(\#fig:fig411)The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).</p>
 </div>
-We can see that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement. 
+Figure 13.1 shows that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement. 
 
 Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects.\index{Graph!Diff-in-diff graph}
 
@@ -331,11 +331,11 @@ model_with_fe_time_coefs |>
 </div>
 
 \index{Robustness tests}
-The resulting figure confirms the main conclusion of the previous image: polluters' yield patterns show a considerable anticipation effect starting towards the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
+The resulting graph shown in Figure 13.2 confirms the main conclusion of the previous image: polluters' yield patterns show a considerable anticipation effect starting toward the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
 
 Notice that during the year after the PA was signed, the 45th President of the United States was elected on November 8, 2016. During his campaign there were some indications of intentions to withdraw the US from the PA, which ultimately happened on November 4, 2020. Hence, reversal effects are potentially driven by these actions.
 
 ## Exercises
 
-1. The 46th president of the US rejoined the Paris Agreement in February 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
+1. The 46th President of the US rejoined the Paris Agreement in February 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
 2. Based on the exercise on ratings in Chapter 4, include ratings as a control variable in the analysis above. Do the results change?

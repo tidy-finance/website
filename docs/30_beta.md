@@ -1,6 +1,6 @@
-# (PART\*) Asset pricing {.unnumbered}
+# (PART\*) Asset Pricing {.unnumbered}
 
-# Beta estimation
+# Beta Estimation
 
 In this chapter, we introduce an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of @Sharpe1964, @Lintner1965, and @Mossin1966, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio.\index{CAPM} The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas.\index{Beta} We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization.
 
@@ -15,9 +15,9 @@ library(furrr)
 ```
 Compared to previous chapters, we introduce `slider` [@slider] for sliding window functions, and `furrr` [@furrr] to apply mapping functions in parallel.
 
-## Estimating beta using monthly returns
+## Estimating Beta using Monthly Returns
 
-The estimation procedure is based on a rolling-window estimation where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our `SQLite`-database introduced in the previous Chapters 2-4.\index{Data!CRSP}\index{Data!Fama-French factors}
+The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our `SQLite`-database introduced in the previous Chapters 2-4.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 
 ```r
@@ -79,7 +79,7 @@ F-statistic:  145 on 1 and 490 DF,  p-value: <2e-16
 
 `lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns an overview of the estimated parameters. `coefficients(fit)` would return only the estimated coefficients. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$). 
 
-## Rolling-window estimation
+## Rolling-Window Estimation
 
 After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
 
@@ -156,7 +156,7 @@ beta_example
 5  14593 1985-04-01 Manufacturing    -0.0467    -0.0096  1.90
 # … with 440 more rows
 ```
-It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk. 
+It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk and the resulting Figure 6.1. 
 
 ```r
 beta_examples <- crsp_monthly |>
@@ -185,7 +185,7 @@ beta_examples |>
 <p class="caption">(\#fig:fig311)The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.</p>
 </div>
 
-## Parallelized rolling-window estimation
+## Parallelized Rolling-Window Estimation
 
 Even though we could now just apply the function using `group_by()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. 
 Remember that we have to perform rolling-window estimations across all stocks and time periods. 
@@ -268,7 +268,7 @@ beta_monthly <- crsp_monthly_nested |>
   drop_na()
 ```
 
-## Estimating beta using daily returns
+## Estimating Beta using Daily Returns
 
 Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. 
 Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. 
@@ -357,9 +357,9 @@ beta_daily <- crsp_daily_nested |>
   drop_na()
 ```
 
-## Comparing beta estimates
+## Comparing Beta Estimates
 
-What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. The first figure below shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
+What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. Figure 6.2 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
 
 
 ```r
@@ -382,7 +382,7 @@ crsp_monthly |>
 <p class="caption">(\#fig:fig312)The box plots show the average firm-specific beta estimates by industry.</p>
 </div>
 
-Next, we illustrate the time-variation in the cross-section of estimated betas. The figure below shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are a rare exception.
+Next, we illustrate the time-variation in the cross-section of estimated betas. Figure 6.3 shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are a rare exception.
 
 
 ```r
@@ -412,7 +412,7 @@ beta_monthly |>
 <p class="caption">(\#fig:fig313)Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.</p>
 </div>
 
-To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks. 
+To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks in Figure 6.4. 
 
 
 ```r
@@ -443,7 +443,7 @@ beta |>
 <p class="caption">(\#fig:fig314)CAPM betas are computed using 5 years of monthly or 3 months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.</p>
 </div>
 
-The estimates look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
+The estimates in Figure 6.4 look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
@@ -490,7 +490,7 @@ beta_long |>
 <p class="caption">(\#fig:fig315)The two lines show the share of securities with beta estimates using 5 years of monthly or 3 months of daily data.</p>
 </div>
 
-The figure above does not indicate any troubles, so let us move on to the next check. 
+Figure 6.5 does not indicate any troubles, so let us move on to the next check. 
 
 We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\index{Summary statistics}
 
