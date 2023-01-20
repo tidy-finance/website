@@ -1,6 +1,6 @@
-[![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](cover_crc_tidy_finance.jpg)](www.tidy-finance.org)
+![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](cover_crc_tidy_finance.jpg)
 
-This is the work-in-progress repo for the book **Tidy Finance with R** by [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo).
+This is the work-in-progress repo for the book [**Tidy Finance with R**](www.tidy-finance.org) by [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo).
 
 The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The book is built with [bookdown](https://bookdown.org/).
 
