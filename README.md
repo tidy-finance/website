@@ -17,7 +17,7 @@ renv::use_python()
 ```
 It is recommended to use Python 3.10.6.
 
-Then, open index.qmd -> hit Render button to render all pages (note: this also evaluates all code chunks!).
+Then, open index.qmd -> hit Render button to render all pages. Since we have turned-on auto freeze, we only evaluate code chunks if the code has changed. 
 
 Or enter in terminal 
 
@@ -29,4 +29,10 @@ If you want to render & publish on quarto-pub, then run
 
 ```
 quarto publish quarto-pub
+```
+
+If you want to publish without render, then run
+
+```
+quarto publish quarto-pub --no-render
 ```
