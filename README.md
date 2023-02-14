@@ -5,7 +5,7 @@ This is the repository for the website tidy-finance.org based on the
 
 The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The book is built with [bookdown](https://bookdown.org/).
 
-Print release via [Chapman & Hall / CRC](https://www.routledge.com/go/chapman-hall?utm_source=tidy-finance.org).
+Print release via [Chapman & Hall / CRC](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349).
 
 ## Instructions 
 
