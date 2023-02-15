@@ -1,0 +1,157 @@
+---
+title: "Construction of a Historical S&P 500 Total Return Index"
+author: [Christoph Scheuch]
+date: "2023-02-15"
+description: An approximation of total returns using Robert Shiller's stock market data
+image: thumbnail.jpg
+categories: 
+  - Data
+---
+
+NOTE: I NEED TO REFACTOR ALL CODE TO MAKE IT MORE COMPLIANT WITH OUR STYLE FROM THE BOOK. I JUST RENDERED THIS PAGE TO DISCUSS WHETHER WE REALLY WANT TO INCLUDE IT.
+
+I recently wanted to simulate simple equity savings plans over long time horizons and many different starting periods. The good thing is that the S&P 500 index provides a great starting point as it is easily available since 1928 via [Yahoo Finance](https://finance.yahoo.com/quote/%5EGSPC/). However, I wanted my savings plans to be accumulating, i.e., all cash distributions are reinvested in the savings plan. The S&P index is inadequate for this situation as it is a price index that only tracks its components’ price movements. The [S&P 500 Total Return Index](https://finance.yahoo.com/quote/%5ESP500TR/) tracks the overall performance of the S&P 500 and would be the solution to my problem, but it is only available since 1988.
+
+Fortunately, I came up with a solution using data provided by [Robert Shiller](http://www.econ.yale.edu/~shiller/) and provide the complete code below for future reference. If you spot any errors or have better suggestions, please feel free to create an issue.
+
+This is the set of packages I use throughout this note.
+
+```{r, message = FALSE}
+library(tidyverse) # for overall grammar
+library(lubridate) # to parse dates
+library(tidyquant) # to download data from yahoo finance
+library(glue)      # to automatically construct figure captions
+library(scales)    # for nicer axis labels 
+library(readxl)    # to read Shiller's data 
+```
+
+First, let us download the S&P 500 Total Return Index from Yahoo Finance. I only consider the closing prices of the last day of each month because my savings plans only transfer funds once a month. In principle, you could also approximate the daily time series, but I believe it will be noiser because Shiller only provides monthly data.
+
+```{r}
+tbl.SP500Recent <-  tq_get("^SP500TR", get = "stock.prices",
+                           from = "1988-01-04", to = "2020-10-31") %>%
+  transmute(Date = date, TotalReturnIndex = close) %>%
+  na.omit() %>%
+  group_by(Month = ceiling_date(Date, "month")-1) %>%
+  arrange(Date) %>%
+  filter(Date == max(Date)) %>%
+  ungroup() %>%
+  select(Month, TotalReturnIndex)
+```
+
+Next, I download data from [Robert Shiller’s website](http://www.econ.yale.edu/~shiller/data.htm) used in his great book [Irrational Excuberance](https://press.princeton.edu/books/paperback/9780691173122/irrational-exuberance) into a temporary file and read the relevant sheet. In particular, the data contains monthly S&P 500 price and dividend data. The original file has a bit of annoying date format that I have to correct before parsing.
+
+```{r, warning = FALSE, message = FALSE}
+temp <- tempfile(fileext = ".xls")
+
+download.file(url = "http://www.econ.yale.edu/~shiller/data/ie_data.xls",
+              destfile = temp, mode='wb')
+
+tbl.ShillerHistorical <- read_excel(temp, sheet = "Data", skip = 7) %>%
+  transmute(Month = ceiling_date(ymd(str_replace(str_c(Date, ".01"), "\\.1\\.", "\\.10\\.")), "month")-1,
+            Price = as.numeric(P),
+            Dividend = as.numeric(D)) 
+```
+
+To construct the total return index, I need a return figure that includes dividends. In the next code chunk, I compute monthly total returns of the S&P 500 index by incorporating the monthly dividend paid on the index in the corresponding month. Note that Shiller’s data contains the 12-month moving sum of monthly dividends, hence the division by 12. Admittedly, this is a brute force approximation, but I couldn’t come up with a better solution ad hoc.
+
+```{r}
+tbl.ShillerHistorical <- tbl.ShillerHistorical %>%
+  arrange(Month) %>%
+  mutate(Ret = (Price + Dividend / 12) / lag(Price) - 1)
+```
+
+Before I go back in time, let us check whether the total return computed above is able to match the actual total return since 1988. I start with the first total return index number that is available and use the cumulative product of returns from above to construct the check time series.
+
+```{r}
+tbl.Check <- tbl.ShillerHistorical %>%
+  full_join(tbl.SP500Recent, by = "Month") %>%
+  filter(!is.na(TotalReturnIndex)) %>%
+  arrange(Month) %>%
+  mutate(Ret = if_else(row_number() == 1, 0, Ret), # ignore first month return
+         TotalReturnCheck = TotalReturnIndex[1] * cumprod(1 + Ret)) %>%
+  na.omit()
+```
+
+The correlation between the actual time series and the check is remarkably high which gives me confidence in the method I propose here.
+
+```{r}
+cor(tbl.Check$TotalReturnIndex, tbl.Check$TotalReturnCheck)
+```
+
+In addition, the visual inspection of the two time series corroborates my confidence. Note that both the actual and the simulated total return indexes start at the same index value.
+
+```{r}
+fig.Check <- tbl.Check %>%
+  select(Month, Actual = TotalReturnIndex, Simulated = TotalReturnCheck) %>%
+  pivot_longer(cols = -Month, names_to = "Type", values_to = "Value") %>%
+  ggplot(aes(x = Month, y = Value, color = Type)) +
+  geom_line() +
+  theme_bw() +
+  scale_y_continuous(labels = comma)+ 
+  labs(x = NULL, y = NULL,
+       title = "Actual and Simulated S&P 500 Total Return Index",
+       subtitle = glue("Both Indexes start at {min(tbl.Check$Month)}"))
+fig.Check
+```
+
+Now, let us use the same logic to construct the total return index for the time before 1988. Note that I just sort the months in descending order and divide by the cumulative product of the total return from Shiller’s data.
+
+```{r}
+tbl.SP500Historical <- tbl.SP500Recent %>% 
+  filter(Month == min(Month)) %>%
+  full_join(tbl.ShillerHistorical %>%
+              filter(Month <= min(tbl.SP500Recent$Month)), by = "Month") %>%
+  arrange(desc(Month)) %>%
+  mutate(Ret = if_else(row_number() == 1, 0, Ret), # ignore first month return
+         TotalReturnIndex = TotalReturnIndex[1] / cumprod(1 + Ret))
+```
+
+Before we take a look at the results, I also add the S&P price index from Yahoo Finance for comparison.
+
+```{r}
+tbl.SP500Index <- tq_get("^GSPC", get = "stock.prices",
+                         from = "1928-01-01", to = "2020-10-31") %>%
+  transmute(Date = date, Index = close) %>%
+  na.omit() %>%
+  group_by(Month = ceiling_date(Date, "month") - 1) %>%
+  arrange(Date) %>%
+  filter(Date == max(Date)) %>%
+  ungroup() %>%
+  select(Month, Index)
+```
+
+Finally, let us combine (i) the actual S&P 500 Total Return Index from 1988 until 2020, (ii) the simulated S&P 500 total return index before 1988, and (iii) the S&P 500 price index from 1928 until 2020.
+
+```{r}
+tbl.SP500Monthly <- tbl.SP500Recent%>%
+  bind_rows(tbl.SP500Historical %>%
+              filter(Month < min(tbl.SP500Recent$Month))  %>%
+              select(Month, TotalReturnIndex)) %>%
+  full_join(tbl.SP500Index %>% 
+              select(Month, Index), by = "Month") %>%
+  filter(Month >= "1928-01-01")  %>%
+  arrange(Month)
+tbl.SP500Monthly
+```
+
+The plot below shows you the dramatic differences in cumulative returns if you only consider price changes, as the S&P 500 Index does, versus total returns with reinvested capital gains. Note that I plot the indexes in log scale, otherwise everything until the last couple of decades would look like a flat line. I believe it is also important to keep the differences between price and performance indexes in mind whenever you compare equity indexes across countries. For instance, the DAX is a performance index by default and should never be compared with the S&P 500 price index.
+
+```{r}
+fig.Historical <- tbl.SP500Monthly %>%
+  select(Month, Index, `Total Return` = TotalReturnIndex) %>%
+  pivot_longer(cols = -Month, names_to = "Type", values_to = "Value") %>%
+  group_by(Type) %>%
+  arrange(Month) %>%
+  mutate(Value = Value / Value[1] * 100) %>%
+  ggplot(aes(x = Month, y = Value, color = Type)) +
+  geom_line() +
+  theme_bw() +
+  scale_y_log10(labels = comma) +
+  scale_x_date(expand = c(0, 0), date_breaks = "10 years", date_labels = "%Y") + 
+  labs(x = NULL, y = NULL,
+       title = "S&P 500 Index and Total Return Index Since 1928",
+       subtitle = glue("Both Indexes are Normalized to 100 at {min(tbl.SP500Monthly$Month)}"))
+fig.Historical
+```
+
