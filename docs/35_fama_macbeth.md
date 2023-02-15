@@ -143,9 +143,9 @@ left_join(price_of_risk,
 # A tibble: 4 × 4
   factor      risk_premium t_statistic t_statistic_newey_west
   <chr>              <dbl>       <dbl>                  <dbl>
-1 (Intercept)      1.70         6.68                   5.76  
-2 beta             0.00766      0.0734                 0.0654
-3 bm               0.141        3.03                   2.59  
+1 (Intercept)      1.70         6.67                   5.75  
+2 beta             0.00826      0.0791                 0.0705
+3 bm               0.141        3.03                   2.60  
 4 log_mktcap      -0.114       -3.20                  -2.94  
 ```
 

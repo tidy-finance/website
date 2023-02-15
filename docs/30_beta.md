@@ -202,7 +202,7 @@ crsp_monthly_nested
 ```
 
 ```
-# A tibble: 30,071 × 3
+# A tibble: 30,072 × 3
   permno industry      data              
    <dbl> <chr>         <list>            
 1  10000 Manufacturing <tibble [16 × 3]> 
@@ -210,7 +210,7 @@ crsp_monthly_nested
 3  10002 Finance       <tibble [324 × 3]>
 4  10003 Finance       <tibble [118 × 3]>
 5  10005 Mining        <tibble [65 × 3]> 
-# … with 30,066 more rows
+# … with 30,067 more rows
 ```
 
 Alternatively, we could have created the same nested data by *excluding* the variables that we *do not* want to nest, as in the following code chunk. However, for many applications it is desirable to explicitly state the variables that are nested into the `data` list-column, so that the reader can track what ends up in there.
@@ -517,7 +517,7 @@ beta_long |>
   name          mean    sd   min    q05   q50   q95   max       n
   <chr>        <dbl> <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl>   <int>
 1 beta_daily   0.749 0.926 -43.7 -0.447 0.686  2.23  56.6 3233745
-2 beta_monthly 1.10  0.713 -13.0  0.125 1.03   2.32  10.3 2102936
+2 beta_monthly 1.10  0.713 -13.0  0.125 1.03   2.32  10.3 2102854
 ```
 
 The summary statistics also look plausible for the two estimation procedures. 

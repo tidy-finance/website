@@ -152,10 +152,10 @@ crsp_monthly |>
   exchange   mean     sd      min     q05     q50    q95    max     n
   <chr>     <dbl>  <dbl>    <dbl>   <dbl>   <dbl>  <dbl>  <dbl> <int>
 1 AMEX       415.  2181.     7.57    12.6    75.8  1218. 2.57e4   145
-2 NASDAQ    8649. 90038.     7.01    29.1   428.  18781. 2.90e6  2779
+2 NASDAQ    8651. 90038.     7.01    29.3   429.  18781. 2.90e6  2779
 3 NYSE     17858. 48619.    23.9    195.   3434.  80748. 4.73e5  1395
 4 Other    13906.    NA  13906.   13906.  13906.  13906. 1.39e4     1
-5 Overall  11348. 77458.     7.01    34.0   794.  40647. 2.90e6  4320
+5 Overall  11349. 77458.     7.01    34.3   796.  40647. 2.90e6  4320
 ```
 
 ## Univariate Size Portfolios with Flexible Breakpoints

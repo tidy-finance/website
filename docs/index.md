@@ -4,7 +4,7 @@ author:
   Christoph Scheuch (wikifolio Financial Technologies) and
   Stefan Voigt (University of Copenhagen and Danish Finance Institute) and 
   Patrick Weiss (Reykjavik University and Vienna University of Economics and Business)
-date: "2022-12-27"
+date: "2023-02-15"
 knit: "bookdown::render_book"
 site: bookdown::bookdown_site
 documentclass: book
@@ -14,14 +14,14 @@ link-citations: yes
 links-as-notes: true
 github-repo: voigtstefan/tidy_finance
 url: https://www.tidy-finance.org
-cover-image: cover_homepage.jpg
+cover-image: cover_crc_tidy_finance.jpg
 description: |
   An open-source textbook on empirical finance applications with R. 
 ---
 
 # Preface {.unnumbered}
 
-[![Buy hardcover version](cover_homepage.jpg){.cover width="250"}]()
+[![Buy hardcover version](cover_crc_tidy_finance.jpg){.cover width="250"}](https://www.routledge.com/Tidy-Finance-with-R/Scheuch-Voigt-Weiss/p/book/9781032389349)
 
 This website is the online version of *Tidy Finance with R*, a book currently under development and intended for eventual print release via [Chapman & Hall/CRC](https://www.routledge.com/go/chapman-hall?utm_source=tidy-finance.org). The book is the result of a joint effort of [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance.org), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance.org), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance.org). 
 
@@ -183,7 +183,7 @@ This version of the book was built with R [@R-base] version 4.2.2 (2022-10-31, I
   </tr>
   <tr>
    <td style="text-align:left;"> bookdown </td>
-   <td style="text-align:left;"> 0.31 </td>
+   <td style="text-align:left;"> 0.32 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> broom </td>
@@ -191,7 +191,7 @@ This version of the book was built with R [@R-base] version 4.2.2 (2022-10-31, I
   </tr>
   <tr>
    <td style="text-align:left;"> dbplyr </td>
-   <td style="text-align:left;"> 2.2.1 </td>
+   <td style="text-align:left;"> 2.3.0 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> devtools </td>
@@ -203,7 +203,7 @@ This version of the book was built with R [@R-base] version 4.2.2 (2022-10-31, I
   </tr>
   <tr>
    <td style="text-align:left;"> fixest </td>
-   <td style="text-align:left;"> 0.11.0 </td>
+   <td style="text-align:left;"> 0.11.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> forcats </td>
@@ -259,7 +259,7 @@ This version of the book was built with R [@R-base] version 4.2.2 (2022-10-31, I
   </tr>
   <tr>
    <td style="text-align:left;"> purrr </td>
-   <td style="text-align:left;"> 1.0.0 </td>
+   <td style="text-align:left;"> 1.0.1 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> quadprog </td>
@@ -287,7 +287,7 @@ This version of the book was built with R [@R-base] version 4.2.2 (2022-10-31, I
   </tr>
   <tr>
    <td style="text-align:left;"> rmarkdown </td>
-   <td style="text-align:left;"> 2.19 </td>
+   <td style="text-align:left;"> 2.20 </td>
   </tr>
   <tr>
    <td style="text-align:left;"> RPostgres </td>

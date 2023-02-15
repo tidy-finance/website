@@ -39,11 +39,11 @@ prices
 # A tibble: 5,535 × 8
   symbol date        open  high   low close    volume adjusted
   <chr>  <date>     <dbl> <dbl> <dbl> <dbl>     <dbl>    <dbl>
-1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.852
-2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.780
-3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.792
-4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.723
-5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.757
+1 AAPL   2000-01-03 0.936 1.00  0.908 0.999 535796800    0.851
+2 AAPL   2000-01-04 0.967 0.988 0.903 0.915 512377600    0.779
+3 AAPL   2000-01-05 0.926 0.987 0.920 0.929 778321600    0.790
+4 AAPL   2000-01-06 0.948 0.955 0.848 0.848 767972800    0.722
+5 AAPL   2000-01-07 0.862 0.902 0.853 0.888 460734400    0.756
 # … with 5,530 more rows
 ```
 
@@ -230,11 +230,11 @@ ticker
 # A tibble: 30 × 8
   symbol company          ident…¹ sedol weight sector share…² local…³
   <chr>  <chr>            <chr>   <chr>  <dbl> <chr>    <dbl> <chr>  
-1 UNH    UnitedHealth Gr… 91324P… 2917… 0.105  Healt… 5833572 USD    
-2 GS     Goldman Sachs G… 38141G… 2407… 0.0686 Finan… 5833572 USD    
-3 HD     Home Depot Inc.  437076… 2434… 0.0633 Consu… 5833572 USD    
-4 MCD    McDonald's Corp… 580135… 2550… 0.0531 Consu… 5833572 USD    
-5 AMGN   Amgen Inc.       031162… 2023… 0.0524 Healt… 5833572 USD    
+1 UNH    UnitedHealth Gr… 91324P… 2917… 0.0953 Healt… 5764398 USD    
+2 GS     Goldman Sachs G… 38141G… 2407… 0.0719 Finan… 5764398 USD    
+3 HD     Home Depot Inc.  437076… 2434… 0.0616 Consu… 5764398 USD    
+4 MSFT   Microsoft Corpo… 594918… 2588… 0.0526 Infor… 5764398 USD    
+5 MCD    McDonald's Corp… 580135… 2550… 0.0515 Consu… 5764398 USD    
 # … with 25 more rows, and abbreviated variable names ¹​identifier,
 #   ²​shares_held, ³​local_currency
 ```
@@ -511,13 +511,13 @@ res <- tibble(
 
 for (i in seq_along(c)) {
   w <- (1 - c[i]) * mvp_weights + (c[i]) * efp_weights
-  res$mu[i] <- 12 * 100 * t(w) %*% mu
-  res$sd[i] <- 12 * sqrt(100) * sqrt(t(w) %*% Sigma %*% w)
+  res$mu[i] <- 12 * 100 * t(w) %*% mu   
+  res$sd[i] <- 100 * sqrt(12) * sqrt(t(w) %*% Sigma %*% w)
 }
 ```
 
 The code above proceeds in two steps: First, we compute a vector of combination weights $c$ and then we evaluate the resulting linear combination with $c\in\mathbb{R}$:   
-$$w^* = cw_\text{eff}(\bar\mu) + (1-c)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{c\bar\mu + (1-c)\tilde\mu - D/C}{E-D^2/C}$ where $C = \iota'Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. 
+$$w^* = cw_\text{eff}(\bar\mu) + (1-c)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{c\bar\mu + (1-c)\tilde\mu - D/C}{E-D^2/C}$ where $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one powerful figure using `ggplot2` (see Figure 1.6). We also add the individual stocks in the same call. 
 We compute annualized returns based on the simple assumption that monthly returns are independent and identically distributed. Thus, the average annualized return is just 12 times the expected monthly return.\index{Graph!Efficient frontier} 
 
@@ -532,8 +532,8 @@ res |>
   ) +
   geom_point(
     data = tibble(
-      mu = 12 * 100 * mu,
-      sd = 12 * 10 * sqrt(diag(Sigma))
+      mu = 12 * 100 * mu,       
+      sd = 100 * sqrt(12) * sqrt(diag(Sigma))
     ),
     aes(y = mu, x = sd), size = 1
   ) +

@@ -248,9 +248,9 @@ evaluate_portfolio(weights_crsp) |>
    measure                            benchmark     tilt
    <chr>                                  <dbl>    <dbl>
  1 Expected utility                  -0.249     -0.261  
- 2 Average return                     7.08       0.167  
+ 2 Average return                     7.08       0.166  
  3 SD return                         15.3       20.9    
- 4 Sharpe ratio                       0.463      0.00796
+ 4 Sharpe ratio                       0.463      0.00793
  5 CAPM alpha                         0.000129  -0.00538
  6 Market beta                        0.992      0.950  
  7 Absolute weight                    0.0249     0.0637 
@@ -309,7 +309,7 @@ optimal_theta$par
 
 ```
 momentum_lag     size_lag 
-       0.312       -1.986 
+        0.31        -1.99 
 ```
 
 The resulting values of $\hat\theta$ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio toward smaller stocks (negative coefficient for size) and toward past winners (positive value for momentum). Both findings are in line with the well-documented size effect [@Banz1981] and the momentum anomaly [@Jegadeesh1993].
@@ -410,7 +410,7 @@ performance_table |>
  6 Market beta   1.13     9.92e-1  1.01     1.04     1.13     1.08e+0
  7 Absolute we…  0.0249   2.49e-2  0.0381   0.0249   0.0260   2.49e-2
  8 Max. weight   0.0249   3.55e+0  3.37     2.69     0.157    2.21e-1
- 9 Min. weight   0.0249   2.77e-5 -0.0353   0       -0.0331   0      
+ 9 Min. weight   0.0249   2.77e-5 -0.0352   0       -0.0331   0      
 10 Avg. sum of…  0        0       27.4      0        2.27     0      
 11 Avg. fracti…  0        0       38.6      0        7.40     0      
 # … with abbreviated variable names ¹​`VW  Optimal `,

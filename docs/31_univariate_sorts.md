@@ -108,7 +108,7 @@ coeftest(model_fit, vcov = NeweyWest)
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)
-(Intercept) 0.000287   0.001312    0.22     0.83
+(Intercept) 0.000287   0.001311    0.22     0.83
 ```
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
@@ -271,7 +271,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort),
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)
-(Intercept)  0.00232    0.00322    0.72     0.47
+(Intercept)  0.00233    0.00322    0.72     0.47
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor [@Frazzini2014]. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.\index{Risk aversion}
@@ -288,8 +288,8 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 t test of coefficients:
 
             Estimate Std. Error t value Pr(>|t|)    
-(Intercept) -0.00447    0.00256   -1.75    0.081 .  
-mkt_excess   1.16555    0.09562   12.19   <2e-16 ***
+(Intercept) -0.00446    0.00256   -1.74    0.082 .  
+mkt_excess   1.16562    0.09562   12.19   <2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
