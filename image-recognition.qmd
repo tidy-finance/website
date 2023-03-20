@@ -1,0 +1,426 @@
+---
+title: "Image Recognition - a replication of (Re-)Imag(in)ing Price Trends"
+---
+
+In this chapter, we introduce image recognition tools in the context of a replication study of @Jiang2022. 
+
+TODO Short Description of what the paper is actually doing.
+
+Our focus is threefold. First, we provide a short introduction to (tidy) image recognition techniques with `keras`. Second, we show how to store trained model parameters such that they are readily available to everybody in order to achieve reproducibility and to spare others from exerting the sometimes immense computation effort to train deep neural networks for image recognition. Third, we show the merits of image recognition in the context of chart analysis for market timing and portfolio choice. 
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(RSQLite)
+library(keras)
+library(furrr)
+library(arrow)
+```
+
+We use `keras` for deep learning applications (@keras) and `arrow` is a useful package to store big data (@arrow).
+
+## Data preparation
+
+We use daily stock data from CRSP for all firms listed on NYSE, AMEX, and NASDAQ. The sample in the paper we replicate runs from 1993-2019. The data does not reach back further into the past because daily opening, high, and low prices first become available in June 1992. The original paper adjusts prices for corporate actions such as dividend payments, which should be straightforward to implement. For the sake of simplicity, we skip this step.
+
+### Get data 
+
+The application is to build portfolios on a monthly basis. I retrieve data on `mktcap` and monthly returns from the monthly CRSP database. 
+
+```{r}
+start_date_charts <- ymd("1993-01-01")
+end_date <- ymd("2021-12-31")
+```
+
+```{r}
+tidy_finance <- dbConnect(
+  SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE
+)
+
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |> 
+  select(permno, month, mktcap, ret) |> 
+  collect() 
+```
+
+The following few lines of code request the daily CRSP open-high-low-close (OHLC) data from WRDS. If the project should be included in the book, we request the data together with the daily returns in 21_WRDS. (I only need  the data starting from 1993).
+
+```{r, eval = FALSE}
+library(RPostgres)
+library(dbplyr)
+
+wrds <- dbConnect(
+  Postgres(),
+  host = "wrds-pgdata.wharton.upenn.edu",
+  dbname = "wrds",
+  port = 9737,
+  sslmode = "require",
+  user = Sys.getenv("user"),
+  password = Sys.getenv("password")
+)
+```
+
+Next, I retrieve the daily CRSP data. 
+Daily CRSP high and low prices are set to zero if they are missing, I thus filter out such observations. 
+
+```{r, eval = FALSE}
+dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
+
+crsp_daily <- dsf_db |>
+    select(permno, date, 
+           open = openprc, 
+           low = bidlo, 
+           high = askhi, 
+           close = prc) |>
+    filter(date >= start_date_charts & date <= end_date) |>
+    mutate(close = abs(close)) |>
+    filter(if_all(open:close, ~.>0)) |>
+    arrange(permno, date) |>
+    collect()
+
+crsp_daily <- crsp_daily |>
+  mutate(year = year(date),
+         month = ceiling_date(date, "month")) 
+```
+
+I store the price change indicators right away: We want to predict the (close) price change of the stock within the next 20 days. The indicator is one if the price change is positive and 0 otherwise. 
+
+```{r, eval = FALSE}
+crsp_daily <- crsp_daily |>
+  left_join(
+    crsp_daily |> 
+      # TODO @SV: this approach is inconsistent with our usual joins because we don't use lage on purpose due to missing months. can we somehow do this in anotherway (e.g. create a grid of daily prices)?
+      mutate(date = lag(date, 20)) |>
+      select(permno, date, close_future = close),
+    by = c("permno", "date")
+  ) |>
+  drop_na() |>
+  mutate(price_change = as.integer(close_future > close)) |>
+  select(permno, date, year, month, open, low, high, 
+         close, close_future, price_change)
+```
+
+### The OHLC Chart
+
+Jiang et al. (2020) apply image recognition for price plots based on OHLC bars.
+High and low prices are represented by the top and bottom of the middle vertical bar, while opening and closing prices are represented by the small horizontal lines on the left and right of the bar, respectively. One day occupies an area three pixels wide (the center bar, open mark, and closing mark are each one pixel wide).
+
+We impose a constant height for all images and scale the vertical axis so that the maximum and minimum of the OHLC path coincides with the top and bottom of the image. As a result, all images for the same number of days have the same pixel dimensions. The original paper also proposes to add moving average lines or volume bars, for the sake of simplicity I use the default version just based on OHLC data. 
+
+```{r}
+create_chart <- function(data,
+                         horizon = nrow(data),
+                         resolution = 64){
+
+  data <- data |> 
+    tail(horizon)
+
+  breakpoints <- seq(from = data |>
+                       select(open:close) |>
+                       min(),
+                     to = data |>
+                       select(open:close) |>
+                       max(),
+                     length.out = resolution)
+
+  data <- data |>
+    mutate(
+      across(open:close, 
+             ~findInterval(., breakpoints, all.inside = TRUE))
+      )
+
+  chart <- matrix(0,
+                  nrow = resolution,
+                  ncol = 3 * horizon)
+
+  chart[rbind(cbind(y = data$open, n = 1 + (1:horizon-1) * 3),
+              cbind(y = data$close, n = 3 + (1:horizon-1) * 3),
+              data |> transmute(y = map2(low,
+                                         high,
+                                         ~seq(from = .x,
+                                              to = .y)),
+                                n = 2 + (1:horizon-1) * 3) |>
+                unnest(y) |> as.matrix())] <- 1
+
+  return(chart)
+}
+```
+
+We use black as the background color and white color for visible objects on the charts. The following is a little helper function to illustrate the matrix of pixels we create when building a price chart.
+
+```{r}
+plot_chart <- function(chart){
+  chart |>
+    as.data.frame() |>
+    as_tibble(rownames = "column") |>
+    pivot_longer(-column,
+                 names_to = "row") |>
+    mutate(row = as.integer(str_remove(row, "V"))) |>
+    ggplot(aes(x = row,
+               y = as.integer(column),
+               fill= as.factor(value))) +
+    scale_fill_manual(values = c("black", "white")) +
+    geom_tile() +
+    theme_void() +
+    theme(legend.position="none")
+}
+```
+
+Below an example how the chart looks like for one particular `permno`. We will feed the neural network with many such graphs, trying to fit the models such that we can predict 20-day ahead price changes. 
+
+```{r, eval = FALSE}
+example_data <- crsp_daily |>
+  filter(permno == 10001)
+
+example_chart <- create_chart(example_data, 
+                              horizon = 20,
+                              resolution = 36)
+
+plot_chart(example_chart)
+```
+
+### Creating training data
+
+I resort to the benchmark setup of the original paper with charts that contain the 20 days and a resolution of 64 pixels on the vertical axis. 
+
+```{r}
+horizon <- 20
+resolution <- 64
+```
+
+Creating the training data is (very) time-consuming. I used a virtual environment with 64 workers and 376 GB memory, which took roughly 48 hours. I stored the resulting output as `.feather` files. You can download the files here from my Google drive folder: https://drive.google.com/drive/folders/1CVG8jqIOw3L3GolPeWtCgHCemzhdXhZm?usp=sharing
+
+```{r, eval = FALSE}
+plan(multisession, 
+     workers = availableCores())
+
+years <- seq(from = 1993, to = 2021)
+
+for(j in seq_along(years)){
+  year_tmp <- years[j]
+  
+  crsp_daily_tmp <- crsp_daily |> 
+    filter(year== year_tmp)
+  
+  # Create charts
+  chart_data <- crsp_daily_tmp |>
+    group_by(permno, month) |>
+    mutate(price_change = last(price_change)) |>
+    filter(n() >= horizon) |>
+    nest(data = -c(permno, year, month, price_change)) |>
+    mutate(chart = future_map(data,
+                              create_chart,
+                              horizon,
+                              resolution)) |>
+    ungroup() |>
+    select(permno, year, month, chart, price_change)
+
+  chart_data <- chart_data |> mutate(chart = map(chart, c))
+  write_feather(chart_data, 
+                str_c("data/labeled_data/charts_", year_tmp, ".feather"))
+}
+```
+
+## Machine learning for image recognition
+
+Read in the training data (all charts until 2000)
+```{r}
+# TODO @SV: my memory crashed while loading this - can we do the replication with less data? I only proceed with 2 years for now
+chart_data <- tibble(file = dir("data/labeled_data", full.names = TRUE)) |> 
+  filter(row_number() == 1 | row_number() == 29) |>
+  mutate(chart_data = map(file, read_feather)) |>
+  unnest(chart_data) |> 
+  # TODO @SV: explain the 3*horizon 
+  mutate(chart = map(chart,  ~matrix(., nrow = resolution, ncol = 3 * horizon)))
+
+nrow(chart_data) # Roughly 1.9million charts
+```
+
+```{r}
+plot_chart((chart_data |> pull(chart))[[500]])
+```
+We estimate and validate using (1993 - 2000), randomly select 70% images for training, 40 % for validation. Remaining 20 years comprise the out-of-sample test data set.
+
+```{r}
+charts_train <- chart_data |> 
+  filter(month < "2000-01-01")
+```
+
+Image recognition with `keras` requires the data to be in an array format. The `aperm()` function then transposes an array by permuting its dimensions (???)
+
+<!-- TODO @SV: need to explain what aperm does -->
+
+```{r}
+train_x <- array(data = unlist(charts_train |> pull(chart)),
+                 dim = c(resolution,
+                         # TODO @SV: again the 3*horizon
+                         3 * horizon,
+                         nrow(charts_train)))
+
+train_x <- aperm(train_x, c(3, 1, 2))
+```
+
+Finally, we extract the labels. 
+
+<!-- TODO @SV: I find the "labels" wording unusual as it is an indicator, which I already corrected above. Can we use indicator everywhere? A label is a character or factor variable in all other tidy contexts -->
+
+```{r}
+train_y <- charts_train |>
+  pull(price_change)
+```
+
+We design the model as close as possible to the descriptions of the original paper. The following lines of code comprise of the building blocks of a convolutional network. Consult the paper for more information. An excellent introduction to the topic by one of the developers of `keras` can be found here: https://www.manning.com/books/deep-learning-with-r.
+
+```{r, eval = FALSE}
+# TODO @SV: maybe introduce a parameter for 3*horizon because it is used so often?
+inputs <- layer_input(shape = c(resolution, 3*horizon, 1))
+
+outputs <- inputs |>
+  layer_conv_2d(filters = 64,
+                kernel_size = c(5,3),
+                strides = c(1,3),
+                activation = "LeakyReLU") |>
+  layer_batch_normalization() |>
+  layer_max_pooling_2d(pool_size = c(2, 1)) |>
+  layer_conv_2d(filters = 128,
+                kernel_size = c(5,3),
+                strides = c(1,3),
+                activation = "LeakyReLU") |>
+  layer_batch_normalization() |>
+  layer_max_pooling_2d(pool_size = c(2, 1)) |>
+  layer_flatten() |>
+  layer_dropout(0.5) |>
+  layer_dense(2, activation = "softmax")
+
+model <- keras_model(inputs, outputs)
+
+model
+```
+The model contains 100k+ parameters that need to be estimated.  We rely on the descriptions in the original paper for the learning procedures.
+
+<!-- TODO @SV: briefly list the descriptions of the original paper here -->
+
+```{r, eval = FALSE}
+model |> compile(optimizer = optimizer_adam(learning_rate = 1e-5),
+                 loss = "sparse_categorical_crossentropy")
+
+model |> fit(train_x,
+             train_y,
+             epochs = 100,
+             validation_split = 0.3,
+             batch_size = 128,
+             callbacks =  callback_early_stopping(monitor = "val_loss", 
+                                                  patience = 3))
+```
+
+After successful learning, we store the estimated parameters. 
+
+```{r, eval = FALSE}
+save_model_tf(model, "data/chart_classification_model")
+```
+
+# Model evaluation
+
+You can download the trained model here: https://drive.google.com/file/d/1sB8OGzvl30EGbdMYBbax8-lHUbuKjYkl/view?usp=sharing. Unzip and you are ready to run the following lines. 
+
+```{r}
+model <- load_model_tf("data/chart_classification_model")
+```
+
+Every month in which we construct new forecasts, we sort stocks into decile portfolios based on out-of-sample CNN estimates for probability of a positive subsequent return. We also construct a long-short spread portfolio (`H-L`) that is long decile 10 and short decile 1. The holding period for each portfolio coincides with the forecast horizon for each model (one month in the implementation below.
+
+Next, we create predictions for each chart in the out-of-sample period. 
+```{r}
+charts_test <- chart_data |>
+  filter(month > "2000-01-01")
+
+test_x <- array(data = unlist(pull(charts_test, chart)),
+                dim = c(resolution,
+                        3 * horizon,
+                        nrow(charts_test)))
+
+test_x <- aperm(test_x,
+                c(3,1,2))
+```
+
+```{r}
+charts_test <- bind_cols(charts_test,
+                         probability_pos_return = (model |>
+                                                     predict(test_x))[,1]) |>
+  select(-c(file, price_change, chart))
+```
+
+I merge with the monthly CRSP data (current market capitalization and leading returns)
+```{r}
+crsp_monthly <- crsp_monthly |> 
+  select(-ret) |>
+  left_join(
+    crsp_monthly |> 
+      group_by(permno) |> 
+      # TODO @SV: again different procedure to get lagged values!S
+      mutate(month = lag(month, 1)) |> 
+      ungroup() |> 
+      select(permno, month, ret_lead = ret),
+    by = c("permno", "month"))
+
+charts_test <- charts_test |> 
+  left_join(crsp_monthly, by = c("permno", "month"))|> 
+  drop_na()
+```
+
+```{r}
+assign_portfolio <- function(data, var, n_portfolios) {
+  breakpoints <- data |>
+    summarize(breakpoint = quantile({{ var }},
+      probs = seq(0, 1, length.out = n_portfolios + 1),
+      na.rm = TRUE
+    )) |>
+    pull(breakpoint) |>
+    as.numeric()
+
+  assigned_portfolios <- data |>
+    mutate(portfolio = findInterval({{ var }},
+      breakpoints,
+      all.inside = TRUE
+    )) |>
+    pull(portfolio)
+
+  return(assigned_portfolios)
+}
+```
+
+```{r}
+prediction_portfolios <- charts_test |> 
+  group_by(month) |>
+  mutate(
+    portfolio = assign_portfolio(
+      data = cur_data(),
+      var = probability_pos_return,
+      n_portfolios = 10
+    ),
+    portfolio = as.factor(portfolio)
+  ) |>
+  group_by(portfolio, month) |>
+  summarize(
+    ret_equal = mean(ret_lead),
+    ret_mv = weighted.mean(ret_lead, mktcap), 
+    .groups = "drop"
+  )
+```
+
+```{r}
+prediction_portfolios |> 
+  pivot_longer(cols = c(ret_equal, ret_mv), names_to = "Aggregation") |>
+  group_by(portfolio, Aggregation) |>
+  summarise(ret = mean(value), .groups = "drop") |>
+   ggplot(aes(x = portfolio, y = ret, fill = as_factor(Aggregation))) +
+  geom_bar(stat = "identity", position = position_dodge(0.5)) +
+  labs(
+    title = "Average returns of prediction sorted portfolios",
+    x = "Portfolio",
+    y = "Return",
+    fill = "Portfolio"
+  ) 
+```
+
