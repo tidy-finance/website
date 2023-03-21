@@ -340,15 +340,14 @@ charts_test <- bind_cols(charts_test,
 
 I merge with the monthly CRSP data (current market capitalization and leading returns)
 ```{r}
+crsp_monthly_lead <- crsp_monthly |>
+  mutate(month = month %m-% months(1)) |>
+  select(permno, month, return_lead = ret)
+
 crsp_monthly <- crsp_monthly |> 
   select(-ret) |>
   left_join(
-    crsp_monthly |> 
-      group_by(permno) |> 
-      # TODO @SV: again different procedure to get lagged values!S
-      mutate(month = lag(month, 1)) |> 
-      ungroup() |> 
-      select(permno, month, ret_lead = ret),
+    crsp_monthly_lead,
     by = c("permno", "month"))
 
 charts_test <- charts_test |> 
@@ -359,10 +358,12 @@ charts_test <- charts_test |>
 ```{r}
 assign_portfolio <- function(data, var, n_portfolios) {
   breakpoints <- data |>
-    summarize(breakpoint = quantile({{ var }},
-      probs = seq(0, 1, length.out = n_portfolios + 1),
-      na.rm = TRUE
-    )) |>
+    reframe(
+      breakpoint = quantile(
+        {{ var }},
+        probs = seq(0, 1, length.out = n_portfolios + 1),
+        na.rm = TRUE)
+      ) |>
     pull(breakpoint) |>
     as.numeric()
 
@@ -382,7 +383,7 @@ prediction_portfolios <- charts_test |>
   group_by(month) |>
   mutate(
     portfolio = assign_portfolio(
-      data = cur_data(),
+      data = pick(everything()),
       var = probability_pos_return,
       n_portfolios = 10
     ),
@@ -390,8 +391,8 @@ prediction_portfolios <- charts_test |>
   ) |>
   group_by(portfolio, month) |>
   summarize(
-    ret_equal = mean(ret_lead),
-    ret_mv = weighted.mean(ret_lead, mktcap), 
+    ret_equal = mean(return_lead),
+    ret_mv = weighted.mean(return_lead, mktcap), 
     .groups = "drop"
   )
 ```
@@ -410,4 +411,3 @@ prediction_portfolios |>
     fill = "Portfolio"
   ) 
 ```
-
