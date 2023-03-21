@@ -4,24 +4,27 @@ title: "Image Recognition - a replication of (Re-)Imag(in)ing Price Trends"
 
 In this chapter, we introduce image recognition tools in the context of a replication study of @Jiang2022. 
 
-TODO Short Description of what the paper is actually doing.
+The paper focuses on the ability of past prices to forecast future returns. The authors argue that by representing historical prices as an image and modeling the predictive association between images and future returns using convolutional neural networks resembles a model choice that is both flexible enough to capture complex patterns and tractable to retain interpretability of the results. Perhaps surprisingly, the large-scale empirical study for US stock returns yields powerful results: @Jiang2022 report out-of-sample Sharpe ratios as high as 7.2 for portfolio sorts based on image-based predictions! 
+While we do not attempt to provide a complete replication of the (manifold) computational-expensive results reported in @Jiang2022, we feel that a discussion of image recognition tools in R in the context of return predictions is both pedagocially valuable and economically meaningful. 
 
-Our focus is threefold. First, we provide a short introduction to (tidy) image recognition techniques with `keras`. Second, we show how to store trained model parameters such that they are readily available to everybody in order to achieve reproducibility and to spare others from exerting the sometimes immense computation effort to train deep neural networks for image recognition. Third, we show the merits of image recognition in the context of chart analysis for market timing and portfolio choice. 
+The focus of this chapter is therefore threefold. First, we provide a short introduction to (tidy) image recognition techniques with `keras`. Second, we show how to store trained model parameters such that they are readily available to everybody in order to achieve reproducibility and to spare others from exerting the sometimes immense computation effort to train deep neural networks for image recognition. Third, we show the merits of image recognition in the context of chart analysis for market timing and portfolio choice. 
 
 ```{r}
 library(tidyverse)
-library(lubridate)
 library(RSQLite)
 library(keras)
 library(furrr)
+library(archive)
+library(googledrive)
 library(arrow)
+
 ```
 
-We use `keras` for deep learning applications (@keras) and `arrow` is a useful package to store big data (@arrow).
+We use `keras` for deep learning applications (@keras). `arrow` is a useful package to store big data (@arrow).
 
 ## Data preparation
 
-We use daily stock data from CRSP for all firms listed on NYSE, AMEX, and NASDAQ. The sample in the paper we replicate runs from 1993-2019. The data does not reach back further into the past because daily opening, high, and low prices first become available in June 1992. The original paper adjusts prices for corporate actions such as dividend payments, which should be straightforward to implement. For the sake of simplicity, we skip this step.
+We use daily stock data from CRSP for all firms listed on NYSE, AMEX, and NASDAQ. The sample in the paper we replicate runs from 1993-2019. The data does not reach back further into the past because daily opening, high, and low prices first become available in June 1992. The original paper adjusts prices for corporate actions such as dividend payments, which should be straightforward to implement. For the sake of simplicity, we skip this step in our application.
 
 ### Get data 
 
@@ -44,69 +47,37 @@ crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   collect() 
 ```
 
-The following few lines of code request the daily CRSP open-high-low-close (OHLC) data from WRDS. If the project should be included in the book, we request the data together with the daily returns in 21_WRDS. (I only need  the data starting from 1993).
+Next, we retrieve daily CRSP price data. More precisely, we extract the daily high and low prices as well as daily opening and closing prices. This information will be used to generate images in the spirit of candle charts. Daily CRSP high and low prices are set to zero if they are missing, we thus filter out such observations. Finally, to keep the computational burden manageable without relying on a cluster or other supercomputer facilities, we restrict the application to data since the year 2010. 
 
 ```{r, eval = FALSE}
-library(RPostgres)
-library(dbplyr)
-
-wrds <- dbConnect(
-  Postgres(),
-  host = "wrds-pgdata.wharton.upenn.edu",
-  dbname = "wrds",
-  port = 9737,
-  sslmode = "require",
-  user = Sys.getenv("user"),
-  password = Sys.getenv("password")
-)
+crsp_daily <- tbl(tidy_finance, "crsp_daily") |> 
+  filter(if_all(open:close, ~.>0)) |>
+  select(permno, date, month, open, low, high, close) |> 
+  collect() |>
+  mutate(year = year(date))
 ```
 
-Next, I retrieve the daily CRSP data. 
-Daily CRSP high and low prices are set to zero if they are missing, I thus filter out such observations. 
-
-```{r, eval = FALSE}
-dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
-
-crsp_daily <- dsf_db |>
-    select(permno, date, 
-           open = openprc, 
-           low = bidlo, 
-           high = askhi, 
-           close = prc) |>
-    filter(date >= start_date_charts & date <= end_date) |>
-    mutate(close = abs(close)) |>
-    filter(if_all(open:close, ~.>0)) |>
-    arrange(permno, date) |>
-    collect()
-
-crsp_daily <- crsp_daily |>
-  mutate(year = year(date),
-         month = ceiling_date(date, "month")) 
-```
-
-I store the price change indicators right away: We want to predict the (close) price change of the stock within the next 20 days. The indicator is one if the price change is positive and 0 otherwise. 
+We store the price changes we aim to predict right away. The entire exercise can be seen as a classification problem. In particular, we want to predict the (close) price change of the stock within the next 20 days. The outcome variable^[The term label is commonly used in Machine learning contexts to denote the outcome variable. In our case, the label is either one, if the price goes up or zero if not. To avoid confusion, we refer to the outcome variable instead of label throughout this chapter.] is one if the price change is positive and 0 otherwise. If the date 20 days ahead is not a trading day, we set `price_change` to missing.
 
 ```{r, eval = FALSE}
 crsp_daily <- crsp_daily |>
   left_join(
     crsp_daily |> 
-      # TODO @SV: this approach is inconsistent with our usual joins because we don't use lage on purpose due to missing months. can we somehow do this in anotherway (e.g. create a grid of daily prices)?
-      mutate(date = lag(date, 20)) |>
+      mutate(date = date%m-%days(20)) |>
       select(permno, date, close_future = close),
     by = c("permno", "date")
   ) |>
   drop_na() |>
   mutate(price_change = as.integer(close_future > close)) |>
   select(permno, date, year, month, open, low, high, 
-         close, close_future, price_change)
+         close, price_change)
 ```
 
 ### The OHLC Chart
 
-Jiang et al. (2020) apply image recognition for price plots based on OHLC bars.
-High and low prices are represented by the top and bottom of the middle vertical bar, while opening and closing prices are represented by the small horizontal lines on the left and right of the bar, respectively. One day occupies an area three pixels wide (the center bar, open mark, and closing mark are each one pixel wide).
+@Jiang2022 apply image recognition for price plots based on OHLC bars. High and low prices are represented by the top and bottom of the middle vertical bar, while opening and closing prices are represented by the small horizontal lines on the left and right of the bar, respectively. One day occupies an area three pixels wide (the center bar, open mark, and closing mark are each one pixel wide).
 
-We impose a constant height for all images and scale the vertical axis so that the maximum and minimum of the OHLC path coincides with the top and bottom of the image. As a result, all images for the same number of days have the same pixel dimensions. The original paper also proposes to add moving average lines or volume bars, for the sake of simplicity I use the default version just based on OHLC data. 
+We impose a constant height for all images and scale the vertical axis so that the maximum and minimum of the OHLC path coincides with the top and bottom of the image. As a result, all images for the same number of days have the same pixel dimensions. The original paper also proposes to add moving average lines or volume bars. For the sake of simplicity, we use the default version just based on OHLC data. 
 
 ```{r}
 create_chart <- function(data,
@@ -167,11 +138,11 @@ plot_chart <- function(chart){
 }
 ```
 
-Below an example how the chart looks like for one particular `permno`. We will feed the neural network with many such graphs, trying to fit the models such that we can predict 20-day ahead price changes. 
+Below an example how the chart looks like for one particular `permno`. We feed the neural network with many such graphs as input. The aim is to fit the models such that we can predict 20-day ahead price changes. 
 
 ```{r, eval = FALSE}
 example_data <- crsp_daily |>
-  filter(permno == 10001)
+  filter(permno == 18326)
 
 example_chart <- create_chart(example_data, 
                               horizon = 20,
@@ -182,14 +153,32 @@ plot_chart(example_chart)
 
 ### Creating training data
 
-I resort to the benchmark setup of the original paper with charts that contain the 20 days and a resolution of 64 pixels on the vertical axis. 
+We resort to the benchmark setup of @Jiang2022 with charts that contain the last 20 days and a resolution of 64 pixels on the vertical axis. We create one chart for each month to avoid that the information in the figures is overlapping (which could lead to information spillover and overly optimistic performance measures). 
 
 ```{r}
 horizon <- 20
+horizontal_resolution <- horizon * 3
 resolution <- 64
 ```
 
-Creating the training data is (very) time-consuming. I used a virtual environment with 64 workers and 376 GB memory, which took roughly 48 hours. I stored the resulting output as `.feather` files. You can download the files here from my Google drive folder: https://drive.google.com/drive/folders/1CVG8jqIOw3L3GolPeWtCgHCemzhdXhZm?usp=sharing
+Creating the training data is (very) time-consuming. For the entire sample, we used a virtual environment with 64 workers and 376 GB memory, which took roughly 48 hours. The resulting output is stored as `.feather` files. For your convenience, you can download the files from my [Google drive folder](https://drive.google.com/drive/folders/1CVG8jqIOw3L3GolPeWtCgHCemzhdXhZm?usp=sharing). 
+
+A simple way to download the data from within R is to use `googledrive`. The code snippet below downloads the images and stores the files in a folder `data/labeled_data`. 
+```{r}
+library(googledrive)
+drive_deauth()
+
+available_files <- drive_ls(as_id("1CVG8jqIOw3L3GolPeWtCgHCemzhdXhZm"))
+
+map2(available_files$name, 
+                  available_files$id,
+                  \(name, id) drive_download(
+  file = as_id(id),
+  path = paste0("data/labeled_data/", name),
+  overwrite = TRUE))
+```
+
+If you want to run the code yourself (for instance because you want to alter the structure of the images), you can use the code snippet below. This code has been used to generate the files available for download.
 
 ```{r, eval = FALSE}
 plan(multisession, 
@@ -224,46 +213,39 @@ for(j in seq_along(years)){
 
 ## Machine learning for image recognition
 
-Read in the training data (all charts until 2000)
+After the arguably cumbersome task of creating a large set of images for the classification task, we can start to implement a suitable ML framework. To keep the computational burden at a manageable level, we use only images from price charts for the period from 2018 - 2019 to train the convolutional neural networks. The out-of-sample period to evaluate the performance of the model are the years 2020 and 2021. While we had to store the charts as vectors, we restore the dimension: Each chart has `r resolution` rows and illustrates `r horizon` days. For each day, we need 3 pixels (to illustrate the open, the close, and the price range). Thus, each chart has `r 3 * horizon` columns. 
 ```{r}
-# TODO @SV: my memory crashed while loading this - can we do the replication with less data? I only proceed with 2 years for now
-chart_data <- tibble(file = dir("data/labeled_data", full.names = TRUE)) |> 
-  filter(row_number() == 1 | row_number() == 29) |>
+chart_data <- tibble(file = dir("data/labeled_data", full.names = TRUE)) |>
+  mutate(year = as.numeric(str_extract(file, "\\d{4}(?=\\.feather)"))) |>
+  filter(year >= 2018) |>
+  select(-year) |>
   mutate(chart_data = map(file, read_feather)) |>
   unnest(chart_data) |> 
-  # TODO @SV: explain the 3*horizon 
-  mutate(chart = map(chart,  ~matrix(., nrow = resolution, ncol = 3 * horizon)))
-
-nrow(chart_data) # Roughly 1.9million charts
+  mutate(chart = map(chart,  ~matrix(., nrow = resolution, ncol = horizontal_resolution)))
 ```
 
-```{r}
-plot_chart((chart_data |> pull(chart))[[500]])
-```
-We estimate and validate using (1993 - 2000), randomly select 70% images for training, 40 % for validation. Remaining 20 years comprise the out-of-sample test data set.
+In total, the dataset consists of `r nrow(chart_data)` charts. We estimate and validate using the sample from 2018 and 2019. For that purpose, we randomly select 70 percent of the images for training and 30 percent for validation. The remaining and most recent 2 years comprise the out-of-sample test data set.
 
 ```{r}
 charts_train <- chart_data |> 
-  filter(month < "2000-01-01")
+  filter(month < "2020-01-01")
 ```
 
-Image recognition with `keras` requires the data to be in an array format. The `aperm()` function then transposes an array by permuting its dimensions (???)
-
-<!-- TODO @SV: need to explain what aperm does -->
+Image recognition with `keras` requires the data to be in a specific array format. An array is a data structure that allows to access each element easily via an index (think of it as a multi-dimensional matrix). We store the data such that the second index resembles the rows of each chart, the third index resembles the columns and the first index "stacks" the charts. While cumbersome, the following few lines simple transpose the charts into the desired format. The `aperm()` function returns transposes the dimensions of an array and makes sure that we end having the desired format.
 
 ```{r}
 train_x <- array(data = unlist(charts_train |> pull(chart)),
                  dim = c(resolution,
-                         # TODO @SV: again the 3*horizon
-                         3 * horizon,
+                         horizontal_resolution,
                          nrow(charts_train)))
 
 train_x <- aperm(train_x, c(3, 1, 2))
+dim(train_x)
 ```
 
-Finally, we extract the labels. 
+As a result, our training data contains `r dim(train_x)[1]` charts of dimension `r dim(train_x)[2]` $\times$ `r dim(train_x)[3]`.
 
-<!-- TODO @SV: I find the "labels" wording unusual as it is an indicator, which I already corrected above. Can we use indicator everywhere? A label is a character or factor variable in all other tidy contexts -->
+Finally, we extract the outcome variables. 
 
 ```{r}
 train_y <- charts_train |>
@@ -273,8 +255,7 @@ train_y <- charts_train |>
 We design the model as close as possible to the descriptions of the original paper. The following lines of code comprise of the building blocks of a convolutional network. Consult the paper for more information. An excellent introduction to the topic by one of the developers of `keras` can be found here: https://www.manning.com/books/deep-learning-with-r.
 
 ```{r, eval = FALSE}
-# TODO @SV: maybe introduce a parameter for 3*horizon because it is used so often?
-inputs <- layer_input(shape = c(resolution, 3*horizon, 1))
+inputs <- layer_input(shape = c(resolution, horizontal_resolution, 1))
 
 outputs <- inputs |>
   layer_conv_2d(filters = 64,
@@ -298,8 +279,7 @@ model <- keras_model(inputs, outputs)
 model
 ```
 The model contains 100k+ parameters that need to be estimated.  We rely on the descriptions in the original paper for the learning procedures.
-
-<!-- TODO @SV: briefly list the descriptions of the original paper here -->
+In a nutshell, learning requires to choose an appropriate learning rate for the gradient descent procedure in the optimization process. The number of epochs is the maximum number of times, the entire training sample is used for optimizatoin. Further, a batch size of 128 means that the weights are updated after 128 charts have been processed. Finally, @Jiang2022 specify that learning stops as soon as the prediction error in the validation sample increased two consecutive times which could indicate that the model starts overfitting instead of improving out-of-sample performance. 
 
 ```{r, eval = FALSE}
 model |> compile(optimizer = optimizer_adam(learning_rate = 1e-5),
@@ -322,8 +302,15 @@ save_model_tf(model, "data/chart_classification_model")
 
 # Model evaluation
 
-You can download the trained model here: https://drive.google.com/file/d/1sB8OGzvl30EGbdMYBbax8-lHUbuKjYkl/view?usp=sharing. Unzip and you are ready to run the following lines. 
+You can download the [trained model parameters](https://drive.google.com/file/d/1sB8OGzvl30EGbdMYBbax8-lHUbuKjYkl/view?usp=sharing) and extract directly from within R.
+```{r}
+drive_download(as_id("1sB8OGzvl30EGbdMYBbax8-lHUbuKjYkl"),
+               path = "data/chart_classification_model.7z")
 
+archive_extract("data/chart_classification_model.7z", dir = "data")
+```
+
+Next, you can load the pretrained model.
 ```{r}
 model <- load_model_tf("data/chart_classification_model")
 ```
@@ -333,11 +320,11 @@ Every month in which we construct new forecasts, we sort stocks into decile port
 Next, we create predictions for each chart in the out-of-sample period. 
 ```{r}
 charts_test <- chart_data |>
-  filter(month > "2000-01-01")
+  filter(month >= "2020-01-01")
 
 test_x <- array(data = unlist(pull(charts_test, chart)),
                 dim = c(resolution,
-                        3 * horizon,
+                        horizontal_resolution,
                         nrow(charts_test)))
 
 test_x <- aperm(test_x,
