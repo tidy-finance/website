@@ -11,7 +11,6 @@ The chapter relies on the following set of packages:
 ```{r, eval = TRUE, message = FALSE}
 library(tidyverse)
 library(RSQLite)
-library(lubridate)
 library(scales)
 library(sandwich)
 library(lmtest)
@@ -55,16 +54,17 @@ crsp_monthly |>
     top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1, 0),
     top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1, 0),
     top10 = if_else(mktcap >= quantile(mktcap, 0.90), 1, 0),
-    top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1, 0),
-    total_market_cap = sum(mktcap)
+    top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1, 0)
   ) |>
   summarize(
+    total_market_cap =  sum(mktcap),
     `Largest 1% of stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
     `Largest 5% of stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
     `Largest 10% of stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
     `Largest 25% of stocks` = sum(mktcap[top25 == 1]) / total_market_cap,
     .groups = "drop"
   ) |>
+  select(-total_market_cap) |> 
   pivot_longer(cols = -month) |>
   mutate(name = factor(name, levels = c(
     "Largest 1% of stocks", "Largest 5% of stocks",
@@ -154,7 +154,7 @@ assign_portfolio <- function(n_portfolios,
                              data) {
   breakpoints <- data |>
     filter(exchange %in% exchanges) |>
-    summarize(breakpoint = quantile(
+    reframe(breakpoint = quantile(
       mktcap_lag,
       probs = seq(0, 1, length.out = n_portfolios + 1),
       na.rm = TRUE
@@ -188,7 +188,7 @@ compute_portfolio_returns <- function(n_portfolios = 10,
     mutate(portfolio = assign_portfolio(
       n_portfolios = n_portfolios,
       exchanges = exchanges,
-      data = cur_data()
+      data = pick(everything())
     )) |>
     group_by(month, portfolio) |>
     summarize(
