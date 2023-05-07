@@ -1,0 +1,403 @@
+---
+title: "Non-standard errors in portfolio sorts"
+author: "Patrick Weiss"
+date: "2023-05-05"
+description: An easy implementation for NSE in portfolio sorts
+categories: 
+  - Replications
+---
+
+# Introduction
+
+I find non-standard errors[^1] very exciting and an important angle on academic research activity generally. Luckily, Stefan Voigt asked me to join forces contributing to Menkveld et al. (2023). Furthermore, if you look back at the history of Tidy Finance, we included a chapter on [Size sorts and p-hacking](https://www.tidy-finance.org/size-sorts-and-p-hacking.html) early, starting an assessment of different choices in portfolio sorts. Recently, my excellent co-authors (shout out to [Dominik Walter](https://sites.google.com/view/dominikwalter/startseite) and [Rüdiger Weber](https://sites.google.com/site/ruedigercweber/)) and I uploaded a new working paper version of "Non-Standard Errors in Portfolio Sorts"[^2] (WWW below). In the paper, we thoroughly study how methodological choices influence return differentials estimated from portfolio sorts. The conclusion is that we should embrace non-standard errors and report distributions of return differentials.
+
+This blog article will teach you how to do portfolio sorts with non-standard errors in mind, i.e., vary over possible decisions to gain a deeper insight into return differentials. We will estimate one premium's distribution as opposed to a single return differential. The code here is inspired by Tidy Finance with R and the replication code for WWW in this [Github repository](https://github.com/patrick-weiss/PortfolioSorts_NSE). In the end, you will know how to sort portfolios on the variable *asset growth* in nearly 70,000 ways.
+
+# Data
+
+First, we need some data. On the one hand, we need the monthly return time series for the CRSP universe. On the other hand, we need some accounting data from Compustat for constructing the sorting variable itself. To save space and because there is a chatper in Tidy Finance on it, I refer you to our chapter on [WRDS, CRSP, and Compustat](https://www.tidy-finance.org/wrds-crsp-compustat.html) for the details on how to download the data. Here, I only read the data from my SQLite database.
+
+We first need a few packages. The `tidyverse` (of course) and the `RSQLite`-package for the database. Additionally, I connect to my database that contains all necessary data. The prefix `../` in the path argument moves one directory up.
+
+```{r}
+# Packages
+library(tidyverse)
+library(RSQLite)
+
+# Database
+# SQLite database
+data_tidy_nse <- dbConnect(SQLite(), 
+                           "../../data/data_nse.sqlite", 
+                           extended_types = TRUE)
+```
+
+
+```{r}
+#| include: false
+#| eval: false
+library(dbplyr)
+library(RPostgres)
+library(frenchdata)
+
+# Set up ---------------------------------------------------------------------
+# Dates
+start_date <- as.Date("1968-01-01")
+end_date <- as.Date("2021-12-31")
+
+# WRDS connection
+wrds <- dbConnect(
+  Postgres(),
+  host = "wrds-pgdata.wharton.upenn.edu",
+  dbname = "wrds",
+  port = 9737,
+  sslmode = "require",
+  user = Sys.getenv("user"), # put your information here
+  password = Sys.getenv("password") # put your information here
+)
+
+
+# Fama & French 5 factors (monthly) ------------------------------------------
+# Load
+factors_ff_monthly <- download_french_data("Fama/French 5 Factors (2x3)")$subsets$data[[1]] 
+
+# Manipulate
+factors_ff_monthly <- factors_ff_monthly |>
+  transmute(
+    month = floor_date(ymd(paste0(date, "01")), "month"),
+    rf = as.numeric(RF) / 100
+  ) |>
+  filter(month >= start_date & month <= end_date)
+
+# Store
+factors_ff_monthly |>
+  dbWriteTable(conn = data_tidy_nse, 
+               name = "factors_ff_monthly", 
+               value = _,
+               overwrite = TRUE)
+
+
+# CRSP Monthly ---------------------------------------------------------------
+# Load
+## Returns
+msf_db <- tbl(wrds, in_schema("crsp", "msf"))
+
+## Names
+msenames_db <- tbl(wrds, in_schema("crsp", "msenames"))
+
+## Delisting
+msedelist_db <- tbl(wrds, in_schema("crsp", "msedelist"))
+
+# CRSP
+crsp_monthly <- msf_db |>
+  filter(date >= start_date & date <= end_date) |>
+  inner_join(msenames_db |>
+               filter(shrcd %in% c(10, 11)) |>
+               select(permno, ncusip, exchcd, siccd, namedt, nameendt), by = c("permno")) |>
+  filter(date >= namedt & date <= nameendt) |>
+  mutate(month = floor_date(date, "month")) |>
+  left_join(msedelist_db |>
+              select(permno, dlstdt, dlret, dlstcd) |>
+              mutate(month = floor_date(dlstdt, "month")), by = c("permno", "month")) |>
+  select(permno, cusip, ncusip, month, ret, retx, shrout, altprc, exchcd, siccd, dlret, dlstcd) |>
+  mutate(month = as.Date(month)) |>
+  collect() 
+
+# Manipulate
+# CRSP mktcap & lag
+crsp_monthly <- crsp_monthly |>
+  mutate(mktcap = shrout * 10^3 * abs(altprc) / 10^6) |>
+  mutate(mktcap = if_else(mktcap == 0, NA_real_, mktcap))
+
+mktcap_lag <- crsp_monthly |>
+  mutate(month = month %m+% months(1)) |>
+  select(permno, month, mktcap_lag = mktcap)
+
+crsp_monthly <- crsp_monthly |>
+  left_join(mktcap_lag, by = c("permno", "month"))
+
+rm(mktcap_lag)
+
+# Delisting returns
+crsp_monthly <- crsp_monthly |>
+  mutate(ret_adj = case_when(
+    is.na(dlstcd) ~ ret,
+    !is.na(dlstcd) & !is.na(dlret) ~ dlret,
+    dlstcd %in% c(500, 520, 580, 584) |
+      (dlstcd >= 551 & dlstcd <= 574) ~ -0.30,
+    dlstcd == 100 ~ ret,
+    TRUE ~ -1
+  )) |>
+  select(-c(dlret, dlstcd))
+
+# Excess returns
+crsp_monthly <- crsp_monthly |>
+  left_join(factors_ff_monthly |> select(month, rf), by = "month") |>
+  mutate(
+    ret_excess = ret_adj - rf,
+    ret_excess = pmax(ret_excess, -1)
+  ) |>
+  select(-ret_adj, -rf)
+
+# Exchange codes
+crsp_monthly <- crsp_monthly |>
+  mutate(exchange = case_when(
+    exchcd %in% c(1, 31) ~ "NYSE",
+    exchcd %in% c(2, 32) ~ "AMEX",
+    exchcd %in% c(3, 33) ~ "NASDAQ",
+    TRUE ~ "Other"
+  ))
+
+# Industry codes
+crsp_monthly <- crsp_monthly |>
+  mutate(industry = case_when(
+    siccd >= 1 & siccd <= 999 ~ "Agriculture",
+    siccd >= 1000 & siccd <= 1499 ~ "Mining",
+    siccd >= 1500 & siccd <= 1799 ~ "Construction",
+    siccd >= 2000 & siccd <= 3999 ~ "Manufacturing",
+    siccd >= 4000 & siccd <= 4899 ~ "Transportation",
+    siccd >= 4900 & siccd <= 4999 ~ "Utilities",
+    siccd >= 5000 & siccd <= 5199 ~ "Wholesale",
+    siccd >= 5200 & siccd <= 5999 ~ "Retail",
+    siccd >= 6000 & siccd <= 6999 ~ "Finance",
+    siccd >= 7000 & siccd <= 8999 ~ "Services",
+    siccd >= 9000 & siccd <= 9999 ~ "Public",
+    TRUE ~ "Missing"
+  ))
+
+# Drop NAs
+crsp_monthly <- crsp_monthly |>
+  drop_na(ret_excess, mktcap, mktcap_lag)
+
+# Save 
+crsp_monthly |>
+  dbWriteTable(conn = data_tidy_nse, 
+               name = "crsp_monthly", 
+               value = _,
+               overwrite = TRUE)
+
+
+# Compustat Annual --------------------------------------------------------
+# Load
+compustat <- tbl(wrds, in_schema("comp", "funda")) |>
+  filter(
+    indfmt == "INDL" &
+      datafmt == "STD" &
+      consol == "C" &
+      datadate >= start_date & datadate <= end_date
+  ) |>
+  select(
+    gvkey, # Firm identifier
+    datadate, # Date of the accounting data
+    at, # Total assets
+    ceq, # Total common/ordinary equity
+    ib, # income before extraordinary items 
+    itcb, # Investment tax credit
+    lt, # Total liabilities
+    pstkrv, # Preferred stock redemption value
+    pstkl, # Preferred stock liquidating value
+    pstk, # Preferred stock par value
+    prcc_f, # price close
+    seq, # Stockholders' equity
+    txditc,  # Deferred taxes and investment tax credit
+    txdb # Deferred taxes
+  ) |>
+  collect()
+
+# Manipulate
+compustat <- compustat |>
+  mutate(year = year(datadate),
+         month = floor_date(datadate, "month")) |>
+  group_by(gvkey, year) |>
+  filter(datadate == max(datadate)) |>
+  ungroup()
+
+# Replace negative values of sales, total assets, capital expenditure and inventory with zero
+compustat <- compustat |> 
+  mutate(at = if_else(at < 0, NA_real_, at))
+
+# Save
+compustat |>
+  dbWriteTable(conn = data_tidy_nse, 
+               name = "compustat", 
+               value = _,
+               overwrite = TRUE)
+
+
+# CRSP Compustat link -----------------------------------------------------
+# Load linking table
+ccmxpf_linktable <- tbl(wrds, in_schema("crsp", "ccmxpf_linktable")) |>
+  collect()
+
+# Manipulate
+ccmxpf_linktable <- ccmxpf_linktable |>
+  filter(linktype %in% c("LU", "LC") &
+           linkprim %in% c("P", "C") &
+           usedflag == 1) |>
+  select(permno = lpermno, gvkey, linkdt, linkenddt) |>
+  mutate(linkenddt = replace_na(linkenddt, Sys.Date()))
+
+ccm_links <- crsp_monthly |>
+  inner_join(ccmxpf_linktable, by = "permno", multiple = "all") |>
+  filter(!is.na(gvkey) & (month >= linkdt & month <= linkenddt)) |>
+  select(permno, gvkey, month)
+
+# Add to crsp_monthly
+crsp_monthly <- crsp_monthly |>
+  left_join(ccm_links, by = c("permno", "month"))
+
+# Save 
+crsp_monthly |>
+  dbWriteTable(conn = data_tidy_nse, 
+               name = "crsp_monthly", 
+               value = _,
+               overwrite = TRUE)
+
+
+# Finish chunk ------------------------------------------------------------
+# Remove everything but connection
+rm(list = ls()[which(ls() != "data_tidy_nse")])
+```
+
+
+```{r}
+crsp_monthly <- dbReadTable(data_tidy_nse, "crsp_monthly")
+compustat <- dbReadTable(data_tidy_nse, "compustat")
+```
+
+Then, I need to construct the sorting variable. As an example for this post, I decided to use *asset growth*, which was suggested as a predictor of the cross-section of stock prices by Cooper, Gulen, and Schill (2008)[^3]. Asset growth is measured as the relative change in total assets of a firm. Additionally, I compute three *filters* relating to the firm's stock price, book equity, and earnings. 
+
+```{r}
+# Lag variable
+compustat_lag <- compustat |> 
+  select(gvkey, year, at) |> 
+  mutate(year = year + 1) |> 
+  rename_with(.cols = at, ~ paste0(.x, "_lag"))
+
+# Compute asset growth
+compustat <- compustat |> 
+  left_join(compustat_lag, by = c("gvkey", "year")) |> 
+  mutate(sv_ag = (at - at_lag) / at_lag)
+
+# Compute filters
+compustat <- compustat |> 
+  mutate(filter_be = coalesce(seq, ceq + pstk, at - lt) + coalesce(txditc, txdb + itcb, 0) - coalesce(pstkrv, pstkl, pstk, 0),
+         filter_price = prcc_f,
+         filter_earnings = ib)
+
+# Select required variables
+compustat <- compustat |> 
+  select(gvkey, month, datadate, starts_with("filter_"), starts_with("sv_"))
+```
+
+For the crsp data, we also construct a variable that we will need below. We compute the stock age filter as the time in years between the stock's first appearance in CRSP and the current month. To do this reliably, we again leverage `group_by()`'s power. Note that market capitalization is already in the CRSP database, following our main data construction.
+
+```{r}
+crsp_monthly <- crsp_monthly |>
+  group_by(permno) |>
+  arrange(month) |>
+  mutate(filter_stock_age = as.numeric(difftime(month, min(month), units = "days"))/365) |> 
+  ungroup() |> 
+  select(permno, gvkey, month, industry, exchange, mktcap, mktcap_lag, ret_excess, filter_stock_age)
+```
+
+At the moment, we only have panels of stock returns and characteristics. These panels have not even been matched together yet, because this also constitutes a decision. Hence, let us move to discussing these decisions.
+
+# The decision nodes
+
+In WWW, we identify 14 methodological choices that have to be made to arrive at an estimate of a premium from portfolio sorts. We split these into decision on the sample construction and the portfolio construction. I provide you a table below and refer you to WWW for details on these nodes.
+
+Node | Choices
+:------|:------
+Size restriction | none, NYSE 5%, NYSE 20%
+Financials | include, exclude
+Utilities | include, exclude
+Pos. book equity | include, exclude
+Pos. earnings | include, exclude
+Stock-age restriction | none, >2 years
+Price restriction | none, >\$1, >\$5 
+Sorting variable lag | 3 months, 6 months, Fama-french
+Rebalancing | monthly, annually
+Breapoint quantiles main | 5, 10
+Double sort | single, double dependent, double independent
+Breapoint quantiles secondary | 2, 5
+Breapoint exchanges | NYSE, all
+Weighting scheme | equal-weighting, value-weighting
+
+In principle, there are more decisions to be made. However, this set of 14 choices appears in published, peer-reviewed articles and covers different aspects. If you think that another choice is particularly important, I am curious to hearing about it.
+
+Let us now create all possible combinations of choices that are feasible. We use `expand_grid()` on the tibble of individual nodes and their branches. Note that single sorts do not use the node regarding the number of secondary portfolios, i.e., we remove these paths after combining all choices. This leaves us with 69,120 choices.
+
+```{r}
+# Create sorting grid
+setup_grid <- expand_grid(sorting_variable = "sv_at",
+                          drop_smallNYSE_at = c(0, 0.05, 0.2),
+                          include_financials = c(TRUE, FALSE),
+                          include_utilities = c(TRUE, FALSE),
+                          drop_bookequity = c(TRUE, FALSE),
+                          drop_earnings = c(TRUE, FALSE),
+                          drop_stock_age_at = c(0, 2),
+                          drop_price_at = c(0, 1, 5),
+                          sv_lag = c("3m", "6m", "FF"),
+                          formation_time = c("monthly", "FF"),
+                          n_portfolios_main = c(5, 10),
+                          sorting_method = c("single", "dbl_ind", "dbl_dep"),
+                          n_portfolios_secondary = c(2, 5),
+                          exchanges = c("NYSE", "NYSE|NASDAQ|AMEX"),
+                          value_weighted = c(TRUE, FALSE))
+
+# Remove information on double sorting for univariate sorts
+setup_grid <- setup_grid |> 
+  filter(!(sorting_method == "single" & n_portfolios_secondary > 2)) |> 
+  mutate(n_portfolios_secondary = case_when(sorting_method == "single" ~ NA_real_, 
+                                            TRUE ~ n_portfolios_secondary))
+```
+
+## Merge data
+
+One key decision node is the sorting variable lag. However, merging data is an expensive operation and doing it over and over again is not necessary. Hence, I merge the data together in the three possible lag configurations and store them as separate tibbles. Thereby, I can later reference to the correct table instead of merging the desired output again.
+
+```{r}
+
+```
+
+
+
+#  Portfolio sorts
+
+We are equipped with the necessary data and the set of decisions that we consider. Next, we implement our decisions into actual portfolio sorts. Well. First, we have to define a few functions to make the implementation feasible. Thinking in functions is an important aspect that enables you to accomplish the task set for this blog post. Then, we will apply these functions.
+
+## Functions
+
+I write functions that accomplish specific tasks and then combine them to generate to desired output. Breaking it up into smaller steps makes the whole process more tractable and easier to test.
+
+We start with selecting the data we want
+
+
+
+
+## Applying the functions
+
+Finally, we have data, decisions, and functions. Surely, we are now ready to implement the portfolio sort, right? Yes! Just let me briefly discuss how the implementation works
+
+
+# The premium distribution
+
+Given all the estimates for the premium, we can now take a look at their distribution.
+
+You can immediately see one of the results in WWW: There is a lot of variation depending on the choices you make. However, despite the variation, the premium is always positive. 
+
+
+# Conclusion
+
+In essence, any paper proposing a new predictor usually reports one of the specifications we considered here. Then, they run a few robustness checks, where they vary some of the choices. However, space constraints severely limits the space devoted to these checks. But how about our robustness test here? It is actually over 70,000 robustness tests, if you think about it. However, it is just one graph (maybe two if showing the t-statistics as well), which condenses a lot of information in a digestible way. 
+
+Of course, we have not tested the return differentials' time series against some factor model to show that existing factors do not explain the premia. I did not show you this step, because the implementation is just an addition to our existing code.
+
+If you are interested in learning more about non-standard errors in portfolio sorts, I refer you to WWW. We not only cover many variables there, but also dive much deeper into understanding the variation itself. If you read it, let me know what you think.
+
+
+[^1]: Menkveld, A. J. et al. (2023). “Non-standard Errors”, Journal of Finance (forthcoming). http://dx.doi.org/10.2139/ssrn.3961574
+
+[^2]:  Walter, D., Weber, R., and Weiss, P. (2023). "Non-Standard Errors in Portfolio Sorts". [http://dx.doi.org/10.2139/ssrn.4164117](http://dx.doi.org/10.2139/ssrn.4164117)
+
+[^3]: Cooper, M. J., Gulen, H., and Schill, M. J. (2008). "Asset growth and the cross‐section of stock returns", The Journal of Finance, 63(4), 1609-1651.

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.2.335">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Patrick Weiss">
+<meta name="dcterms.date" content="2023-05-05">
+<meta name="description" content="An easy implementation for NSE in portfolio sorts">
+
+<title>Tidy Finance - Non-standard errors in portfolio sorts</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../images/favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-DH3KZSMJ5W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-DH3KZSMJ5W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"interstitial",
+  "consent_type":"express",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  });
+});
+</script> 
+  
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+<link rel="stylesheet" href="../../styling/styles.css">
+<meta property="og:title" content="Tidy Finance - Non-standard errors in portfolio sorts">
+<meta property="og:description" content="An easy implementation for NSE in portfolio sorts">
+<meta property="og:site-name" content="Tidy Finance">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../../images/logo-website-white.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Tidy Finance</span>
+    </a>
+  </div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html">
+ <span class="menu-text">Book</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../blog.html">
+ <span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contribute.html">
+ <span class="menu-text">Contribute</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../support.html">
+ <span class="menu-text">Support</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../blog.xml"><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+              <div id="quarto-search" class="" title="Search"></div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Non-standard errors in portfolio sorts</h1>
+                  <div>
+        <div class="description">
+          An easy implementation for NSE in portfolio sorts
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Replications</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Patrick Weiss </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">May 5, 2023</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#data" id="toc-data" class="nav-link" data-scroll-target="#data">Data</a></li>
+  <li><a href="#the-decision-nodes" id="toc-the-decision-nodes" class="nav-link" data-scroll-target="#the-decision-nodes">The decision nodes</a>
+  <ul class="collapse">
+  <li><a href="#merge-data" id="toc-merge-data" class="nav-link" data-scroll-target="#merge-data">Merge data</a></li>
+  </ul></li>
+  <li><a href="#portfolio-sorts" id="toc-portfolio-sorts" class="nav-link" data-scroll-target="#portfolio-sorts">Portfolio sorts</a>
+  <ul class="collapse">
+  <li><a href="#functions" id="toc-functions" class="nav-link" data-scroll-target="#functions">Functions</a></li>
+  <li><a href="#applying-the-functions" id="toc-applying-the-functions" class="nav-link" data-scroll-target="#applying-the-functions">Applying the functions</a></li>
+  </ul></li>
+  <li><a href="#the-premium-distribution" id="toc-the-premium-distribution" class="nav-link" data-scroll-target="#the-premium-distribution">The premium distribution</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
+  </ul>
+<div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/tidy-finance/website/edit/main/blog/nse_portfolio_sorts/index.qmd" class="toc-action">Edit this page</a></p><p><a href="https://github.com/tidy-finance/website/issues/new" class="toc-action">Report an issue</a></p></div></div></nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<section id="introduction" class="level1">
+<h1>Introduction</h1>
+<p>I find non-standard errors<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> very exciting and an important angle on academic research activity generally. Luckily, Stefan Voigt asked me to join forces contributing to Menkveld et al.&nbsp;(2023). Furthermore, if you look back at the history of Tidy Finance, we included a chapter on <a href="https://www.tidy-finance.org/size-sorts-and-p-hacking.html">Size sorts and p-hacking</a> early, starting an assessment of different choices in portfolio sorts. Recently, my excellent co-authors (shout out to <a href="https://sites.google.com/view/dominikwalter/startseite">Dominik Walter</a> and <a href="https://sites.google.com/site/ruedigercweber/">Rüdiger Weber</a>) and I uploaded a new working paper version of “Non-Standard Errors in Portfolio Sorts”<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> (WWW below). In the paper, we thoroughly study how methodological choices influence return differentials estimated from portfolio sorts. The conclusion is that we should embrace non-standard errors and report distributions of return differentials.</p>
+<p>This blog article will teach you how to do portfolio sorts with non-standard errors in mind, i.e., vary over possible decisions to gain a deeper insight into return differentials. We will estimate one premium’s distribution as opposed to a single return differential. The code here is inspired by Tidy Finance with R and the replication code for WWW in this <a href="https://github.com/patrick-weiss/PortfolioSorts_NSE">Github repository</a>. In the end, you will know how to sort portfolios on the variable <em>asset growth</em> in nearly 70,000 ways.</p>
+</section>
+<section id="data" class="level1">
+<h1>Data</h1>
+<p>First, we need some data. On the one hand, we need the monthly return time series for the CRSP universe. On the other hand, we need some accounting data from Compustat for constructing the sorting variable itself. To save space and because there is a chatper in Tidy Finance on it, I refer you to our chapter on <a href="https://www.tidy-finance.org/wrds-crsp-compustat.html">WRDS, CRSP, and Compustat</a> for the details on how to download the data. Here, I only read the data from my SQLite database.</p>
+<p>We first need a few packages. The <code>tidyverse</code> (of course) and the <code>RSQLite</code>-package for the database. Additionally, I connect to my database that contains all necessary data. The prefix <code>../</code> in the path argument moves one directory up.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Packages</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'tidyverse' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'tibble' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'tidyr' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'readr' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'purrr' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'stringr' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'forcats' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: package 'lubridate' was built under R version 4.2.3</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>── Attaching core tidyverse packages ───────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.1     ✔ readr     2.1.4
+✔ forcats   1.0.0     ✔ stringr   1.5.0
+✔ lubridate 1.9.2     ✔ tibble    3.2.1
+✔ purrr     1.0.1     ✔ tidyr     1.3.0
+── Conflicts ─────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Database</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co"># SQLite database</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>data_tidy_nse <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(<span class="fu">SQLite</span>(), </span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>                           <span class="st">"../../data/data_nse.sqlite"</span>, </span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>                           <span class="at">extended_types =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="ot">&lt;-</span> <span class="fu">dbReadTable</span>(data_tidy_nse, <span class="st">"crsp_monthly"</span>)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> <span class="fu">dbReadTable</span>(data_tidy_nse, <span class="st">"compustat"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Then, I need to construct the sorting variable. As an example for this post, I decided to use <em>asset growth</em>, which was suggested as a predictor of the cross-section of stock prices by Cooper, Gulen, and Schill (2008)<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a>. Asset growth is measured as the relative change in total assets of a firm. Additionally, I compute three <em>filters</em> relating to the firm’s stock price, book equity, and earnings.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Lag variable</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>compustat_lag <span class="ot">&lt;-</span> compustat <span class="sc">|&gt;</span> </span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, year, at) <span class="sc">|&gt;</span> </span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> year <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="at">.cols =</span> at, <span class="sc">~</span> <span class="fu">paste0</span>(.x, <span class="st">"_lag"</span>))</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute asset growth</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> compustat <span class="sc">|&gt;</span> </span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(compustat_lag, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"gvkey"</span>, <span class="st">"year"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sv_ag =</span> (at <span class="sc">-</span> at_lag) <span class="sc">/</span> at_lag)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute filters</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> compustat <span class="sc">|&gt;</span> </span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">filter_be =</span> <span class="fu">coalesce</span>(seq, ceq <span class="sc">+</span> pstk, at <span class="sc">-</span> lt) <span class="sc">+</span> <span class="fu">coalesce</span>(txditc, txdb <span class="sc">+</span> itcb, <span class="dv">0</span>) <span class="sc">-</span> <span class="fu">coalesce</span>(pstkrv, pstkl, pstk, <span class="dv">0</span>),</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>         <span class="at">filter_price =</span> prcc_f,</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>         <span class="at">filter_earnings =</span> ib)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Select required variables</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> compustat <span class="sc">|&gt;</span> </span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, month, datadate, <span class="fu">starts_with</span>(<span class="st">"filter_"</span>), <span class="fu">starts_with</span>(<span class="st">"sv_"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For the crsp data, we also construct a variable that we will need below. We compute the stock age filter as the time in years between the stock’s first appearance in CRSP and the current month. To do this reliably, we again leverage <code>group_by()</code>’s power. Note that market capitalization is already in the CRSP database, following our main data construction.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(permno) <span class="sc">|&gt;</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">filter_stock_age =</span> <span class="fu">as.numeric</span>(<span class="fu">difftime</span>(month, <span class="fu">min</span>(month), <span class="at">units =</span> <span class="st">"days"</span>))<span class="sc">/</span><span class="dv">365</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, gvkey, month, industry, exchange, mktcap, mktcap_lag, ret_excess, filter_stock_age)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>At the moment, we only have panels of stock returns and characteristics. These panels have not even been matched together yet, because this also constitutes a decision. Hence, let us move to discussing these decisions.</p>
+</section>
+<section id="the-decision-nodes" class="level1">
+<h1>The decision nodes</h1>
+<p>In WWW, we identify 14 methodological choices that have to be made to arrive at an estimate of a premium from portfolio sorts. We split these into decision on the sample construction and the portfolio construction. I provide you a table below and refer you to WWW for details on these nodes.</p>
+<table class="table">
+<thead>
+<tr class="header">
+<th style="text-align: left;">Node</th>
+<th style="text-align: left;">Choices</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Size restriction</td>
+<td style="text-align: left;">none, NYSE 5%, NYSE 20%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Financials</td>
+<td style="text-align: left;">include, exclude</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Utilities</td>
+<td style="text-align: left;">include, exclude</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Pos. book equity</td>
+<td style="text-align: left;">include, exclude</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Pos. earnings</td>
+<td style="text-align: left;">include, exclude</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Stock-age restriction</td>
+<td style="text-align: left;">none, &gt;2 years</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Price restriction</td>
+<td style="text-align: left;">none, &gt;$1, &gt;$5</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Sorting variable lag</td>
+<td style="text-align: left;">3 months, 6 months, Fama-french</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Rebalancing</td>
+<td style="text-align: left;">monthly, annually</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Breapoint quantiles main</td>
+<td style="text-align: left;">5, 10</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Double sort</td>
+<td style="text-align: left;">single, double dependent, double independent</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Breapoint quantiles secondary</td>
+<td style="text-align: left;">2, 5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Breapoint exchanges</td>
+<td style="text-align: left;">NYSE, all</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Weighting scheme</td>
+<td style="text-align: left;">equal-weighting, value-weighting</td>
+</tr>
+</tbody>
+</table>
+<p>In principle, there are more decisions to be made. However, this set of 14 choices appears in published, peer-reviewed articles and covers different aspects. If you think that another choice is particularly important, I am curious to hearing about it.</p>
+<p>Let us now create all possible combinations of choices that are feasible. We use <code>expand_grid()</code> on the tibble of individual nodes and their branches. Note that single sorts do not use the node regarding the number of secondary portfolios, i.e., we remove these paths after combining all choices. This leaves us with 69,120 choices.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create sorting grid</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>setup_grid <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(<span class="at">sorting_variable =</span> <span class="st">"sv_at"</span>,</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>                          <span class="at">drop_smallNYSE_at =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.05</span>, <span class="fl">0.2</span>),</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>                          <span class="at">include_financials =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>),</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>                          <span class="at">include_utilities =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>),</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>                          <span class="at">drop_bookequity =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>),</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>                          <span class="at">drop_earnings =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>),</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>                          <span class="at">drop_stock_age_at =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">2</span>),</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>                          <span class="at">drop_price_at =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">5</span>),</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>                          <span class="at">sv_lag =</span> <span class="fu">c</span>(<span class="st">"3m"</span>, <span class="st">"6m"</span>, <span class="st">"FF"</span>),</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>                          <span class="at">formation_time =</span> <span class="fu">c</span>(<span class="st">"monthly"</span>, <span class="st">"FF"</span>),</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>                          <span class="at">n_portfolios_main =</span> <span class="fu">c</span>(<span class="dv">5</span>, <span class="dv">10</span>),</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>                          <span class="at">sorting_method =</span> <span class="fu">c</span>(<span class="st">"single"</span>, <span class="st">"dbl_ind"</span>, <span class="st">"dbl_dep"</span>),</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>                          <span class="at">n_portfolios_secondary =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">5</span>),</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>                          <span class="at">exchanges =</span> <span class="fu">c</span>(<span class="st">"NYSE"</span>, <span class="st">"NYSE|NASDAQ|AMEX"</span>),</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>                          <span class="at">value_weighted =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>))</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove information on double sorting for univariate sorts</span></span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>setup_grid <span class="ot">&lt;-</span> setup_grid <span class="sc">|&gt;</span> </span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(sorting_method <span class="sc">==</span> <span class="st">"single"</span> <span class="sc">&amp;</span> n_portfolios_secondary <span class="sc">&gt;</span> <span class="dv">2</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">n_portfolios_secondary =</span> <span class="fu">case_when</span>(sorting_method <span class="sc">==</span> <span class="st">"single"</span> <span class="sc">~</span> <span class="cn">NA_real_</span>, </span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>                                            <span class="cn">TRUE</span> <span class="sc">~</span> n_portfolios_secondary))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="merge-data" class="level2">
+<h2 class="anchored" data-anchor-id="merge-data">Merge data</h2>
+<p>One key decision node is the sorting variable lag. However, merging data is an expensive operation and doing it over and over again is not necessary. Hence, I merge the data together in the three possible lag configurations and store them as separate tibbles. Thereby, I can later reference to the correct table instead of merging the desired output again.</p>
+<div class="cell">
+
+</div>
+</section>
+</section>
+<section id="portfolio-sorts" class="level1">
+<h1>Portfolio sorts</h1>
+<p>We are equipped with the necessary data and the set of decisions that we consider. Next, we implement our decisions into actual portfolio sorts. Well. First, we have to define a few functions to make the implementation feasible. Thinking in functions is an important aspect that enables you to accomplish the task set for this blog post. Then, we will apply these functions.</p>
+<section id="functions" class="level2">
+<h2 class="anchored" data-anchor-id="functions">Functions</h2>
+<p>I write functions that accomplish specific tasks and then combine them to generate to desired output. Breaking it up into smaller steps makes the whole process more tractable and easier to test.</p>
+<p>We start with selecting the data we want</p>
+</section>
+<section id="applying-the-functions" class="level2">
+<h2 class="anchored" data-anchor-id="applying-the-functions">Applying the functions</h2>
+<p>Finally, we have data, decisions, and functions. Surely, we are now ready to implement the portfolio sort, right? Yes! Just let me briefly discuss how the implementation works</p>
+</section>
+</section>
+<section id="the-premium-distribution" class="level1">
+<h1>The premium distribution</h1>
+<p>Given all the estimates for the premium, we can now take a look at their distribution.</p>
+<p>You can immediately see one of the results in WWW: There is a lot of variation depending on the choices you make. However, despite the variation, the premium is always positive.</p>
+</section>
+<section id="conclusion" class="level1">
+<h1>Conclusion</h1>
+<p>In essence, any paper proposing a new predictor usually reports one of the specifications we considered here. Then, they run a few robustness checks, where they vary some of the choices. However, space constraints severely limits the space devoted to these checks. But how about our robustness test here? It is actually over 70,000 robustness tests, if you think about it. However, it is just one graph (maybe two if showing the t-statistics as well), which condenses a lot of information in a digestible way.</p>
+<p>Of course, we have not tested the return differentials’ time series against some factor model to show that existing factors do not explain the premia. I did not show you this step, because the implementation is just an addition to our existing code.</p>
+<p>If you are interested in learning more about non-standard errors in portfolio sorts, I refer you to WWW. We not only cover many variables there, but also dive much deeper into understanding the variation itself. If you read it, let me know what you think.</p>
+
+
+</section>
+
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>Menkveld, A. J. et al.&nbsp;(2023). “Non-standard Errors”, Journal of Finance (forthcoming). http://dx.doi.org/10.2139/ssrn.3961574<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Walter, D., Weber, R., and Weiss, P. (2023). “Non-Standard Errors in Portfolio Sorts”. <a href="http://dx.doi.org/10.2139/ssrn.4164117">http://dx.doi.org/10.2139/ssrn.4164117</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Cooper, M. J., Gulen, H., and Schill, M. J. (2008). “Asset growth and the cross‐section of stock returns”, The Journal of Finance, 63(4), 1609-1651.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var filterRegex = new RegExp(/^(?:http:|https:)\/\/www\.tidy-finance\.org/);
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+    var links = window.document.querySelectorAll('a:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+          // target, if specified
+          link.setAttribute("target", "_blank");
+          // default icon
+          link.classList.add("external");
+      }
+    }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+      <div class="nav-footer-center">
+        <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+ © Chistoph Scheuch, Stefan Voigt &amp; Patrick Weiss
+  </li>  
+</ul>
+      <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+  </div>
+</footer>
+
+
+
+<script src="../../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
