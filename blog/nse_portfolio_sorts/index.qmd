@@ -369,14 +369,14 @@ setup_grid <- setup_grid |>
 
 One key decision node is the sorting variable lag. However, merging data is an expensive operation, and doing it repeatedly is unnecessary. Hence, we merge the data in the three possible lag configurations and store them as separate tibbles. Thereby, we can later reference the correct table instead of merging the desired output.
 
-First, let us consider the Fama-French (FF) lag. Here, we consider accounting information published in year $t-1$ starting from July of year $t$. That is, we use the accounting information published 6 to 18 months ago. We first match the accounting data to the stock market data before we fill in the missing observations. A few pitfalls exist when using the `fill()`-function. First, one might easily forget to order and group the data. Second, the function does not care how outdated the information becomes. In principle, you can end up with data that is decades old. Therefore, we ensure that these filled data points are not older than 12 months. Finally, notice that this code provides much flexibility. All variables with prefixes *sv_* and *filter_* get filled. So you can easily adapt my code to your needs.
+First, let us consider the Fama-French (FF) lag. Here, we consider accounting information published in year $t-1$ starting from July of year $t$. That is, we use the accounting information published 6 to 18 months ago. We first match the accounting data to the stock market data before we fill in the missing observations. A few pitfalls exist when using the `fill()`-function. First, one might easily forget to order and group the data. Second, the function does not care how outdated the information becomes. In principle, you can end up with data that is decades old. Therefore, we ensure that these filled data points are not older than 12 months. This is achieved with the new variable `sv_age_check`, which serves as a filter for outdated data. Finally, notice that this code provides much flexibility. All variables with prefixes *sv_* and *filter_* get filled. So you can easily adapt my code to your needs.
 
 ```{r}
 data_FF <- crsp_monthly |> 
   mutate(sorting_date = month) |> 
   left_join(compustat |> 
               mutate(sorting_date = floor_date(datadate, "year") %m+% months(18),
-                     sv_date_COMP_y = sorting_date) |> 
+                     sv_age_check = sorting_date) |> 
               select(-month, -datadate), 
             by = c("gvkey", "sorting_date"))
   
@@ -386,8 +386,8 @@ data_FF <- data_FF |>
   group_by(permno, gvkey) |> 
   fill(starts_with("sv_"), starts_with("filter_")) |> 
   ungroup() |> 
-  filter(sv_date_COMP_y > month %m-% months(12)) |>
-  select(-sv_date_COMP_y, -sorting_date, -gvkey)
+  filter(sv_age_check > month %m-% months(12)) |>
+  select(-sv_age_check, -sorting_date, -gvkey)
 ```
 
 Next, we create the basis with lags of three and six months. The process is exactly the same as above for the FF lag, but without the `floor_date()` as we apply a constant lag to all observations. Again, we make sure that after the call to `fill()` our information does not become too old.
