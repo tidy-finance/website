@@ -565,7 +565,7 @@ sort_single <- function(data, sorting_variable, exchanges, n_portfolios_main) {
 For double sorts, things are more interesting. First, we have the issue of independent and dependent double sorts. An independent sort considers the two sorting variables (*size* and *asset growth*) independently. In contrast, dependent sorts are, in our case, first sorting on *size* and within these buckets on *asset growth*. We group by the secondary portfolio to achieve the dependent sort before generating the main portfolios. Second, we need to generate an overall portfolio of the two sorts - we will see this later. 
 
 ```{r}
-sort_double_ind <- function(data, sorting_variable, exchanges, n_portfolios_main, n_portfolios_secondary) {
+sort_double_independent <- function(data, sorting_variable, exchanges, n_portfolios_main, n_portfolios_secondary) {
   data |> 
     group_by(month) |>
     mutate(portfolio_secondary = assign_portfolio(data = pick(me, exchange),
@@ -581,7 +581,7 @@ sort_double_ind <- function(data, sorting_variable, exchanges, n_portfolios_main
     ungroup()
 }
 
-sort_double_dep <- function(data, sorting_variable, exchanges, n_portfolios_main, n_portfolios_secondary) {
+sort_double_dependent <- function(data, sorting_variable, exchanges, n_portfolios_main, n_portfolios_secondary) {
   data |>
     group_by(month) |>
     mutate(portfolio_secondary = assign_portfolio(data = pick(me, exchange),
@@ -605,9 +605,9 @@ sort_double_dep <- function(data, sorting_variable, exchanges, n_portfolios_main
 Now, we still have one decision node to cover: Rebalancing. We can either rebalance annually in July or monthly. To achieve this, we write two more functions - the last functions before finishing up. Let us start with monthly rebalancing because it is much easier. All we need to do is to use the assigned portfolio numbers to generate portfolio returns. Inside the function, we use three `if()` calls to decide the sorting method. Notice that the double sorts use the simple average for aggregating the extreme portfolios of the size buckets.
 
 ```{r}
-rebalance_mon <- function(data, sorting_variable, sorting_method, 
-                          n_portfolios_main, n_portfolios_secondary, 
-                          exchanges, value_weighted) {
+rebalance_monthly <- function(data, sorting_variable, sorting_method, 
+                              n_portfolios_main, n_portfolios_secondary, 
+                              exchanges, value_weighted) {
   # Single sort
   if(sorting_method == "single") {
     data_rets <- data |> 
@@ -622,10 +622,10 @@ rebalance_mon <- function(data, sorting_variable, sorting_method,
   # Double independent sort
   if(sorting_method == "dbl_ind") {
     data_rets <- data |> 
-      sort_double_ind(sorting_variable = sorting_variable, 
-                      exchanges = exchanges, 
-                      n_portfolios_main = n_portfolios_main,
-                      n_portfolios_secondary = n_portfolios_secondary) |> 
+      sort_double_independent(sorting_variable = sorting_variable, 
+                              exchanges = exchanges, 
+                              n_portfolios_main = n_portfolios_main,
+                              n_portfolios_secondary = n_portfolios_secondary) |> 
       group_by(month, portfolio) |>
       summarize(ret = if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess)),
                 portfolio_main = unique(portfolio_main),
@@ -639,10 +639,10 @@ rebalance_mon <- function(data, sorting_variable, sorting_method,
   # Double dependent sort
   if(sorting_method == "dbl_dep") {
     data_rets <- data |> 
-      sort_double_dep(sorting_variable = sorting_variable, 
-                      exchanges = exchanges, 
-                      n_portfolios_main = n_portfolios_main,
-                      n_portfolios_secondary = n_portfolios_secondary) |> 
+      sort_double_dependent(sorting_variable = sorting_variable, 
+                            exchanges = exchanges, 
+                            n_portfolios_main = n_portfolios_main,
+                            n_portfolios_secondary = n_portfolios_secondary) |> 
       group_by(month, portfolio) |>
       summarize(ret = if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess)),
                 portfolio_main = unique(portfolio_main),
@@ -660,9 +660,9 @@ rebalance_mon <- function(data, sorting_variable, sorting_method,
 Now, let us move to the annual rebalancing. Here, we first assign a portfolio on the data in July based on single or independent/dependent double sorts. Then, we fill the remaining months forward before computing returns. Hence, we need one extra step for each sort.
 
 ```{r}
-rebalance_ann <- function(data, sorting_variable, sorting_method, 
-                          n_portfolios_main, n_portfolios_secondary, 
-                          exchanges, value_weighted) {
+rebalance_annually <- function(data, sorting_variable, sorting_method, 
+                               n_portfolios_main, n_portfolios_secondary, 
+                               exchanges, value_weighted) {
   data_sorting <- data |> 
     filter(month(month) == 7) |>
     group_by(month)
@@ -682,10 +682,10 @@ rebalance_ann <- function(data, sorting_variable, sorting_method,
   if(sorting_method == "dbl_ind") {
     # Assign portfolios
     data_sorting <- data_sorting |> 
-      sort_double_ind(sorting_variable = sorting_variable, 
-                      exchanges = exchanges, 
-                      n_portfolios_main = n_portfolios_main,
-                      n_portfolios_secondary = n_portfolios_secondary) |> 
+      sort_double_independent(sorting_variable = sorting_variable, 
+                              exchanges = exchanges, 
+                              n_portfolios_main = n_portfolios_main,
+                              n_portfolios_secondary = n_portfolios_secondary) |> 
       select(permno, month, portfolio, portfolio_main, portfolio_secondary) |> 
       mutate(sorting_month = month)
   }
@@ -694,10 +694,10 @@ rebalance_ann <- function(data, sorting_variable, sorting_method,
   if(sorting_method == "dbl_dep") {
     # Assign portfolios
     data_sorting <- data_sorting |> 
-      sort_double_dep(sorting_variable = sorting_variable, 
-                      exchanges = exchanges, 
-                      n_portfolios_main = n_portfolios_main,
-                      n_portfolios_secondary = n_portfolios_secondary)  |> 
+      sort_double_dependent(sorting_variable = sorting_variable, 
+                            exchanges = exchanges, 
+                            n_portfolios_main = n_portfolios_main,
+                            n_portfolios_secondary = n_portfolios_secondary)  |> 
       select(permno, month, portfolio, portfolio_main, portfolio_secondary) |> 
       mutate(sorting_month = month)
   }
@@ -757,24 +757,24 @@ execute_sorts <- function(sorting_variable, drop_smallNYSE_at, include_financial
   # Rebalancing
   ## Monthly
   if(formation_time == "monthly") {
-    data_return <- rebalance_mon(data = data_sorts, 
-                                 sorting_variable = sorting_variable, 
-                                 sorting_method = sorting_method, 
-                                 n_portfolios_main = n_portfolios_main, 
-                                 n_portfolios_secondary = n_portfolios_secondary, 
-                                 exchanges = exchanges, 
-                                 value_weighted = value_weighted)
+    data_return <- rebalance_monthly(data = data_sorts, 
+                                     sorting_variable = sorting_variable, 
+                                     sorting_method = sorting_method, 
+                                     n_portfolios_main = n_portfolios_main, 
+                                     n_portfolios_secondary = n_portfolios_secondary, 
+                                     exchanges = exchanges, 
+                                     value_weighted = value_weighted)
   }
   
-  ## Monthly
+  ## Annually
   if(formation_time == "FF") {
-    data_return <- rebalance_ann(data = data_sorts, 
-                                 sorting_variable = sorting_variable, 
-                                 sorting_method = sorting_method, 
-                                 n_portfolios_main = n_portfolios_main, 
-                                 n_portfolios_secondary = n_portfolios_secondary, 
-                                 exchanges = exchanges, 
-                                 value_weighted = value_weighted)
+    data_return <- rebalance_annually(data = data_sorts, 
+                                      sorting_variable = sorting_variable, 
+                                      sorting_method = sorting_method, 
+                                      n_portfolios_main = n_portfolios_main, 
+                                      n_portfolios_secondary = n_portfolios_secondary, 
+                                      exchanges = exchanges, 
+                                      value_weighted = value_weighted)
   }
   
   # Compute return differential
