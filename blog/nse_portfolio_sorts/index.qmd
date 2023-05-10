@@ -738,7 +738,7 @@ rebalance_annually <- function(data, sorting_variable, sorting_method,
 
 Now, we have everything to compute our 69,120 portfolio sorts for *asset growth* to understand the variation our decisions induce. To achieve this, our function considers all choices as arguments and passes them to the sample selection and portfolio construction functions.
 
-Finally, the function computes the return differential for each month. Since we are only interested in the mean here, we simply take the mean of these time series and call it our premium estimate. Notice that we also multiply the estimate by `-100` because the sorting variable *asset growth* predicts slow-growing firms to outperform, i.e., our portfolio sort would go in the wrong direction.
+Finally, the function computes the return differential for each month. Since we are only interested in the mean here, we simply take the mean of these time series and call it our premium estimate.
 
 ```{r}
 execute_sorts <- function(sorting_variable, drop_smallNYSE_at, include_financials, include_utilities, drop_bookequity,
@@ -783,10 +783,9 @@ execute_sorts <- function(sorting_variable, drop_smallNYSE_at, include_financial
     summarize(premium = ret[portfolio == max(portfolio)] - ret[portfolio == min(portfolio)],
               .groups = "drop") |> 
     pull(premium) |> 
-    mean() * -100
+    mean() * 100
 }
 ```
-
 
 ## Applying the functions
 
@@ -834,7 +833,13 @@ data_premia <- setup_grid |>
   ))
 ```
 
-At this point, we can also consider storing the data in our SQLite database for future reference. I skip this step today.
+Now you have all the estimates for the premium. However, one last step has to be considered when you actually investigate the premium. The portfolio sorting algorithm we constructed here is always long in the firms with a high value for the sorting variable and short in firms with low characteristics. This provides a very general way of doing it. Hence, you simply correct for this effect at the end by multiplying the column by `-1` if your sorting variable predicts an inverse relation between the sorting variable and expected returns. Otherwise, you can ignore the following chunk.
+
+```{r}
+data_premia <- data_premia |> 
+  mutate(premium_estimate = premium_estimate * -1)
+```
+
 
 ```{r}
 #| include: false
