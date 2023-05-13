@@ -78,24 +78,27 @@ variables_ff <- me_ff |>
 Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ```{r}
-assign_portfolio <- function(data, var, percentiles) {
+assign_portfolio <- function(data, 
+                             sorting_variable, 
+                             percentiles) {
   breakpoints <- data |>
     filter(exchange == "NYSE") |>
-    reframe(breakpoint = quantile(
-      {{ var }},
-      probs = {{ percentiles }},
-      na.rm = TRUE
-    )) |>
-    pull(breakpoint) |>
-    as.numeric()
+    pull(all_of(sorting_variable)) |>
+    quantile(
+      probs = percentiles,
+      na.rm = TRUE,
+      names = FALSE
+    )
 
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval({{ var }},
+    mutate(portfolio = findInterval(
+      pick(everything()) |>
+        pull(all_of(sorting_variable)),
       breakpoints,
       all.inside = TRUE
     )) |>
     pull(portfolio)
-
+  
   return(assigned_portfolios)
 }
 
@@ -105,12 +108,12 @@ portfolios_ff <- variables_ff |>
   mutate(
     portfolio_me = assign_portfolio(
       data = pick(everything()),
-      var = me_ff,
+      sorting_variable = "me_ff",
       percentiles = c(0, 0.5, 1)
     ),
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
-      var = bm_ff,
+      sorting_variable = "bm_ff",
       percentiles = c(0, 0.3, 0.7, 1)
     )
   ) |>
