@@ -10,11 +10,13 @@ categories:
 
 # What does this post cover?
 
-Recommender systems are a key component of our digital lifes, ranging from e-commerce, online advertisements, movie recommendations, or more generally all kind of product recommendations. A recommender system aims to efficiently deliver relevant information to users by automatically searching through a large volume of dynamically generated information to provide users with personalized content. In this blog post, we illustrate the concept of recommender systems in building a simple stock recommendation tool that relies on publicly available portfolios from the social trading platform wikifolio.com. The resulting recommender proposes stocks for investors who already have their own portfolio and look for new investment opportunities. The underlying assumption is that the wikifolio traders hold stock portfolios that can provide inspiration for other investors. 
+Recommender systems are a key component of our digital lifes, ranging from e-commerce, online advertisements, movie recommendations, or more generally all kinds of product recommendations. A recommender system aims to efficiently deliver relevant information to users by automatically searching through a large volume of dynamically generated information to provide users with personalized content. In this blog post, I illustrate the concept of recommender systems in building a simple stock recommendation tool that relies on publicly available portfolios from the social trading platform wikifolio.com. The resulting recommender proposes stocks for investors who already have their own portfolio and look for new investment opportunities. The underlying assumption is that the wikifolio traders hold stock portfolios that can provide useful inspiration for other investors. 
 
 wikifolio.com is the leading social trading platform in Europe, where anyone can publish and monetize their trading strategies through virtual portfolios, which are called wikifolios. The community of wikifolio traders includes full time investors and successful entrepreneurs, as well as experts from different sectors, portfolio managers and financial editors. All traders share their trading ideas through fully transparent wikifolios. The wikifolios are easy to track and replicate, by investing in the corresponding, collateralized index certificate. As of writing, there are more than 30k published wikifolios of more than 9k traders, indicating a large diversity of available portfolios for training our recommender. 
 
 There are essentially three types of recommender models: recommenders via collaborative filtering, recommenders via content-based filtering and hybrid recommenders (that mix the first two). In this blog post, I focus on the collaborative filtering approach as it requires no information other than portfolios and can provide fairly high precision with little complexity. Nonetheless, I first briefly describe the the recommender approaches and refer to [Ricci et al. (2011)](https://link.springer.com/book/10.1007/978-0-387-85820-3) for a comprehensive exposition. 
+
+# A Primer on Recommender Systems
 
 ## Collaborative Filtering 
 
@@ -32,7 +34,46 @@ The main advantage of content-based filtering is that it can make recommendation
 
 Hybrid recommender systems combine both collaborative and content-based filtering to overcome the challenges of each individual approach. There are different hybridization techniques available, e.g., combining the scores of different components (weighted), choosing among different compontent (switching), following strict priority rules (cascading), presenting outputs from different components at the same time (mixed), etc.
 
-# Training Collaborative Filtering Recommenders
+# Train Collaborative Filtering Recommenders
+```{r}
+library(tidyverse)
+library(recommenderlab)
+```
+
+
+
+```{r}
+wikifolio_portfolios <- read_rds("data/wikifolio_portfolios.rds")
+glimpse(wikifolio_portfolios)
+```
+
+```{r}
+# Convert long data to binary rating matrix where only non-NA values are stored
+# explicitely and NA values are represented by dots
+binary_rating_matrix <- wikifolio_portfolios |>
+  pivot_wider(id_cols = wikifolio,
+              names_from = stock,
+              values_from = in_portfolio,
+              values_fill = list(in_portfolio = 0)) |>
+  select(-wikifolio) |>
+  as.matrix() |>
+  as("binaryRatingMatrix")
+binary_rating_matrix
+```
+
+
+```{r}
+# cross validation: split in to training and test data
+# k-fold: k-times recursive estimation of cross validation
+# given: -1 means that all but 1 randomly selected item is ignored for evaluation
+scheme <- binary_rating_matrix |>
+  evaluationScheme(method = "cross",
+                   k      = 5,
+                   train  = 0.8,
+                   given  = -1)
+scheme
+```
+
 
 Here is the list of recommenders we consider for the backtest:
 
@@ -42,55 +83,8 @@ Here is the list of recommenders we consider for the backtest:
 * Item-Based Filtering: the algorithm calculates a similarity matrix across stocks. Recommendations are then based on the list of most similar stocks to the ones the wikifolio already has in its portfolio. This approach is also quite efficient since the similarities are pre-computed and recommendations can be generated very fast.
 * User-Based Filtering: the algorithm finds a neighborhood of similar wikifolios based on their portfolios for each wikifolio (for this exercise it is set to 100 most similar wikifolios). Recommendations are then based on what the most similar wikifolios have in their portfolio. 
 
-## Data preparation 
 
-```{r}
-wikifolio_portfolios <- read_rds("data/wikifolio_portfolios.rds") %>%
-  select(wikifolio = WikifolioIsin,
-         stock = UnderlyingIsin,
-         quantity = UnderlyingQuantity,
-         price = UnderlyingPrice,
-         weight = UnderlyingPortfolioWeight) %>%
-  mutate(in_portfolio = 1) %>%
-  group_by(stock) %>%
-  filter(n_distinct(wikifolio) > 1) %>%
-  ungroup() %>%
-  group_by(wikifolio) %>%
-  filter(n_distinct(stock) > 1) %>%
-  ungroup()
-wikifolio_portfolios
-```
-
-```{r}
-# Convert long data to binary rating matrix where only non-NA values are stored
-# explicitely and NA values are represented by dots
-binary_rating_matrix <- wikifolio_portfolios %>%
-  pivot_wider(id_cols = wikifolio,
-              names_from = stock,
-              values_from = in_portfolio,
-              values_fill = list(in_portfolio = 0)) %>%
-  select(-wikifolio) %>%
-  as.matrix() %>%
-  as("binaryRatingMatrix")
-binary_rating_matrix
-```
-
-
-# Evaluation of recommenders
-
-```{r}
-# cross validation: split in to training and test data
-# k-fold: k-times recursive estimation of cross validation
-# given: -1 means that all but 1 randomly selected item is ignored for evaluation
-scheme <- binary_rating_matrix %>%
-  evaluationScheme(method = "cross",
-                   k      = 5,
-                   train  = 0.8,
-                   given  = -1)
-scheme
-```
-
-```{r}
+```{r eval = FALSE}
 recommenderRegistry$get_entries(dataType = "binaryRatingMatrix")
 
 # specify set of algorithms
@@ -99,11 +93,11 @@ recommenderRegistry$get_entries(dataType = "binaryRatingMatrix")
 # confidence = how often the rule has been found to be true
 # nn = number of nearest neighbors
 algorithms <- list(
-  "Random Items"             = list(name  = "RANDOM",  param = NULL),
-  "Popular Items"            = list(name  = "POPULAR", param = NULL),
-  "Association Rules"        = list(name  = "AR", param = list(supp = 0.01, conf = 0.1)),
-  "Item-Based Filtering"     = list(name  = "IBCF", param = list(k = 10)),
-  "User-Based Filtering"     = list(name  = "UBCF", param = list(method = "Cosine", nn = 100))
+  "Random Items"         = list(name  = "RANDOM",  param = NULL),
+  "Popular Items"        = list(name  = "POPULAR", param = NULL),
+  "Association Rules"    = list(name  = "AR", param = list(supp = 0.01, conf = 0.1)),
+  "Item-Based Filtering" = list(name  = "IBCF", param = list(k = 10)),
+  "User-Based Filtering" = list(name  = "UBCF", param = list(method = "Cosine", nn = 100))
 )
 
 # run algorithms
@@ -114,17 +108,34 @@ results <- evaluate(scheme,
                     progress = TRUE,
                     n = number_of_recommendations
 )
-results
+```
 
-# get evaluation metrics averaged of cross-validation folds
-results_tbl <- results %>%
-  avg() %>%
-  map(as_tibble) %>%
-  bind_rows(.id = "model")
+```{r eval = FALSE, include = FALSE}
+write_rds(results, "data/results.rds")
+```
+
+```{r include = FALSE}
+results <- read_rds("data/results.rds")
 ```
 
 
-For each recommender, we count the following numbers:
+```{r}
+results
+```
+
+
+# Evaluate Recommenders
+
+The output of `evaluate()` already provides evaluation metrics in a structured way. We simply have to average the metrics over the cross-validation folds.
+
+```{r}
+results_tbl <- results |>
+  avg() |>
+  map(as_tibble) |>
+  bind_rows(.id = "model")
+```
+
+For each recommender, we are interested the following numbers:
 
 * True Negative (TN) = number of not predicted items that do not correspond to withheld items
 * False Positive (FP) = number of incorrect predictions that do not correspond to withheld items
@@ -135,45 +146,49 @@ The two figures below present the most common evaluation techniques for the perf
 
 ## ROC curves
 
-This approach comes from signal-detection and is called §Receiver Operating Characteristic" (ROC). The ROC-curve plots the algorithm’s probability of detection (TPR) agains the probability of false alarm (FPR).
+The first visualization approach comes from signal-detection and is called "Receiver Operating Characteristic" (ROC). The ROC-curve plots the algorithm’s probability of detection (TPR) against the probability of false alarm (FPR).
 
 * TPR = TP / (TP + FN) (i.e. share of true positive recommendations relative to all known portfolios)
 * FPR = FP / (FP + TN) (i.e. share of incorrect recommendations relative to )
 
-The bigger the area under the ROC curve, the better is the corresponding algorithm.
+Intuitively, the bigger the area under the ROC curve, the better is the corresponding algorithm.
 
-```{r eval = TRUE}
-results_tbl %>%
+```{r}
+results_tbl |>
   ggplot(aes(FPR, TPR, colour = model)) +
   geom_line() +
   geom_label(aes(label = n))  +
-  labs(x = "False Positive Rate (FPR)",
-       y = "True Positive Rate (TPR)",
-       title = "Item-based filtering achieves the highest TPR given any FPR",
-       colour = "Model") +
+  labs(
+    x = "False Positive Rate (FPR)",
+    y = "True Positive Rate (TPR)",
+    title = "Item-based filtering achieves the highest TPR given any FPR",
+    colour = "Model"
+  ) +
   theme_bw() +
   scale_y_continuous(labels = percent) +
   scale_x_continuous(labels = percent)
 ```
 
 
-## Precision-recall curves
+## Precision-Recall Curves
 
-The following two measures are often used in information retrieval problems:
+The second popular approach is to plot Precision-Recall curves. The two measures are often used in information retrieval problems:
 
 * Precision = TP / (TP + FP) (i.e. correctly recommended items relative to total recommended items)
 * Recall = TP / (TP + FN) (i.e. correctly recommended items relative to total number of known useful recommendations)
 
 The goal is to have a higher precision for any level of recall. In fact, there is trade-off between the two measures since high precision means low recall and vice-versa.
 
-```{r eval = TRUE}
-results_tbl %>%
+```{r}
+results_tbl |>
   ggplot(aes(x = recall, y = precision, colour = model)) +
   geom_line() +
   geom_label(aes(label = n))  +
-  labs(x = "Recall", y = "Precision",
-       title = "Item-based filtering achieves higher precision than other models",
-       colour = "Model") +
+  labs(
+    x = "Recall", y = "Precision",
+    title = "Item-based filtering achieves higher precision than other models",
+    colour = "Model"
+  ) +
   theme_grey(base_size = 14) +
   theme_bw() +
   scale_y_continuous(labels = percent) +
@@ -181,22 +196,28 @@ results_tbl %>%
 ```
 
 
-## Predictions for new users
+
+# Create Predictions for New Users
+
+The final step is to create stock recommendations for investors who already have portfolios. I pick the IBCF algorithm to create such recommendations because it excelled in the analyses above. 
 
 ```{r}
 recommender <- Recommender(binary_rating_matrix, method = "IBCF")
 ```
 
-```{r eval = TRUE}
+As ane example, suppose you currently have a portfolio that consists of Nvidia (US67066G1040) and Apple (US0378331005). I have to transform this sample portfolio into a rating matrix with the same dimensions as the data we used as input for our training. The `predict()` function then delivers a prediction for the example portfolio. 
+```{r}
 sample_portfolio <- c("US67066G1040", "US0378331005")
-sample_rating_matrix <- tibble(distinct(wikifolio_portfolios, stock)) %>%
-  mutate(in_portfolio = if_else(stock %in% sample_portfolio, 1, 0)) %>%
+sample_rating_matrix <- tibble(distinct(wikifolio_portfolios, stock)) |>
+  mutate(in_portfolio = if_else(stock %in% sample_portfolio, 1, 0)) |>
   pivot_wider(names_from = stock,
               values_from = in_portfolio,
-              values_fill = list(in_portfolio = 0)) %>%
-  as.matrix() %>%
+              values_fill = list(in_portfolio = 0)) |>
+  as.matrix() |>
   as("binaryRatingMatrix")
 
 prediction <- predict(recommender, sample_rating_matrix, n = 1)
 as(prediction, "list")
 ```
+
+So the IBCF algorithm recommends XXX as a stock if you are already invested in Nvidia and Apple. Of course, this recommendation is not serious investment advice, but rather serves an illustrative purpose. 
