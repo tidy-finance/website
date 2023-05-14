@@ -8,8 +8,6 @@ categories:
   - Recommender System
 ---
 
-# What does this post cover?
-
 Recommender systems are a key component of our digital lifes, ranging from e-commerce, online advertisements, movie recommendations, or more generally all kinds of product recommendations. A recommender system aims to efficiently deliver relevant information to users by automatically searching through a large volume of dynamically generated information to provide users with personalized content. In this blog post, I illustrate the concept of recommender systems in building a simple stock recommendation tool that relies on publicly available portfolios from the social trading platform wikifolio.com. The resulting recommender proposes stocks for investors who already have their own portfolio and look for new investment opportunities. The underlying assumption is that the wikifolio traders hold stock portfolios that can provide useful inspiration for other investors. 
 
 wikifolio.com is the leading social trading platform in Europe, where anyone can publish and monetize their trading strategies through virtual portfolios, which are called wikifolios. The community of wikifolio traders includes full time investors and successful entrepreneurs, as well as experts from different sectors, portfolio managers and financial editors. All traders share their trading ideas through fully transparent wikifolios. The wikifolios are easy to track and replicate, by investing in the corresponding, collateralized index certificate. As of writing, there are more than 30k published wikifolios of more than 9k traders, indicating a large diversity of available portfolios for training our recommender. 
@@ -26,30 +24,36 @@ Advantages of collaborative filtering include: (i) no information about users or
 
 ## Content-Based Filering
 
-Content-based filtering methods exploit information about users or items to create recommendations by building a model that relates available characteristics of users or items to each other. The recommendation problem is hence cast into a classification problem (user will like the item or not) or more generally a regression problem (which rating will user give an item). The classification problem can be item-centered by focusing on available user information and estimating a model for each item. If there are a lot of user-item interactions available, the resulting model is fairly robust, but it is less personalised (as it ignores user characteristics apart from interactions). The classification problem can also be user-centered by working with item features and estimating a model for each user. However, if a user only has few interactions then the resulting model becomes easily instable. Content-based filtering can also be neither user nor item-centered by stacking the two feature vectors and putting them into a neural network. 
+Content-based filtering methods exploit information about users or items to create recommendations by building a model that relates available characteristics of users or items to each other. The recommendation problem is hence cast into a classification problem (user will like the item or not) or more generally a regression problem (which rating will user give an item). The classification problem can be item-centered by focusing on available user information and estimating a model for each item. If there are a lot of user-item interactions available, the resulting model is fairly robust, but it is less personalized (as it ignores user characteristics apart from interactions). The classification problem can also be user-centered by working with item features and estimating a model for each user. However, if a user only has few interactions then the resulting model becomes easily instable. Content-based filtering can also be neither user nor item-centered by stacking the two feature vectors and putting them into a neural network. 
 
-The main advantage of content-based filtering is that it can make recommendations for new users without any interaction history or recommend new items to users. The disadvantages include: (i) training needs a lot of users and item examples for reliable results; (ii) tuning might be much harder in practice than collaborative filering; (iii) missing information might be a problem since there is no clear solution how to treat missingness in user or item characteristics.
+The main advantage of content-based filtering is that it can make recommendations for new users without any interaction history or recommend new items to users. The disadvantages include: (i) training needs a lot of users and item examples for reliable results; (ii) tuning might be much harder in practice than collaborative filtering; (iii) missing information might be a problem since there is no clear solution how to treat missingness in user or item characteristics.
 
 ## Hybrid Recommenders
 
 Hybrid recommender systems combine both collaborative and content-based filtering to overcome the challenges of each individual approach. There are different hybridization techniques available, e.g., combining the scores of different components (weighted), choosing among different compontent (switching), following strict priority rules (cascading), presenting outputs from different components at the same time (mixed), etc.
 
-# Train Collaborative Filtering Recommenders
-```{r}
+# Train Collaborative Filtering Recommenders in R
+
+For this post, we rely on the `tidyverse` [@Wickham2019] family of packages, `scales` [@scales] for scale functions for visualization, and `recommenderlab` [@recommenderlab] - a package that provides an infrastructure to develop and test collaborative filerting recommender algorithms.  
+```{r, message = FALSE, warning = FALSE}
 library(tidyverse)
+library(scales)
 library(recommenderlab)
 ```
 
+```{r, include = FALSE}
+wikifolio_portfolios <- read_rds("../data/wikifolio_portfolios.rds")
+```
 
+I load a dataset with stock holdings of investable wikifolios at the beginning of 2023. Reach out if you want to get access to the data. 
 
 ```{r}
-wikifolio_portfolios <- read_rds("data/wikifolio_portfolios.rds")
 glimpse(wikifolio_portfolios)
 ```
 
+First, I convert the long data to a binary rating matrix where only non-NA values are stored explicitly and NA values are represented by dots for efficiency. 
+
 ```{r}
-# Convert long data to binary rating matrix where only non-NA values are stored
-# explicitely and NA values are represented by dots
 binary_rating_matrix <- wikifolio_portfolios |>
   pivot_wider(id_cols = wikifolio,
               names_from = stock,
@@ -61,37 +65,30 @@ binary_rating_matrix <- wikifolio_portfolios |>
 binary_rating_matrix
 ```
 
+As in our book chapter on factor selection via machine learning, I perform cross-validation and split the data into training and test data. The training sample constitute 80% of the data and I perform $k$-times recursive estimation of the cross validation with $k=5$. Note that the parameter `given=-1` means that all but one randomly selected item is ignored for the evaluation.
 
 ```{r}
-# cross validation: split in to training and test data
-# k-fold: k-times recursive estimation of cross validation
-# given: -1 means that all but 1 randomly selected item is ignored for evaluation
 scheme <- binary_rating_matrix |>
-  evaluationScheme(method = "cross",
-                   k      = 5,
-                   train  = 0.8,
-                   given  = -1)
+  evaluationScheme(
+    method = "cross",
+    k      = 5,
+    train  = 0.8,
+    given  = -1
+)
 scheme
 ```
 
-
-Here is the list of recommenders we consider for the backtest:
+Here is the list of recommenders that I consider for the backtest:
 
 * Random Items: the benchmark case because it just stupidly chooses random stocks from all possible choices.
-* Popular Items: just recommended the most popular stocks to each user (measured by the number of wikifolios that hold the stock).
-* Association Rules: each wikifolio and its portfolio is considered as a transaction. Association rule mining finds similar portfolios across all users (if a users has x, y and z in his/her portfolio, then he/she is X% likely of also including w). It can be fully pre-computed.
-* Item-Based Filtering: the algorithm calculates a similarity matrix across stocks. Recommendations are then based on the list of most similar stocks to the ones the wikifolio already has in its portfolio. This approach is also quite efficient since the similarities are pre-computed and recommendations can be generated very fast.
-* User-Based Filtering: the algorithm finds a neighborhood of similar wikifolios based on their portfolios for each wikifolio (for this exercise it is set to 100 most similar wikifolios). Recommendations are then based on what the most similar wikifolios have in their portfolio. 
+* Popular Items: just recommended the most popular stocks to measured by the number of wikifolios that hold the stock.
+* Association Rules: each wikifolio and its portfolio is considered as a transaction. Association rule mining finds similar portfolios across all traders (if a traders has x, y and z in his/her portfolio, then he/she is X% likely of also including w). 
+* Item-Based Filtering: the algorithm calculates a similarity matrix across stocks. Recommendations are then based on the list of most similar stocks to the ones the wikifolio already has in its portfolio. 
+* User-Based Filtering: the algorithm finds a neighborhood of similar wikifolios for each wikifolio (for this exercise it is set to 100 most similar wikifolios). Recommendations are then based on what the most similar wikifolios have in their portfolio. 
 
+For each algorithm, I base the evaluation on 1, 3, 5, and 10 recommendations. Note that the evaluation takes a couple of hours, in particular because IBCF and UBCF are quite time-consuming. 
 
 ```{r eval = FALSE}
-recommenderRegistry$get_entries(dataType = "binaryRatingMatrix")
-
-# specify set of algorithms
-# popular = number of users who have the item in their profile
-# support = how frequently the item set appears
-# confidence = how often the rule has been found to be true
-# nn = number of nearest neighbors
 algorithms <- list(
   "Random Items"         = list(name  = "RANDOM",  param = NULL),
   "Popular Items"        = list(name  = "POPULAR", param = NULL),
@@ -100,7 +97,6 @@ algorithms <- list(
   "User-Based Filtering" = list(name  = "UBCF", param = list(method = "Cosine", nn = 100))
 )
 
-# run algorithms
 number_of_recommendations <- c(1, 3, 5, 10)
 results <- evaluate(scheme,
                     algorithms,
@@ -111,22 +107,16 @@ results <- evaluate(scheme,
 ```
 
 ```{r eval = FALSE, include = FALSE}
-write_rds(results, "data/results.rds")
+write_rds(results, "../data/results.rds")
 ```
 
 ```{r include = FALSE}
-results <- read_rds("data/results.rds")
+results <- read_rds("../data/results.rds")
 ```
-
-
-```{r}
-results
-```
-
 
 # Evaluate Recommenders
 
-The output of `evaluate()` already provides evaluation metrics in a structured way. We simply have to average the metrics over the cross-validation folds.
+The output of `evaluate()` already provides evaluation metrics in a structured way. I can simply average the metrics over the cross-validation folds.
 
 ```{r}
 results_tbl <- results |>
@@ -135,14 +125,14 @@ results_tbl <- results |>
   bind_rows(.id = "model")
 ```
 
-For each recommender, we are interested the following numbers:
+Now, for each recommender, we are interested the following numbers:
 
 * True Negative (TN) = number of not predicted items that do not correspond to withheld items
 * False Positive (FP) = number of incorrect predictions that do not correspond to withheld items
 * False negative (FN) = number of not predicted items that correspond to withheld items
 * True Positive (TP) = number of correct predictions that correspond to withheld items
 
-The two figures below present the most common evaluation techniques for the performance of recommender algorithms in backtests.
+The two figures below present the most common evaluation techniques for the performance of recommender algorithms in backtest settings like mine. 
 
 ## ROC curves
 
@@ -161,14 +151,15 @@ results_tbl |>
   labs(
     x = "False Positive Rate (FPR)",
     y = "True Positive Rate (TPR)",
-    title = "Item-based filtering achieves the highest TPR given any FPR",
+    title = "ROC Curves of Collaborative Filtering Algorithms for a Stock Recommender",
     colour = "Model"
   ) +
-  theme_bw() +
+  theme(legend.position = "right") + 
   scale_y_continuous(labels = percent) +
   scale_x_continuous(labels = percent)
 ```
 
+The figure shows that recommending random items exhibits the lowest TPR for any FPR, so it is the worst among all algorithms (which it is not surprising). Association rules, on the other hand, constitutes the best algorithm among the current selection. This result is neat because association rule mining is a computationally cheap algorithm, so we could potentially fine-tune or reestimate the model easily.
 
 ## Precision-Recall Curves
 
@@ -186,26 +177,26 @@ results_tbl |>
   geom_label(aes(label = n))  +
   labs(
     x = "Recall", y = "Precision",
-    title = "Item-based filtering achieves higher precision than other models",
+    title = "Precision-Recall Curves of Collaborative Filtering Algorithms for a Stock Recommender",
     colour = "Model"
   ) +
-  theme_grey(base_size = 14) +
-  theme_bw() +
+  theme(legend.position = "right") + 
   scale_y_continuous(labels = percent) +
   scale_x_continuous(labels = percent)
 ```
 
+Again, proposing random items exhibits the worst performance, as for any given level of recall, this approach has the lowest precision. Association rules are also the best algorithm with this visualization approach.
 
+# Create Predictions
 
-# Create Predictions for New Users
-
-The final step is to create stock recommendations for investors who already have portfolios. I pick the IBCF algorithm to create such recommendations because it excelled in the analyses above. 
+The final step is to create stock recommendations for investors who already have portfolios. I pick the IBCF algorithm to create such recommendations because it excelled in the analyses above. Note that in the case of association rules, I also need to provide the support and confidence parameters. 
 
 ```{r}
-recommender <- Recommender(binary_rating_matrix, method = "IBCF")
+recommender <- Recommender(binary_rating_matrix, method = "AR", param = list(supp = 0.01, conf = 0.1))
 ```
 
 As ane example, suppose you currently have a portfolio that consists of Nvidia (US67066G1040) and Apple (US0378331005). I have to transform this sample portfolio into a rating matrix with the same dimensions as the data we used as input for our training. The `predict()` function then delivers a prediction for the example portfolio. 
+
 ```{r}
 sample_portfolio <- c("US67066G1040", "US0378331005")
 sample_rating_matrix <- tibble(distinct(wikifolio_portfolios, stock)) |>
@@ -217,7 +208,7 @@ sample_rating_matrix <- tibble(distinct(wikifolio_portfolios, stock)) |>
   as("binaryRatingMatrix")
 
 prediction <- predict(recommender, sample_rating_matrix, n = 1)
-as(prediction, "list")
+as(prediction, "list")[[1]]
 ```
 
-So the IBCF algorithm recommends XXX as a stock if you are already invested in Nvidia and Apple. Of course, this recommendation is not serious investment advice, but rather serves an illustrative purpose. 
+So the IBCF algorithm recommends Microsoft (US5949181045) as a stock if you are already invested in Nvidia and Apple, which makes a lot of sense given the similarity in business model. Of course, this recommendation is not serious investment advice, but rather serves an illustrative purpose. 
