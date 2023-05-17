@@ -7,12 +7,14 @@ The main aim of this chapter is to familiarize yourself with the tidyverse. We s
 ## Working with Stock Market Data
 
 At the start of each session, we load the required packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the convenient `tidyquant` package [@tidyquant] to download price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse`.\index{tidyverse}
+Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
 
 You typically have to install a package once before you can load it. In case you have not done this yet, call `install.packages("tidyquant")`. \index{tidyquant} If you have trouble using `tidyquant`, check out the corresponding [documentation.](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ00-introduction-to-tidyquant.html)
 
 ```{r, eval = TRUE, message=FALSE}
 library(tidyverse)
 library(tidyquant)
+library(scales)
 ```
 
 We first download daily prices for one stock market ticker, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
@@ -63,15 +65,15 @@ returns <- returns |>
   drop_na(ret)
 ```
 
-Next, we visualize the distribution of daily returns in a histogram in @fig-101. For convenience, we multiply the returns by 100 to get returns in percent for the visualizations.\index{Graph!Histogram} Additionally, we add a dashed line that indicates the 5 percent quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at most 5 percent. The 5 percent quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to stylized facts of returns.\index{Returns}
+Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we add a dashed line that indicates the 5 percent quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at most 5 percent. The 5 percent quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to stylized facts of returns.\index{Returns}
 
 ```{r} 
 #| label: fig-101 
 #| fig-alt: "Title: Distribution of daily Apple stock returns in percent. The figure shows a histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed around 0. The vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent."
 #| fig-cap: "The dotted vertical line indicates the historical 5 percent quantile."
-quantile_05 <- quantile(returns |> pull(ret) * 100, probs = 0.05)
+quantile_05 <- quantile(returns |> pull(ret), probs = 0.05)
 returns |>
-  ggplot(aes(x = ret * 100)) +
+  ggplot(aes(x = ret)) +
   geom_histogram(bins = 100) +
   geom_vline(aes(xintercept = quantile_05),
     linetype = "dashed"
@@ -79,15 +81,15 @@ returns |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Distribution of daily Apple stock returns in percent"
-  )
+    title = "Distribution of daily Apple stock returns"
+  ) +
+  scale_x_continuous(labels = percent)
 ```
 
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest.
 
 ```{r}
 returns |>
-  mutate(ret = ret * 100) |>
   summarize(across(
     ret,
     list(
@@ -104,7 +106,6 @@ You can also compute these summary statistics for each year individually by impo
 
 ```{r}
 returns |>
-  mutate(ret = ret * 100) |>
   group_by(year = year(date)) |>
   summarize(across(
     ret,
@@ -177,7 +178,6 @@ all_returns <- index_prices |>
   select(symbol, date, ret) |>
   drop_na(ret)
 all_returns |>
-  mutate(ret = ret * 100) |>
   group_by(symbol) |>
   summarize(across(
     ret,
@@ -206,14 +206,16 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 #| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100."
 volume <- index_prices |>
   group_by(date) |>
-  summarize(volume = sum(volume * close / 1e9))
+  summarize(volume = sum(volume * close))
 volume |>
   ggplot(aes(x = date, y = volume)) +
   geom_line() +
   labs(
     x = NULL, y = NULL,
     title = "Aggregate daily trading volume of DOW index constitutens"
-  )
+  ) +
+    scale_y_continuous(labels = unit_format(unit = "B", scale = 1e-9))
+
 ```
 
 @fig-104 indicates a clear upward trend in aggregated daily trading volume. In particular, since the outbreak of the COVID-19 pandemic, markets have processed substantial trading volumes, as analyzed, for instance, by @Goldstein2021.\index{Covid 19} One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. In @fig-105, we add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline()`, addressing potential differences in the axes' scales.
@@ -232,7 +234,9 @@ volume |>
     x = "Previous day aggregate trading volume",
     y = "Aggregate trading volume",
     title = "Persistence in daily trading volume of DOW index constituents"
-  )
+  ) + 
+  scale_x_continuous(labels = unit_format(unit = "B", scale = 1e-9)) +
+  scale_y_continuous(labels = unit_format(unit = "B", scale = 1e-9))
 ```
 
 Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.\index{Error message}
@@ -295,7 +299,8 @@ Next, we set out to find the weights for a portfolio that achieves, as an exampl
 The code below implements the analytic solution to this optimization problem for a benchmark return $\bar\mu$, which we set to 3 times the expected return of the minimum variance portfolio. We encourage you to verify that it is correct.
 
 ```{r}
-mu_bar <- 3 * t(mvp_weights) %*% mu
+benchmark_multiple <- 3
+mu_bar <- benchmark_multiple * t(mvp_weights) %*% mu
 C <- as.numeric(t(iota) %*% solve(Sigma) %*% iota)
 D <- as.numeric(t(iota) %*% solve(Sigma) %*% mu)
 E <- as.numeric(t(mu) %*% solve(Sigma) %*% mu)
@@ -309,21 +314,22 @@ efp_weights <- mvp_weights +
 \index{Separation theorem} The mutual fund separation theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $w_{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{eff}(\bar{\mu})$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} The code below implements the construction of the *efficient frontier*, which characterizes the highest expected return achievable at each level of risk. To understand the code better, make sure to familiarize yourself with the inner workings of the `for` loop.
 
 ```{r}
-c <- seq(from = -0.4, to = 1.9, by = 0.01)
+length_year <- 12
+a <- seq(from = -0.4, to = 1.9, by = 0.01)
 res <- tibble(
-  c = c,
+  a = a,
   mu = NA,
   sd = NA
 )
-for (i in seq_along(c)) {
-  w <- (1 - c[i]) * mvp_weights + (c[i]) * efp_weights
-  res$mu[i] <- 12 * 100 * t(w) %*% mu   
-  res$sd[i] <- 100 * sqrt(12) * sqrt(t(w) %*% Sigma %*% w)
+for (i in seq_along(a)) {
+  w <- (1 - a[i]) * mvp_weights + (a[i]) * efp_weights
+  res$mu[i] <- length_year * t(w) %*% mu   
+  res$sd[i] <- sqrt(length_year) * sqrt(t(w) %*% Sigma %*% w)
 }
 ```
 
-The code above proceeds in two steps: First, we compute a vector of combination weights $c$ and then we evaluate the resulting linear combination with $c\in\mathbb{R}$:\
-$$w^* = cw_\text{eff}(\bar\mu) + (1-c)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{c\bar\mu + (1-c)\tilde\mu - D/C}{E-D^2/C}$ where $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one powerful figure using `ggplot2` (see @fig-106). We also add the individual stocks in the same call. We compute annualized returns based on the simple assumption that monthly returns are independent and identically distributed. Thus, the average annualized return is just 12 times the expected monthly return.\index{Graph!Efficient frontier}
+The code above proceeds in two steps: First, we compute a vector of combination weights $a$ and then we evaluate the resulting linear combination with $a\in\mathbb{R}$:\
+$$w^* = aw_\text{eff}(\bar\mu) + (1-a)w_{mvp} = \omega_\text{mvp} + \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right)$$ with $\lambda^* = 2\frac{a\bar\mu + (1-a)\tilde\mu - D/C}{E-D^2/C}$ where $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios within one powerful figure using `ggplot2` (see @fig-106). We also add the individual stocks in the same call. We compute annualized returns based on the simple assumption that monthly returns are independent and identically distributed. Thus, the average annualized return is just 12 times the expected monthly return.\index{Graph!Efficient frontier}
 
 ```{r}
 #| label: fig-106
@@ -333,21 +339,23 @@ res |>
   ggplot(aes(x = sd, y = mu)) +
   geom_point() +
   geom_point(
-    data = res |> filter(c %in% c(0, 1)),
+    data = res |> filter(a %in% c(0, 1)),
     size = 4
   ) +
   geom_point(
     data = tibble(
-      mu = 12 * 100 * mu,       
-      sd = 100 * sqrt(12) * sqrt(diag(Sigma))
+      mu = length_year * mu,       
+      sd = sqrt(length_year) * sqrt(diag(Sigma))
     ),
     aes(y = mu, x = sd), size = 1
   ) +
   labs(
-    x = "Annualized standard deviation (in percent)",
-    y = "Annualized expected return (in percent)",
+    x = "Annualized standard deviation",
+    y = "Annualized expected return",
     title = "Efficient frontier for DOW index constituents"
-  )
+  ) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent)
 ```
 
 The line in @fig-106 indicates the efficient frontier: the set of portfolios a mean-variance efficient investor would choose from. Compare the performance relative to the individual assets (the dots) - it should become clear that diversifying yields massive performance gains (at least as long as we take the parameters $\Sigma$ and $\mu$ as given).
