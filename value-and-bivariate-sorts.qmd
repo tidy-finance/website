@@ -10,9 +10,6 @@ The current chapter relies on this set of packages.
 ```{r, eval = TRUE, message = FALSE}
 library(tidyverse)
 library(RSQLite)
-library(scales)
-library(lmtest)
-library(sandwich)
 ```
 
 ## Data Preparation
@@ -92,28 +89,31 @@ data_for_sorts <- data_for_sorts |>
   drop_na()
 ```
 
-The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function allowing for the specification of exchanges to use for the breakpoints. Additionally, we reintroduce the argument `var` into the function for defining different sorting variables via `curly-curly`.\index{Curly-curly}
+The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function allowing for the specification of exchanges to use for the breakpoints. Additionally, we reintroduce the argument `sorting_variable` into the function for defining different sorting variables.
 
 ```{r}
-assign_portfolio <- function(data, var, n_portfolios, exchanges) {
+assign_portfolio <- function(data, 
+                             sorting_variable, 
+                             n_portfolios, 
+                             exchanges) {
   breakpoints <- data |>
     filter(exchange %in% exchanges) |>
-    reframe(
-      breakpoint = quantile(
-        {{ var }},
-        probs = seq(0, 1, length.out = n_portfolios + 1),
-        na.rm = TRUE)
-      ) |>
-    pull(breakpoint) |>
-    as.numeric()
+    pull({{ sorting_variable }}) |>
+    quantile(
+      probs = seq(0, 1, length.out = n_portfolios + 1),
+      na.rm = TRUE,
+      names = FALSE
+    )
 
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval({{ var }},
+    mutate(portfolio = findInterval(
+      pick(everything()) |>
+        pull({{ sorting_variable }}),
       breakpoints,
       all.inside = TRUE
     )) |>
     pull(portfolio)
-
+  
   return(assigned_portfolios)
 }
 ```
@@ -132,13 +132,13 @@ value_portfolios <- data_for_sorts |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
-      var = bm,
+      sorting_variable = "bm",
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
     portfolio_me = assign_portfolio(
       data = pick(everything()),
-      var = me,
+      sorting_variable = "me",
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
@@ -170,14 +170,14 @@ The resulting annualized value premium is 4.608 percent.
 
 In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable.\index{Portfolio sorts!Dependent bivariate} In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts ensure an equal amount of stocks within each portfolio.
 
-To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `var = me`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
+To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{r}
 value_portfolios <- data_for_sorts |>
   group_by(month) |>
   mutate(portfolio_me = assign_portfolio(
     data = pick(everything()),
-    var = me,
+    sorting_variable = "me",
     n_portfolios = 5,
     exchanges = c("NYSE")
   )) |>
@@ -185,7 +185,7 @@ value_portfolios <- data_for_sorts |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
-      var = bm,
+      sorting_variable = "bm",
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
