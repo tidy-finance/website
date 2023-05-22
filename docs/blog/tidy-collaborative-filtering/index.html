@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.340">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Christoph Scheuch">
+<meta name="dcterms.date" content="2023-05-17">
+<meta name="description" content="A simple implementation for prototyping multiple collaborative filtering algorithms.">
+
+<title>Tidy Finance - Tidy Collaborative Filtering: Building A Stock Recommender</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<link href="../../images/favicon.png" rel="icon" type="image/png">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-DH3KZSMJ5W"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-DH3KZSMJ5W', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"interstitial",
+  "consent_type":"express",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  });
+});
+</script> 
+  
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+<link rel="stylesheet" href="../../styling/styles.css">
+<meta property="og:title" content="Tidy Finance - Tidy Collaborative Filtering: Building A Stock Recommender">
+<meta property="og:description" content="A simple implementation for prototyping multiple collaborative filtering algorithms.">
+<meta property="og:image" content="https://www.tidy-finance.org/blog/tidy-collaborative-filtering/thumbnail.png">
+<meta property="og:site-name" content="Tidy Finance">
+<meta property="og:image:height" content="547">
+<meta property="og:image:width" content="794">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a href="../../index.html" class="navbar-brand navbar-brand-logo">
+    <img src="../../images/logo-website-white.png" alt="" class="navbar-logo">
+    </a>
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Tidy Finance</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html" rel="" target="">
+ <span class="menu-text">Book</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../blog.html" rel="" target="">
+ <span class="menu-text">Blog</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../contribute.html" rel="" target="">
+ <span class="menu-text">Contribute</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../support.html" rel="" target="">
+ <span class="menu-text">Support</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../blog.xml" rel="" target=""><i class="bi bi-rss" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+            <div class="quarto-navbar-tools">
+</div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Tidy Collaborative Filtering: Building A Stock Recommender</h1>
+                  <div>
+        <div class="description">
+          A simple implementation for prototyping multiple collaborative filtering algorithms.
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">Recommender System</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Christoph Scheuch </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">May 17, 2023</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#a-primer-on-recommender-systems" id="toc-a-primer-on-recommender-systems" class="nav-link active" data-scroll-target="#a-primer-on-recommender-systems">A Primer on Recommender Systems</a>
+  <ul class="collapse">
+  <li><a href="#collaborative-filtering" id="toc-collaborative-filtering" class="nav-link" data-scroll-target="#collaborative-filtering">Collaborative Filtering</a></li>
+  <li><a href="#content-based-filering" id="toc-content-based-filering" class="nav-link" data-scroll-target="#content-based-filering">Content-Based Filering</a></li>
+  <li><a href="#hybrid-recommenders" id="toc-hybrid-recommenders" class="nav-link" data-scroll-target="#hybrid-recommenders">Hybrid Recommenders</a></li>
+  </ul></li>
+  <li><a href="#train-collaborative-filtering-recommenders-in-r" id="toc-train-collaborative-filtering-recommenders-in-r" class="nav-link" data-scroll-target="#train-collaborative-filtering-recommenders-in-r">Train Collaborative Filtering Recommenders in R</a></li>
+  <li><a href="#evaluate-recommenders" id="toc-evaluate-recommenders" class="nav-link" data-scroll-target="#evaluate-recommenders">Evaluate Recommenders</a>
+  <ul class="collapse">
+  <li><a href="#roc-curves" id="toc-roc-curves" class="nav-link" data-scroll-target="#roc-curves">ROC curves</a></li>
+  <li><a href="#precision-recall-curves" id="toc-precision-recall-curves" class="nav-link" data-scroll-target="#precision-recall-curves">Precision-Recall Curves</a></li>
+  </ul></li>
+  <li><a href="#create-predictions" id="toc-create-predictions" class="nav-link" data-scroll-target="#create-predictions">Create Predictions</a></li>
+  </ul>
+<div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/tidy-finance/website/edit/main/blog/tidy-collaborative-filtering/index.qmd" class="toc-action">Edit this page</a></p><p><a href="https://github.com/tidy-finance/website/issues/new" class="toc-action">Report an issue</a></p></div></div></nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+<p>Recommender systems are a key component of our digital lifes, ranging from e-commerce, online advertisements, movie recommendations, or more generally all kinds of product recommendations. A recommender system aims to efficiently deliver personalized content to users based on a large pool of potentially relevant information. In this blog post, I illustrate the concept of recommender systems in building a simple stock recommendation tool that relies on publicly available portfolios from the social trading platform <a href="https://wikifolio.com/">wikifolio.com</a>. The resulting recommender proposes stocks to investors who already have their own portfolio and look for new investment opportunities. The underlying assumption is that the wikifolio traders hold stock portfolios that can provide meaningful inspiration for other investors.</p>
+<p>wikifolio.com is the leading social trading platform in Europe, where anyone can publish and monetize their trading strategies through virtual portfolios, which are called wikifolios. The community of wikifolio traders includes full time investors and successful entrepreneurs, as well as experts from different sectors, portfolio managers and financial editors. All traders share their trading ideas through fully transparent wikifolios. The wikifolios are easy to track and replicate, by investing in the corresponding, collateralized index certificate. As of writing, there are more than 30k published wikifolios of more than 9k traders, indicating a large diversity of available portfolios for training our recommender.</p>
+<p>There are essentially three types of recommender models: recommenders via collaborative filtering, recommenders via content-based filtering and hybrid recommenders (that mix the first two). In this blog post, I focus on the collaborative filtering approach as it requires no information other than portfolios and can provide fairly high precision with little complexity. Nonetheless, I first briefly describe the the recommender approaches and refer to <a href="https://link.springer.com/book/10.1007/978-0-387-85820-3">Ricci et al.&nbsp;(2011)</a> for a comprehensive exposition.</p>
+<section id="a-primer-on-recommender-systems" class="level1">
+<h1>A Primer on Recommender Systems</h1>
+<section id="collaborative-filtering" class="level2">
+<h2 class="anchored" data-anchor-id="collaborative-filtering">Collaborative Filtering</h2>
+<p>In collaborative filtering, recommendations are based on past user interactions and items to produce new recommendations. The central notion is that past user-item interactions are sufficient to detect similar users or items. Broadly speaking, there are two sub-classes of collaborative filtering: the memory-based approach, which essentially searches nearest neighbors based on recorded transactions and is hence model-free, and the model-based approach, where new representations of users and items are built based on some generative pre-estimated model. Theoretically, the memory-based approach has a low bias (since no latent model is assumed) but a high variance (since the recommendations change a lot in the nearest neighbor search). The model-based approach relies on a trained interaction model. It has a relatively higher bias but a lower variance, i.e., recommendations are more stable since they come from a model.</p>
+<p>Advantages of collaborative filtering include: (i) no information about users or items is required; (ii) a high precision can be achieved with little data; (iii) the more interaction between users and items is available, the more recommendations become accurate. However, the disadvantages of collaborative filtering are: (i) it is impossible to make recommendations to a new user or recommend a new item (cold start problem); (ii) calculating recommendations for millions of users or items consumes a lot of computational power (scalability problem); (iii) if the number of items is large relative to the users and most users only have interacted with a small subset of all items, then the resulting representation has many zero interactions and might hence lead to computational difficulties (sparsity problem).</p>
+</section>
+<section id="content-based-filering" class="level2">
+<h2 class="anchored" data-anchor-id="content-based-filering">Content-Based Filering</h2>
+<p>Content-based filtering methods exploit information about users or items to create recommendations by building a model that relates available characteristics of users or items to each other. The recommendation problem is hence cast into a classification problem (the user will like the item or not) or more generally a regression problem (which rating will the user give an item). The classification problem can be item-centered by focusing on available user information and estimating a model for each item. If there are a lot of user-item interactions available, the resulting model is fairly robust, but it is less personalized (as it ignores user characteristics apart from interactions). The classification problem can also be user-centered by working with item features and estimating a model for each user. However, if a user only has a few interactions then the resulting model becomes easily unstable. Content-based filtering can also be neither the user nor item-centered by stacking the two feature vectors and putting them into a neural network.</p>
+<p>The main advantage of content-based filtering is that it can make recommendations for new users without any interaction history or recommend new items to users. The disadvantages include: (i) training needs a lot of users and item examples for reliable results; (ii) tuning might be much harder in practice than collaborative filtering; (iii) missing information might be a problem since there is no clear solution how to treat missingness in user or item characteristics.</p>
+</section>
+<section id="hybrid-recommenders" class="level2">
+<h2 class="anchored" data-anchor-id="hybrid-recommenders">Hybrid Recommenders</h2>
+<p>Hybrid recommender systems combine both collaborative and content-based filtering to overcome the challenges of each approach. There are different hybridization techniques available, e.g., combining the scores of different components (weighted), choosing among different component (switching), following strict priority rules (cascading), presenting outputs from different components at the same time (mixed), etc.</p>
+</section>
+</section>
+<section id="train-collaborative-filtering-recommenders-in-r" class="level1">
+<h1>Train Collaborative Filtering Recommenders in R</h1>
+<p>For this post, we rely on the <code>tidyverse</code> <span class="citation" data-cites="Wickham2019">(<a href="#ref-Wickham2019" role="doc-biblioref">Wickham et al. 2019</a>)</span> family of packages, <code>scales</code> <span class="citation" data-cites="scales">(<a href="#ref-scales" role="doc-biblioref">Wickham and Seidel 2022</a>)</span> for scale functions for visualization, and <code>recommenderlab</code> <span class="citation" data-cites="recommenderlab">(<a href="#ref-recommenderlab" role="doc-biblioref">Hahsler 2023</a>)</span> - a package that provides an infrastructure to develop and test collaborative filtering recommender algorithms.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(recommenderlab)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>I load a data set with stock holdings of investable wikifolios at the beginning of 2023 that I host in one of my repositories. The data contains the portfolios of 6,544 wikifolios that held in total 5,069 stocks on January 1st 2023.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>wikifolio_portfolios <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">"https://raw.githubusercontent.com/christophscheuch/christophscheuch.github.io/main/data/wikifolio_portfolios.csv"</span>) </span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(wikifolio_portfolios)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 149,916
+Columns: 2
+$ wikifolio &lt;chr&gt; "DE000LS9AAB3", "DE000LS9AAB3", "DE000LS9AAB3", "…
+$ stock     &lt;chr&gt; "AU000000CSL8", "AU0000193666", "CA0679011084", "…</code></pre>
+</div>
+</div>
+<p>First, I convert the long data to a binary rating matrix.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>binary_rating_matrix <span class="ot">&lt;-</span> wikifolio_portfolios <span class="sc">|&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">in_portfolio =</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">id_cols =</span> wikifolio,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>              <span class="at">names_from =</span> stock,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_from =</span> in_portfolio,</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_fill =</span> <span class="fu">list</span>(<span class="at">in_portfolio =</span> <span class="dv">0</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>wikifolio) <span class="sc">|&gt;</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.matrix</span>() <span class="sc">|&gt;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as</span>(<span class="st">"binaryRatingMatrix"</span>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>binary_rating_matrix</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>6544 x 5069 rating matrix of class 'binaryRatingMatrix' with 149916 ratings.</code></pre>
+</div>
+</div>
+<p>As in our book chapter on <a href="factor-selection-via-machine-learning.qmd">factor selection via machine learning</a>, I perform cross-validation and split the data into training and test data. The training sample constitute 80% of the data and I perform 5-fold cross validation. Testing is performed by withholding items from the test portfolios (parameter <code>given</code>) and checking how well the algorithm predicts the withheld items. The <code>given=-1</code> means that an algorithm sees all but 1 withheld stock for the test portfolios and needs to predict the missing stock. I refer to <span class="citation" data-cites="BreeseEtAl1998">Breese, Heckerman, and Kadie (<a href="#ref-BreeseEtAl1998" role="doc-biblioref">1998</a>)</span> for a discussion of other withholding strategies.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>scheme <span class="ot">&lt;-</span> binary_rating_matrix <span class="sc">|&gt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">evaluationScheme</span>(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">method =</span> <span class="st">"cross-validation"</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">k      =</span> <span class="dv">5</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">train  =</span> <span class="fl">0.8</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">given  =</span> <span class="sc">-</span><span class="dv">1</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>scheme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Evaluation scheme using all-but-1 items
+Method: 'cross-validation' with 5 run(s).
+Good ratings: NA
+Data set: 6544 x 5069 rating matrix of class 'binaryRatingMatrix' with 149916 ratings.</code></pre>
+</div>
+</div>
+<p>Here is the list of recommenders that I consider for the backtest with some intuition:</p>
+<ul>
+<li>Random Items: the benchmark case because it just stupidly chooses random stocks from all possible choices.</li>
+<li>Popular Items: just recommended the most popular stocks to measured by the number of wikifolios that hold the stock.</li>
+<li>Association Rules: each wikifolio and its portfolio is considered as a transaction. Association rule mining finds similar portfolios across all traders (if a traders has x, y and z in his/her portfolio, then he/she is X% likely of also including w).</li>
+<li>Item-Based Filtering: the algorithm calculates a similarity matrix across stocks. Recommendations are then based on the list of most similar stocks to the ones the wikifolio already has in its portfolio.</li>
+<li>User-Based Filtering: the algorithm finds a neighborhood of similar wikifolios for each wikifolio (for this exercise it is set to 100 most similar wikifolios). Recommendations are then based on what the most similar wikifolios have in their portfolio.</li>
+</ul>
+<p>For each algorithm, I base the evaluation on 1, 3, 5, and 10 recommendations. This specification means that each algorithm proposes 1 to 10 recommendations to the test portfolios and the evaluation scheme then checks whether the proposals contain the one withheld stock. Note that the evaluation takes a couple of hours, in particular because the Item-Based and User-Based Filtering approaches are quite time-consuming.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>algorithms <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Random Items"</span>         <span class="ot">=</span> <span class="fu">list</span>(<span class="at">name  =</span> <span class="st">"RANDOM"</span>,  <span class="at">param =</span> <span class="cn">NULL</span>),</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Popular Items"</span>        <span class="ot">=</span> <span class="fu">list</span>(<span class="at">name  =</span> <span class="st">"POPULAR"</span>, <span class="at">param =</span> <span class="cn">NULL</span>),</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Association Rules"</span>    <span class="ot">=</span> <span class="fu">list</span>(<span class="at">name  =</span> <span class="st">"AR"</span>, <span class="at">param =</span> <span class="fu">list</span>(<span class="at">supp =</span> <span class="fl">0.01</span>, <span class="at">conf =</span> <span class="fl">0.1</span>)),</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Item-Based Filtering"</span> <span class="ot">=</span> <span class="fu">list</span>(<span class="at">name  =</span> <span class="st">"IBCF"</span>, <span class="at">param =</span> <span class="fu">list</span>(<span class="at">k =</span> <span class="dv">10</span>)),</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"User-Based Filtering"</span> <span class="ot">=</span> <span class="fu">list</span>(<span class="at">name  =</span> <span class="st">"UBCF"</span>, <span class="at">param =</span> <span class="fu">list</span>(<span class="at">method =</span> <span class="st">"Cosine"</span>, <span class="at">nn =</span> <span class="dv">100</span>))</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>number_of_recommendations <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">5</span>, <span class="dv">10</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">evaluate</span>(</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  scheme,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  algorithms,</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">type =</span> <span class="st">"topNList"</span>,</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">progress =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">n =</span> number_of_recommendations</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="evaluate-recommenders" class="level1">
+<h1>Evaluate Recommenders</h1>
+<p>The output of <code>evaluate()</code> already provides the evaluation metrics in a structured way. I can simply average the metrics over the cross-validation folds.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>results_tbl <span class="ot">&lt;-</span> results <span class="sc">|&gt;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">avg</span>() <span class="sc">|&gt;</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map</span>(as_tibble) <span class="sc">|&gt;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"model"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, for each recommender, we are interested the following numbers:</p>
+<ul>
+<li>True Negative (TN) = number of not predicted items that do not correspond to withheld items</li>
+<li>False Positive (FP) = number of incorrect predictions that do not correspond to withheld items</li>
+<li>False negative (FN) = number of not predicted items that correspond to withheld items</li>
+<li>True Positive (TP) = number of correct predictions that correspond to withheld items</li>
+</ul>
+<p>The two figures below present the most common evaluation techniques for the performance of recommender algorithms in backtest settings like mine.</p>
+<section id="roc-curves" class="level2">
+<h2 class="anchored" data-anchor-id="roc-curves">ROC curves</h2>
+<p>The first visualization approach comes from signal-detection and is called “Receiver Operating Characteristic” (ROC). The ROC-curve plots the algorithm’s probability of detection (TPR) against the probability of false alarm (FPR).</p>
+<ul>
+<li>TPR = TP / (TP + FN) (i.e.&nbsp;share of true positive recommendations relative to all known portfolios)</li>
+<li>FPR = FP / (FP + TN) (i.e.&nbsp;share of incorrect recommendations relative to )</li>
+</ul>
+<p>Intuitively, the bigger the area under the ROC curve, the better is the corresponding algorithm.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>results_tbl <span class="sc">|&gt;</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(FPR, TPR, <span class="at">colour =</span> model)) <span class="sc">+</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_label</span>(<span class="fu">aes</span>(<span class="at">label =</span> n))  <span class="sc">+</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"False Positive Rate (FPR)"</span>,</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"True Positive Rate (TPR)"</span>,</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"ROC curves of stock recommender algorithms"</span>,</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"Model"</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"right"</span>) <span class="sc">+</span> </span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> percent) <span class="sc">+</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> percent)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="index_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid" alt="Title: ROC curves of stock recommender algorithms. The figure shows that the association rules mining algorithm achieves the highest true positive rate for any false positive rate." width="2100"></p>
+</div>
+</div>
+<p>The figure shows that recommending random items exhibits the lowest TPR for any FPR, so it is the worst among all algorithms (which it is not surprising). Association rules, on the other hand, constitutes the best algorithm among the current selection. This result is neat because association rule mining is a computationally cheap algorithm, so we could potentially fine-tune or reestimate the model easily.</p>
+</section>
+<section id="precision-recall-curves" class="level2">
+<h2 class="anchored" data-anchor-id="precision-recall-curves">Precision-Recall Curves</h2>
+<p>The second popular approach is to plot Precision-Recall curves. The two measures are often used in information retrieval problems:</p>
+<ul>
+<li>Precision = TP / (TP + FP) (i.e.&nbsp;correctly recommended items relative to total recommended items)</li>
+<li>Recall = TP / (TP + FN) (i.e.&nbsp;correctly recommended items relative to total number of known useful recommendations)</li>
+</ul>
+<p>The goal is to have a higher precision for any level of recall. In fact, there is trade-off between the two measures since high precision means low recall and vice-versa.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>results_tbl <span class="sc">|&gt;</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> recall, <span class="at">y =</span> precision, <span class="at">colour =</span> model)) <span class="sc">+</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>() <span class="sc">+</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_label</span>(<span class="fu">aes</span>(<span class="at">label =</span> n))  <span class="sc">+</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Recall"</span>, <span class="at">y =</span> <span class="st">"Precision"</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Precision-Recall curves of stock recommender algorithms"</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour =</span> <span class="st">"Model"</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"right"</span>) <span class="sc">+</span> </span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> percent) <span class="sc">+</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">labels =</span> percent)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="index_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid" alt="Title: Precision-Recall curves of stock recommender algorithms. The figure shows that the association rules mining algorithm achieves the highest precision for any level of recall." width="2100"></p>
+</div>
+</div>
+<p>Again, proposing random items exhibits the worst performance, as for any given level of recall, this approach has the lowest precision. Association rules are also the best algorithm with this visualization approach.</p>
+</section>
+</section>
+<section id="create-predictions" class="level1">
+<h1>Create Predictions</h1>
+<p>The final step is to create stock recommendations for investors who already have portfolios. I pick the IBCF algorithm to create such recommendations because it excelled in the analyses above. Note that in the case of association rules, I also need to provide the support and confidence parameters.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>recommender <span class="ot">&lt;-</span> <span class="fu">Recommender</span>(binary_rating_matrix, <span class="at">method =</span> <span class="st">"AR"</span>, <span class="at">param =</span> <span class="fu">list</span>(<span class="at">supp =</span> <span class="fl">0.01</span>, <span class="at">conf =</span> <span class="fl">0.1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>As ane example, suppose you currently have a portfolio that consists of Nvidia (US67066G1040) and Apple (US0378331005). I have to transform this sample portfolio into a rating matrix with the same dimensions as the data we used as input for our training. The <code>predict()</code> function then delivers a prediction for the example portfolio.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>sample_portfolio <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"US67066G1040"</span>, <span class="st">"US0378331005"</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>sample_rating_matrix <span class="ot">&lt;-</span> <span class="fu">tibble</span>(<span class="fu">distinct</span>(wikifolio_portfolios, stock)) <span class="sc">|&gt;</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">in_portfolio =</span> <span class="fu">if_else</span>(stock <span class="sc">%in%</span> sample_portfolio, <span class="dv">1</span>, <span class="dv">0</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> stock,</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_from =</span> in_portfolio,</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_fill =</span> <span class="fu">list</span>(<span class="at">in_portfolio =</span> <span class="dv">0</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.matrix</span>() <span class="sc">|&gt;</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as</span>(<span class="st">"binaryRatingMatrix"</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>prediction <span class="ot">&lt;-</span> <span class="fu">predict</span>(recommender, sample_rating_matrix, <span class="at">n =</span> <span class="dv">1</span>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="fu">as</span>(prediction, <span class="st">"list"</span>)[[<span class="dv">1</span>]]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "US5949181045"</code></pre>
+</div>
+</div>
+<p>So the IBCF algorithm recommends Microsoft (US5949181045) as a stock if you are already invested in Nvidia and Apple, which makes a lot of sense given the similarity in business model. Of course, this recommendation is not serious investment advice, but rather serves an illustrative purpose.</p>
+
+
+
+</section>
+
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-BreeseEtAl1998" class="csl-entry" role="listitem">
+Breese, John S., David Heckerman, and Carl Kadie. 1998. <span>“<span class="nocase">Empirical Analysis of Predictive Algorithms for Collaborative Filtering</span>.”</span> In <em>Proceedings of the Fourteenth Conference on Uncertainty in Artificial Intelligence</em>, 43–52. UAI’98. Madison, Wisconsin: Morgan Kaufmann Publishers Inc.
+</div>
+<div id="ref-recommenderlab" class="csl-entry" role="listitem">
+Hahsler, Michael. 2023. <em><span class="nocase">recommenderlab: Lab for Developing and Testing Recommender Algorithms</span></em>. <a href="https://CRAN.R-project.org/package=recommenderlab">https://CRAN.R-project.org/package=recommenderlab</a>.
+</div>
+<div id="ref-Wickham2019" class="csl-entry" role="listitem">
+Wickham, Hadley, Mara Averick, Jennifer Bryan, Winston Chang, Lucy D’Agostino McGowan, Romain François, Garrett Grolemund, et al. 2019. <span>“<span class="nocase">Welcome to the Tidyverse</span>.”</span> <em><span>Journal of Open Source Software</span></em> 4 (43): 1686. <a href="https://doi.org/10.21105/joss.01686">https://doi.org/10.21105/joss.01686</a>.
+</div>
+<div id="ref-scales" class="csl-entry" role="listitem">
+Wickham, Hadley, and Dana Seidel. 2022. <em><span class="nocase">scales: Scale functions for visualization</span></em>. <a href="https://CRAN.R-project.org/package=scales">https://CRAN.R-project.org/package=scales</a>.
+</div>
+</div></section></div></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var filterRegex = new RegExp("^(?:http:|https:)\/\/www\.tidy-finance\.org");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+          // target, if specified
+          link.setAttribute("target", "_blank");
+      }
+    }
+});
+</script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+      <ul class="footer-items list-unstyled">
+    <li class="nav-item">
+ © Chistoph Scheuch, Stefan Voigt &amp; Patrick Weiss
+  </li>  
+</ul>
+    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+<script src="../../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
