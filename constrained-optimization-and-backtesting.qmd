@@ -29,6 +29,8 @@ tidy_finance <- dbConnect(
 industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
   select(-month) |>
   collect()
+
+industry_returns
 ```
 
 ## Recap of Portfolio Choice 
@@ -39,9 +41,13 @@ $$w_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1$$
 where $\Sigma$ is the $(N \times N)$ covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In terms of code, the math is equivalent to the following chunk. \index{Minimum variance portfolio}
 
 ```{r}
+n_industries <- ncol(industry_returns)
+
 Sigma <- cov(industry_returns)
-w_mvp <- solve(Sigma) %*% rep(1, ncol(Sigma))
+w_mvp <- solve(Sigma) %*% rep(1, n_industries)
 w_mvp <- as.vector(w_mvp / sum(w_mvp))
+
+mu <- colMeans(industry_returns)
 ```
 
 Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* $\bar{\mu}$ such that she chooses
@@ -114,7 +120,6 @@ compute_efficient_weight <- function(Sigma,
   return(as.vector(w_opt))
 }
 
-mu <- colMeans(industry_returns)
 compute_efficient_weight(Sigma, mu)
 ```
 
@@ -183,8 +188,6 @@ Before we dive into constrained optimization, we revisit the *unconstrained* pro
 Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
 
 ```{r}
-n_industries <- ncol(industry_returns)
-
 w_mvp_numerical <- solve.QP(
   Dmat = Sigma,
   dvec = rep(0, n_industries),
