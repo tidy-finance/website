@@ -115,9 +115,9 @@ data <- industries_ff_monthly |>
   left_join(factors_q_monthly, by = "month") |>
   left_join(macro_predictors, by = "month") |>
   mutate(
-    ret = ret - factor_ff_rf
+    ret_excess = ret - factor_ff_rf
   ) |>
-  select(month, industry, ret, everything()) |>
+  select(month, industry, ret_excess, everything()) |>
   drop_na()
 ```
 
@@ -130,8 +130,7 @@ Our data contains `r ncol(data)-2` columns of regressors with the `r ncol(macro_
 #| fig-alt: "Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry's excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis."
 data |>
   group_by(industry) |>
-  mutate(ret = ret) |>
-  ggplot(aes(x = industry, y = ret)) +
+  ggplot(aes(x = industry, y = ret_excess)) +
   geom_boxplot() +
   coord_flip() +
   labs(
@@ -180,11 +179,11 @@ $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t
 - We demean and scale each regressor such that the standard deviation is one
 
 ```{r}
-rec <- recipe(ret ~ ., data = training(split)) |>
+rec <- recipe(ret_excess ~ ., data = training(split)) |>
   step_rm(month) |>
   step_interact(terms = ~ contains("factor"):contains("macro")) |>
   step_normalize(all_predictors()) |>
-  step_center(ret, skip = TRUE)
+  step_center(ret_excess, skip = TRUE)
 ```
 
 A table of all available recipe steps can be found [in the `tidymodels` documentation.](https://www.tidymodels.org/find/recipes/) As of `r format(Sys.Date(), "%Y")`, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
@@ -246,7 +245,7 @@ predicted_values <- lm_fit |>
   bind_cols(data |> filter(industry == "Manuf")) |>
   select(month,
     "Fitted value" = .pred,
-    "Realization" = ret
+    "Realization" = ret_excess
   ) |>
   pivot_longer(-month, names_to = "Variable")
 ```
@@ -303,9 +302,9 @@ What do the estimated coefficients look like? To analyze these values and to ill
 
 ```{r}
 x <- data_bake |>
-  select(-ret) |>
+  select(-ret_excess) |>
   as.matrix()
-y <- data_bake |> pull(ret)
+y <- data_bake |> pull(ret_excess)
 
 fit_lasso <- glmnet(
   x = x,
