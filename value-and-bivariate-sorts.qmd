@@ -24,24 +24,24 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  collect()
-
-crsp_monthly <- crsp_monthly |>
-  select(
+    select(
     permno, gvkey, month, ret_excess,
     mktcap, mktcap_lag, exchange
-  ) |>
+  ) |> 
+  collect() 
+
+crsp_monthly <- crsp_monthly |>
   drop_na()
 ```
 
 Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.\index{Data!Compustat}
 
 ```{r}
-compustat <- tbl(tidy_finance, "compustat") |>
-  collect()
+book_equity <- tbl(tidy_finance, "compustat") |>
+    select(gvkey, datadate, be) |>
+    collect()
 
-be <- compustat |>
-  select(gvkey, datadate, be) |>
+book_equity <- book_equity |>
   drop_na() |>
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
@@ -59,7 +59,7 @@ me <- crsp_monthly |>
   mutate(sorting_date = month %m+% months(1)) |>
   select(permno, sorting_date, me = mktcap)
 
-bm <- be |>
+bm <- book_equity |>
   inner_join(crsp_monthly |>
     select(month, permno, gvkey, mktcap), by = c("gvkey", "month")) |>
   mutate(
