@@ -497,11 +497,13 @@ cookieconsent.run({
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">extended_types =</span> <span class="cn">TRUE</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>crsp <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"crsp_monthly"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"compustat"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"crsp_monthly"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, month, mktcap) <span class="sc">|&gt;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"compustat"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(datadate, gvkey, year, at, be, capx, oancf, txdb) <span class="sc">|&gt;</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin’s q, a measure of a firm’s investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a <em>panel</em> of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.</p>
 <div class="cell">
@@ -528,15 +530,14 @@ cookieconsent.run({
 <p>Tobin’s q is the ratio of the market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications <span class="citation" data-cites="Fazzari1988 Erickson2012">(e.g., <a href="#ref-Fazzari1988" role="doc-biblioref">Fazzari et al. 1988</a>; <a href="#ref-Erickson2012" role="doc-biblioref">Erickson and Whited 2012</a>)</span>. We follow the implementation of <span class="citation" data-cites="Gulen2015">Gulen and Ion (<a href="#ref-Gulen2015" role="doc-biblioref">2015</a>)</span> and compute Tobin’s q as the market value of equity (<code>mktcap</code>) plus the book value of assets (<code>at</code>) minus book value of equity (<code>be</code>) plus deferred taxes (<code>txdb</code>), all divided by book value of assets (<code>at</code>). Finally, we only keep observations where all variables of interest are non-missing, and the reported book value of assets is strictly positive.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>data_investment <span class="ot">&lt;-</span> data_investment <span class="sc">|&gt;</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(crsp <span class="sc">|&gt;</span></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(gvkey, month, mktcap),</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"gvkey"</span>, <span class="st">"month"</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tobins_q =</span> (mktcap <span class="sc">+</span> at <span class="sc">-</span> be <span class="sc">+</span> txdb) <span class="sc">/</span> at)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>data_investment <span class="ot">&lt;-</span> data_investment <span class="sc">|&gt;</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, year, investment_lead, cash_flows, tobins_q) <span class="sc">|&gt;</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(crsp_monthly,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"gvkey"</span>, <span class="st">"month"</span>)</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">tobins_q =</span> (mktcap <span class="sc">+</span> at <span class="sc">-</span> be <span class="sc">+</span> txdb) <span class="sc">/</span> at)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>data_investment <span class="ot">&lt;-</span> data_investment <span class="sc">|&gt;</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, year, investment_lead, cash_flows, tobins_q) <span class="sc">|&gt;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions. In the specific example, we winsorize the main variables (<code>investment</code>, <code>cash_flows</code>, and <code>tobins_q</code>) at the 1 percent level.</p>
 <div class="cell">
@@ -583,9 +584,9 @@ cookieconsent.run({
 <pre><code># A tibble: 3 × 9
   measure      mean     sd    min      q05    q50   q95    max      n
   &lt;chr&gt;       &lt;dbl&gt;  &lt;dbl&gt;  &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt;  &lt;int&gt;
-1 cash_flows 0.0145 0.266  -1.50  -4.57e-1 0.0649 0.273  0.480 124193
-2 investmen… 0.0584 0.0778  0      7.27e-4 0.0333 0.208  0.467 124193
-3 tobins_q   1.99   1.69    0.571  7.92e-1 1.38   5.33  10.8   124193</code></pre>
+1 cash_flows 0.0145 0.266  -1.50  -4.57e-1 0.0649 0.273  0.480 124194
+2 investmen… 0.0584 0.0778  0      7.27e-4 0.0333 0.208  0.467 124194
+3 tobins_q   1.99   1.69    0.571  7.92e-1 1.38   5.33  10.8   124194</code></pre>
 </div>
 </div>
 </section>
@@ -601,7 +602,7 @@ cookieconsent.run({
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>model_ols</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>OLS estimation, Dep. Var.: investment_lead
-Observations: 124,193 
+Observations: 124,194 
 Standard-errors: IID 
             Estimate Std. Error t value  Pr(&gt;|t|)    
 (Intercept)  0.04241   0.000342   124.1 &lt; 2.2e-16 ***
@@ -609,7 +610,7 @@ cash_flows   0.05144   0.000835    61.6 &lt; 2.2e-16 ***
 tobins_q     0.00767   0.000132    58.2 &lt; 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.076031   Adj. R2: 0.044471</code></pre>
+RMSE: 0.076031   Adj. R2: 0.044472</code></pre>
 </div>
 </div>
 <p>As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.</p>
@@ -624,16 +625,16 @@ RMSE: 0.076031   Adj. R2: 0.044471</code></pre>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>model_fe_firm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>OLS estimation, Dep. Var.: investment_lead
-Observations: 124,193 
-Fixed-effects: gvkey: 13,903
+Observations: 124,194 
+Fixed-effects: gvkey: 13,904
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(&gt;|t|)    
 cash_flows   0.0146   0.000963    15.2 &lt; 2.2e-16 ***
 tobins_q     0.0113   0.000136    82.6 &lt; 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.050073     Adj. R2: 0.53332 
-                 Within R2: 0.059464</code></pre>
+RMSE: 0.050072     Adj. R2: 0.533321
+                 Within R2: 0.059463</code></pre>
 </div>
 </div>
 <p>The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q <em>on top</em> of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.</p>
@@ -647,15 +648,15 @@ RMSE: 0.050073     Adj. R2: 0.53332
 <span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>model_fe_firmyear</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>OLS estimation, Dep. Var.: investment_lead
-Observations: 124,193 
-Fixed-effects: gvkey: 13,903,  year: 34
+Observations: 124,194 
+Fixed-effects: gvkey: 13,904,  year: 34
 Standard-errors: IID 
            Estimate Std. Error t value  Pr(&gt;|t|)    
 cash_flows   0.0182   0.000941    19.3 &lt; 2.2e-16 ***
 tobins_q     0.0102   0.000135    75.5 &lt; 2.2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-RMSE: 0.048796     Adj. R2: 0.556675
+RMSE: 0.048796     Adj. R2: 0.556677
                  Within R2: 0.051589</code></pre>
 </div>
 </div>
@@ -678,7 +679,7 @@ gvkey                          No               Yes
 year                           No                No
 _______________ _________________ _________________
 VCOV type                     IID               IID
-Observations              124,193           124,193
+Observations              124,194           124,194
 R2                        0.04449           0.58557
 Within R2                      --           0.05946
 
@@ -693,7 +694,7 @@ gvkey                         Yes
 year                          Yes
 _______________ _________________
 VCOV type                     IID
-Observations              124,193
+Observations              124,194
 R2                        0.60643
 Within R2                 0.05159
 ---
@@ -735,21 +736,21 @@ gvkey                         Yes               Yes
 year                          Yes               Yes
 _______________ _________________ _________________
 VCOV type                     IID         by: gvkey
-Observations              124,193           124,193
+Observations              124,194           124,194
 R2                        0.60643           0.60643
 Within R2                 0.05159           0.05159
 
                 model_cluster_f...1
 Dependent Var.:     investment_lead
                                    
-cash_flows        0.0182*** (9.472)
+cash_flows        0.0182*** (9.473)
 tobins_q          0.0102*** (16.39)
 Fixed-Effects:    -----------------
 gvkey                           Yes
 year                            Yes
 _______________   _________________
 VCOV type          by: gvkey &amp; year
-Observations                124,193
+Observations                124,194
 R2                          0.60643
 Within R2                   0.05159
 ---
