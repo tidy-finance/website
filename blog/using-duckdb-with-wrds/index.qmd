@@ -1,0 +1,301 @@
+---
+title: "Using DuckDB with WRDS Data"
+author: "Ian Gow"
+date: "2023-06-08"
+description: Demonstrate the power of DuckDB and dbplyr with WRDS data.
+image: thumbnail.png
+image-alt: image alt text
+categories: 
+  - Data
+---
+
+In this short note, I show how one can use DuckDB with WRDS data stored in the PostgreSQL database provided by WRDS.
+I then use some simple benchmarks to show how DuckDB offers a powerful, fast analytical engine for researchers in accounting and finance.
+
+To make the analysis concrete, I focus on data used in the excellent recent book ["Tidy Finance with R"](https://www.tidy-finance.org).
+Essentially, I combine data from CRSP's daily stock return file (`crsp.dsf`) with data on factor returns from Ken French's website.
+
+# Summary of findings
+
+Using DuckDB speeds up the data collection from WRDS in this case from 15 minutes to about 1 minute.
+Using DuckDB to do the aggregate query reduces the time taken from over two minutes using `dbplyr` to well under one second.
+DuckDB is faster than `dplyr` even if the data are in RAM.
+Additionally DuckDB is faster than SQLite.
+In fact, DuckDB runs faster collecting data from WRDS than `dplyr` does with data on disk in an SQLite database.
+Performance isn't everything, but performance gains like these likely deliver real quality-of-life benefits to data analysts.
+
+# Getting data
+
+There are two data sets that we need to collect.
+The first is the factor returns, which we collect from Ken French's website using the `frenchdata` package.
+The second is from CRSP's daily stock file, which we get from WRDS.
+
+We start by loading three packages.
+Note that we load `DBI` rather than the underlying database driver package.^[This is how it's done in ["R for Data Science"](https://r4ds.hadley.nz). I have read comments by Hadley Wickham that this is the right way to do it, but I can't find those comments.]
+In addition to these three packages, you should have the `duckdb` and `RSQLite` packages installed. Use `install.packages()` in R to install any missing packages.
+
+```{r}
+#| warning: false
+library(tidyverse)
+library(DBI)
+library(frenchdata)
+library(duckdb)
+```
+
+Next we set up a DuckDB database file in the `data` directory, creating this directory if need be.
+We set `read_only = FALSE` because we will want to write to this database connection.
+
+```{r}
+if (!dir.exists("data")) dir.create("data")
+
+tidy_finance <- dbConnect(
+  duckdb::duckdb(),
+  "data/tidy_finance.duckdb",
+  read_only = FALSE)
+```
+
+## Fama-French factor returns
+
+We use the same `start_date` and `end_date` values used in ["Tidy Finance with R"](https://www.tidy-finance.org) and the code below also is adapted from that book.
+However, we use the `copy_to()` function from `dplyr` to save the table to our database.
+
+```{r}
+start_date <- ymd("1960-01-01")
+end_date <- ymd("2021-12-31")
+
+factors_ff_daily_raw <- 
+  download_french_data("Fama/French 3 Factors [Daily]")
+
+factors_ff_daily <- 
+  factors_ff_daily_raw$subsets$data[[1]] |>
+  transmute(
+    date = ymd(date),
+    rf = as.numeric(RF) / 100,
+    mkt_excess = as.numeric(`Mkt-RF`) / 100,
+    smb = as.numeric(SMB) / 100,
+    hml = as.numeric(HML) / 100
+  ) |>
+  filter(date >= start_date & date <= end_date) |>
+  copy_to(tidy_finance,
+          df = _,
+          name = "factors_ff_daily",
+          temporary = FALSE,
+          overwrite = TRUE)
+```
+
+## Getting daily returns from WRDS
+
+Next, we will connect to the WRDS PostgreSQL database.
+It turns out to be most efficient for us to connect through our DuckDB connection, which we can do using `postgres_scanner`.
+This requires a few lines of code to set things up.
+First, we need to `LOAD postgres_scanner` (here I assume you have previously run `INSTALL postgres_scanner` to install the package ... if not, please do that using `dbExecute()` first).^[You can do this from R using `dbExecute(tidy_finance, "INSTALL postgres_scanner")`.]
+Second, because WRDS limits the number of connections we can make and DuckDB will happily try to make multiple connections to increase download speeds, we need to `SET threads TO 3`.
+
+```{r}
+#| output: false
+dbExecute(tidy_finance, "LOAD postgres_scanner")
+dbExecute(tidy_finance, "SET threads TO 3")
+```
+
+Third, I specify the connection details as follows.
+I recommend using environment variables (e.g., set using `Sys.setenv()`), as this facilitates sharing code with others.
+You should not include this chunk of code in your code, rather run it before executing your other code.
+In addition to setting these environment variables, you may want to set `PGPASSWORD` too.
+(Hopefully it is obvious that your should use *your* WRDS ID and password, not mine.)
+
+```{r}
+#| eval: true
+Sys.setenv(PGHOST = "wrds-pgdata.wharton.upenn.edu",
+           PGPORT = 9737L,
+           PGDATABASE = "wrds",
+           PGUSER = "iangow")
+```
+
+Now we can connect to the CRSP daily stock file.
+While this is notionally `crsp.dsf`, it turns out that the "table" stored at `crsp.dsf` is actually a [view](https://www.postgresql.org/docs/current/sql-createview.html), not a table and `postgres_scanner` requires a actual table.
+To access the table, we need to use the schema `crsp_a_stock`.^[You may have access to `crsp_q_stock` or `crsp_m_stock` depending on your institution's subscription to CRSP.]
+
+```{r}
+dsf_db <- tbl(tidy_finance, 
+              sql("postgres_scan_pushdown('', 'crsp_a_stock', 'dsf')"))
+```
+
+As we can see, we have access to data in `crsp.dsf`.
+
+```{r}
+dsf_db
+```
+
+The following code is adapted from the Tidy Finance code [here](https://www.tidy-finance.org/wrds-crsp-and-compustat.html#daily-crsp-data).
+But, whereas the original code is much more complicated and takes more than 15 minutes, this code takes just over a minute.^[Performance will vary according to the speed of your connection to WRDS. Note that this query does temporarily use a significant amount of RAM on my machine, it is not clear that DuckDB will use as much RAM if this is more constrained. If necessary, you can run (say) `dbExecute(tidy_finance, "SET memory_limit='1GB'")` to constrain DuckDB's memory usage; doing so has little impact on performance for this query.]
+
+```{r}
+#| cache: true  
+rs <- dbExecute(tidy_finance, "DROP TABLE IF EXISTS crsp_daily")
+
+system.time({
+  crsp_daily <- 
+    dsf_db |>
+    filter(between(date, start_date, end_date),
+           !is.na(ret)) |>
+    select(permno, date, ret) |>
+    mutate(month = as.Date(floor_date(date, "month"))) |>
+    left_join(factors_ff_daily |>
+                select(date, rf), by = "date") |>
+    mutate(
+      ret_excess = ret - rf,
+      ret_excess = pmax(ret_excess, -1, na.rm = TRUE)
+    ) |>
+    select(permno, date, month, ret_excess) |>
+    compute(name = "crsp_daily", temporary = FALSE)
+})
+```
+## Saving data to SQLite
+
+If you have been working through "Tidy Finance", you may already have an SQLite database containing `crsp_daily`.
+If not, we can easily create one now and copy the table from our DuckDB database to SQLite.
+
+```{r}
+tidy_finance_sqlite <- dbConnect(
+  RSQLite::SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE)
+```
+
+```{r}
+#| include: false
+dbDisconnect(tidy_finance, shutdown = TRUE)
+
+tidy_finance <- dbConnect(
+  duckdb::duckdb(),
+  "data/tidy_finance.duckdb",
+  read_only = TRUE)
+
+crsp_daily <- tbl(tidy_finance, "crsp_daily")
+```
+
+
+```{r}
+#| cache: true 
+#| output: false
+copy_to(tidy_finance_sqlite,
+        crsp_daily,
+        name = "crsp_daily",
+        overwrite = TRUE,
+        temporary = FALSE)
+
+dbExecute(tidy_finance_sqlite, "VACUUM")
+```
+
+Having created our two databases, we disconnect from them.
+This mimics the most common "write-once, read-many" pattern for using databases.
+
+```{r}
+dbDisconnect(tidy_finance_sqlite)
+dbDisconnect(tidy_finance, shutdown = TRUE)
+```
+
+# Benchmarking a simple aggregation query
+
+The following is a simple comparison of three different ways of doing some basic data analysis with R.
+After running the code above, we have the table `crsp_daily` as described in [Tidy Finance](https://www.tidy-finance.org/wrds-crsp-and-compustat.html#daily-crsp-data) in two separate databases: a SQLite database and a DuckDB database.
+
+The following examines the same query processed in three different ways.
+
+  1. Using `dplyr` on an in-memory dataframe
+  2. Using `dbplyr` with an SQLite database
+  3. Using `dbplyr` with a DuckDB database 
+
+## dplyr
+
+We first need to load the data into memory.
+
+```{r}
+tidy_finance <- dbConnect(
+  RSQLite::SQLite(),
+  "data/tidy_finance.sqlite",
+  extended_types = TRUE)
+
+crsp_daily <- tbl(tidy_finance, "crsp_daily")
+```
+
+What takes most time is simply loading nearly 2GB of data into memory.
+
+```{r}
+#| cache: false 
+#| cache-lazy: false
+system.time(crsp_daily_local <- crsp_daily |> collect())
+```
+
+Once the data are in memory, it is *relatively* quick to run a summary query.
+
+```{r}
+#| cache: true
+system.time(crsp_daily_local |> 
+              group_by(month) |> 
+              summarize(ret = mean(ret_excess)) |> 
+              collect())
+```
+
+```{r}
+#| cache: true
+rm(crsp_daily_local)
+```
+
+## dbplyr with SQLite
+
+Things are faster with SQLite, though there's no obvious way to split the time between reading the data and performing the aggregation.
+Note that we have a `collect()` at the end.
+This will not take a noticeable amount of time, but seems to be a reasonable step if our plan is to analyse the aggregated data in R.
+
+```{r}
+#| cache: true
+system.time(crsp_daily |> 
+              group_by(month) |> 
+              summarize(ret = mean(ret_excess)) |> 
+              collect())
+```
+
+```{r}
+dbDisconnect(tidy_finance)
+```
+
+## dbplyr with DuckDB
+
+Let's consider DuckDB. 
+Note that we are only reading the data here, so we set `read_only = TRUE` in connecting to the database.
+Apart from the connection, there is no difference between the code here and the code above using SQLite.
+
+```{r}
+tidy_finance <- dbConnect(
+  duckdb::duckdb(),
+  "data/tidy_finance.duckdb",
+  read_only = TRUE)
+```
+
+```{r}
+crsp_daily <- tbl(tidy_finance, "crsp_daily")
+```
+
+```{r}
+system.time(crsp_daily |> 
+              group_by(month) |> 
+              summarize(ret = mean(ret_excess)) |> 
+              collect())
+```
+
+Having done our benchmarks, we can take a quick peek at the data.
+
+```{r}
+crsp_daily |> 
+  group_by(month) |> 
+  summarize(ret = mean(ret_excess)) |> 
+  collect()
+```
+
+Finally, we disconnect from the database.
+This will happen automatically if we close R, etc., and is less important if we have `read_only = TRUE` (so there is no lock on the file), but we keep things tidy here.
+
+```{r}
+dbDisconnect(tidy_finance, shutdown = TRUE)
+```
