@@ -37,7 +37,7 @@ industry_returns
 
 A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. 
 In the most extreme case, where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to 
-$$w_\text{mvp} = \arg\min w'\Sigma w \text{ s.t. } w'\iota = 1$$
+$$\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1$$
 where $\Sigma$ is the $(N \times N)$ covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In terms of code, the math is equivalent to the following chunk. \index{Minimum variance portfolio}
 
 ```{r}
@@ -51,9 +51,9 @@ mu <- colMeans(industry_returns)
 ```
 
 Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* $\bar{\mu}$ such that she chooses
-$$w_\text{eff}({\bar{\mu}}) =\arg\min w'\Sigma w \text{ s.t. } w'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
+$$\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
 We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor $\gamma$. That means the investor aims to choose portfolio weights as the solution to
-$$ w^*_\gamma = \arg\max w' \mu - \frac{\gamma}{2}w'\Sigma w\quad \text{ s.t. } w'\iota = 1.$$
+$$ \omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1.$$
 The solution to the optimal portfolio choice problem is:
 $$\omega^*_{\gamma}  = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.$$
 Empirically, this classical solution imposes many problems. 
@@ -176,7 +176,7 @@ transaction_costs |>
 ## Constrained Optimization
 
 Next, we introduce constraints to the above optimization procedure. 
-Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0 \forall i$). 
+Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). 
 However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `solve.QP()` function from the package `quadprog`.\index{Optimization!Constrained}
 
 The function `solve.QP()` delivers numerical solutions to quadratic programming problems of the form 
@@ -212,7 +212,7 @@ all(near(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution))
 The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. 
 For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the vast optimization landscape. \index{Optimization}
 
-Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $w_i >=0$. 
+Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. 
 
 ```{r}
 w_no_short_sale <- solve.QP(
@@ -227,7 +227,7 @@ w_no_short_sale$solution
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
 You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
 
-`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |w_i| \leq 1.5$. 
+`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
 Thus, we can no longer rely on `solve.QP()`, which is defined as solving quadratic programming problems with linear constraints. 
 Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
@@ -300,7 +300,7 @@ You may wonder why an investor would deviate from what is theoretically the opti
 The short answer is: the *efficient portfolio* is only efficient if the true parameters of the data generating process correspond to the estimated parameters $\hat\Sigma$ and $\hat\mu$. 
 Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations, which could result from *error-maximization* due to estimation uncertainty [@Jagannathan2003].
 
-Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\sum_{i=1}^N |(w_{i, t+1} - w_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
+Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
 
 ```{r}
 compute_efficient_weight_L1_TC <- function(mu,
