@@ -530,9 +530,9 @@ cookieconsent.run({
 <section id="parametric-portfolio-policies" class="level2">
 <h2 class="anchored" data-anchor-id="parametric-portfolio-policies">Parametric Portfolio Policies</h2>
 <p>The basic idea of parametric portfolio weights is as follows. Suppose that at each date <span class="math inline">\(t\)</span> we have <span class="math inline">\(N_t\)</span> stocks in the investment universe, where each stock <span class="math inline">\(i\)</span> has a return of <span class="math inline">\(r_{i, t+1}\)</span> and is associated with a vector of firm characteristics <span class="math inline">\(x_{i, t}\)</span> such as time-series momentum or the market capitalization. The investor’s problem is to choose portfolio weights <span class="math inline">\(w_{i,t}\)</span> to maximize the expected utility of the portfolio return: <span class="math display">\[\begin{aligned}
-\max_{w} E_t\left(u(r_{p, t+1})\right) = E_t\left[u\left(\sum\limits_{i=1}^{N_t}w_{i,t}r_{i,t+1}\right)\right]
+\max_{\omega} E_t\left(u(r_{p, t+1})\right) = E_t\left[u\left(\sum\limits_{i=1}^{N_t}\omega_{i,t}r_{i,t+1}\right)\right]
 \end{aligned}\]</span> where <span class="math inline">\(u(\cdot)\)</span> denotes the utility function.</p>
-<p>Where do the stock characteristics show up? We parameterize the optimal portfolio weights as a function of the stock characteristic <span class="math inline">\(x_{i,t}\)</span> with the following linear specification for the portfolio weights: <span class="math display">\[w_{i,t} = \bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t},\]</span> where <span class="math inline">\(\bar{w}_{i,t}\)</span> is a stock’s weight in a benchmark portfolio (we use the value-weighted or naive portfolio in the application below), <span class="math inline">\(\theta\)</span> is a vector of coefficients which we are going to estimate, and <span class="math inline">\(\hat{x}_{i,t}\)</span> are the characteristics of stock <span class="math inline">\(i\)</span>, cross-sectionally standardized to have zero mean and unit standard deviation.</p>
+<p>Where do the stock characteristics show up? We parameterize the optimal portfolio weights as a function of the stock characteristic <span class="math inline">\(x_{i,t}\)</span> with the following linear specification for the portfolio weights: <span class="math display">\[\omega_{i,t} = \bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t},\]</span> where <span class="math inline">\(\bar{\omega}_{i,t}\)</span> is a stock’s weight in a benchmark portfolio (we use the value-weighted or naive portfolio in the application below), <span class="math inline">\(\theta\)</span> is a vector of coefficients which we are going to estimate, and <span class="math inline">\(\hat{x}_{i,t}\)</span> are the characteristics of stock <span class="math inline">\(i\)</span>, cross-sectionally standardized to have zero mean and unit standard deviation.</p>
 <p>Intuitively, the portfolio strategy is a form of active portfolio management relative to a performance benchmark. Deviations from the benchmark portfolio are derived from the individual stock characteristics. Note that by construction the weights sum up to one as <span class="math inline">\(\sum_{i=1}^{N_t}\hat{x}_{i,t} = 0\)</span> due to the standardization. Moreover, the coefficients are constant across assets and over time. The implicit assumption is that the characteristics fully capture all aspects of the joint distribution of returns that are relevant for forming optimal portfolios.</p>
 <p>We first implement cross-sectional standardization for the entire CRSP universe. We also keep track of (lagged) relative market capitalization <code>relative_mktcap</code>, which will represent the value-weighted benchmark portfolio, while <code>n</code> denotes the number of traded assets <span class="math inline">\(N_t\)</span>, which we use to construct the naive portfolio benchmark.</p>
 <div class="cell">
@@ -550,7 +550,7 @@ cookieconsent.run({
 <section id="computing-portfolio-weights" class="level2">
 <h2 class="anchored" data-anchor-id="computing-portfolio-weights">Computing Portfolio Weights</h2>
 <p>Next, we move on to identify optimal choices of <span class="math inline">\(\theta\)</span>. We rewrite the optimization problem together with the weight parametrization and can then estimate <span class="math inline">\(\theta\)</span> to maximize the objective function based on our sample <span class="math display">\[\begin{aligned}
-E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
+E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
 \end{aligned}\]</span> The allocation strategy is straightforward because the number of parameters to estimate is small. Instead of a tedious specification of the <span class="math inline">\(N_t\)</span> dimensional vector of expected returns and the <span class="math inline">\(N_t(N_t+1)/2\)</span> free elements of the covariance matrix, all we need to focus on in our application is the vector <span class="math inline">\(\theta\)</span>. <span class="math inline">\(\theta\)</span> contains only two elements in our application - the relative deviation from the benchmark due to <em>size</em> and <em>momentum</em>.</p>
 <p>To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector <span class="math inline">\(\theta_0\)</span>. The next step is to choose <span class="math inline">\(\theta\)</span> optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.</p>
 <div class="cell">
@@ -564,9 +564,9 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">colnames</span>(data_portfolios), <span class="st">"lag"</span></span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The function <code>compute_portfolio_weights()</code> below computes the portfolio weights <span class="math inline">\(\bar{w}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\)</span> according to our parametrization for a given value <span class="math inline">\(\theta_0\)</span>. Everything happens within a single pipeline. Hence, we provide a short walk-through.</p>
+<p>The function <code>compute_portfolio_weights()</code> below computes the portfolio weights <span class="math inline">\(\bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\)</span> according to our parametrization for a given value <span class="math inline">\(\theta_0\)</span>. Everything happens within a single pipeline. Hence, we provide a short walk-through.</p>
 <p>We first compute <code>characteristic_tilt</code>, the tilting values <span class="math inline">\(\frac{1}{N_t}\theta'\hat{x}_{i, t}\)</span> which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio <code>weight_benchmark</code>, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. <code>weight_tilt</code> completes the picture and contains the final portfolio weights <code>weight_tilt = weight_benchmark + characteristic_tilt</code> which deviate from the benchmark portfolio depending on the stock characteristics.</p>
-<p>The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again: <span class="math display">\[w_{i,t}^+ = \frac{\max(0, w_{i,t})}{\sum_{j=1}^{N_t}\max(0, w_{i,t})}.\]</span></p>
+<p>The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again: <span class="math display">\[\omega_{i,t}^+ = \frac{\max(0, \omega_{i,t})}{\sum_{j=1}^{N_t}\max(0, \omega_{i,t})}.\]</span></p>
 <p>The following function computes the optimal portfolio weights in the way just described.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>compute_portfolio_weights <span class="ot">&lt;-</span> <span class="cf">function</span>(theta,</span>
@@ -814,21 +814,21 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 <span id="cb17-50"><a href="#cb17-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(<span class="at">n =</span> <span class="dv">11</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 11 × 7
-   measure      `EW    ` `VW    ` VW  Op…¹ VW (no…² EW  Op…³ EW (no…⁴
-   &lt;chr&gt;           &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;    &lt;dbl&gt;
- 1 Expected ut… -0.250   -2.49e-1 -0.246   -0.247   -0.250   -2.50e-1
- 2 Average ret… 10.7      7.08e+0 14.9     13.6     13.1      8.09e+0
- 3 SD return    20.3      1.53e+1 20.5     19.5     22.5      1.70e+1
- 4 Sharpe ratio  0.525    4.63e-1  0.727    0.698    0.584    4.76e-1
- 5 CAPM alpha    0.00231  1.29e-4  0.00659  0.00531  0.00437  4.76e-4
- 6 Market beta   1.13     9.92e-1  1.01     1.04     1.13     1.08e+0
- 7 Absolute we…  0.0249   2.49e-2  0.0381   0.0249   0.0260   2.49e-2
- 8 Max. weight   0.0249   3.55e+0  3.37     2.69     0.157    2.21e-1
- 9 Min. weight   0.0249   2.77e-5 -0.0352   0       -0.0331   0      
-10 Avg. sum of…  0        0       27.4      0        2.27     0      
-11 Avg. fracti…  0        0       38.6      0        7.40     0      
-# … with abbreviated variable names ¹​`VW  Optimal `,
-#   ²​`VW (no s.) Optimal `, ³​`EW  Optimal `, ⁴​`EW (no s.) Optimal `</code></pre>
+   measure     `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Optimal `
+   &lt;chr&gt;          &lt;dbl&gt;    &lt;dbl&gt;          &lt;dbl&gt;                 &lt;dbl&gt;
+ 1 Expected u… -0.250   -2.49e-1       -0.246                -0.247  
+ 2 Average re… 10.7      7.08e+0       14.9                  13.6    
+ 3 SD return   20.3      1.53e+1       20.5                  19.5    
+ 4 Sharpe rat…  0.525    4.63e-1        0.727                 0.698  
+ 5 CAPM alpha   0.00231  1.29e-4        0.00659               0.00531
+ 6 Market beta  1.13     9.92e-1        1.01                  1.04   
+ 7 Absolute w…  0.0249   2.49e-2        0.0381                0.0249 
+ 8 Max. weight  0.0249   3.55e+0        3.37                  2.69   
+ 9 Min. weight  0.0249   2.77e-5       -0.0352                0      
+10 Avg. sum o…  0        0             27.4                   0      
+11 Avg. fract…  0        0             38.6                   0      
+# ℹ 2 more variables: `EW  Optimal ` &lt;dbl&gt;,
+#   `EW (no s.) Optimal ` &lt;dbl&gt;</code></pre>
 </div>
 </div>
 <p>The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Finally, imposing no short-sale constraints does not improve the performance of the portfolios in our application.</p>
