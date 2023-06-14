@@ -1,0 +1,227 @@
+---
+title: "Convert Raw TRACE Data to a Local SQLite Database"
+author: [Kevin Riehl, Lukas Müller]
+date: "2023-06-08"
+description: An R code that converts TRACE files from FINRA into a SQLite for facilitated analysis and filtering
+image: thumbnail.jpg
+image-alt: An image of a bar in New York called Bond 45 by Björn Antonissen (https://unsplash.com/de/fotos/-VQMnroeFK4).
+categories: 
+  - Data
+---
+
+Corporate bond research is gaining momentum, but data availability can be a challenge for most researchers. While FINRA makes its TRACE Enhanced Data on U.S. corporate bond trading available through vendors such as Wharton Research Data Services (WRDS), not every researcher has access to these services. Alternatively, FINRA offers its Enhanced Historical Data and Academic Data (the latter exclusively) as one-off purchases. However, organizing this data can be complex and time consuming due to the nested and zipped structure of raw TXT files, making it cumbersome for researchers to explore the exciting world of fixed income securities.
+
+Our R code enables you organizing the TRACE academic data and TRACE enhanced data by eliminating the complexities of multiple, nested files, simplifying the data conversion process. Drawing from the existing SAS-based solution of Dick-Nielsen (2014) [^1] and (2019) [^2], you can now easily convert TRACE data into a single, organized SQLite database, allowing for seamless and efficient downstream analysis.
+
+Here are the key benefits our solution offers:
+
+- **Accessibility**: Our solution is a cost-effective alternative to accessing data from WRDS or directly from FINRA, making it accessible to researchers without WRDS. The resulting database shares symbology with WRDS and can thus be processed with existing codes, i.e., in Tidy Finance with R.
+- **Efficiency**: Our R code streamlines the data conversion process, saving you time and effort compared to manually structuring processing nested files.
+- **Versatility**: SQLite is a widely used database format that can be utilized by various applications and programming languages, giving you flexibility in your downstream analysis.
+- **Open-Source Code**: We provide our solution as R code available on [GitHub](https://github.com/DerKevinRiehl/bondTradingDataSqliteDbConverterR).
+- **TRACE academic data**: TRACE academic data is only available as a one-off purchase directly from FINRA. We provide a tool to organize and process the raw data files you receive from TRACE to save you hours of work!
+
+With our R code, you can simplify your corporate bond research and overcome current limitations. Don't let complex data organizing hold you back! Prepare yourself to be immersed in the extraordinary realm of TRACE, the key to unlock a deeper understanding of over-the-counter transactions and to unveil the mysterious pathways of fixed-income securities. With TRACE as your guide, you will embark on a journey of discovery, unraveling market trends and unearthing invaluable insights that will forever enrich your understanding of this mesmerizing world. Embrace the power of TRACE and unveil the secrets that lie within.
+
+In the following, we will discuss first, the structure of the bond trading data "TRACE" provided by FINRA, second the proposed normalized database schema for the generated SQLite database, and finally third, give you a brief hands-on guide to downloading data and using our [R code](https://github.com/DerKevinRiehl/bondTradingDataSqliteDbConverterR) to generate the SQLite. 
+
+# Structure of the TRACE Data
+
+Introducing TRACE, a powerful tool developed by FINRA to facilitate the mandatory reporting of over-the-counter transactions in eligible fixed-income securities. As a FINRA member, broker-dealers have an obligation to report transactions in TRACE-eligible securities, following [SEC-approved rules](https://www.finra.org/filing-reporting/trace).
+
+Accessing TRACE data is a straightforward process. You can obtain it through established vendors like Wharton Research Data Services (WRDS) or purchase it directly from FINRA. The data comes in two variations: "TRACE Academic Data" and "TRACE Enhanced Historical Data," which have minor differences while containing similar information. While the information in the data itself is virtually identical, the data sets exhibit minor differences. TRACE provides a valuable resource for understanding over-the-counter transactions and gaining insights into market trends for fixed-income securities. Explore TRACE and unlock a wealth of information that will enhance your understanding of over-the-counter transactions and the world of fixed-income securities.
+
+**The academic data** is delivered as a set of TXT files in a folder. Each TXT file follows a naming convention and represents trading bond data of a single day, e.g., `0047-corp-academic-trace-data-2013-01-02.txt`. The TXT files obtain a CSV-like table structure inside with `|` as a separator symbol, and this shows an example of the data:
+```
+REC_CT_NB|TRD_ST_CD|ISSUE_SYM_ID|CUSIP_ID|RPTG_PARTY_ID|RPTG_PARTY_GVP_ID|PRDCT_SBTP_CD|WIS_DSTRD_CD|NO_RMNRN_CD|ENTRD_VOL_QT|RPTD_PR|YLD_DRCTN_CD|CALCD_YLD_PT|ASOF_CD|TRD_EXCTN_DT|TRD_EXCTN_TM|TRD_RPT_DT|TRD_RPT_TM|TRD_STLMT_DT|TRD_MDFR_LATE_CD|TRD_MDFR_SRO_CD|RPT_SIDE_CD|BUYER_CMSN_AMT|BUYER_CPCTY_CD|SLLR_CMSN_AMT|SLLR_CPCTY_CD|CNTRA_PARTY_ID|CNTRA_PARTY_GVP_ID|LCKD_IN_FL|ATS_FL|SPCL_PR_FL|TRDG_MKT_CD|PBLSH_FL|SYSTM_CNTRL_DT|SYSTM_CNTRL_NB|PREV_TRD_CNTRL_DT|PREV_TRD_CNTRL_NB|FIRST_TRD_CNTRL_DT|FIRST_TRD_CNTRL_NB
+1|T|BCS3930817|06740L8C2|d1a9a1444e0922a25d6dc248cc687dd18bc95ea5||CORP|N||3000000.00|100.250000||7.586602||20130102|031500|20130102|080003|20130107|||S|0.00||0.00|A|C|||||S1|Y|20130102|2000000003|||20130102|2000000003
+2|T|BCS3930817|06740L8C2|d1a9a1444e0922a25d6dc248cc687dd18bc95ea5||CORP|N||3000000.00|100.250000||7.586602||20130102|031500|20130102|080003|20130107|||B|0.00|A|0.00||C|||||S1|Y|20130102|2000000004|||20130102|2000000004
+...
+```
+
+**The enhanced data** is delivered as a set of ZIP files in a folder representing a year like `EHDwC 2020.zip`. Each of these ZIP files contains further sub-ZIP files representing single days like `enhanced-time-and-sales-cusip-2020-01-02.zip`. Finally, in these sub-ZIP files, you can find TXT files representing the trading bond data of a specific day, like `enhanced-time-and-sales-cusip-2020-01-02.txt`.
+
+```
+├── EHDwC 2020.zip
+│   └──enhanced-time-and-sales-cusip-2020-01-02.zip
+│   |  └── enhanced-time-and-sales-cusip-2020-01-02.txt
+│   └──enhanced-time-and-sales-cusip-2020-01-03.zip
+│      └── enhanced-time-and-sales-cusip-2020-01-03.txt
+...
+```
+
+The TXT files obtain a CSV-like table structure inside with `|` as a separator symbol, this shows an example of the data:
+```
+Record Count Num|Reference Number|Trade Status|TRACE Symbol|CUSIP|Bloomberg Identifier|Sub Product|When Issued Indicator|Remuneration|Quantity|Price|Yield Direction|Yield|As Of Indicator|Execution Date|Execution Time|Trade Report Date|Trade Report Time|Settlement Date|Trade Modifier 3|Trade Modifier 4|Buy/Sell Indicator|Buyer Commission|Buyer Capacity|Seller Commission|Seller Capacity|Reporting Party Type|Contra Party Indicator|Locked In Indicator|ATS Indicator|Special Price Indicator|Trading Market Indicator|Dissemination Flag|Prior Trade Report Date|Prior Reference Number|First Trade Control Date|First Trade Control Number
+1|0000005|T|SUHJ4887191|G857ABAC4|BBG00GQ7JTK4|CORP|N||350000.00|99.970000|||A|20200101|205505|20200102|080002|20200106|||B|0.00|P|0.00||D|C||||S1|Y|||20200102|0000005
+2|0000006|T|SUHJ4887191|G857ABAC4|BBG00GQ7JTK4|CORP|N||350000.00|100.000000|||A|20200101|205505|20200102|080002|20200106|||S|0.00||0.00|P|D|D||||S1|Y|||20200102|0000006
+...
+```
+
+**The comparison** of the columns and column names of academic and enhanced data in @tbl-comparison reveals that they are not identical but resemble strongly.
+
+<div class="table-wrapper" markdown="block">
+
+| **Academic Data** |                    |         |   | **Enhanced   Data** |                            |        |
+|-------------------|--------------------|--------------|---|---------------------|----------------------------|--------------|
+| **Nr**            | **Field Name**     | **Example**  |   | **Nr**              | **Field Name**             | **Example**  |
+| 1                 | REC_CT_NB          | 1            |   | 1                   | Record.Count.Num           | 1            |
+|                   |                    |              |   | 2                   | Reference.Number           | 2            |
+| 2                 | TRD_ST_CD          | T            |   | 3                   | Trade.Status               | T            |
+| 3                 | ISSUE_SYM_ID       | BCS4940817   |   | 4                   | TRACE.Symbol               | CAT6354537   |
+| 4                 | CUSIP_ID           | 06743L8C2    |   | 5                   | CUSIP                      | 14954R2P1    |
+|                   |                    |              |   | 6                   | Bloomberg.Identifier       | BBG032F5NQR4 |
+| 5                 | RPTG_PARTY_ID      | d1b2a1444e0… |   |                     |                            |              |
+| 6                 | RPTG_PARTY_GVP_ID  |              |   |                     |                            |              |
+| 7                 | PRDCT_SBTP_CD      | CORP         |   | 7                   | Sub.Product                | CORP         |
+| 8                 | WIS_DSTRD_CD       | N            |   | 8                   | When.Issued.Indicator      | N            |
+| 9                 | NO_RMNRN_CD        |              |   | 9                   | Remuneration               |              |
+| 10                | ENTRD_VOL_QT       | 3000000      |   | 10                  | Quantity                   | 25000,00     |
+| 11                | RPTD_PR            | 100.25       |   | 11                  | Price                      | 95,407,000   |
+| 12                | YLD_DRCTN_CD       |              |   | 12                  | Yield.Direction            |              |
+| 13                | CALCD_YLD_PT       | 7.586602     |   | 13                  | Yield                      | 2,554,416    |
+| 14                | ASOF_CD            |              |   | 14                  | As.Of.Indicator            |              |
+| 15                | TRD_EXCTN_DT       | 20130102     |   | 15                  | Execution.Date             | 20220401     |
+| 16                | TRD_EXCTN_TM       | 31500        |   | 16                  | Execution.Time             | 80002        |
+| 17                | TRD_RPT_DT         | 20130102     |   | 17                  | Trade.Report.Date          | 20220401     |
+| 18                | TRD_RPT_TM         | 80003        |   | 18                  | Trade.Report.Time          | 80002        |
+| 19                | TRD_STLMT_DT       | 20130107     |   | 19                  | Settlement.Date            | 20220405     |
+| 20                | TRD_MDFR_LATE_CD   |              |   | 20                  | Trade.Modifier.3           |              |
+| 21                | TRD_MDFR_SRO_CD    |              |   | 21                  | Trade.Modifier.4           |              |
+| 22                | RPT_SIDE_CD        | S            |   | 22                  | Buy.Sell.Indicator         | B            |
+| 23                | BUYER_CMSN_AMT     | 0            |   | 23                  | Buyer.Commission           | 0,00         |
+| 24                | BUYER_CPCTY_CD     |              |   | 24                  | Buyer.Capacity             | A            |
+| 25                | SLLR_CMSN_AMT      | 0            |   | 25                  | Seller.Commission          | 0,00         |
+| 26                | SLLR_CPCTY_CD      | A            |   | 26                  | Seller.Capacity            |              |
+| 27                | CNTRA_PARTY_ID     | C            |   | 27                  | Reporting.Party.Type       | D            |
+| 28                | CNTRA_PARTY_GVP_ID |              |   | 28                  | Contra.Party.Indicator     | D            |
+| 29                | LCKD_IN_FL         |              |   | 29                  | Locked.In.Indicator        |              |
+| 30                | ATS_FL             |              |   | 30                  | ATS.Indicator              |              |
+| 31                | SPCL_PR_FL         |              |   | 31                  | Special.Price.Indicator    |              |
+| 32                | TRDG_MKT_CD        | S1           |   | 32                  | Trading.Market.Indicator   | S1           |
+| 33                | PBLSH_FL           | Y            |   | 33                  | Dissemination.Flag         | N            |
+| 34                | SYSTM_CNTRL_DT     | 20130102     |   |                     |                            |              |
+| 35                | SYSTM_CNTRL_NB     | 2000000003   |   |                     |                            |              |
+| 36                | PREV_TRD_CNTRL_DT  |              |   | 34                  | Prior.Trade.Report.Date    | NA           |
+| 37                | PREV_TRD_CNTRL_NB  |              |   | 35                  | Prior.Reference.Number     | NA           |
+| 38                | FIRST_TRD_CNTRL_DT | 20130102     |   | 36                  | First.Trade.Control.Date   | 20220401     |
+| 39                | FIRST_TRD_CNTRL_NB | 2000000003   |   | 37                  | First.Trade.Control.Number | 2            |
+
+: Comparison of table structure between academic and enhanced TRACE. {#tbl-comparison}
+
+</div>
+
+# Structure of the Local SQLite Database
+
+In order to work with a merged set of final data, we propose an unified schema for the data, which is oriented on the academic data. The resulting SQLite represents the data in a standardized and normalized form that can be used for further analysis with simple SQL queries in a variety of applications and programming languages. The resulting database shares template and labeling with WRDS and can therefore seamlessly interface with existing program codes for cleaning the data, e.g., as given in Tidy Finance with R (https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4). 
+
+@tbl-finaltable explains the fields of the final table. Capitalized columns are carried over from the original data, and lowercase columns denote variables used in the code available through the functions used to clean and process the data.
+
+| **Final Data** |                      |                       |             |
+|----------------|----------------------|-----------------------|-------------|
+| **Nr**         | **Field Name**       | **SQLite Datatype** | **Example** |
+| 1              | REC_CT_NB            | INTEGER               | 1           | 
+| 2              | REF_NB               | INTEGER               | 2           | 
+| 3              | trc_st               | TEXT                  | T           | 
+| 4              | ISSUE_SYM_ID         | TEXT                  | CAT5654597  | 
+| 5              | cusip_id             | TEXT                  | 14943R2P1   | 
+| 6              | BLMBRG_ID            | TEXT                  | BBG012F8NQR4| 
+| 7              | RPTG_PARTY_ID        | TEXT                  | d1a3a1444e..| 
+| 8              | RPTG_PARTY_GVP_ID    | TEXT                  | 12345       | 
+| 9              | PRDCT_SBTP_CD        | TEXT                  | CORP        | 
+| 10             | wis_fl               | TEXT                  | N           | 
+| 11             | NO_RMNRN_CD          | TEXT                  | 12345       | 
+| 12             | entrd_vol_qt         | INTEGER               | 3000000     | 
+| 13             | rptd_pr              | REAL                  | 100.25      | 
+| 14             | YLD_DRCTN_CD         | TEXT                  | 12345       | 
+| 15             | yld_pt               | REAL                  | 7.586602    | 
+| 16             | asof_cd              | TEXT                  | 12345       | 
+| 17             | trd_exctn_dt         | TEXT                  | 20220401    | 
+| 18             | trd_exctn_tm         | TEXT                  | 80002       | 
+| 19             | trd_rpt_dt           | TEXT                  | 20220401    | 
+| 20             | trd_rpt_tm           | TEXT                  | 80002       | 
+| 21             | stlmnt_dt            | TEXT                  | 20220405    | 
+| 22             | TRD_MDFR_LATE_CD     | TEXT                  |             | 
+| 23             | TRD_MDFR_SRO_CD      | TEXT                  |             | 
+| 24             | rpt_side_cd          | TEXT                  | B           | 
+| 25             | BUYER_CMSN_AMT       | REAL                  | 10.00       | 
+| 26             | BUYER_CPCTY_CD       | TEXT                  | A           | 
+| 27             | SLLR_CMSN_AMT        | REAL                  | 12.00       | 
+| 28             | SLLR_CPCTY_CD        | TEXT                  | 12345       | 
+| 29             | RPT_PRTY_ID          | TEXT                  | D           | 
+| 30             | cntra_mp_id          | TEXT                  | D           | 
+| 31             | CNTRA_PARTY_GVP_ID   | TEXT                  |             | 
+| 32             | LCKD_IN_FL           | TEXT                  |             | 
+| 33             | ATS_FL               | TEXT                  |             | 
+| 34             | spcl_trd_fl          | TEXT                  |             | 
+| 35             | TRDG_MKT_CD          | TEXT                  | S1          | 
+| 36             | PBLSH_FL             | TEXT                  | N           | 
+| 37             | SYSTM_CNTRL_DT       | TEXT                  | 20130102    | 
+| 38             | SYSTM_CNTRL_NB       | TEXT                  | 2000000003  | 
+| 39             | pr_trd_dt            | TEXT                  | 20130103    | 
+| 40             | PREV_TRD_CNTRL_NB    | TEXT                  |             | 
+| 41             | FIRST_TRD_CNTRL_DT   | TEXT                  | 20130105    | 
+| 42             | FIRST_TRD_CNTRL_NB   | INTEGER               | 2           | 
+| 43             | msg_seq_nb           | TEXT                  | AC_2000000003 | 
+| 44             | orig_msg_seq_nb      | TEXT                  | AC_2        | 
+| 45             | days_to_sttl_ct      | INTEGER               | 4 (days between stlmnt_dt and trd_exectn_dt) | 
+
+: Structure of the local SQLite database. {#tbl-finaltable}
+
+# Create a Local SQLite from Downloaded TRACE Data
+
+After successfully ordering and downloading the data, you should possess all necessary raw files to start creating a SQLite. In the following, we assume that you possess a folder with all downloaded TRACE data (enhanced and academic) called "TRACE_Downloads", with a similar structure as follows:
+```
+TRACE_Downloads/
+├── academic_txts/
+│   ├── 0047-corp-academic-trace-data-2013-01-02.txt
+│   ├── 0047-corp-academic-trace-data-2013-01-03.txt
+│   └──...
+├── EHDwC 2020.zip
+├── EHDwC 2021.zip
+├── EHDwC 2022.zip
+├── ...
+```
+
+The below R code allows the user to convert the raw data provided by FINRA (Academic Data as well as Enhanced Historical Data) into a SQLite for further analyses. For the curious reader, you can find implementation details and code documentation in our [GitHub Repository](https://github.com/DerKevinRiehl/bondTradingDataSqliteDbConverterR). 
+
+**Please note**, that the conversion can take some time and might require disk space (in our case for data around 2013 to 2022 around 4 days and 50 GB on a normal machine).
+
+```{r}
+#| eval: false
+# Imports
+library(DBI)
+
+# Step 1: Start Connection To SQLite File
+database_file <- ("bond_trading_data_db.sqlite")
+conn <- dbConnect(RSQLite::SQLite(), database_file)
+print("SQL connection established...")
+
+# Step 2: Create table schema in SQLite
+prepare_database_table(conn)
+print("Created table schema...")
+
+# Step 3: Convert downloaded academic data and insert to SQLite
+print("Start convert download academic data in final table...")
+folder_A <- ("academic_txts")
+convert_downloaded_academic_data_to_sqlite_db(conn, folder_A)
+
+# Step 4: Convert downloaded enhanced data and insert to SQLite
+print("Start convert download enhanced data in final table...")
+convert_downloaded_enhanced_data_to_sqlite_db(conn, "EHDwC 2020.zip")
+convert_downloaded_enhanced_data_to_sqlite_db(conn, "EHDwC 2021.zip")
+convert_downloaded_enhanced_data_to_sqlite_db(conn, "EHDwC 2022.zip")
+
+# Step 5: Close Connection to SQLite File
+dbDisconnect(conn)
+print("Connection closed and database successfully created...")
+```
+
+## Final Remarks
+
+We hope that this blog post is helpful to the reader working with TRACE academic data and TRACE enhanced data and in facilitating analyses in this emerging, exciting, and promising field of research.
+
+At the end, we would like to thank the editors of Tidy Finance for their helpful suggestions and support with writing this blog post, and our supervisor Prof. Dr. Dirk Schiereck from the [Chair of Corporate Finance at TU Darmstadt (Germany)](https://www.cofi.wi.tu-darmstadt.de/index.en.jsp) who made the data available for this project.
+
+[^1]: Dick-Nielsen, J. (2014). How to clean enhanced TRACE data. Available at [SSRN 2337908] (https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2337908).
+[^2]: Dick-Nielsen, J., & Poulsen, T. K. (2019). How to clean academic trace data. Available at [SSRN 3456082] (https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3456082).
