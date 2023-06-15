@@ -38,10 +38,8 @@ Further, we utilize accounting data. The most common source of accounting data i
 
 ```{r}
 book_equity <- tbl(tidy_finance, "compustat") |>
-    select(gvkey, datadate, be) |>
-    collect()
-
-book_equity <- book_equity |>
+  select(gvkey, datadate, be) |>
+  collect() |>
   drop_na() |>
   mutate(month = floor_date(ymd(datadate), "month"))
 ```
@@ -70,10 +68,7 @@ bm <- book_equity |>
   select(permno, gvkey, sorting_date, comp_date, bm)
 
 data_for_sorts <- crsp_monthly |>
-  left_join(bm, by = c("permno",
-    "gvkey",
-    "month" = "sorting_date"
-  )) |>
+  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) |>
   left_join(me, by = c("permno", "month" = "sorting_date")) |>
   select(
     permno, gvkey, month, ret_excess,
@@ -84,6 +79,7 @@ data_for_sorts <- data_for_sorts |>
   arrange(permno, gvkey, month) |>
   group_by(permno, gvkey) |>
   fill(bm, comp_date) |>
+  ungroup() |> 
   filter(comp_date > month %m-% months(12)) |>
   select(-comp_date) |>
   drop_na()
@@ -156,7 +152,7 @@ value_premium <- value_portfolios |>
   group_by(month, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] -
-    ret[portfolio_bm == min(portfolio_bm)])
+                              ret[portfolio_bm == min(portfolio_bm)])
 
 mean(value_premium$value_premium * 100)
 ```
