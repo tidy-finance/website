@@ -492,9 +492,10 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lmtest)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sandwich)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(broom)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sandwich)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Compared to previous chapters, we introduce <code>lmtest</code> <span class="citation" data-cites="lmtest">(<a href="#ref-lmtest" role="doc-biblioref">Zeileis and Hothorn 2002</a>)</span> for inference for estimated coefficients, and <code>sandwich</code> <span class="citation" data-cites="sandwich">(<a href="#ref-sandwich" role="doc-biblioref">Zeileis 2006</a>)</span> for different covariance matrix estimators.</p>
+<p>Compared to previous chapters, we introduce <code>lmtest</code> <span class="citation" data-cites="lmtest">(<a href="#ref-lmtest" role="doc-biblioref">Zeileis and Hothorn 2002</a>)</span> for inference for estimated coefficients, <code>broom</code> package <span class="citation" data-cites="broom">(<a href="#ref-broom" role="doc-biblioref">Robinson, Hayes, and Couch 2022</a>)</span> to tidy the estimation output of many estimated linear models, and <code>sandwich</code> <span class="citation" data-cites="sandwich">(<a href="#ref-sandwich" role="doc-biblioref">Zeileis 2006</a>)</span> for different covariance matrix estimators</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We start with loading the required data from our <code>SQLite</code>-database introduced in Chapters 2-4. In particular, we use the monthly CRSP sample as our asset universe. Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha). <code>beta</code> is the tibble with market betas computed in the previous chapter.</p>
@@ -542,7 +543,8 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month, portfolio) <span class="sc">|&gt;</span></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), </span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>            <span class="at">.groups =</span> <span class="st">"drop"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="performance-evaluation" class="level2">
@@ -612,9 +614,10 @@ t test of coefficients:
 <span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
 <span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio, month) <span class="sc">|&gt;</span></span>
 <span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag),</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret_excess =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag),</span>
 <span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  )<span class="sc">|&gt;</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(factors_ff_monthly, <span class="at">by =</span> <span class="st">"month"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="more-performance-evaluation" class="level2">
@@ -622,13 +625,20 @@ t test of coefficients:
 <p>In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios_summary <span class="ot">&lt;-</span> beta_portfolios <span class="sc">|&gt;</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(factors_ff_monthly, <span class="at">by =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">alpha =</span> <span class="fu">as.numeric</span>(<span class="fu">lm</span>(ret <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> mkt_excess)<span class="sc">$</span>coefficients[<span class="dv">1</span>]),</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">beta =</span> <span class="fu">as.numeric</span>(<span class="fu">lm</span>(ret <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> mkt_excess)<span class="sc">$</span>coefficients[<span class="dv">2</span>]),</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">mean</span>(ret)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nest</span>(<span class="at">data =</span> <span class="fu">c</span>(month, ret_excess, mkt_excess)) <span class="sc">|&gt;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">estimates =</span> <span class="fu">map</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    data, <span class="sc">~</span> <span class="fu">tidy</span>(<span class="fu">lm</span>(ret_excess <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> mkt_excess, <span class="at">data =</span> .x))</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">unnest</span>(estimates) <span class="sc">|&gt;</span> </span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(portfolio, term, estimate) <span class="sc">|&gt;</span> </span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> term, <span class="at">values_from =</span> estimate) <span class="sc">|&gt;</span> </span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">alpha =</span> <span class="st">`</span><span class="at">(Intercept)</span><span class="st">`</span>, <span class="at">beta =</span> mkt_excess) <span class="sc">|&gt;</span> </span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    beta_portfolios <span class="sc">|&gt;</span> </span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span> </span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(<span class="at">ret_excess =</span> <span class="fu">mean</span>(ret_excess),</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>                <span class="at">.groups =</span> <span class="st">"drop"</span>), <span class="at">by =</span> <span class="st">"portfolio"</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><a href="#fig-701">Figure&nbsp;1</a> illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.</p>
 <div class="cell">
@@ -658,12 +668,12 @@ t test of coefficients:
 <h2 class="anchored" data-anchor-id="the-security-market-line-and-beta-portfolios">The Security Market Line and Beta Portfolios</h2>
 <p>The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time. <a href="#fig-702">Figure&nbsp;2</a> illustrates the security market line: We see that (not surprisingly) the high beta portfolio returns have a high correlation with the market returns. However, it seems like the average excess returns for high beta stocks are lower than what the security market line implies would be an “appropriate” compensation for the high market risk.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sml_capm <span class="ot">&lt;-</span> <span class="fu">lm</span>(ret <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> beta, <span class="at">data =</span> beta_portfolios_summary)<span class="sc">$</span>coefficients</span>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sml_capm <span class="ot">&lt;-</span> <span class="fu">lm</span>(ret_excess <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> beta, <span class="at">data =</span> beta_portfolios_summary)<span class="sc">$</span>coefficients</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>beta_portfolios_summary <span class="sc">|&gt;</span></span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(</span>
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> beta, </span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> ret, </span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> ret_excess, </span>
 <span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> portfolio</span>
 <span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">+</span></span>
 <span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
@@ -698,15 +708,16 @@ t test of coefficients:
 <p>To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>beta_longshort <span class="ot">&lt;-</span> beta_portfolios <span class="sc">|&gt;</span></span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">|&gt;</span></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">portfolio =</span> <span class="fu">case_when</span>(</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    portfolio <span class="sc">==</span> <span class="fu">max</span>(<span class="fu">as.numeric</span>(portfolio)) <span class="sc">~</span> <span class="st">"high"</span>,</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    portfolio <span class="sc">==</span> <span class="fu">min</span>(<span class="fu">as.numeric</span>(portfolio)) <span class="sc">~</span> <span class="st">"low"</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(portfolio <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"low"</span>, <span class="st">"high"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">id_cols =</span> month, <span class="at">names_from =</span> portfolio, <span class="at">values_from =</span> ret) <span class="sc">|&gt;</span></span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">long_short =</span> high <span class="sc">-</span> low) <span class="sc">|&gt;</span></span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(factors_ff_monthly, <span class="at">by =</span> <span class="st">"month"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">portfolio =</span> <span class="fu">case_when</span>(</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    portfolio <span class="sc">==</span> <span class="fu">max</span>(<span class="fu">as.numeric</span>(portfolio)) <span class="sc">~</span> <span class="st">"high"</span>,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    portfolio <span class="sc">==</span> <span class="fu">min</span>(<span class="fu">as.numeric</span>(portfolio)) <span class="sc">~</span> <span class="st">"low"</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(portfolio <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"low"</span>, <span class="st">"high"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">id_cols =</span> month, </span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>              <span class="at">names_from =</span> portfolio, </span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>              <span class="at">values_from =</span> ret_excess) <span class="sc">|&gt;</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">long_short =</span> high <span class="sc">-</span> low) <span class="sc">|&gt;</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(factors_ff_monthly, <span class="at">by =</span> <span class="st">"month"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Again, the resulting long-short strategy does not exhibit statistically significant returns.</p>
 <div class="cell">
@@ -792,6 +803,9 @@ Newey, Whitney .K, and Kenneth D. West. 1994. <span>“<span class="nocase">Auto
 </div>
 <div id="ref-Newey1987" class="csl-entry" role="listitem">
 Newey, Whitney K., and Kenneth D. West. 1987. <span>“<span class="nocase">A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance Matrix</span>.”</span> <em><span>Econometrica</span></em> 55 (3): 703–8. <a href="http://www.jstor.org/stable/1913610">http://www.jstor.org/stable/1913610</a>.
+</div>
+<div id="ref-broom" class="csl-entry" role="listitem">
+Robinson, David, Alex Hayes, and Simon Couch. 2022. <em><span class="nocase">broom: Convert statistical objects into tidy tibbles</span></em>. <a href="https://CRAN.R-project.org/package=broom">https://CRAN.R-project.org/package=broom</a>.
 </div>
 <div id="ref-sandwich" class="csl-entry" role="listitem">
 Zeileis, Achim. 2006. <span>“<span class="nocase">Object-Oriented computation of sandwich estimators</span>.”</span> <em>Journal of Statistical Software</em> 16 (9): 1–16. <a href="http://dx.doi.org/10.18637/jss.v016.i09">http://dx.doi.org/10.18637/jss.v016.i09</a>.
