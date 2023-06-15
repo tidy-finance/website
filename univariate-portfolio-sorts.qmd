@@ -17,9 +17,11 @@ library(tidyverse)
 library(RSQLite)
 library(scales)
 library(lmtest)
+library(broom)
 library(sandwich)
 ```
-Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for estimated coefficients, and `sandwich` [@sandwich] for different covariance matrix estimators. 
+
+Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for estimated coefficients, `broom` package [@broom] to tidy the estimation output of many estimated linear models, and `sandwich` [@sandwich] for different covariance matrix estimators
 
 ## Data Preparation
 
@@ -80,7 +82,8 @@ beta_portfolios <- data_for_sorts |>
     )
   ) |>
   group_by(month, portfolio) |>
-  summarize(ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop")
+  summarize(ret = weighted.mean(ret_excess, mktcap_lag), 
+            .groups = "drop")
 ```
 
 ## Performance Evaluation
@@ -151,9 +154,10 @@ beta_portfolios <- data_for_sorts |>
   ) |>
   group_by(portfolio, month) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag),
+    ret_excess = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
-  )
+  )|>
+  left_join(factors_ff_monthly, by = "month")
 ```
 
 ## More Performance Evaluation
@@ -162,12 +166,19 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 
 ```{r}
 beta_portfolios_summary <- beta_portfolios |>
-  left_join(factors_ff_monthly, by = "month") |>
-  group_by(portfolio) |>
-  summarize(
-    alpha = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[1]),
-    beta = as.numeric(lm(ret ~ 1 + mkt_excess)$coefficients[2]),
-    ret = mean(ret)
+  nest(data = c(month, ret_excess, mkt_excess)) |>
+  mutate(estimates = map(
+    data, ~ tidy(lm(ret_excess ~ 1 + mkt_excess, data = .x))
+  )) |>
+  unnest(estimates) |> 
+  select(portfolio, term, estimate) |> 
+  pivot_wider(names_from = term, values_from = estimate) |> 
+  rename(alpha = `(Intercept)`, beta = mkt_excess) |> 
+  left_join(
+    beta_portfolios |> 
+      group_by(portfolio) |> 
+      summarize(ret_excess = mean(ret_excess),
+                .groups = "drop"), by = "portfolio"
   )
 ```
 
@@ -200,12 +211,12 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 #| label: fig-702
 #| fig-cap: "Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas."
 #| fig-alt: "Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."
-sml_capm <- lm(ret ~ 1 + beta, data = beta_portfolios_summary)$coefficients
+sml_capm <- lm(ret_excess ~ 1 + beta, data = beta_portfolios_summary)$coefficients
 
 beta_portfolios_summary |>
   ggplot(aes(
     x = beta, 
-    y = ret, 
+    y = ret_excess, 
     color = portfolio
   )) +
   geom_point() +
@@ -234,13 +245,14 @@ To provide more evidence against the CAPM predictions, we again form a long-shor
 
 ```{r}
 beta_longshort <- beta_portfolios |>
-  ungroup() |>
   mutate(portfolio = case_when(
     portfolio == max(as.numeric(portfolio)) ~ "high",
     portfolio == min(as.numeric(portfolio)) ~ "low"
   )) |>
   filter(portfolio %in% c("low", "high")) |>
-  pivot_wider(id_cols = month, names_from = portfolio, values_from = ret) |>
+  pivot_wider(id_cols = month, 
+              names_from = portfolio, 
+              values_from = ret_excess) |>
   mutate(long_short = high - low) |>
   left_join(factors_ff_monthly, by = "month")
 ```
