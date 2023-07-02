@@ -22,6 +22,7 @@ library(scales)
 We first download daily prices for one stock market ticker, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
 
 ```{r, eval = TRUE}
+#| cache: true
 prices <- tq_get("AAPL",
   get = "stock.prices",
   from = "2000-01-01",
@@ -141,6 +142,7 @@ ticker
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on the NASDAQ exchange). \index{Exchange!NASDAQ}
 
 ```{r, eval = TRUE}
+#| cache: true
 index_prices <- tq_get(ticker,
   get = "stock.prices",
   from = "2000-01-01",
@@ -180,6 +182,7 @@ all_returns <- index_prices |>
   mutate(ret = adjusted / lag(adjusted) - 1) |>
   select(symbol, date, ret) |>
   drop_na(ret)
+
 all_returns |>
   group_by(symbol) |>
   summarize(across(
@@ -207,11 +210,12 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 #| label: fig-104
 #| fig-cap: "Total daily trading volume in billion USD."
 #| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100."
-volume <- index_prices |>
+trading_volume <- index_prices |>
   group_by(date) |>
-  summarize(volume = sum(volume * close))
-volume |>
-  ggplot(aes(x = date, y = volume)) +
+  summarize(trading_volume = sum(volume * adjusted))
+
+trading_volume |>
+  ggplot(aes(x = date, y = trading_volume)) +
   geom_line() +
   labs(
     x = NULL, y = NULL,
@@ -227,8 +231,8 @@ volume |>
 #| label: fig-105
 #| fig-cap: "Total daily trading volume in billion USD."
 #| fig-alt: "Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45-degree line."
-volume |>
-  ggplot(aes(x = lag(volume), y = volume)) +
+trading_volume |>
+  ggplot(aes(x = lag(trading_volume), y = trading_volume)) +
   geom_point() +
   geom_abline(aes(intercept = 0, slope = 1),
     linetype = "dashed"
@@ -277,7 +281,7 @@ returns_matrix <- returns |>
     values_from = ret
   ) |>
   select(-month)
-Sigma <- cov(returns_matrix)
+sigma <- cov(returns_matrix)
 mu <- colMeans(returns_matrix)
 ```
 
@@ -286,15 +290,16 @@ Then, we compute the minimum variance portfolio weights $\omega_\text{mvp}$ as w
 ```{r}
 N <- ncol(returns_matrix)
 iota <- rep(1, N)
-mvp_weights <- solve(Sigma) %*% iota
+sigma_inv <- solve(sigma)
+mvp_weights <- sigma_inv %*% iota
 mvp_weights <- mvp_weights / sum(mvp_weights)
 tibble(
   average_ret = as.numeric(t(mvp_weights) %*% mu),
-  volatility = as.numeric(sqrt(t(mvp_weights) %*% Sigma %*% mvp_weights))
+  volatility = as.numeric(sqrt(t(mvp_weights) %*% sigma %*% mvp_weights))
 )
 ```
 
-The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(Sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).\
+The command `solve(A, b)` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `solve(sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).\
 Note that the *monthly* volatility of the minimum variance portfolio is of the same order of magnitude as the *daily* standard deviation of the individual components. Thus, the diversification benefits in terms of risk reduction are tremendous!\index{Diversification}
 
 Next, we set out to find the weights for a portfolio that achieves, as an example, three times the expected return of the minimum variance portfolio. However, mean-variance investors are not interested in any portfolio that achieves the required return but rather in the efficient portfolio, i.e., the portfolio with the lowest standard deviation. If you wonder where the solution $\omega_\text{eff}$ comes from: \index{Efficient portfolio} The efficient portfolio is chosen by an investor who aims to achieve minimum variance *given a minimum acceptable expected return* $\bar{\mu}$. Hence, their objective function is to choose $\omega_\text{eff}$ as the solution to $$\omega_\text{eff}(\bar{\mu}) = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$$
@@ -304,12 +309,12 @@ The code below implements the analytic solution to this optimization problem for
 ```{r}
 benchmark_multiple <- 3
 mu_bar <- benchmark_multiple * t(mvp_weights) %*% mu
-C <- as.numeric(t(iota) %*% solve(Sigma) %*% iota)
-D <- as.numeric(t(iota) %*% solve(Sigma) %*% mu)
-E <- as.numeric(t(mu) %*% solve(Sigma) %*% mu)
+C <- as.numeric(t(iota) %*% sigma_inv %*% iota)
+D <- as.numeric(t(iota) %*% sigma_inv %*% mu)
+E <- as.numeric(t(mu) %*% sigma_inv %*% mu)
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
 efp_weights <- mvp_weights +
-  lambda_tilde / 2 * (solve(Sigma) %*% mu - D * mvp_weights)
+  lambda_tilde / 2 * (sigma_inv %*% mu - D * mvp_weights)
 ```
 
 ## The Efficient Frontier
@@ -327,7 +332,7 @@ res <- tibble(
 for (i in seq_along(a)) {
   w <- (1 - a[i]) * mvp_weights + (a[i]) * efp_weights
   res$mu[i] <- length_year * t(w) %*% mu   
-  res$sd[i] <- sqrt(length_year) * sqrt(t(w) %*% Sigma %*% w)
+  res$sd[i] <- sqrt(length_year) * sqrt(t(w) %*% sigma %*% w)
 }
 ```
 
@@ -348,7 +353,7 @@ res |>
   geom_point(
     data = tibble(
       mu = length_year * mu,       
-      sd = sqrt(length_year) * sqrt(diag(Sigma))
+      sd = sqrt(length_year) * sqrt(diag(sigma))
     ),
     aes(y = mu, x = sd), size = 1
   ) +
