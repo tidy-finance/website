@@ -19,7 +19,7 @@ library(tidyquant)
 library(scales)
 ```
 
-We first download daily prices for one stock market ticker, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
+We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
 
 ```{r, eval = TRUE}
 #| cache: true
@@ -129,21 +129,21 @@ In case you wonder: the additional argument `.names = "{.fn}"` in `across()` det
 
 ## Scaling Up the Analysis
 
-As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of tickers (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
+As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
 
-This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of tickers, e.g., `ticker <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
+This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of symbols, e.g., `symbol <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
 
 ```{r, eval = TRUE, message = FALSE}
-ticker <- tq_index("DOW") |> 
+symbols <- tq_index("DOW") |> 
   filter(company != "US DOLLAR")
-ticker
+symbols
 ```
 
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on the NASDAQ exchange). \index{Exchange!NASDAQ}
 
 ```{r, eval = TRUE}
 #| cache: true
-index_prices <- tq_get(ticker,
+index_prices <- tq_get(symbols,
   get = "stock.prices",
   from = "2000-01-01",
   to = "2021-12-31"
@@ -172,9 +172,9 @@ index_prices |>
   theme(legend.position = "none")
 ```
 
-Do you notice the small differences relative to the code we used before? `tq_get(ticker)` returns a tibble for several symbols as well. All we need to do to illustrate all tickers simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
+Do you notice the small differences relative to the code we used before? `tq_get(symbols)` returns a tibble for several symbols as well. All we need to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
 
-The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into ticker-specific variables of interest.
+The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.
 
 ```{r}
 all_returns <- index_prices |>
@@ -200,7 +200,7 @@ all_returns |>
 
 \index{Summary statistics}
 
-Note that you are now also equipped with all tools to download price data for *each* ticker listed in the S&P 500 index with the same number of lines of code. Just use `ticker <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
+Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
 ## Other Forms of Data Aggregation
 
@@ -272,7 +272,7 @@ returns <- index_prices |>
 
 Here, `floor_date()` is a function from the `lubridate` package [@lubridate], which provides useful functions to work with dates and times.
 
-Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ tickers and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
+Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
 
 ```{r}
 returns_matrix <- returns |>
@@ -370,9 +370,9 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1.  Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the ticker's un-adjusted and adjusted closing prices. Explain the differences.
+1.  Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the symbol's un-adjusted and adjusted closing prices. Explain the differences.
 2.  Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
-3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 4.  Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
 5.  Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
 6.  In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?

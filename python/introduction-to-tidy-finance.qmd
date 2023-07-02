@@ -18,13 +18,13 @@ import numpy as np
 import yfinance as yf
 ```
 
-We first download daily prices for one stock market ticker, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the function `yf.download()`. \index{Stock prices}
+We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the function `yf.download()`. \index{Stock prices}
 
 ```{python}
 #| cache: true
 prices = (yf.download("AAPL", "2000-01-01", "2021-12-31")
   .reset_index()
-  .assign(ticker="AAPL")
+  .assign(symbol = "AAPL")
   .rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low",
                    "Close": "close", "Adj Close": "adjusted", "Volume": "volume"
                    })
@@ -32,7 +32,7 @@ prices = (yf.download("AAPL", "2000-01-01", "2021-12-31")
 prices.head()
 ```
 
-\index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance if you do not specify another data source. The above code chunk returns a data frame with eight quite self-explanatory columns: `ticker`, `date`, the market prices at the `open`, `high`, `low`, and `close`, the daily `volume` (in the number of traded shares), and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
+\index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance if you do not specify another data source. The above code chunk returns a data frame with eight quite self-explanatory columns: `symbol`, `date`, the market prices at the `open`, `high`, `low`, and `close`, the daily `volume` (in the number of traded shares), and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
 Next, we use the `plotnine` package to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
@@ -56,7 +56,7 @@ prices_figure.draw()
 returns = (prices
   .sort_values("date")
   .assign(ret = lambda x: x["adjusted"].pct_change())
-  .get(["ticker", "date", "ret"])
+  .get(["symbol", "date", "ret"])
 )
 returns.head()
 ```
@@ -104,29 +104,29 @@ returns["ret"].groupby(returns["date"].dt.year).describe()
 
 ## Scaling Up the Analysis
 
-As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of tickers (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
+As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of stock symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
 
-This is where the magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of tickers, e.g., `ticker = ["AAPL", "MMM", "BA"]`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
+This is where the magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of symbols, e.g., `symbol = ["AAPL", "MMM", "BA"]`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
 
 We first download a table with DOW Jones constituents from an external website.  
 ```{python}
 url = ("https://www.ssga.com/us/en/institutional/etfs/library-content/"
        "products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx")
 
-ticker = (pd.read_excel(url, skiprows=4, nrows=30)
+symbols = (pd.read_excel(url, skiprows=4, nrows=30)
   .get("Ticker")
   .tolist()
 )
 ```
 
-Next, we can use `yf.download()` to download prices for all tickers in the above list. 
+Next, we can use `yf.download()` to download prices for all stock symbols in the above list. 
 
 ```{python}
 #| cache: true
-index_prices = (yf.download(ticker, "2000-01-01", "2021-12-31")
-  .melt(ignore_index=False, var_name=["variable", "ticker"])
+index_prices = (yf.download(symbols, "2000-01-01", "2021-12-31")
+  .melt(ignore_index=False, var_name=["variable", "symbol"])
   .reset_index()
-  .pivot(index=["Date", "ticker"], columns="variable", values="value")
+  .pivot(index=["Date", "symbol"], columns="variable", values="value")
   .reset_index()
   .rename(columns={"Date": "date", "Open": "open", "High": "high", "Low": "low",
                    "Close": "close", "Adj Close": "adjusted", "Volume": "volume"
@@ -134,14 +134,14 @@ index_prices = (yf.download(ticker, "2000-01-01", "2021-12-31")
 )
 ```
 
-The resulting data frame contains `python len(index_prices)` daily observations for `python len(index_prices["ticker"].unique())` different tickers. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains `python len(index_prices)` daily observations for `python len(index_prices["symbol"].unique())` different stock symbols. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ```{python}
 #| label: fig-103
 #| fig-cap: "Prices in USD, adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index."
 index_prices_figure = (ggplot(index_prices, 
-                              aes(y="adjusted", x="date", color="ticker"))
+                              aes(y="adjusted", x="date", color="symbol"))
  + geom_line()
  + labs(x="", y="", color="",
         title=("Stock prices of DOW index constituents"))
@@ -150,18 +150,18 @@ index_prices_figure = (ggplot(index_prices,
 index_prices_figure.draw()
 ```
 
-Do you notice the small differences relative to the code we used before? `yf.download(ticker)` returns a data frame for several tickers as well. All we need to do to illustrate all tickers simultaneously is to include `color = ticker` in the `ggplot2` aesthetics. In this way, we generate a separate line for each ticker. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
+Do you notice the small differences relative to the code we used before? `yf.download(symbols)` returns a data frame for several symbols as well. All we need to do to illustrate all symbols simultaneously is to include `color = symbol` in the `ggplot2` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
 
-The same holds for stock returns. Before computing the returns, we use `groupby("ticker")` such that the `assign()` command is performed for each ticker individually. The same logic also applies to the computation of summary statistics: `groupby("ticker")` is the key to aggregating the time series into ticker-specific variables of interest.
+The same holds for stock returns. Before computing the returns, we use `groupby("symbol")` such that the `assign()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `groupby("symbol")` is the key to aggregating the time series into symbol-specific variables of interest.
 
 ```{python}
 all_returns = (index_prices
-  .assign(ret=lambda x: x.groupby("ticker")["adjusted"].pct_change())
-  .get(["ticker", "date", "ret"])
+  .assign(ret=lambda x: x.groupby("symbol")["adjusted"].pct_change())
+  .get(["symbol", "date", "ret"])
   .dropna(subset="ret")
 )
 
-all_returns.groupby("ticker")["ret"].describe()
+all_returns.groupby("symbol")["ret"].describe()
 ```
 
 \index{Summary statistics}
@@ -219,18 +219,18 @@ In the previous part, we show how to download stock market data and inspect it w
 
 ```{python}
 prices = (index_prices
-  .groupby("ticker")
+  .groupby("symbol")
   .apply(lambda x: x.assign(counts=x["adjusted"].dropna().count()))
   .reset_index(drop=True)
   .query("counts == counts.max()")
 )
 ```
 
-Next, we transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ tickers and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
+Next, we transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
 
 ```{python}
 returns_matrix = (prices
-  .pivot(columns="ticker", values="adjusted", index="date")
+  .pivot(columns="symbol", values="adjusted", index="date")
   .resample("m")
   .last()
   .pct_change()
@@ -321,9 +321,9 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1.  Download daily prices for another stock market ticker of your choice from Yahoo!Finance with `yf.download()` from the `yfinance` package. Plot two time series of the ticker's un-adjusted and adjusted closing prices. Explain the differences.
+1.  Download daily prices for another stock market symbols of your choice from Yahoo!Finance with `yf.download()` from the `yfinance` package. Plot two time series of the symbol's un-adjusted and adjusted closing prices. Explain the differences.
 2.  Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
-3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- ["AAPL", "MMM", "BA"]`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- ["AAPL", "MMM", "BA"]`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 4.  Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
 5.  Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
 6.  In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
