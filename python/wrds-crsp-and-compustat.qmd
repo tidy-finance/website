@@ -20,6 +20,7 @@ import numpy as np
 WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with R as DuckDB. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.\index{Database!PostgreSQL}
 
 ```{python}
+#| eval: false
 from sqlalchemy import create_engine
 ```
 
@@ -188,11 +189,14 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```{python}
 #| eval: false
-tidy_finance = create_engine("duckdb:///data/tidy_finance.db")
+import sqlite3
+
+tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 
 factors_ff_monthly = pd.read_sql_query(
   sql="SELECT * FROM factors_ff_monthly",
-  con=tidy_finance
+  con=tidy_finance,
+  parse_dates={"month": {"unit": "D", "origin": "unix"}}
 )
   
 crsp_monthly = (crsp_monthly
@@ -216,16 +220,24 @@ Finally, we store the monthly CRSP file in our database.
 
 ```{python}
 #| eval: false
-crsp_monthly.to_sql(name="crsp_monthly", con=tidy_finance, if_exists="replace")
+(crsp_monthly
+  .assign(
+    date = lambda x: (x["date"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"),
+    month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d")
+  )
+  .to_sql(name="crsp_monthly", con=tidy_finance, if_exists="replace")
+)
 ```
 
 ```{python}
 #| echo: false
-tidy_finance = create_engine("duckdb:///data/tidy_finance.db")
+import sqlite3
+tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 crsp_monthly = pd.read_sql_query(
   sql="SELECT * FROM crsp_monthly",
   con=tidy_finance,
-  parse_dates=["date", "month"]
+  parse_dates={"month": {"unit": "D", "origin": "unix"}, 
+               "date": {"unit": "D", "origin": "unix"}}
 )
 ```
 
@@ -269,7 +281,7 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 cpi_monthly = pd.read_sql_query(
   sql="SELECT * FROM cpi_monthly",
   con=tidy_finance,
-  parse_dates=["month"]
+  parse_dates={"month": {"unit": "D", "origin": "unix"}}
 )
 
 market_cap_per_exchange = (crsp_monthly
@@ -350,7 +362,6 @@ market_cap_per_industry_figure = (ggplot(market_cap_per_industry,
 market_cap_per_industry_figure.draw()
 ```
 
-
 ## Daily CRSP Data
 
 Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
@@ -359,6 +370,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 
 ```{python}
 #| eval: false
+# TODO: Migrate to SQLite
 tidy_finance = create_engine("duckdb:///data/tidy_finance.db")
 tidy_finance_con = tidy_finance.connect()
 
@@ -448,7 +460,12 @@ compustat = (compustat
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
 ```{python}
 #| eval: false
-compustat.to_sql(name="compustat", con=tidy_finance, if_exists="replace")
+(compustat
+  .assign(
+    datadate = lambda x: (x["datadate"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d")
+  )
+  .to_sql(name="compustat", con=tidy_finance, if_exists="replace")
+)
 ```
 
 ```{python}
@@ -456,7 +473,7 @@ compustat.to_sql(name="compustat", con=tidy_finance, if_exists="replace")
 compustat = pd.read_sql_query(
   sql="SELECT * FROM compustat",
   con=tidy_finance,
-  parse_dates=["datadate"]
+  parse_dates={"datadate": {"unit": "D", "origin": "unix"}}
 )
 ```
 
@@ -502,7 +519,13 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 ```{python}
 #| eval: false
-crsp_monthly.to_sql(name="crsp_monthly", con=tidy_finance, if_exists="replace")
+(crsp_monthly
+  .assign(
+    date = lambda x: (x["date"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"),
+    month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d")
+  )
+  .to_sql(name="crsp_monthly", con=tidy_finance, if_exists="replace")
+)
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}

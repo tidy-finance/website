@@ -19,12 +19,7 @@ import statsmodels.formula.api as smf
 
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
-::: {.panel-tabset}
-
-### SQLite
-
 ```{python}
-#| eval: true
 import sqlite3
 
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
@@ -50,39 +45,6 @@ factors_ff_monthly = (pd.read_sql_query(
   .dropna()
 )
 ```
-
-### DuckDB
-
-```{python}
-#| eval: false
-#| warning: false
-import duckdb
-
-tidy_finance = duckdb.connect("data/tidy_finance.db")
-
-data_ff = (pd.read_sql_query(
-    sql="SELECT permno, gvkey, month, ret_excess, mktcap, mktcap_lag, exchange FROM crsp_monthly",
-    con=tidy_finance,
-    parse_dates=["month"])
-  .dropna()
-)
-
-book_equity = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be FROM compustat",
-    con=tidy_finance,
-    parse_dates=["datadate"])
-  .dropna()
-)
-
-factors_ff_monthly = (pd.read_sql_query(
-    sql="SELECT month, smb, hml FROM factors_ff_monthly",
-    con=tidy_finance,
-    parse_dates=["month"])
-  .dropna()
-)
-```
-
-:::
 
 Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
@@ -166,7 +128,6 @@ portfolios_ff = (data_ff
 )
 ```
 
-
 ## Fama and French Factor Returns
 
 Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size!Size factor}\index{Value factor}
@@ -199,14 +160,13 @@ The results for the SMB factor are quite convincing as all three criteria outlin
 
 ```{python}
 model_smb = smf.ols(formula="smb ~ smb_replicated", data=test).fit()
-model_smb.summary()
 ```
 
 The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 94%. 
 
 ```{python}
 model_hml = smf.ols(formula="hml ~ hml_replicated", data=test).fit()
-model_hml.summary()
+model_hml.summary(slim=True)
 ```
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 
