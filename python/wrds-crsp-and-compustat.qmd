@@ -3,7 +3,7 @@ title: WRDS, CRSP, and Compustat
 ---
 
 ::: {.callout-note}
-You are reading the work-in-progress Python edition of Tidy Finance with R. Code chunks and text thus might change over the next couple of months. You can find the complete R version [here](../r/index.qmd).
+You are reading the work-in-progress edition of **Tidy Finance with Python**. Code chunks and text might change over the next couple of months. We are always looking for feedback via [contact\@tidy-finance.org](mailto:contact@tidy-finance.org). Meanwhile, you can find the complete R version [here](../r/index.qmd).
 :::
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `DuckDB`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
@@ -371,32 +371,6 @@ There is a solution to this challenge. As with many *big data* problems, you can
 ```{python}
 #| eval: false
 # TODO: Migrate to SQLite
-tidy_finance = create_engine("duckdb:///data/tidy_finance.db")
-tidy_finance_con = tidy_finance.connect()
-
-tidy_finance_con.execute("LOAD postgres_scanner")
-# Note that 3 threads already led to FATAL error "too many connections for role"
-tidy_finance.execute("SET threads TO 2;")
-# Note that the connection string looks a bit different for duckdb than for sqlalchemy
-connection_string = ("postgresql://" + 
-                      os.environ["USER"] + ":" + 
-                      os.environ["PASSWORD"] +
-                      "@wrds-pgdata.wharton.upenn.edu:9737/wrds")
-
-# First initialize the table
-tidy_finance_con.execute("CREATE OR REPLACE TABLE crsp_daily(permno DOUBLE, date DATE, month DATE, ret_excess DOUBLE)")
-
-# Then insert the crsp daily data
-tidy_finance_con.execute(
-  ("INSERT INTO crsp_daily " +
-   "SELECT permno, dsf.date, date_trunc('month', dsf.date)::date as month, " +
-   "CASE WHEN ret - rf > -1 THEN ret - rf ELSE -1 END AS ret_excess " +  
-   "FROM POSTGRES_SCAN_PUSHDOWN('" + connection_string + "', 'crsp_a_stock', 'dsf') AS dsf " + 
-   "LEFT JOIN factors_ff_daily AS ff " 
-          "ON dsf.date = ff.date " + 
-   "WHERE dsf.date BETWEEN '1960-01-01' AND '2021-12-31' "
-  )
-)
 ```
 
 To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.

@@ -305,6 +305,12 @@ cookieconsent.run({
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../python/size-sorts-and-p-hacking.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Size Sorts and p-Hacking</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../python/value-and-bivariate-sorts.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Value and Bivariate Sorts</span></a>
   </div>
@@ -373,7 +379,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>You are reading the work-in-progress Python edition of Tidy Finance with R. Code chunks and text thus might change over the next couple of months. You can find the complete R version <a href="../r/index.html">here</a>.</p>
+<p>You are reading the work-in-progress edition of <strong>Tidy Finance with Python</strong>. Code chunks and text might change over the next couple of months. We are always looking for feedback via <a href="mailto:contact@tidy-finance.org">contact@tidy-finance.org</a>. Meanwhile, you can find the complete R version <a href="../r/index.html">here</a>.</p>
 </div>
 </div>
 <p>This chapter shows how to connect to <a href="https://wrds-www.wharton.upenn.edu/">Wharton Research Data Services (WRDS)</a>, a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the <code>DuckDB</code>-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.</p>
@@ -701,33 +707,7 @@ Note
 <p>Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session.</p>
 <p>There is a solution to this challenge. As with many <em>big data</em> problems, you can split up the big task into several smaller tasks that are easy to handle. That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in <code>for()</code>-loops, where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, you can use <code>txtProgressBar()</code>. Eventually, we end up with more than 68 million rows of daily return data. Note that we only store the identifying information that we actually need, namely <code>permno</code>, <code>date</code>, and <code>month</code> alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function <code>dbWriteTable()</code> here with the option to append the new data to an existing table, when we process the second and all following batches.</p>
 <div class="cell" data-execution_count="18">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TODO</span><span class="co">: Migrate to SQLite</span></span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> create_engine(<span class="st">"duckdb:///data/tidy_finance.db"</span>)</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>tidy_finance_con <span class="op">=</span> tidy_finance.<span class="ex">connect</span>()</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>tidy_finance_con.execute(<span class="st">"LOAD postgres_scanner"</span>)</span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Note that 3 threads already led to FATAL error "too many connections for role"</span></span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>tidy_finance.execute(<span class="st">"SET threads TO 2;"</span>)</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Note that the connection string looks a bit different for duckdb than for sqlalchemy</span></span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>connection_string <span class="op">=</span> (<span class="st">"postgresql://"</span> <span class="op">+</span> </span>
-<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>                      os.environ[<span class="st">"USER"</span>] <span class="op">+</span> <span class="st">":"</span> <span class="op">+</span> </span>
-<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>                      os.environ[<span class="st">"PASSWORD"</span>] <span class="op">+</span></span>
-<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>                      <span class="st">"@wrds-pgdata.wharton.upenn.edu:9737/wrds"</span>)</span>
-<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a><span class="co"># First initialize the table</span></span>
-<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>tidy_finance_con.execute(<span class="st">"CREATE OR REPLACE TABLE crsp_daily(permno DOUBLE, date DATE, month DATE, ret_excess DOUBLE)"</span>)</span>
-<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Then insert the crsp daily data</span></span>
-<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>tidy_finance_con.execute(</span>
-<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>  (<span class="st">"INSERT INTO crsp_daily "</span> <span class="op">+</span></span>
-<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>   <span class="st">"SELECT permno, dsf.date, date_trunc('month', dsf.date)::date as month, "</span> <span class="op">+</span></span>
-<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>   <span class="st">"CASE WHEN ret - rf &gt; -1 THEN ret - rf ELSE -1 END AS ret_excess "</span> <span class="op">+</span>  </span>
-<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>   <span class="st">"FROM POSTGRES_SCAN_PUSHDOWN('"</span> <span class="op">+</span> connection_string <span class="op">+</span> <span class="st">"', 'crsp_a_stock', 'dsf') AS dsf "</span> <span class="op">+</span> </span>
-<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>   <span class="st">"LEFT JOIN factors_ff_daily AS ff "</span> </span>
-<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>          <span class="st">"ON dsf.date = ff.date "</span> <span class="op">+</span> </span>
-<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>   <span class="st">"WHERE dsf.date BETWEEN '1960-01-01' AND '2021-12-31' "</span></span>
-<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TODO</span><span class="co">: Migrate to SQLite</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.</p>
 </section>
@@ -1160,7 +1140,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     <div class="nav-footer-center">
       <ul class="footer-items list-unstyled">
     <li class="nav-item">
- © Chistoph Scheuch, Stefan Voigt &amp; Patrick Weiss
+ © Christoph Frey, Chistoph Scheuch, Stefan Voigt &amp; Patrick Weiss
   </li>  
 </ul>
     <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
