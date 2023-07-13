@@ -36,8 +36,10 @@ We can use the `pdr.DataReader()` function of the package to download monthly Fa
 
 ```{python}
 #| warning: false
-factors_ff_monthly_raw = pdr.DataReader("F-F_Research_Data_Factors",
-                                        "famafrench", start_date, end_date)[0]
+factors_ff_monthly_raw = pdr.DataReader(name="F-F_Research_Data_Factors",
+                                        data_source="famafrench", 
+                                        start=start_date, 
+                                        end=end_date)[0]
 
 factors_ff_monthly = (factors_ff_monthly_raw
   .divide(100)
@@ -53,7 +55,9 @@ It is straightforward to download the corresponding *daily* Fama-French factors 
 ```{python}
 #| warning: false
 factors_ff_daily_raw = pdr.DataReader("F-F_Research_Data_Factors_daily",
-                                      "famafrench", start_date, end_date)[0]
+                                      "famafrench", 
+                                      start_date, 
+                                      end_date)[0]
 
 factors_ff_daily = (factors_ff_daily_raw
   .divide(100)
@@ -68,7 +72,8 @@ In a subsequent chapter, we also use the 10 monthly industry portfolios, so let 
 ```{python}
 #| warning: false
 industries_ff_monthly_raw = pdr.DataReader("10_Industry_Portfolios",
-                                           "famafrench", start_date, 
+                                           "famafrench", 
+                                           start_date, 
                                            end_date)[0]
 
 industries_ff_monthly = (industries_ff_monthly_raw
@@ -82,18 +87,18 @@ It is worth taking a look at all available portfolio return time series from Ken
 
 ## q-Factors
 
-In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors' homepage from within `read_csv()`.\index{Data!q-factors}\index{Factor!q-factors}
+In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors' homepage from within `pd.read_csv()`.\index{Data!q-factors}\index{Factor!q-factors}
 
 We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lowercase. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)\index{Style guide}
 
 ```{python}
 factors_q_monthly_link = ("http://global-q.org/uploads/1/2/2/6/122679606/" +
                           "q5_factors_monthly_2021.csv")
-factors_q_monthly = (pd.read_csv(factors_q_monthly_link)
-  .assign(month = lambda x: (pd.to_datetime(x["year"].astype(str) 
-                                + "-" + x["month"].astype(str) + "-01")))
-  .drop(columns = ["R_F", "R_MKT", "year"])
-  .rename(columns = lambda x: x.replace("R_", "").lower())
+factors_q_monthly=(pd.read_csv(factors_q_monthly_link)
+  .assign(month=lambda x: (pd.to_datetime(x["year"].astype(str) 
+                              + "-" + x["month"].astype(str) + "-01")))
+  .drop(columns=["R_F", "R_MKT", "year"])
+  .rename(columns=lambda x: x.replace("R_", "").lower())
   .query("month >= @start_date and month <= @end_date")
   .assign(**{col: lambda x: x[col] / 100 for col in ["me", "ia", "roe", "eg"]})
 )
@@ -130,18 +135,18 @@ For variable definitions and the required data transformations, you can consult 
 
 ```{python}
 macro_predictors = (pd.read_csv(macro_predictors_link, thousands=",")
-  .assign(month = lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
-          IndexDiv = lambda x: x["Index"] + x["D12"],
-          logret = lambda x: (np.log(x["IndexDiv"]) - 
+  .assign(month=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
+          IndexDiv=lambda x: x["Index"] + x["D12"],
+          logret=lambda x: (np.log(x["IndexDiv"]) - 
                                 np.log(x["IndexDiv"].shift(1))),
-          Rfree = lambda x: np.log(x["Rfree"] + 1),
-          rp_div = lambda x: x["logret"] - x["Rfree"].shift(-1),
-          dp = lambda x: np.log(x["D12"]) - np.log(x["Index"]),
-          dy = lambda x: np.log(x["D12"]) - np.log(x["D12"].shift(1)),
-          ep = lambda x: np.log(x["E12"]) - np.log(x["Index"]),
-          de = lambda x: np.log(x["D12"]) - np.log(x["E12"]),
-          tms = lambda x: x["lty"] - x["tbl"],
-          dfy = lambda x: x["BAA"] - x["AAA"])
+          Rfree=lambda x: np.log(x["Rfree"] + 1),
+          rp_div=lambda x: x["logret"] - x["Rfree"].shift(-1),
+          dp=lambda x: np.log(x["D12"]) - np.log(x["Index"]),
+          dy=lambda x: np.log(x["D12"]) - np.log(x["D12"].shift(1)),
+          ep=lambda x: np.log(x["E12"]) - np.log(x["Index"]),
+          de=lambda x: np.log(x["D12"]) - np.log(x["E12"]),
+          tms=lambda x: x["lty"] - x["tbl"],
+          dfy=lambda x: x["BAA"] - x["AAA"])
   .get(["month", "rp_div", "dp", "dy", "ep", "de", "svar", "b/m", "ntis", 
         "tbl", "lty", "ltr", "tms", "dfy", "infl"])
   .query("month >= @start_date and month <= @end_date")
@@ -154,10 +159,13 @@ macro_predictors = (pd.read_csv(macro_predictors_link, thousands=",")
 The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `pandas-datareader` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
 
 ```{python}
-cpi_monthly = (pdr.DataReader("CPIAUCNS", "fred", start_date, end_date)
+cpi_monthly = (pdr.DataReader("CPIAUCNS", 
+                              "fred", 
+                              start_date, 
+                              end_date)
   .reset_index(names="month")
   .rename(columns={"CPIAUCNS" : "cpi"})
-  .assign(cpi = lambda x: x["cpi"] / x["cpi"].iloc[-1])
+  .assign(cpi=lambda x: x["cpi"] / x["cpi"].iloc[-1])
 )
 ```
 
@@ -184,11 +192,13 @@ Next, we create a remote table with the monthly Fama-French factor data. We do s
 ```{python}
 (factors_ff_monthly
   .assign(month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="factors_ff_monthly", con=tidy_finance, if_exists="replace")
+  .to_sql(name="factors_ff_monthly", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 ```
 
-If we want to have the whole table in memory, we need to call `pd.read_sql_query()` wtih the corresponding query. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Fetch}
+If we want to have the whole table in memory, we need to call `pd.read_sql_query()` with the corresponding query. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Fetch}
 
 ```{python}
 (pd.read_sql_query(
@@ -207,23 +217,33 @@ Before we move on to the next data source, let us also store the other five tabl
 #| output: false
 (factors_ff_daily
   .assign(date = lambda x: (x["date"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="factors_ff_daily", con=tidy_finance, if_exists="replace")
+  .to_sql(name="factors_ff_daily", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 (industries_ff_monthly
   .assign(month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="industries_ff_monthly", con=tidy_finance, if_exists="replace")
+  .to_sql(name="industries_ff_monthly", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 (factors_q_monthly
   .assign(month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="factors_q_monthly", con=tidy_finance, if_exists="replace")
+  .to_sql(name="factors_q_monthly", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 (macro_predictors
   .assign(month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="macro_predictors", con=tidy_finance, if_exists="replace")
+  .to_sql(name="macro_predictors", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 (cpi_monthly
   .assign(month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"))
-  .to_sql(name="cpi_monthly",con=tidy_finance, if_exists="replace")
+  .to_sql(name="cpi_monthly", 
+          con=tidy_finance, 
+          if_exists="replace")
 )
 ```
 

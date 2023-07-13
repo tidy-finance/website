@@ -6,7 +6,8 @@ title: Introduction to Tidy Finance
 You are reading the work-in-progress edition of **Tidy Finance with Python**. Code chunks and text might change over the next couple of months. We are always looking for feedback via [contact\@tidy-finance.org](mailto:contact@tidy-finance.org). Meanwhile, you can find the complete R version [here](../r/index.qmd).
 :::
 
-The main aim of this chapter is to familiarize yourself with the tidyverse. We start by downloading and visualizing stock data from Yahoo!Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
+The main aim of this chapter is to familiarize yourself with ´pandas´ and ´numpy´, the main workhorses for data analysis in Python. 
+We start by downloading and visualizing stock data from Yahoo!Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with Stock Market Data
 
@@ -24,9 +25,11 @@ We first download daily prices for one stock symbol, e.g., the Apple stock, *AAP
 #| cache: true
 #| message: false
 #| warning: false
-prices = (yf.download("AAPL", "2000-01-01", "2021-12-31")
+prices = (yf.download(tickers="AAPL", 
+                      start="2000-01-01", 
+                      end="2021-12-31")
   .reset_index()
-  .assign(symbol = "AAPL")
+  .assign(symbol="AAPL")
   .rename(columns={"Date": "date", 
                    "Open": "open", 
                    "High": "high",
@@ -39,7 +42,7 @@ prices = (yf.download("AAPL", "2000-01-01", "2021-12-31")
 prices.head()
 ```
 
-\index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance if you do not specify another data source. The above code chunk returns a data frame with eight quite self-explanatory columns: `symbol`, `date`, the market prices at the `open`, `high`, `low`, and `close`, the daily `volume` (in the number of traded shares), and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
+\index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance if you do not specify another data source. The above code chunk returns a data frame with eight quite self-explanatory columns: `date`, the market prices at the `open`, `high`, `low`, and `close`, the `adjusted` price in USD, the daily `volume` (in the number of traded shares), and the `symbol`. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
 Next, we use the `plotnine` package to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
@@ -63,13 +66,13 @@ prices_figure.draw()
 ```{python}
 returns = (prices
   .sort_values("date")
-  .assign(ret = lambda x: x["adjusted"].pct_change())
+  .assign(ret=lambda x: x["adjusted"].pct_change())
   .get(["symbol", "date", "ret"])
 )
 returns.head()
 ```
 
-The resulting data frame contains three columns, where the last contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NA`) because there is no previous price.\index{Missing value} Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The function `sort_values()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `ascending=False`.
+The resulting data frame contains three columns, where the last contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NaN`) because there is no previous price.\index{Missing value} Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The function `sort_values()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `ascending=False`.
 
 For the upcoming examples, we remove missing values as these would require separate treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
 
@@ -86,6 +89,7 @@ Next, we visualize the distribution of daily returns in a histogram in @fig-101.
 from mizani.formatters import percent_format
 
 quantile_05 = returns["ret"].quantile(0.05)
+
 returns_figure = (ggplot(returns, aes(x="ret"))
  + geom_histogram(bins=100)
  + geom_vline(aes(xintercept=quantile_05), linetype="dashed")
@@ -102,7 +106,7 @@ Here, `bins = 100` determines the number of bins used in the illustration and he
 returns["ret"].describe()
 ```
 
-We see that the maximum *daily* return was `python round(returns["ret"].max() * 100, 3)` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
+We see that the maximum *daily* return was `{python} round(returns["ret"].max() * 100, 3)` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
 You can also compute these summary statistics for each year individually by imposing `.groupby(returns["date"].dt.year)`, where the call `.dt.year` returns the year of a date variable. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the return distribution.
 
 ```{python}
@@ -134,13 +138,16 @@ Next, we can use `yf.download()` to download prices for all stock symbols in the
 #| cache: true
 #| message: false
 #| warning: false
-index_prices = (yf.download(symbols, "2000-01-01", "2021-12-31")
+index_prices = (yf.download(tickers=symbols, 
+                            start="2000-01-01",
+                            end="2021-12-31",
+                            progress=False)
   .melt(ignore_index=False, 
         var_name=["variable", "symbol"])
   .reset_index()
   .pivot(index=["Date", "symbol"], 
          columns="variable", 
-        values="value")
+         values="value")
   .reset_index()
   .rename(columns={"Date": "date", 
                    "Open": "open", 
@@ -153,7 +160,7 @@ index_prices = (yf.download(symbols, "2000-01-01", "2021-12-31")
 )
 ```
 
-The resulting data frame contains `python len(index_prices)` daily observations for `python len(index_prices["symbol"].unique())` different stock symbols. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains `{python} len(index_prices)` daily observations for `{python} len(index_prices["symbol"].unique())` different stock symbols. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! (What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ```{python}
 #| label: fig-103
@@ -165,7 +172,7 @@ index_prices_figure = (ggplot(index_prices,
                                   color="symbol"))
  + geom_line()
  + labs(x="", y="", color="",
-        title=("Stock prices of DOW index constituents"))
+        title="Stock prices of DOW index constituents")
  + theme(legend_position="none")
  )
 index_prices_figure.draw()
@@ -208,8 +215,8 @@ trading_volume_figure = (ggplot(trading_volume,
  + geom_line()
  + labs(x="", 
         y="",
-        title=("Aggregate daily trading volume of "
-               "DOW index constituents in billion USD"))
+        title="Aggregate daily trading volume of "
+              "DOW index constituents in billion USD")
 )
 trading_volume_figure.draw()
 ```
@@ -229,8 +236,8 @@ trading_volume_figure = (ggplot(trading_volume,
                linetype="dashed")
  + labs(x="Previous day aggregate trading volume",
         y="Aggregate trading volume",
-        title=("Persistence in daily trading volume of DOW constituents "
-               "in billion USD"))
+        title="Persistence in daily trading volume of DOW constituents "
+              "in billion USD")
 )
 trading_volume_figure.draw()
 ```
@@ -250,7 +257,7 @@ prices = (index_prices
 )
 ```
 
-Next, we transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
+Next, we transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot()` with the new column names from the column `symbol` and setting the values to `adjusted`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
 
 ```{python}
 returns_matrix = (prices
@@ -313,6 +320,7 @@ for i in a:
     w = (1 - i) * mvp_weights + i * efp_weights
     res.loc[i, "mu"] = (w.T @ mu)
     res.loc[i, "sd"] = np.sqrt(w.T @ sigma @ w)
+
 ```
 
 The code above proceeds in two steps: First, we compute a vector of combination weights $a$ and then we evaluate the resulting linear combination with $a\in\mathbb{python}$:\
