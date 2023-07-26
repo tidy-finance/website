@@ -11,8 +11,10 @@ This chapter shows how to connect to [Wharton Research Data Services (WRDS)](htt
 First, we load the packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 ```{python}
 import pandas as pd
-from pandas.tseries.offsets import DateOffset
 import numpy as np
+import sqlite3
+
+from pandas.tseries.offsets import DateOffset
 ```
 
 ## Accessing WRDS
@@ -187,7 +189,6 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```{python}
 #| eval: false
-import sqlite3
 
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 
@@ -227,13 +228,13 @@ Finally, we store the monthly CRSP file in our database.
   )
   .to_sql(name="crsp_monthly", 
           con=tidy_finance, 
-          if_exists="replace")
+          if_exists="replace",
+          index = False)
 )
 ```
 
 ```{python}
 #| echo: false
-import sqlite3
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 crsp_monthly = pd.read_sql_query(
   sql="SELECT * FROM crsp_monthly",
@@ -442,16 +443,10 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
   .assign(
     datadate = lambda x: (x["datadate"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d")
   )
-  .to_sql(name="compustat", con=tidy_finance, if_exists="replace")
-)
-```
-
-```{python}
-#| echo: false
-compustat = pd.read_sql_query(
-  sql="SELECT * FROM compustat",
-  con=tidy_finance,
-  parse_dates={"datadate": {"unit": "D", "origin": "unix"}}
+  .to_sql(name="compustat", 
+          con=tidy_finance, 
+          if_exists="replace",
+          index = False)
 )
 ```
 
@@ -502,7 +497,10 @@ As the last step, we update the previously prepared monthly CRSP file with the l
     date = lambda x: (x["date"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d"),
     month = lambda x: (x["month"]- pd.Timestamp("1970-01-01")) // pd.Timedelta("1d")
   )
-  .to_sql(name="crsp_monthly", con=tidy_finance, if_exists="replace")
+  .to_sql(name="crsp_monthly", 
+          con=tidy_finance, 
+          if_exists="replace",
+          index = False)
 )
 ```
 
