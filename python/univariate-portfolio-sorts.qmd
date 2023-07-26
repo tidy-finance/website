@@ -19,9 +19,10 @@ The current chapter relies on the following set of packages.
 ```{python}
 import pandas as pd
 import numpy as np
-import statsmodels.api as sm
 import sqlite3
 from plotnine import *
+
+import statsmodels.api as sm
 from mizani.formatters import percent_format
 ```
 
@@ -75,7 +76,9 @@ beta_lag = (beta
 )
 
 data_for_sorts = (crsp_monthly
-  .merge(beta_lag, how="inner", on=["permno", "month"])
+  .merge(beta_lag, 
+         how="inner", 
+         on=["permno", "month"])
 )
 ```
 
@@ -85,12 +88,16 @@ We then compute the value-weighted returns for each of the two resulting portfol
 
 ```{python}
 beta_portfolios = (data_for_sorts
-  .groupby("month", group_keys=False)
-  .apply(lambda x: x.assign(portfolio=pd.qcut(x["beta_lag"], q=[0, 0.5, 1], labels=["low", "high"]).astype("category")))
-  .groupby(["portfolio", "month"], group_keys=False)
-  .apply(lambda x: x.assign(ret=np.average(x["ret_excess"], weights=x["mktcap_lag"])))
-)
+    .groupby("month", group_keys=False)
+    .apply(lambda x: x.assign(portfolio=pd.qcut(x["beta_lag"], 
+                                                q=[0, 0.5, 1], 
+                                                labels=["low", "high"])))
+    .groupby(["portfolio","month"], group_keys=False)
+    .apply(lambda x: np.average(x["ret_excess"], weights=x["mktcap_lag"]))
+    .reset_index(name="ret")
+    )
 ```
+
 
 ## Performance Evaluation
 
@@ -98,7 +105,9 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 
 ```{python}
 beta_longshort = (beta_portfolios
-  .pivot_table(index="month", columns="portfolio",values="ret")
+  .pivot_table(index="month", 
+               columns="portfolio", 
+               values="ret")
   .reset_index()
   .assign(long_short = lambda x: x["high"] - x["low"])
 )
@@ -110,7 +119,6 @@ We compute the average return and the corresponding standard error to test wheth
 model_fit = (sm.OLS
   .from_formula("long_short ~ 1", data=beta_longshort)
   .fit(cov_type="HAC", cov_kwds={"maxlags": 6})
-  .get_robustcov_results(cov_type="HAC", maxlags=6)
   .summary(slim=True)
 )
 model_fit
@@ -128,7 +136,7 @@ In some applications, the variable used for the sorting might be clustered (e.g.
 def assign_portfolio(data, sorting_variable, n_portfolios):
     breakpoints = np.quantile(data[sorting_variable].dropna(), 
                               np.linspace(0, 1, n_portfolios + 1), 
-                              method = "linear")
+                              method="linear")
     assigned_portfolios = pd.cut(data[sorting_variable],
                                  bins=breakpoints,
                                  labels=range(1, breakpoints.size),
@@ -145,7 +153,9 @@ beta_portfolios = (data_for_sorts
   .groupby(["portfolio", "month"], group_keys=False)
   .apply(lambda x: x.assign(ret=np.average(x["ret_excess"], 
                                            weights=x["mktcap_lag"])))
-  .merge(factors_ff_monthly, how="left", on="month")
+  .merge(factors_ff_monthly, 
+         how="left", 
+         on="month")
 )
 ```
 
@@ -173,14 +183,14 @@ beta_portfolios_summary = (beta_portfolios
 #| label: fig-701
 #| fig-cap: "Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period." 
 #| fig-alt: "Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low beta portfolios are positive, while high beta portfolios show negative alphas."
-beta_portfolios_summary_figure = (ggplot(
-  beta_portfolios_summary, aes(x="portfolio", y="alpha", fill="portfolio"))
+plot_beta_portfolios_summary = (ggplot(beta_portfolios_summary, 
+    aes(x="portfolio", y="alpha", fill="portfolio"))
   + geom_bar(stat="identity")
   + labs(title="CAPM alphas of beta-sorted portfolios",
          x="Portfolio", y="CAPM alpha", fill="Portfolio")
   + scale_y_continuous(labels=percent_format())
   + theme(legend_position="none"))
-beta_portfolios_summary_figure.draw()
+plot_beta_portfolios_summary.draw()
 ```
 
 These results suggest a negative relation between beta and future stock returns, which contradicts the predictions of the CAPM. According to the CAPM, returns should increase with beta across the portfolios and risk-adjusted returns should be statistically indistinguishable from zero.
@@ -196,8 +206,8 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 sml_capm = (sm.OLS.from_formula("ret ~ 1 + beta", data=beta_portfolios_summary)
             .fit().params)
 
-sml_capm_figure = (ggplot(beta_portfolios_summary,
-             aes(x="beta", y="ret", color="portfolio"))
+plot_sml_capm = (ggplot(beta_portfolios_summary,
+    aes(x="beta", y="ret", color="portfolio"))
   + geom_point()
   + geom_abline(intercept=0,
                 slope=factors_ff_monthly["mkt_excess"].mean(),
@@ -211,7 +221,7 @@ sml_capm_figure = (ggplot(beta_portfolios_summary,
   + labs(x="Beta", y="Excess return", color="Portfolio",
          title="Average portfolio excess returns and average beta estimates")
 )
-sml_capm_figure.draw()
+plot_sml_capm()
 ```
 
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.
@@ -234,7 +244,6 @@ Again, the resulting long-short strategy does not exhibit statistically signific
 ```{python}
 model_fit = (sm.OLS.from_formula("long_short ~ 1", data=beta_longshort)
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
-  .get_robustcov_results(cov_type="HAC", maxlags=1)
   .summary(slim=True)
 )
 model_fit
@@ -245,7 +254,6 @@ However, the long-short portfolio yields a statistically significant negative CA
 ```{python}
 model_fit = (sm.OLS.from_formula("long_short ~ 1 + mkt_excess", data=beta_longshort)
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
-  .get_robustcov_results(cov_type="HAC", maxlags=1)
   .summary(slim=True)
 )
 model_fit
@@ -267,7 +275,7 @@ beta_longshort_year = (beta_longshort
   .melt(id_vars="year", var_name="name", value_name="value")
 )
 
-beta_longshort_year_figure = (ggplot(
+plot_beta_longshort_year = (ggplot(
   beta_longshort_year, aes(x="year", y="value", fill="name"))
   + geom_col(position='dodge')
   + facet_wrap("~name", ncol=1)
@@ -276,7 +284,7 @@ beta_longshort_year_figure = (ggplot(
   + scale_y_continuous(labels=percent_format())
   + labs(x="", y="", title="Annual returns of beta portfolios")
 )
-beta_longshort_year_figure.draw()
+plot_beta_longshort_year.draw()
 ```
 
 Overall, this chapter shows how functional programming can be leveraged to form an arbitrary number of portfolios using any sorting variable and how to evaluate the performance of the resulting portfolios. In the next chapter, we dive deeper into the many degrees of freedom that arise in the context of portfolio analysis. 

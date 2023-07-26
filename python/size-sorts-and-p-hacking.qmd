@@ -15,12 +15,13 @@ The chapter relies on the following set of packages:
 ```{python}
 import pandas as pd
 import numpy as np
-import datetime as dt
-import itertools
-from multiprocessing import Pool, cpu_count
 import sqlite3
+
 from plotnine import *
 from mizani.formatters import percent_format
+
+import itertools
+from multiprocessing import Pool, cpu_count
 ```
 
 ## Data Preparation
@@ -59,23 +60,25 @@ Then, we aggregate the firms within each bucket and compute the buckets' share o
 #| fig-cap: "We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month."
 #| fig-alt: "Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."
 market_cap_concentration = (crsp_monthly
-  .groupby("month")
-  .apply(lambda x: x.assign(top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)).astype(int),
-                            top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)).astype(int),
-                            top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)).astype(int),
-                            top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)).astype(int)))
+  .groupby("month", group_keys = False)
+  .apply(lambda x: x.assign(top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
+                            top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
+                            top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
+                            top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75))))
   .reset_index(drop=True)
   .groupby("month")
-  .apply(lambda x: pd.Series({"Largest 1% of stocks": (x["mktcap"][x["top01"] == 1].sum()) / x["mktcap"].sum(),
-                              "Largest 5% of stocks": (x["mktcap"][x["top05"] == 1].sum()) / x["mktcap"].sum(),
-                              "Largest 10% of stocks": (x["mktcap"][x["top10"] == 1].sum()) / x["mktcap"].sum(),
-                              "Largest 25% of stocks": (x["mktcap"][x["top25"] == 1].sum()) / x["mktcap"].sum() }))
+  .apply(lambda x: pd.Series({"Largest 1% of stocks": (x["mktcap"][x["top01"]].sum()) / x["mktcap"].sum(),
+                              "Largest 5% of stocks": (x["mktcap"][x["top05"]].sum()) / x["mktcap"].sum(),
+                              "Largest 10% of stocks": (x["mktcap"][x["top10"]].sum()) / x["mktcap"].sum(),
+                              "Largest 25% of stocks": (x["mktcap"][x["top25"]].sum()) / x["mktcap"].sum() }))
   .reset_index()
-  .melt(id_vars="month", var_name="name", value_name="value")
+  .melt(id_vars="month", 
+        var_name="name", 
+        value_name="value")
 )
 
-market_cap_concentration_figure = (ggplot(
-  market_cap_concentration, aes(x="month", y="value", color="name", linetype="name"))
+plot_market_cap_concentration = (ggplot(market_cap_concentration, 
+    aes(x="month", y="value", color="name", linetype="name"))
   + geom_line()
   + scale_y_continuous(labels=percent_format())
   + scale_x_date(name="", date_labels="%Y")
@@ -84,7 +87,7 @@ market_cap_concentration_figure = (ggplot(
   + theme(subplots_adjust={"bottom": 0.12}, legend_position=(.5, 0), 
           legend_direction="horizontal", legend_title=element_blank())
 )
-market_cap_concentration_figure.draw()
+plot_market_cap_concentration.draw()
 ```
 
 Next, firm sizes also differ across listing exchanges. Stocks' primary listings were important in the past and are potentially still relevant today. @fig-802 shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ's market cap around the year 2000 was?\index{NYSE}\index{AMEX}\index{NASDAQ}\index{Graph!Area graph}
@@ -103,7 +106,7 @@ market_cap_share = (crsp_monthly
   )
 )
 
-market_cap_share_figure = (ggplot(
+plot_market_cap_share = (ggplot(
   market_cap_share, aes(x="month", y="share", fill="exchange", color="exchange")) 
   + geom_area(position="stack", stat="identity", alpha=0.5) 
   + geom_line(position="stack") 
@@ -114,7 +117,7 @@ market_cap_share_figure = (ggplot(
   + theme(subplots_adjust={"bottom": 0.12}, legend_position=(.5, 0), 
           legend_direction="horizontal", legend_title=element_blank())
 )
-market_cap_share_figure.draw()
+plot_market_cap_share.draw()
 ```
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `describe()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.\index{Summary statistics}
