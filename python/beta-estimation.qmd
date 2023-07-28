@@ -19,8 +19,10 @@ from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import percent_format, date_format
 
-from multiprocessing import Pool, cpu_count
+from pandarallel import pandarallel
+pandarallel.initialize(progress_bar=False, verbose = 0)
 ```
+
 Compared to previous chapters, we introduce `statsmodels` for regression analysis and for sliding window functions, and `multiprocessing` to apply mapping functions in parallel.
 
 ## Estimating Beta using Monthly Returns
@@ -74,6 +76,7 @@ After we estimated the regression coefficients on an example, we scale the estim
 
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
+    from statsmodels.regression.rolling import RollingOLS # parallelization in Windows requires standalone functions
     result = (RollingOLS.from_formula("ret_excess ~ mkt_excess",
                                       data=data,
                                       window=window_size,
@@ -82,6 +85,7 @@ def roll_capm_estimation(data, window_size, min_obs):
               .params["mkt_excess"])
     result.index = data.index
     return result
+
 ```
 
 Before we attack the whole CRSP sample, let us focus on a couple of examples for well-known firms.
@@ -157,8 +161,7 @@ beta_monthly = (crsp_monthly
 
 ## Estimating Beta using Daily Returns
 
-Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. 
-Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. 
+Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. 
 
 First, we load daily CRSP data. 
 Note that the sample is large compared to the monthly data, so make sure to have enough memory available.
@@ -185,18 +188,7 @@ factors_ff_daily = (pd.read_sql_query(
 ```
 
 We make sure to keep only relevant data to save memory space. 
-However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops as in Chapter 3. 
-
-```{python}
-crsp_daily = (crsp_daily
-  .merge(factors_ff_daily, 
-         how="inner", 
-         on="date")
-)
-```
-
-This is what the estimation looks like for a couple of examples using `map()`. 
-For the daily data, we use the same function as above but only take 3 months of data and require at least 50 daily return observations in these months. These restrictions help us to retrieve somewhat smooth coefficient estimates.
+However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops. 
 
 ```{python}
 window_size = 90
@@ -211,6 +203,9 @@ valid_permnos = (crsp_daily
 )
 
 crsp_daily = (crsp_daily
+  .merge(factors_ff_daily, 
+         how="inner", 
+         on="date")
   .merge(valid_permnos, 
          how="inner", 
          on="permno")
@@ -220,130 +215,118 @@ crsp_daily = (crsp_daily
 Even though we could now just apply the function using `groupby()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).
 
 ```{python}
-pool = Pool(processes=int(cpu_count()/2))
-
-chunks = [chunk for _, chunk in crsp_daily.groupby('permno')]
-        pool.map(calculate_beta, chunks)
-
-    crsp_monthly_nested = calculate_beta(crsp_monthly_nested)
-
-beta_daily = (crsp_daily
-  .merge(valid_permnos, 
-         how="inner", 
-         on="permno")
+betas = (crsp_daily
   .groupby(["permno"], group_keys=False)
-  .apply(lambda x: x.assign(beta_daily=roll_capm_estimation(x,
-                                                            window_size,
-                                                            min_obs)))
+  .parallel_apply(roll_capm_estimation, window_size, min_obs)
   .dropna()
 )
-```
 
-For the sake of completeness, we tell our session again to use multiple workers for parallelization.
-
-```{r}
-plan(multisession, workers = availableCores())
-```
-
-The code chunk for beta estimation using daily returns now looks very similar to the one for monthly data. The whole estimation takes around 30 minutes using eight cores and 16gb memory. 
-
-```{r}
-beta_daily <- crsp_daily_nested |>
-  mutate(beta_daily = future_map(
-    data, ~ roll_capm_estimation(., months = 3, min_obs = 50)
-  )) |>
-  unnest(c(beta_daily)) |>
-  select(permno, month, beta_daily = beta) |>
-  drop_na()
+beta_daily = crsp_daily.(assign = betas)
 ```
 
 ## Comparing Beta Estimates
 
 What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. @fig-602 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
 
-```{r}
+```{python}
 #| label: fig-602 
 #| fig-cap: "The box plots show the average firm-specific beta estimates by industry."
 #| fig.alt: "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
-crsp_monthly |>
-  left_join(beta_monthly, by = c("permno", "month")) |>
-  drop_na(beta_monthly) |>
-  group_by(industry, permno) |>
-  summarize(beta = mean(beta_monthly), 
-            .groups = "drop") |>
-  ggplot(aes(x = reorder(industry, beta, FUN = median), y = beta)) +
-  geom_boxplot() +
-  coord_flip() +
-  labs(
-    x = NULL, y = NULL,
-    title = "Firm-specific beta distributions by industry"
-  )
+
+beta_industries = (beta_monthly
+    .dropna(subset="beta_monthly")
+    .groupby(["industry","permno"])["beta_monthly"]
+    .aggregate("mean")
+    .reset_index()
+)
+
+industry_order = (beta_industries
+    .groupby('industry')["beta_monthly"]
+    .aggregate("median").sort_values()
+    .index.tolist()
+)
+
+ggplot(beta_industries, aes(x="industry",y="beta_monthly"))+geom_boxplot()
+plot_beta_industries = (ggplot(beta_monthly, aes(x="industry", y="beta_monthly"))
+    + geom_boxplot()
+    + coord_flip()
+    + scale_x_discrete(limits=industry_order)
+    + labs(x="", y="", title="Firm-specific beta distributions by industry")
+)
+
+plot_beta_industries.draw()
 ```
 
 Next, we illustrate the time-variation in the cross-section of estimated betas. @fig-603 shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are a rare exception.
 
-```{r} 
+```{python} 
 #| label: fig-603 
 #| fig-cap: "Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta."
 #| fig-alt: "Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly."
-beta_monthly |>
-  drop_na(beta_monthly) |>
-  group_by(month) |>
-  reframe(
-    x = quantile(beta_monthly, seq(0.1, 0.9, 0.1)),
-    quantile = 100 * seq(0.1, 0.9, 0.1)
-  ) |>
-  ggplot(aes(
-    x = month, 
-    y = x, 
-    color = as_factor(quantile),
-    linetype = as_factor(quantile)
-    )) +
-  geom_line() +
-  labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "Monthly deciles of estimated betas",
-  )
+beta_quantiles = (beta_monthly
+    .groupby("month")['beta_monthly']
+    .quantile(q=np.arange(0.1, 1.0, 0.1))
+    .reset_index()
+    .rename(columns={"level_1": "quantile"})
+    .assign(quantile=lambda x: (x["quantile"] * 100).astype(int))
+    .dropna()
+)
+
+plot_beta_quantiles = (ggplot(beta_quantiles,
+    aes(x='month', 
+        y='beta_monthly', 
+        color='factor(quantile)'))
+    + geom_line()
+    + scale_x_datetime(breaks=date_breaks('10 year'), labels=date_format('%Y'))
+    + labs(x="", y="", color="",
+           title="Monthly deciles of estimated betas")
+)
+
+plot_beta_quantiles.draw()
 ```
 
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604. 
 
-```{r} 
+```{python} 
 #| label: fig-604 
 #| fig-cap: "CAPM betas are computed using 5 years of monthly or 3 months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks."
 #| fig-alt: "Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency."
-beta <- beta_monthly |>
-  full_join(beta_daily, by = c("permno", "month")) |>
-  arrange(permno, month)
+beta = (beta_monthly
+    .get(["permno", "month", "beta_monthly"])
+    .merge(beta_daily.get(["permno", "month", "beta_daily"]),
+           how="left",
+           on=["permno", "month"])
+)
 
-beta |>
-  inner_join(examples, by = "permno") |>
-  pivot_longer(cols = c(beta_monthly, beta_daily)) |>
-  drop_na() |>
-  ggplot(aes(
-    x = month, 
-    y = value, 
-    color = name, 
-    linetype = name
-    )) +
-  geom_line() +
-  facet_wrap(~company, ncol = 1) +
-  labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL, 
-    title = "Comparison of beta estimates using monthly and daily data"
-  )
+beta_comparison = (beta
+    .merge(examples, on="permno")
+    .melt(id_vars=["permno", "month", "company"],
+          value_vars=["beta_monthly", "beta_daily"],
+          var_name="name", value_name="value")
+    .dropna()
+)
+
+plot_beta_comparison = (ggplot(beta_comparison,
+    aes(x="month", y="value", color="name"))
+    + geom_line()
+    + facet_wrap("~company", ncol=1)
+    + scale_x_datetime(breaks=date_breaks('10 year'), labels=date_format('%Y'))
+    + labs(x="", y="", color="",
+           title="Comparison of beta estimates using monthly and daily data")
+)
+
+plot_beta_comparison.draw()
+
 ```
 
 The estimates in @fig-604 look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
 
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
-```{r}
-  dbWriteTable(tidy_finance,
-    "beta",
-    value = beta,
-    overwrite = TRUE
-  )
+```{python}
+beta.to_sql(name="beta", 
+            con=tidy_finance, 
+            if_exists="replace")
 ```
 
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. 
@@ -351,61 +334,46 @@ This descriptive helps us discover potential errors in our data preparation or e
 For instance, suppose there was a gap in our output where we do not have any betas. 
 In this case, we would have to go back and check all previous steps to find out what went wrong. 
 
-```{r} 
+```{python} 
 #| label: fig-605 
 #| fig-cap: "The two lines show the share of securities with beta estimates using 5 years of monthly or 3 months of daily data."
 #| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or 3 months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta."
-beta_long <- crsp_monthly |>
-  left_join(beta, by = c("permno", "month")) |>
-  pivot_longer(cols = c(beta_monthly, beta_daily))
+beta_long = (crsp_monthly
+    .merge(beta, how="left", on=["permno", "month"])
+    .melt(id_vars=["permno", "month"],
+          value_vars=["beta_monthly", "beta_daily"],
+          var_name="name", value_name="value")
+    .groupby(['month', 'name'])
+    .aggregate(share=('value', lambda x: sum(~x.isna()) / len(x)))
+    .reset_index()
+)
 
-beta_long |>
-  group_by(month, name) |>
-  summarize(share = sum(!is.na(value)) / n()) |>
-  ggplot(aes(
-    x = month, 
-    y = share, 
-    color = name,
-    linetype = name
-    )) +
-  geom_line() +
-  scale_y_continuous(labels = percent) +
-  labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "End-of-month share of securities with beta estimates"
-  ) +
-  coord_cartesian(ylim = c(0, 1))
+plot_beta_long = (ggplot(beta_long, 
+    aes(x='month', y='share', color='name', linetype='name'))
+    + geom_line()
+    + scale_y_continuous(labels=percent_format())
+    + scale_x_datetime(breaks=date_breaks('10 year'), labels=date_format('%Y'))
+    + labs(x=None, y=None, color=None, linetype=None,
+           title="End-of-month share of securities with beta estimates")
+)
+
+plot_beta_long.draw()
 ```
 
 @fig-605 does not indicate any troubles, so let us move on to the next check. 
 
 We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\index{Summary statistics}
 
-```{r}
-beta_long |>
-  select(name, value) |>
-  drop_na() |>
-  group_by(name) |>
-  summarize(
-    mean = mean(value),
-    sd = sd(value),
-    min = min(value),
-    q05 = quantile(value, 0.05),
-    q50 = quantile(value, 0.50),
-    q95 = quantile(value, 0.95),
-    max = max(value),
-    n = n()
-  )
+```{python}
+beta_long.groupby("name")["share"].describe()
 ```
 
 The summary statistics also look plausible for the two estimation procedures. 
 
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods and frequencies).
 
-```{r}
-beta |>
-  select(beta_daily, beta_monthly) |>
-  cor(use = "complete.obs")
+```{python}
+beta.get(["beta_monthly", "beta_daily"]).corr()
 ```
 
 Indeed, we find a positive correlation between our beta estimates. In the subsequent chapters, we mainly use the estimates based on monthly data as most readers should be able to replicate them due to potential memory limitations that might arise with the daily data. 
