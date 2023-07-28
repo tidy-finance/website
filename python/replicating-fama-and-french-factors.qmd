@@ -12,6 +12,8 @@ The current chapter relies on this set of packages.
 ```{python}
 import pandas as pd
 import numpy as np
+import sqlite3
+
 import statsmodels.formula.api as smf
 ```
 
@@ -20,8 +22,6 @@ import statsmodels.formula.api as smf
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
-import sqlite3
-
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 
 data_ff = (pd.read_sql_query(
@@ -62,9 +62,7 @@ me_ff = (data_ff
 
 me_ff_dec = (data_ff
   .query("month.dt.month == 12")
-  .assign(
-    sorting_date = lambda x: x["month"] + pd.DateOffset(months=7)
-    )
+  .assign(sorting_date = lambda x: x["month"] + pd.DateOffset(months=7))
   .get(["permno", "gvkey", "sorting_date", "mktcap"])
   .rename(columns={"mktcap": "bm_me"})
 )
@@ -74,15 +72,20 @@ bm_ff = (book_equity
     sorting_date = lambda x: pd.to_datetime((x["datadate"].dt.year + 1).astype(str) + "0701", format="%Y%m%d")
     )
   .rename(columns={"be": "bm_be"})
-  .merge(me_ff_dec, how="inner", on=["gvkey", "sorting_date"])
+  .merge(me_ff_dec, 
+         how="inner", 
+         on=["gvkey", "sorting_date"])
   .assign(bm_ff = lambda x: x["bm_be"] / x["bm_me"])
   .get(["permno", "sorting_date", "bm_ff"])
 )
 
 variables_ff = (me_ff
-  .merge(bm_ff, how="inner", on=["permno", "sorting_date"])
+  .merge(bm_ff, 
+         how="inner", 
+         on=["permno", "sorting_date"])
   .dropna()
-  .drop_duplicates(subset=["permno", "sorting_date"], keep="first")
+  .drop_duplicates(subset=["permno", "sorting_date"], 
+                   keep="first")
  )
 ```
 
@@ -97,8 +100,8 @@ def assign_portfolio(data, sorting_variable, percentiles):
         .get(sorting_variable)
         .quantile(percentiles, interpolation = "linear")
         )
-    breakpoints.iloc[0] = min(data.get(sorting_variable))
-    breakpoints.iloc[breakpoints.size-1] = max(data.get(sorting_variable))
+    breakpoints.iloc[0] = -np.Inf
+    breakpoints.iloc[breakpoints.size-1] = np.Inf
     assigned_portfolios = pd.cut(data[sorting_variable],
                                  bins=breakpoints,
                                  labels=pd.Series(range(1, breakpoints.size)),
@@ -109,11 +112,10 @@ portfolios_ff = (variables_ff
   .merge(data_ff,
          how="inner",
          left_on=["permno", "sorting_date"], right_on=["permno", "month"])
-  .groupby("sorting_date")
+  .groupby("sorting_date", group_keys=False)
   .apply(lambda x: x
          .assign(portfolio_me = assign_portfolio(x, 'me_ff', [0, 0.5, 1]),
-                 portfolio_bm = assign_portfolio(x, 'bm_ff', [0, 0.3, 0.7, 1]))
-         .reset_index(drop=True))
+                 portfolio_bm = assign_portfolio(x, 'bm_ff', [0, 0.3, 0.7, 1])))
   .reset_index(drop=True)
   .get(["permno", "sorting_date", "portfolio_me", "portfolio_bm"])
 )
@@ -153,7 +155,9 @@ In the previous section, we replicated the size and value premiums following the
 
 ```{python}
 test = (factors_ff_monthly
-  .merge(factors_ff_monthly_replicated, how="inner", on="month")
+  .merge(factors_ff_monthly_replicated, 
+         how="inner", 
+         on="month")
 )
 ```
 
