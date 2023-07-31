@@ -210,9 +210,7 @@ Instead of plotting both groups using the simple model approach, we can also use
 #| label: fig-1402 
 #| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Climate Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
 #| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
-bonds_panel_alt = (
-  bonds_panel
-  .copy()
+bonds_panel_alt = (bonds_panel
   .assign(
     diff_to_treatment = lambda x:
           np.round(((x["month"] - (treatment_date - pd.tseries.offsets.MonthBegin())).dt.days / 365) * 12, 0).astype(int)
@@ -246,47 +244,46 @@ for j in range(variables.shape[0]):
 model_with_fe_time = (smf.ols(
     formula=formula,
     data=bonds_panel_alt.set_index(["cusip_id", "month"]))
-    .fit()
-    .summary()
+  .fit()
+  .summary()
 )
 
 lag0_row = pd.DataFrame({
-    "term": ["lag0"],
-    "estimate": [0],
-    "ci_1": [0],
-    "ci_2": [0],
-    "ci_up": [0],
-    "ci_low": [0],
-    "month": [treatment_date - pd.tseries.offsets.MonthBegin()]
+  "term": ["lag0"],
+  "estimate": [0],
+  "ci_1": [0],
+  "ci_2": [0],
+  "ci_up": [0],
+  "ci_low": [0],
+  "month": [treatment_date - pd.tseries.offsets.MonthBegin()]
 })
 
 model_with_fe_time_coefs = (
-    pd.DataFrame(model_with_fe_time.tables[1].data[1:],
-                 columns=["term", "estimate", "std_error",
-                          "t_stat", "p_value", "ci_1", "ci_2"])
-    .assign(term=lambda x: x["term"].str.replace("[T.True]", ""))
-    .assign(estimate=lambda x: x["estimate"].astype(float),
-            std_error=lambda x: x["std_error"].astype(float))
-    .assign(ci_up=lambda x: x["estimate"] + norm.ppf(0.975) * x["std_error"],
-            ci_low=lambda x: x["estimate"] + norm.ppf(0.025) * x["std_error"])
-    .merge(variables, how="left", left_on="term", right_on="variable_name")
-    .drop(columns="variable_name")
-    .query("term != 'Intercept'")
+  pd.DataFrame(model_with_fe_time.tables[1].data[1:],
+               columns=["term", "estimate", "std_error",
+                        "t_stat", "p_value", "ci_1", "ci_2"])
+  .assign(term=lambda x: x["term"].str.replace("[T.True]", ""))
+  .assign(estimate=lambda x: x["estimate"].astype(float),
+          std_error=lambda x: x["std_error"].astype(float))
+  .assign(ci_up=lambda x: x["estimate"] + norm.ppf(0.975) * x["std_error"],
+          ci_low=lambda x: x["estimate"] + norm.ppf(0.025) * x["std_error"])
+  .merge(variables, how="left", left_on="term", right_on="variable_name")
+  .drop(columns="variable_name")
+  .query("term != 'Intercept'")
 )
 
 model_with_fe_time_coefs = pd.concat(
     [model_with_fe_time_coefs, lag0_row], ignore_index=True)
 
 polluter_plot = (
-    ggplot(model_with_fe_time_coefs, aes(x="month", y="estimate"))
-    + geom_vline(aes(xintercept=treatment_date
-                     - pd.tseries.offsets.MonthBegin()), linetype="dashed")
-    + geom_hline(aes(yintercept=0), linetype="dashed")
-    + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
-    + geom_point(aes(y="estimate"))
-    + labs(x=None,
-           y="Yield",
-           title="Polluters' yield patterns around Paris Agreement signing")
+  ggplot(model_with_fe_time_coefs, aes(x="month", y="estimate"))
+  + geom_vline(aes(xintercept=treatment_date - pd.tseries.offsets.MonthBegin()), 
+                   linetype="dashed")
+  + geom_hline(aes(yintercept=0), linetype="dashed")
+  + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
+  + geom_point(aes(y="estimate"))
+  + labs(x=None, y="Yield",
+         title="Polluters' yield patterns around Paris Agreement signing")
 )
 polluter_plot.draw()
 ```
