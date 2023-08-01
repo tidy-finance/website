@@ -59,8 +59,10 @@ We start our analysis by preparing the sample of bonds. We only consider bonds w
 
 ```{python}
 treatment_date = pd.to_datetime("2015-12-12")
-polluting_industries = [49, 13, 45, 29, 28, 33, 40, 20,
-                        26, 42, 10, 53, 32, 99, 37]
+polluting_industries = [
+  49, 13, 45, 29, 28, 33, 40, 20,
+  26, 42, 10, 53, 32, 99, 37
+]
 
 bonds = (mergent
   .query("offering_amt > 0")
@@ -175,8 +177,8 @@ To provide such visual evidence, we revisit the simple OLS model and replace the
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 model_without_fe_time = (smf.ols(
     formula=("avg_yield ~ polluter + month_cat:polluter "
-           "+ time_to_maturity + log_offering_amt"),
-    data=bonds_panel.set_index(["cusip_id", "month"]))
+             "+ time_to_maturity + log_offering_amt"),
+    data=bonds_panel)
   .fit()
   .summary()
 )
@@ -191,8 +193,8 @@ model_without_fe_coefs = (
   .assign(treatment = lambda x: x["term"].str.contains("True"))
   .assign(estimate = lambda x: x["estimate"].astype(float),
           std_error = lambda x: x["std_error"].astype(float))
-  .assign(ci_up = lambda x: x["estimate"] + np.sqrt(2) * x["std_error"],
-          ci_low = lambda x: x["estimate"] - np.sqrt(2) * x["std_error"])
+  .assign(ci_up = lambda x: x["estimate"] + 1.96 * x["std_error"],
+          ci_low = lambda x: x["estimate"] - 1.96 * x["std_error"])
 )
 
 polluters_plot = (
@@ -250,11 +252,13 @@ for j in range(variables.shape[0]):
         bonds_panel_alt[new_var_name] = bonds_panel_alt["new_var"]
         formula += (f" + {new_var_name}" if j > 0 else new_var_name)
 
-model_with_fe_time = (smf.ols(
+formula = formula + " + EntityEffects + TimeEffects"
+
+model_with_fe_time = (lm.PanelOLS.from_formula(
     formula=formula,
     data=bonds_panel_alt.set_index(["cusip_id", "month"]))
   .fit()
-  .summary()
+  .summary
 )
 
 lag0_row = pd.DataFrame({
@@ -291,7 +295,7 @@ polluter_plot = (
   + geom_hline(aes(yintercept=0), linetype="dashed")
   + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
   + geom_point(aes(y="estimate"))
-  + labs(x=None, y="Yield",
+  + labs(x="", y="Yield",
          title="Polluters' yield patterns around Paris Agreement signing")
 )
 polluter_plot.draw()
