@@ -32,11 +32,13 @@ tidy_finance <- dbConnect(
 
 mergent <- tbl(tidy_finance, "mergent") |>
   select(complete_cusip, maturity, offering_amt, sic_code) |>
-  collect()
+  collect() |> 
+  drop_na()
 
 trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
   select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt)|>
-  collect()
+  collect() |> 
+  drop_na()
 ```
 
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}
@@ -44,10 +46,15 @@ We start our analysis by preparing the sample of bonds. We only consider bonds w
 ```{r}
 treatment_date <- ymd("2015-12-12")
 
+polluting_industries <- c(
+  49, 13, 45, 29, 28, 33, 40, 20,
+  26, 42, 10, 53, 32, 99, 37
+)
+
 bonds <- mergent |>
+  filter(offering_amt > 0) |> 
   mutate(
-    time_to_maturity = as.numeric(maturity - treatment_date),
-    time_to_maturity = time_to_maturity / 365,
+    time_to_maturity = as.numeric(maturity - treatment_date) / 365,
     sic_code = as.integer(substr(sic_code, 1, 2)),
     log_offering_amt = log(offering_amt)
   ) |>
@@ -55,14 +62,7 @@ bonds <- mergent |>
   select(
     cusip_id = complete_cusip,
     time_to_maturity, log_offering_amt, sic_code
-  )
-
-polluting_industries <- c(
-  49, 13, 45, 29, 28, 33, 40, 20,
-  26, 42, 10, 53, 32, 99, 37
-)
-
-bonds <- bonds |>
+  ) |>
   mutate(polluter = sic_code %in% polluting_industries)
 ```
 
@@ -98,9 +98,7 @@ Before we can run the first regression, we need to define the `treated` indicato
 
 ```{r}
 bonds_panel <- bonds_panel |>
-  mutate(post_period = month >= floor_date(treatment_date, "months"))
-
-bonds_panel <- bonds_panel |>
+  mutate(post_period = month >= floor_date(treatment_date, "months")) |>
   mutate(treated = polluter & post_period)
 ```
 
