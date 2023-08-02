@@ -30,7 +30,8 @@ tidy_finance <- dbConnect(
 
 industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
   select(-month) |>
-  collect()
+  collect() |> 
+  drop_na()
 
 industry_returns
 ```
@@ -122,16 +123,20 @@ compute_efficient_weight <- function(Sigma,
   return(as.vector(w_opt))
 }
 
-compute_efficient_weight(Sigma, mu)
+w_efficient <- compute_efficient_weight(Sigma, mu)
+round(w_efficient, 3)
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 ```{r}
+gammas <- c(2, 4, 8, 20)
+betas <- 20 * qexp((1:99) / 100)
+                   
 transaction_costs <- expand_grid(
-  gamma = c(2, 4, 8, 20),
-  beta = 20 * qexp((1:99) / 100)
+  gamma = gammas,
+  beta = betas
 ) |>
   mutate(
     weights = map2(
@@ -208,7 +213,7 @@ w_efficient_numerical <- solve.QP(
   meq = 1
 )
 
-all(near(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution))
+all(near(w_efficient, w_efficient_numerical$solution))
 ```
 
 The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. 
@@ -224,7 +229,7 @@ w_no_short_sale <- solve.QP(
   bvec = c(1, rep(0, n_industries)),
   meq = 1
 )
-w_no_short_sale$solution
+round(w_no_short_sale$solution, 3)
 ```
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
 You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
@@ -235,10 +240,7 @@ Thus, we can no longer rely on `solve.QP()`, which is defined as solving quadrat
 Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
 
 ```{r}
-initial_weights <- rep(
-  1 / n_industries,
-  n_industries
-)
+w_initial <- rep(1 / n_industries, n_industries)
 
 objective <- function(w, gamma = 2) {
   -t(w) %*% (1 + mu) +
@@ -260,7 +262,8 @@ w_reg_t <- constrOptim.nl(
   heq = equality_constraints,
   control.outer = list(trace = FALSE)
 )
-w_reg_t$par
+
+round(w_reg_t$par, 3)
 ```
 
 Note that the function `constrOptim.nl()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`).

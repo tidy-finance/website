@@ -37,6 +37,7 @@ industry_returns  = (pd.read_sql_query(
   .dropna()
   .drop(columns=["month"])
 )
+
 industry_returns
 ```
 
@@ -121,7 +122,7 @@ def compute_efficient_weight(Sigma, mu, gamma=2, beta=0,
     return w_opt
 
 w_efficient = compute_efficient_weight(Sigma, mu)
-w_efficient
+np.round(w_efficient, 3)
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
@@ -131,8 +132,8 @@ What is the effect of transaction costs or different levels of risk aversion on 
 gammas = [2, 4, 8, 20]
 betas = 20 * expon.ppf(np.arange(1, 100) / 100, scale=1)
 
-grid = (pd.DataFrame(list(product(gammas, betas)), 
-                     columns=["gamma", "beta"])
+transaction_costs = (pd.DataFrame(list(product(gammas, betas)), 
+                                  columns=["gamma", "beta"])
   .assign(weights=lambda x: x.apply(lambda y:
             compute_efficient_weight(Sigma, mu, gamma=y["gamma"],
                                      beta=y["beta"] / 10000,
@@ -150,10 +151,9 @@ If transaction costs would be absent, the investor would simply implement the me
 #| fig-cap: "The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark."
 #| fig-alt: "Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."
 plot_rebalancing = (
-    ggplot(grid, aes(x="beta",
-                     y="concentration",
-                     color="factor(gamma)",
-                     linetype="factor(gamma)"))
+    ggplot(transaction_costs, 
+           aes(x="beta", y="concentration",
+               color="factor(gamma)", linetype="factor(gamma)"))
     + geom_line()
     + guides(linetype=None)
     + labs(x="Transaction cost parameter", y="Distance from MVP",
@@ -169,11 +169,11 @@ plot_rebalancing.draw()
 
 Next, we introduce constraints to the above optimization procedure. 
 Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). 
-However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `solve.QP()` function from the package `quadprog`.\index{Optimization!Constrained}
+However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `minimize()` function from the module `scipy.optimize`.\index{Optimization!Constrained}
 
-The function `solve.QP()` delivers numerical solutions to quadratic programming problems of the form 
+The function `minimize()` delivers numerical solutions to quadratic programming problems of an arbitrary form. For our purpose, we consider the form 
 $$\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega >= b_0.$$
-The function takes one argument (`meq`) for the number of equality constraints. Therefore, the above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix $A$ is of the form 
+The function takes the argument `constraints` for equality and inequality constraints. Therefore, the above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix $A$ is of the form 
 $$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
 
 Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
@@ -184,8 +184,8 @@ w_initial = np.ones(n_industries) / n_industries
 equality_constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
 
 w_mvp_numerical = minimize(
-  lambda w: 0.5 * w.T @ Sigma @ w,
-  w_initial,
+  fun=lambda w: 0.5 * w.T @ Sigma @ w,
+  x0=w_initial,
   constraints=equality_constraints,
   tol = 1e-20
 )
@@ -193,8 +193,8 @@ w_mvp_numerical = minimize(
 np.allclose(w_mvp, w_mvp_numerical.x)
 
 w_efficient_numerical = minimize(
-  lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
-  w_initial,
+  fun=lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
+  x0=w_initial,
   constraints=equality_constraints,
   tol=1e-20
 )
@@ -208,13 +208,13 @@ Next, we approach problems where no analytical solutions exist. First, we additi
 
 ```{python}
 w_no_short_sale = minimize(
-  lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
-  w_initial,
+  fun=lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
+  x0=w_initial,
   constraints=equality_constraints,
   bounds=((0, None),) * n_industries,
   tol=1e-20
 )
-w_no_short_sale.x
+np.round(w_no_short_sale.x, 3)
 ```
 
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
@@ -231,13 +231,14 @@ inequality_constraints = {"type": "ineq",
 constraints = [equality_constraints, inequality_constraints]
 
 w_reg_t = minimize(
-  lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
-  w_initial,
+  fun=lambda w: - w.T @ (1 + mu) + 2 * 0.5 * w.T @ Sigma @ w,
+  x0=w_initial,
   constraints=constraints,
-  tol=1e-20
+  tol=1e-20,
+  options={"maxiter": 10000}
 )
 
-w_reg_t.x
+np.round(w_reg_t.x, 3)
 ```
 
 Note that the function `minimize()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `minimize()` performs numerical optimization by searching for a local minimum of the objective function (subject to the equality constraints `equality_constraints` and the inequality constraints `inequality_constraints`).Note that the starting point should not matter if the algorithm identifies a global minimum.
