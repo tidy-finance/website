@@ -349,6 +349,12 @@ cookieconsent.run({
  <span class="menu-text">Fixed Effects and Clustered Standard Errors</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/difference-in-differences.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Difference in Differences</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -412,7 +418,7 @@ Note
 <p>A univariate portfolio sort considers only one sorting variable <span class="math inline">\(x_{t-1,i}\)</span>. Here, <span class="math inline">\(i\)</span> denotes the stock and <span class="math inline">\(t-1\)</span> indicates that the characteristic is observable by investors at time <span class="math inline">\(t\)</span>.<br>
 The objective is to assess the cross-sectional relation between <span class="math inline">\(x_{t-1,i}\)</span> and, typically, stock excess returns <span class="math inline">\(r_{t,i}\)</span> at time <span class="math inline">\(t\)</span> as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.</p>
 <p>The current chapter relies on the following set of packages.</p>
-<div class="cell" data-execution_count="1">
+<div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -424,7 +430,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We start with loading the required data from our <code>SQLite</code>-database introduced in Chapters 2-4. In particular, we use the monthly CRSP sample as our asset universe. Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha). <code>beta</code> is the tibble with market betas computed in the previous chapter.</p>
-<div class="cell" data-execution_count="2">
+<div class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
@@ -454,7 +460,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <section id="sorting-by-market-beta" class="level2">
 <h2 class="anchored" data-anchor-id="sorting-by-market-beta">Sorting by Market Beta</h2>
 <p>Next, we merge our sorting variable with the return data. We use the one-month <em>lagged</em> betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month <span class="math inline">\(t\)</span> information is available in month <span class="math inline">\(t+1\)</span>. You may be tempted to simply use a call such as <code>crsp_monthly['beta_lag'] = crsp_monthly.groupby('permno')['beta'].shift(1)</code> instead. This procedure, however, does not work correctly if there are non-explicit missing values in the time series.</p>
-<div class="cell" data-execution_count="3">
+<div class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>beta_lag <span class="op">=</span> (beta</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .assign(month <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"month"</span>, <span class="st">"beta_monthly"</span>])</span>
@@ -469,7 +475,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. For simplicity, we start with the median lagged market beta as the single breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in <code>np.average()</code>.</p>
-<div class="cell" data-execution_count="4">
+<div class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios <span class="op">=</span> (data_for_sorts</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"month"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(portfolio<span class="op">=</span>pd.qcut(x[<span class="st">"beta_lag"</span>], </span>
@@ -484,7 +490,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <section id="performance-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="performance-evaluation">Performance Evaluation</h2>
 <p>We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.</p>
-<div class="cell" data-execution_count="5">
+<div class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>beta_longshort <span class="op">=</span> (beta_portfolios</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .pivot_table(index<span class="op">=</span><span class="st">"month"</span>, </span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>               columns<span class="op">=</span><span class="st">"portfolio"</span>, </span>
@@ -494,43 +500,15 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using <span class="citation" data-cites="Newey1987">Newey and West (<a href="#ref-Newey1987" role="doc-biblioref">1987</a>)</span> <span class="math inline">\(t\)</span>-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. Researchers often default on choosing a pre-specified lag length of 6 months.</p>
-<div class="cell" data-execution_count="6">
+<div class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .from_formula(<span class="st">"long_short ~ 1"</span>, data<span class="op">=</span>beta_longshort)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  .fit(cov_type<span class="op">=</span><span class="st">"HAC"</span>, cov_kwds<span class="op">=</span>{<span class="st">"maxlags"</span>: <span class="dv">6</span>})</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  .summary(slim<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>model_fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
-<caption>OLS Regression Results</caption>
-<tbody>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">Dep. Variable:</td>
-<td>long_short</td>
-<td data-quarto-table-cell-role="th">R-squared:</td>
-<td>0.000</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Model:</td>
-<td>OLS</td>
-<td data-quarto-table-cell-role="th">Adj. R-squared:</td>
-<td>0.000</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">No. Observations:</td>
-<td>695</td>
-<td data-quarto-table-cell-role="th">F-statistic:</td>
-<td>nan</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Covariance Type:</td>
-<td>HAC</td>
-<td data-quarto-table-cell-role="th">Prob (F-statistic):</td>
-<td>nan</td>
-</tr>
-</tbody>
-</table>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>model_fit_coefs <span class="op">=</span> model_fit.tables[<span class="dv">1</span>]</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>model_fit_coefs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="7">
 <table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
 <tbody>
 <tr class="odd">
@@ -553,7 +531,6 @@ The objective is to assess the cross-sectional relation between <span class="mat
 </tr>
 </tbody>
 </table>
-<br><br>Notes:<br>[1] Standard Errors are heteroscedasticity and autocorrelation robust (HAC) using 6 lags and without small sample correction
 </div>
 </div>
 <p>The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high beta stocks by shorting low beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.</p>
@@ -562,7 +539,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <h2 class="anchored" data-anchor-id="functional-programming-for-portfolio-sorts">Functional Programming for Portfolio Sorts</h2>
 <p>Now we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we define a function that give us flexibility concerning which variable to use for the sorting, denoted by <code>sorting_variable</code>. We use <code>np.quantile()</code> to compute breakpoints for <code>n_portfolios</code>. Then, we assign portfolios to stocks using the <code>pd.cut()</code> function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.</p>
 <p>In some applications, the variable used for the sorting might be clustered (e.g., at a lower bound of 0). Then, multiple breakpoints may be identical, leading to empty portfolios. Similarly, some portfolios might have a very small number of stocks at the beginning of the sample. Cases, where the number of portfolio constituents differs substantially due to the distribution of the characteristics, require careful consideration and, depending on the application, might require customized sorting approaches.</p>
-<div class="cell" data-execution_count="7">
+<div class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, sorting_variable, n_portfolios):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> np.quantile(data[sorting_variable].dropna(), </span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                              np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, n_portfolios <span class="op">+</span> <span class="dv">1</span>), </span>
@@ -574,7 +551,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.</p>
-<div class="cell" data-execution_count="8">
+<div class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios <span class="op">=</span> (data_for_sorts</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(portfolio <span class="op">=</span> assign_portfolio(x, <span class="st">'beta_lag'</span>, <span class="dv">10</span>)))</span>
@@ -590,7 +567,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <section id="more-performance-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="more-performance-evaluation">More Performance Evaluation</h2>
 <p>In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.</p>
-<div class="cell" data-execution_count="9">
+<div class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios_summary <span class="op">=</span> (beta_portfolios</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"portfolio"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(alpha<span class="op">=</span>sm.OLS.from_formula(</span>
@@ -604,7 +581,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p><a href="#fig-701">Figure&nbsp;1</a> illustrates the CAPM alphas of beta-sorted portfolios. It shows that low beta portfolios tend to exhibit positive alphas, while high beta portfolios exhibit negative alphas.</p>
-<div class="cell" data-execution_count="10">
+<div class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>plot_beta_portfolios_summary <span class="op">=</span> (ggplot(beta_portfolios_summary, </span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    aes(x<span class="op">=</span><span class="st">"portfolio"</span>, y<span class="op">=</span><span class="st">"alpha"</span>, fill<span class="op">=</span><span class="st">"portfolio"</span>))</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_bar(stat<span class="op">=</span><span class="st">"identity"</span>)</span>
@@ -613,7 +590,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> theme(legend_position<span class="op">=</span><span class="st">"none"</span>))</span>
 <span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>plot_beta_portfolios_summary.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
+<div class="cell-output cell-output-display" data-execution_count="11">
 <div id="fig-701" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
 <p><img src="univariate-portfolio-sorts_files/figure-html/fig-701-output-1.png" class="img-fluid figure-img" alt="Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low beta portfolios are positive, while high beta portfolios show negative alphas."></p>
@@ -627,7 +604,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <section id="the-security-market-line-and-beta-portfolios" class="level2">
 <h2 class="anchored" data-anchor-id="the-security-market-line-and-beta-portfolios">The Security Market Line and Beta Portfolios</h2>
 <p>The CAPM predicts that our portfolios should lie on the security market line (SML). The slope of the SML is equal to the market risk premium and reflects the risk-return trade-off at any given time. <a href="#fig-702">Figure&nbsp;2</a> illustrates the security market line: We see that (not surprisingly) the high beta portfolio returns have a high correlation with the market returns. However, it seems like the average excess returns for high beta stocks are lower than what the security market line implies would be an “appropriate” compensation for the high market risk.</p>
-<div class="cell" data-execution_count="11">
+<div class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>sml_capm <span class="op">=</span> (sm.OLS.from_formula(<span class="st">"ret ~ 1 + beta"</span>, data<span class="op">=</span>beta_portfolios_summary)</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>            .fit().params)</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -647,7 +624,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Average portfolio excess returns and average beta estimates"</span>)</span>
 <span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>plot_sml_capm.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="12">
 <div id="fig-702" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
 <p><img src="univariate-portfolio-sorts_files/figure-html/fig-702-output-1.png" class="img-fluid figure-img" alt="Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."></p>
@@ -657,7 +634,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 </div>
 </div>
 <p>To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.</p>
-<div class="cell" data-execution_count="12">
+<div class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>beta_longshort <span class="op">=</span> (beta_portfolios</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  .assign(portfolio<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"portfolio"</span>]</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>          .<span class="bu">apply</span>(<span class="kw">lambda</span> y: <span class="st">"high"</span> <span class="cf">if</span> y <span class="op">==</span> x[<span class="st">"portfolio"</span>].<span class="bu">max</span>()</span>
@@ -670,42 +647,14 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Again, the resulting long-short strategy does not exhibit statistically significant returns.</p>
-<div class="cell" data-execution_count="13">
+<div class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS.from_formula(<span class="st">"long_short ~ 1"</span>, data<span class="op">=</span>beta_longshort)</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  .fit(cov_type<span class="op">=</span><span class="st">"HAC"</span>, cov_kwds<span class="op">=</span>{<span class="st">"maxlags"</span>: <span class="dv">1</span>})</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  .summary(slim<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>model_fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
-<caption>OLS Regression Results</caption>
-<tbody>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">Dep. Variable:</td>
-<td>long_short</td>
-<td data-quarto-table-cell-role="th">R-squared:</td>
-<td>0.000</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Model:</td>
-<td>OLS</td>
-<td data-quarto-table-cell-role="th">Adj. R-squared:</td>
-<td>0.000</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">No. Observations:</td>
-<td>695</td>
-<td data-quarto-table-cell-role="th">F-statistic:</td>
-<td>nan</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Covariance Type:</td>
-<td>HAC</td>
-<td data-quarto-table-cell-role="th">Prob (F-statistic):</td>
-<td>nan</td>
-</tr>
-</tbody>
-</table>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>model_fit_coefs <span class="op">=</span> model_fit.tables[<span class="dv">1</span>]</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>model_fit_coefs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="14">
 <table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
 <tbody>
 <tr class="odd">
@@ -728,46 +677,17 @@ The objective is to assess the cross-sectional relation between <span class="mat
 </tr>
 </tbody>
 </table>
-<br><br>Notes:<br>[1] Standard Errors are heteroscedasticity and autocorrelation robust (HAC) using 1 lags and without small sample correction
 </div>
 </div>
 <p>However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor <span class="citation" data-cites="Frazzini2014">(<a href="#ref-Frazzini2014" role="doc-biblioref">Frazzini and Pedersen 2014</a>)</span>. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.</p>
-<div class="cell" data-execution_count="14">
+<div class="cell" data-execution_count="15">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS.from_formula(<span class="st">"long_short ~ 1 + mkt_excess"</span>, data<span class="op">=</span>beta_longshort)</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  .fit(cov_type<span class="op">=</span><span class="st">"HAC"</span>, cov_kwds<span class="op">=</span>{<span class="st">"maxlags"</span>: <span class="dv">1</span>})</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  .summary(slim<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>model_fit</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
-<table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
-<caption>OLS Regression Results</caption>
-<tbody>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">Dep. Variable:</td>
-<td>long_short</td>
-<td data-quarto-table-cell-role="th">R-squared:</td>
-<td>0.451</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Model:</td>
-<td>OLS</td>
-<td data-quarto-table-cell-role="th">Adj. R-squared:</td>
-<td>0.451</td>
-</tr>
-<tr class="odd">
-<td data-quarto-table-cell-role="th">No. Observations:</td>
-<td>695</td>
-<td data-quarto-table-cell-role="th">F-statistic:</td>
-<td>262.8</td>
-</tr>
-<tr class="even">
-<td data-quarto-table-cell-role="th">Covariance Type:</td>
-<td>HAC</td>
-<td data-quarto-table-cell-role="th">Prob (F-statistic):</td>
-<td>2.35e-50</td>
-</tr>
-</tbody>
-</table>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>model_fit_coefs <span class="op">=</span> model_fit.tables[<span class="dv">1</span>]</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>model_fit_coefs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="15">
 <table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
 <tbody>
 <tr class="odd">
@@ -799,11 +719,10 @@ The objective is to assess the cross-sectional relation between <span class="mat
 </tr>
 </tbody>
 </table>
-<br><br>Notes:<br>[1] Standard Errors are heteroscedasticity and autocorrelation robust (HAC) using 1 lags and without small sample correction
 </div>
 </div>
 <p><a href="#fig-703">Figure&nbsp;3</a> shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years - each portfolio exhibits periods with positive and negative annual returns.</p>
-<div class="cell" data-fig.alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods." data-execution_count="15">
+<div class="cell" data-fig.alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods." data-execution_count="16">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>beta_longshort_year <span class="op">=</span> (beta_longshort</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  .assign(year<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"month"</span>].dt.year)</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"year"</span>)</span>
@@ -824,7 +743,7 @@ The objective is to assess the cross-sectional relation between <span class="mat
 <span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">""</span>, title<span class="op">=</span><span class="st">"Annual returns of beta portfolios"</span>)</span>
 <span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>plot_beta_longshort_year.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="15">
+<div class="cell-output cell-output-display" data-execution_count="16">
 <div id="fig-703" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
 <p><img src="univariate-portfolio-sorts_files/figure-html/fig-703-output-1.png" class="img-fluid figure-img"></p>

@@ -152,7 +152,7 @@ cookieconsent.run({
 <link rel="stylesheet" href="../styling/styles.css">
 <meta property="og:title" content="Tidy Finance - Size Sorts and p-Hacking">
 <meta property="og:description" content="">
-<meta property="og:image" content="https://www.tidy-finance.org/python/size-sorts-and-p-hacking_files/figure-html/fig-801-output-2.png">
+<meta property="og:image" content="https://www.tidy-finance.org/python/size-sorts-and-p-hacking_files/figure-html/fig-801-output-1.png">
 <meta property="og:site-name" content="Tidy Finance">
 <meta property="og:image:height" content="960">
 <meta property="og:image:width" content="1280">
@@ -349,6 +349,12 @@ cookieconsent.run({
  <span class="menu-text">Fixed Effects and Clustered Standard Errors</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/difference-in-differences.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Difference in Differences</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -411,7 +417,7 @@ Note
 <p>In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, <span class="citation" data-cites="Fama1993">Fama and French (<a href="#ref-Fama1993" role="doc-biblioref">1993</a>)</span> include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.</p>
 <p>We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums <span class="citation" data-cites="Hasler2021">Walter, Weber, and Weiss (<a href="#ref-Walter2022" role="doc-biblioref">2022</a>)</span>. Exploiting these ideas to generate favorable results is called p-hacking. There is arguably a thin line between p-hacking and conducting robustness tests. Our purpose here is to illustrate the substantial variation that can arise along the evidence-generating process.</p>
 <p>The chapter relies on the following set of packages:</p>
-<div class="cell" data-execution_count="1">
+<div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -425,7 +431,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>First, we retrieve the relevant data from our <code>SQLite</code>-database introduced in Chapters 2-4. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.</p>
-<div class="cell" data-execution_count="2">
+<div class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
@@ -449,7 +455,7 @@ Note
 <h2 class="anchored" data-anchor-id="size-distribution">Size Distribution</h2>
 <p>Before we build our size portfolios, we investigate the distribution of the variable <em>firm size</em>. Visualizing the data is a valuable starting point to understand the input to the analysis. Figure 8.1 shows the fraction of total market capitalization concentrated in the largest firm. To produce this graph, we create monthly indicators that track whether a stock belongs to the largest x percent of the firms. Then, we aggregate the firms within each bucket and compute the buckets’ share of total market capitalization.</p>
 <p><a href="#fig-801">Figure&nbsp;1</a> shows that the largest 1 percent of firms cover up to 50 percent of the total market capitalization, and holding just the 25 percent largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.</p>
-<div class="cell" data-execution_count="3">
+<div class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>market_cap_concentration <span class="op">=</span> (crsp_monthly</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, group_keys <span class="op">=</span> <span class="va">False</span>)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(top01<span class="op">=</span>(x[<span class="st">"mktcap"</span>] <span class="op">&gt;=</span> np.quantile(x[<span class="st">"mktcap"</span>], <span class="fl">0.99</span>)),</span>
@@ -479,49 +485,43 @@ Note
 <span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>          legend_direction<span class="op">=</span><span class="st">"horizontal"</span>, legend_title<span class="op">=</span>element_blank())</span>
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>plot_market_cap_concentration.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>C:\Users\christoph.scheuch\.conda\envs\tidy-finance\lib\site-packages\plotnine\themes\themeable.py:1902: FutureWarning: You no longer need to use subplots_adjust to make space for the legend or text around the panels. This paramater will be removed in a future version. You can still use 'plot_margin' 'panel_spacing' for your other spacing needs.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="3">
+<div class="cell-output cell-output-display" data-execution_count="4">
 <div id="fig-801" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="size-sorts-and-p-hacking_files/figure-html/fig-801-output-2.png" class="img-fluid figure-img" alt="Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."></p>
+<p><img src="size-sorts-and-p-hacking_files/figure-html/fig-801-output-1.png" class="img-fluid figure-img" alt="Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."></p>
 <figcaption class="figure-caption">Figure&nbsp;1: We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.</figcaption>
 </figure>
 </div>
 </div>
 </div>
 <p>Next, firm sizes also differ across listing exchanges. Stocks’ primary listings were important in the past and are potentially still relevant today. <a href="#fig-802">Figure&nbsp;2</a> shows that the New York Stock Exchange (NYSE) was and still is the largest listing exchange in terms of market capitalization. More recently, NASDAQ has gained relevance as a listing exchange. Do you know what the small peak in NASDAQ’s market cap around the year 2000 was?</p>
-<div class="cell" data-fig.alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible." data-execution_count="4">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>market_cap_share <span class="op">=</span> (crsp_monthly</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"exchange"</span>])</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.DataFrame({<span class="st">"mktcap"</span>: x[<span class="st">"mktcap"</span>].<span class="bu">sum</span>()}, index<span class="op">=</span>[<span class="dv">0</span>]))</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    total_market_cap<span class="op">=</span><span class="kw">lambda</span> x: x.groupby(<span class="st">"month"</span>)[<span class="st">"mktcap"</span>].transform(<span class="st">"sum"</span>),</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    share<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"mktcap"</span>] <span class="op">/</span> x[<span class="st">"total_market_cap"</span>]</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>plot_market_cap_share <span class="op">=</span> (ggplot(</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  market_cap_share, aes(x<span class="op">=</span><span class="st">"month"</span>, y<span class="op">=</span><span class="st">"share"</span>, fill<span class="op">=</span><span class="st">"exchange"</span>, color<span class="op">=</span><span class="st">"exchange"</span>)) </span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_area(position<span class="op">=</span><span class="st">"stack"</span>, stat<span class="op">=</span><span class="st">"identity"</span>, alpha<span class="op">=</span><span class="fl">0.5</span>) </span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_line(position<span class="op">=</span><span class="st">"stack"</span>) </span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_date(name<span class="op">=</span><span class="st">""</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">""</span>, fill<span class="op">=</span><span class="st">""</span>, color<span class="op">=</span><span class="st">""</span>,</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Share of total market capitalization per listing exchange"</span>)</span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> theme(subplots_adjust<span class="op">=</span>{<span class="st">"bottom"</span>: <span class="fl">0.12</span>}, legend_position<span class="op">=</span>(<span class="fl">.5</span>, <span class="dv">0</span>), </span>
-<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>          legend_direction<span class="op">=</span><span class="st">"horizontal"</span>, legend_title<span class="op">=</span>element_blank())</span>
-<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>plot_market_cap_share.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>C:\Users\christoph.scheuch\.conda\envs\tidy-finance\lib\site-packages\plotnine\themes\themeable.py:1902: FutureWarning: You no longer need to use subplots_adjust to make space for the legend or text around the panels. This paramater will be removed in a future version. You can still use 'plot_margin' 'panel_spacing' for your other spacing needs.</code></pre>
-</div>
-<div class="cell-output cell-output-display" data-execution_count="4">
+<div class="cell" data-fig.alt="Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible." data-execution_count="5">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>market_cap_share <span class="op">=</span> (crsp_monthly</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"exchange"</span>])</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.DataFrame({<span class="st">"mktcap"</span>: x[<span class="st">"mktcap"</span>].<span class="bu">sum</span>()}, index<span class="op">=</span>[<span class="dv">0</span>]))</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    total_market_cap<span class="op">=</span><span class="kw">lambda</span> x: x.groupby(<span class="st">"month"</span>)[<span class="st">"mktcap"</span>].transform(<span class="st">"sum"</span>),</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    share<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"mktcap"</span>] <span class="op">/</span> x[<span class="st">"total_market_cap"</span>]</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>plot_market_cap_share <span class="op">=</span> (ggplot(</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  market_cap_share, aes(x<span class="op">=</span><span class="st">"month"</span>, y<span class="op">=</span><span class="st">"share"</span>, fill<span class="op">=</span><span class="st">"exchange"</span>, color<span class="op">=</span><span class="st">"exchange"</span>)) </span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_area(position<span class="op">=</span><span class="st">"stack"</span>, stat<span class="op">=</span><span class="st">"identity"</span>, alpha<span class="op">=</span><span class="fl">0.5</span>) </span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_line(position<span class="op">=</span><span class="st">"stack"</span>) </span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_date(name<span class="op">=</span><span class="st">""</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">""</span>, fill<span class="op">=</span><span class="st">""</span>, color<span class="op">=</span><span class="st">""</span>,</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Share of total market capitalization per listing exchange"</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> theme(subplots_adjust<span class="op">=</span>{<span class="st">"bottom"</span>: <span class="fl">0.12</span>}, legend_position<span class="op">=</span>(<span class="fl">.5</span>, <span class="dv">0</span>), </span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>          legend_direction<span class="op">=</span><span class="st">"horizontal"</span>, legend_title<span class="op">=</span>element_blank())</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>plot_market_cap_share.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
 <div id="fig-802" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
-<p><img src="size-sorts-and-p-hacking_files/figure-html/fig-802-output-2.png" class="img-fluid figure-img"></p>
+<p><img src="size-sorts-and-p-hacking_files/figure-html/fig-802-output-1.png" class="img-fluid figure-img"></p>
 <figcaption class="figure-caption">Figure&nbsp;2: Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.</figcaption>
 </figure>
 </div>
@@ -529,28 +529,28 @@ Note
 </div>
 <p>Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function <code>describe()</code> does not include all statistics we are interested in, which is why we create the function <code>create_summary()</code> that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with <code>add_row()</code> with the overall summary statistics.</p>
 <p>The resulting table shows that firms listed on NYSE in December 2021 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.</p>
-<div class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_summary_statistics(data, variable, filter_variable, percentiles):</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>   summary_df <span class="op">=</span> (data</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                 .get([filter_variable, variable])</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                 .groupby(filter_variable)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>                 .describe(percentiles<span class="op">=</span>percentiles)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                 ) </span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>   summary_df.columns <span class="op">=</span> summary_df.columns.droplevel(<span class="dv">0</span>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>   summary_overall_df <span class="op">=</span> (data</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>                         .get(variable)</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>                         .describe(percentiles<span class="op">=</span>percentiles)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>                         ) </span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>   summary_df.loc[<span class="st">"Overall"</span>,:] <span class="op">=</span> summary_overall_df</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>   <span class="cf">return</span> summary_df</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>get_summary_statistics(</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">==</span> crsp_monthly[<span class="st">"month"</span>].<span class="bu">max</span>()],</span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>   <span class="st">"mktcap"</span>,</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>   <span class="st">"exchange"</span>,</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>   [<span class="fl">0.05</span>, <span class="fl">0.5</span>, <span class="fl">0.95</span>]</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
+<div class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> get_summary_statistics(data, variable, filter_variable, percentiles):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>   summary_df <span class="op">=</span> (data</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                 .get([filter_variable, variable])</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                 .groupby(filter_variable)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                 .describe(percentiles<span class="op">=</span>percentiles)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>                 ) </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>   summary_df.columns <span class="op">=</span> summary_df.columns.droplevel(<span class="dv">0</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>   summary_overall_df <span class="op">=</span> (data</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>                         .get(variable)</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>                         .describe(percentiles<span class="op">=</span>percentiles)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>                         ) </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>   summary_df.loc[<span class="st">"Overall"</span>,:] <span class="op">=</span> summary_overall_df</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>   <span class="cf">return</span> summary_df</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>get_summary_statistics(</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">==</span> crsp_monthly[<span class="st">"month"</span>].<span class="bu">max</span>()],</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>   <span class="st">"mktcap"</span>,</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>   <span class="st">"exchange"</span>,</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>   [<span class="fl">0.05</span>, <span class="fl">0.5</span>, <span class="fl">0.95</span>]</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
 <div>
 
 
@@ -646,70 +646,70 @@ Note
 <h2 class="anchored" data-anchor-id="univariate-size-portfolios-with-flexible-breakpoints">Univariate Size Portfolios with Flexible Breakpoints</h2>
 <p>In Chapter 7, we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.</p>
 <p>To replicate the NYSE-centered sorting procedure, we introduce <code>exchanges</code> as an argument in our <code>assign_portfolio()</code> function from <a href="../python/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>. The exchange-specific argument then enters in the filter <code>data["exchanges"].isin(exchanges)</code>. For example, if <code>exchanges = 'NYSE'</code> is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify <code>exchanges = ["NYSE", "NASDAQ", "AMEX"]</code>, which keeps all stocks listed on either of these exchanges.</p>
-<div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, exchanges, sorting_variable, n_portfolios):</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    data_filtered <span class="op">=</span> data[data[<span class="st">"exchange"</span>].isin(exchanges)]</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> np.quantile(data_filtered[sorting_variable].dropna(), </span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                              np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, n_portfolios <span class="op">+</span> <span class="dv">1</span>), </span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>                              method <span class="op">=</span> <span class="st">"linear"</span>)</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(data_filtered[sorting_variable],</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>                                 bins<span class="op">=</span>breakpoints,</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>                                 labels<span class="op">=</span><span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size),</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>                                 include_lowest<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, exchanges, sorting_variable, n_portfolios):</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    data_filtered <span class="op">=</span> data[data[<span class="st">"exchange"</span>].isin(exchanges)]</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> np.quantile(data_filtered[sorting_variable].dropna(), </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>                              np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, n_portfolios <span class="op">+</span> <span class="dv">1</span>), </span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>                              method <span class="op">=</span> <span class="st">"linear"</span>)</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(data_filtered[sorting_variable],</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>                                 bins<span class="op">=</span>breakpoints,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                                 labels<span class="op">=</span><span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size),</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                                 include_lowest<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="weighting-schemes-for-portfolios" class="level2">
 <h2 class="anchored" data-anchor-id="weighting-schemes-for-portfolios">Weighting Schemes for Portfolios</h2>
 <p>Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called <em>value-weighting</em>. The alternative protocol is <em>equal-weighting</em>, which assigns each stock’s return the same weight, i.e., a simple average of the constituents’ returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.</p>
 <p>We implement the two weighting schemes in the function <code>compute_portfolio_returns()</code> that takes a logical argument to weight the returns by firm value. The statement <code>if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))</code> generates value-weighted returns if <code>value_weighted = True</code>. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in Chapter 7.</p>
-<div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_portfolio_returns(n_portfolios<span class="op">=</span><span class="dv">10</span>, </span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>                              exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>],</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>                              value_weighted<span class="op">=</span><span class="va">True</span>, </span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>                              data<span class="op">=</span>crsp_monthly):</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> calculate_returns(data, value_weighted):</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> value_weighted:</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> np.average(data[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>data[<span class="st">"mktcap_lag"</span>])</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> data[<span class="st">"ret_excess"</span>].mean()</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    returns <span class="op">=</span> (data</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"month"</span>)</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(portfolio <span class="op">=</span> assign_portfolio(x, exchanges, <span class="st">"mktcap_lag"</span>, n_portfolios)))</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>      .groupby([<span class="st">"portfolio"</span>, <span class="st">"month"</span>])</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(ret <span class="op">=</span> calculate_returns(x, value_weighted)))</span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"month"</span>)</span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(size_premium <span class="op">=</span> x.loc[x[<span class="st">"portfolio"</span>] <span class="op">==</span> x[<span class="st">"portfolio"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span> x.loc[x[<span class="st">"portfolio"</span>] <span class="op">==</span> x[<span class="st">"portfolio"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean()))</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>      .aggregate({<span class="st">"size_premium"</span>: <span class="st">"mean"</span>})</span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> returns</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_portfolio_returns(n_portfolios<span class="op">=</span><span class="dv">10</span>, </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                              exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>],</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                              value_weighted<span class="op">=</span><span class="va">True</span>, </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                              data<span class="op">=</span>crsp_monthly):</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> calculate_returns(data, value_weighted):</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> value_weighted:</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> np.average(data[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>data[<span class="st">"mktcap_lag"</span>])</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">else</span>:</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>            <span class="cf">return</span> data[<span class="st">"ret_excess"</span>].mean()</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    returns <span class="op">=</span> (data</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"month"</span>)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(portfolio <span class="op">=</span> assign_portfolio(x, exchanges, <span class="st">"mktcap_lag"</span>, n_portfolios)))</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      .groupby([<span class="st">"portfolio"</span>, <span class="st">"month"</span>])</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(ret <span class="op">=</span> calculate_returns(x, value_weighted)))</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"month"</span>)</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(size_premium <span class="op">=</span> x.loc[x[<span class="st">"portfolio"</span>] <span class="op">==</span> x[<span class="st">"portfolio"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span> x.loc[x[<span class="st">"portfolio"</span>] <span class="op">==</span> x[<span class="st">"portfolio"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean()))</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>      .aggregate({<span class="st">"size_premium"</span>: <span class="st">"mean"</span>})</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> returns</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To see how the function <code>compute_portfolio_returns()</code> works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.</p>
-<div class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>ret_all <span class="op">=</span> compute_portfolio_returns(</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  n_portfolios<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>],</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  value_weighted<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  data<span class="op">=</span>crsp_monthly</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>ret_nyse <span class="op">=</span> compute_portfolio_returns(</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  n_portfolios<span class="op">=</span><span class="dv">2</span>,</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>],</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  value_weighted<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  data<span class="op">=</span>crsp_monthly</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.DataFrame([ret_all <span class="op">*</span> <span class="dv">100</span>, ret_nyse <span class="op">*</span> <span class="dv">100</span>], </span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>                    index <span class="op">=</span>[<span class="st">"NYSE, NASDAQ &amp; AMEX"</span>, <span class="st">"NYSE"</span>])</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>data.columns <span class="op">=</span> [<span class="st">"Premium"</span>]</span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>data</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
+<div class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ret_all <span class="op">=</span> compute_portfolio_returns(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  n_portfolios<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>],</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  value_weighted<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  data<span class="op">=</span>crsp_monthly</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>ret_nyse <span class="op">=</span> compute_portfolio_returns(</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  n_portfolios<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>],</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  value_weighted<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  data<span class="op">=</span>crsp_monthly</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> pd.DataFrame([ret_all <span class="op">*</span> <span class="dv">100</span>, ret_nyse <span class="op">*</span> <span class="dv">100</span>], </span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>                    index <span class="op">=</span>[<span class="st">"NYSE, NASDAQ &amp; AMEX"</span>, <span class="st">"NYSE"</span>])</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>data.columns <span class="op">=</span> [<span class="st">"Premium"</span>]</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>data</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="9">
 <div>
 
 
@@ -744,29 +744,29 @@ Note
 <p>From a malicious perspective, these modeling choices give the researcher multiple <em>chances</em> to find statistically significant results. Yet this is considered <em>p-hacking</em>, which renders the statistical inference due to multiple testing invalid <span class="citation" data-cites="Harvey2016">(<a href="#ref-Harvey2016" role="doc-biblioref">Harvey, Liu, and Zhu 2016</a>)</span>.</p>
 <p>Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as <em>robustness tests</em> and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature.</p>
 <p>Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table <code>p_hacking_setup</code>. The function <code>expand_grid()</code> produces a table of all possible permutations of its arguments. Note that we use the argument <code>data</code> to exclude financial firms and truncate the time series.</p>
-<div class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>n_portfolios <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">5</span>, <span class="dv">10</span>]</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>exchanges <span class="op">=</span> [[<span class="st">"NYSE"</span>], [<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>]]</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>value_weighted <span class="op">=</span> [<span class="va">True</span>, <span class="va">False</span>]</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> [crsp_monthly,</span>
-<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"industry"</span>] <span class="op">!=</span> <span class="st">"Finance"</span>],</span>
-<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">&lt;</span> <span class="st">"1990-06-01"</span>],</span>
-<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">&gt;=</span> <span class="st">"1990-06-01"</span>],</span>
-<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>        ]</span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>p_hacking_setup <span class="op">=</span> <span class="bu">list</span>(itertools.product(n_portfolios, exchanges, value_weighted, data))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>n_portfolios <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">5</span>, <span class="dv">10</span>]</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>exchanges <span class="op">=</span> [[<span class="st">"NYSE"</span>], [<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>]]</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>value_weighted <span class="op">=</span> [<span class="va">True</span>, <span class="va">False</span>]</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> [crsp_monthly,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"industry"</span>] <span class="op">!=</span> <span class="st">"Finance"</span>],</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">&lt;</span> <span class="st">"1990-06-01"</span>],</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>        crsp_monthly[crsp_monthly[<span class="st">"month"</span>] <span class="op">&gt;=</span> <span class="st">"1990-06-01"</span>],</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>        ]</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>p_hacking_setup <span class="op">=</span> <span class="bu">list</span>(itertools.product(n_portfolios, exchanges, value_weighted, data))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 6. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios.</p>
-<div class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>p_hacking_results <span class="op">=</span> pd.DataFrame(p_hacking_setup)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>p_hacking_results.columns <span class="op">=</span> [<span class="st">"n_portfolios"</span>, <span class="st">"exchanges"</span>, <span class="st">"value_weighted"</span>, <span class="st">"data"</span>]</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>all_size_premia <span class="op">=</span> pd.DataFrame()</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> p_hacking_setup:</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    tmp_ret <span class="op">=</span> compute_portfolio_returns(i[<span class="dv">0</span>], i[<span class="dv">1</span>], i[<span class="dv">2</span>], i[<span class="dv">3</span>])</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    all_size_premia <span class="op">=</span> pd.concat([all_size_premia, tmp_ret])</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>p_hacking_results[<span class="st">"size_premium"</span>] <span class="op">=</span> all_size_premia.values</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>p_hacking_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="10">
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>p_hacking_results <span class="op">=</span> pd.DataFrame(p_hacking_setup)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>p_hacking_results.columns <span class="op">=</span> [<span class="st">"n_portfolios"</span>, <span class="st">"exchanges"</span>, <span class="st">"value_weighted"</span>, <span class="st">"data"</span>]</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>all_size_premia <span class="op">=</span> pd.DataFrame()</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> p_hacking_setup:</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    tmp_ret <span class="op">=</span> compute_portfolio_returns(i[<span class="dv">0</span>], i[<span class="dv">1</span>], i[<span class="dv">2</span>], i[<span class="dv">3</span>])</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    all_size_premia <span class="op">=</span> pd.concat([all_size_premia, tmp_ret])</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>p_hacking_results[<span class="st">"size_premium"</span>] <span class="op">=</span> all_size_premia.values</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>p_hacking_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
 <div>
 
 
@@ -1176,17 +1176,17 @@ Note
 <section id="the-size-premium-variation" class="level2">
 <h2 class="anchored" data-anchor-id="the-size-premium-variation">The Size-Premium Variation</h2>
 <p>We provide a graph in <a href="#fig-803">Figure&nbsp;3</a> that shows the different premiums. The figure also shows the relation to the average Fama-French SMB (small minus big) premium used in the literature which we include as a dotted vertical line.</p>
-<div class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>p_hacking_results_figure <span class="op">=</span> (ggplot(</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  p_hacking_results, aes(x<span class="op">=</span><span class="st">"size_premium"</span>)) </span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_histogram(bins<span class="op">=</span><span class="bu">len</span>(p_hacking_results))</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(x<span class="op">=</span><span class="va">None</span>, y<span class="op">=</span><span class="va">None</span>, fill<span class="op">=</span><span class="va">None</span>, color<span class="op">=</span><span class="va">None</span>, </span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Distribution of size premiums for different sorting choices"</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_vline(aes(xintercept<span class="op">=</span>factors_ff_monthly[<span class="st">"smb"</span>].mean()), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>p_hacking_results_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>p_hacking_results_figure <span class="op">=</span> (ggplot(</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  p_hacking_results, aes(x<span class="op">=</span><span class="st">"size_premium"</span>)) </span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_histogram(bins<span class="op">=</span><span class="bu">len</span>(p_hacking_results))</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(x<span class="op">=</span><span class="va">None</span>, y<span class="op">=</span><span class="va">None</span>, fill<span class="op">=</span><span class="va">None</span>, color<span class="op">=</span><span class="va">None</span>, </span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Distribution of size premiums for different sorting choices"</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_vline(aes(xintercept<span class="op">=</span>factors_ff_monthly[<span class="st">"smb"</span>].mean()), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>p_hacking_results_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
 <div id="fig-803" class="quarto-figure quarto-figure-center anchored">
 <figure class="figure">
 <p><img src="size-sorts-and-p-hacking_files/figure-html/fig-803-output-1.png" class="img-fluid figure-img" alt="Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge, but the estimated coefficients are positive for all choices."></p>
