@@ -20,6 +20,7 @@ The current chapter relies on the following set of packages:
 import pandas as pd
 import numpy as np
 import sqlite3
+
 import itertools
 import statsmodels.api as sm
 from scipy.optimize import minimize
@@ -36,7 +37,6 @@ crsp_monthly = (pd.read_sql_query(
   sql="SELECT permno, month, ret_excess, mktcap, mktcap_lag FROM crsp_monthly",
   con=tidy_finance,
   parse_dates={"month": {"unit": "D","origin": "unix"}})
-  .dropna()
 )
 ```
 
@@ -46,7 +46,6 @@ factors_ff_monthly = (pd.read_sql_query(
   sql="SELECT month, mkt_excess FROM factors_ff_monthly",
   con=tidy_finance,
   parse_dates={"month": {"unit": "D", "origin": "unix"}})
-  .dropna()
 )
 ```
 
@@ -180,66 +179,68 @@ We want to note that @Gehrig2020 warn that, in the leading case of constant rela
 No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: the original paper @Brandt2009 only cares about the expected utility to choose $\theta$. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.
 
 ```{python}
-def evaluate_portfolio(weights_data, 
+def evaluate_portfolio(weights_crsp, 
                        full_evaluation=True,
                        capm_evaluation=True,
                        length_year=12):
     
-    evaluation = (weights_data
-        .groupby("month", group_keys = True)
-        .apply(lambda x: pd.Series(np.average(x[["ret_excess", "ret_excess"]], 
-                                              weights=x[["weight_tilt", "weight_benchmark"]], 
-                                              axis=0), 
-                                              ["return_tilt", "return_benchmark"]))
-        .reset_index(drop = False)
-        .melt(id_vars="month", 
-              value_vars=["return_tilt", "return_benchmark"],
-              value_name="portfolio_return",
-              var_name="model")
-        .assign(model = lambda x: x["model"].str.replace("return_",""))
+    evaluation = (weights_crsp
+      .groupby("month", group_keys = True)
+      .apply(lambda x: pd.Series(np.average(x[["ret_excess", "ret_excess"]], 
+                                            weights=x[["weight_tilt", "weight_benchmark"]], 
+                                            axis=0), 
+                                            ["return_tilt", "return_benchmark"]))
+      .reset_index(drop = False)
+      .melt(id_vars="month", 
+            value_vars=["return_tilt", "return_benchmark"],
+            value_name="portfolio_return",
+            var_name="model")
+      .assign(model = lambda x: x["model"].str.replace("return_",""))
     )
     
     evaluation_stats = (evaluation
-        .groupby("model")["portfolio_return"]
-        .aggregate([("Expected utility", lambda x: np.mean(power_utility(x))),
-                    ("Average return", lambda x: np.mean(length_year * x) * 100),
-                    ("SD return", lambda x: np.std(x) * np.sqrt(length_year) * 100),
-                    ("Sharpe ratio", lambda x: np.mean(x) / np.std(x) * np.sqrt(length_year))])
+      .groupby("model")["portfolio_return"]
+      .aggregate([("Expected utility", lambda x: np.mean(power_utility(x))),
+                  ("Average return", lambda x: np.mean(length_year * x) * 100),
+                  ("SD return", lambda x: np.std(x) * np.sqrt(length_year) * 100),
+                  ("Sharpe ratio", lambda x: np.mean(x) / np.std(x) * np.sqrt(length_year))])
     )
 
     if capm_evaluation:
         evaluation_capm = (evaluation
-            .merge(factors_ff_monthly,
-                   how = "left",
-                   on = "month")
-            .groupby("model", group_keys = True)
-            .apply(lambda x: sm.OLS(x["portfolio_return"], 
-                             sm.add_constant(x["mkt_excess"])).fit().params)
-            .rename(columns={"const":"CAPM alpha", 
-                             "mkt_excess":"Market beta"})
-          )
-        evaluation_stats = pd.concat([evaluation_stats, 
-                                      evaluation_capm], axis=1)
+          .merge(factors_ff_monthly, how="left", on="month")
+          .groupby("model", group_keys = True)
+          .apply(lambda x: sm.OLS(x["portfolio_return"], 
+                           sm.add_constant(x["mkt_excess"])).fit().params)
+          .rename(columns={"const":"CAPM alpha", 
+                           "mkt_excess":"Market beta"})
+        )
+        evaluation_stats = (evaluation_stats
+          .merge(evaluation_capm, how="left", on="model")
+        )
     
     if full_evaluation:
-        weight_evaluation = (weights_data
-            .melt(id_vars="month",
-                  value_vars=["weight_benchmark", "weight_tilt"],
-                  value_name="weight",
-                  var_name="model")
-             .groupby(["model", "month"])["weight"]
-             .aggregate([("Mean Absolute weight", lambda x: np.mean(np.abs(x))),
-                         ("Max. weight", max),
-                         ("Min. weight", min),
-                         ("Avg. sum of negative weights", lambda x: -np.sum(x[x < 0])),
-                         ("Avg. fraction of negative weights", lambda x: np.mean(x < 0))])
-              .reset_index()
-              .groupby("model")
-              .aggregate(lambda x: np.average(x) * 100) # TODO: Fix aggregation for month
-              .reset_index()
-              .assign(model = lambda x: x["model"].str.replace("weight_",""))
+        evaluation_weights = (weights_crsp
+          .melt(id_vars="month",
+                value_vars=["weight_benchmark", "weight_tilt"],
+                value_name="weight",
+                var_name="model")
+          .groupby(["model", "month"])["weight"]
+          .aggregate([("Absolute weight", lambda x: np.mean(np.abs(x))),
+                      ("Max. weight", max),
+                      ("Min. weight", min),
+                      ("Avg. sum of negative weights", lambda x: -np.sum(x[x < 0])),
+                      ("Avg. fraction of negative weights", lambda x: np.mean(x < 0))])
+          .reset_index()
+          .drop(columns="month")
+          .groupby("model")
+          .aggregate(lambda x: 100 * x.mean()) 
+          .reset_index()
+          .assign(model = lambda x: x["model"].str.replace("weight_",""))
         )
-        evaluation_stats = pd.concat([evaluation_stats, weight_evaluation.set_index("model")], axis=1)
+        evaluation_stats = (evaluation_stats
+          .merge(evaluation_weights, how="left", on="model")
+        )
         
     return evaluation_stats.transpose()
 ```
@@ -280,11 +281,13 @@ You may wonder why we return the negative value of the objective function. This 
 In its most basic form, Python optimization relies on the function `minimize()`. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of $\hat\theta$, which maximize the hypothetical expected utility of the investor. 
 
 ```{python}
-optimal_theta = minimize(fun=objective_function, 
-                         x0=[1.5]*n_parameters,
-                         args=(data_portfolios, "Expected utility", True, True),
-                         method="Nelder-Mead",
-                         tol=0.01)
+optimal_theta = minimize(
+  fun=objective_function,
+  x0=[1.5]*n_parameters,
+  args=(data_portfolios, "Expected utility", True, True),
+  method="Nelder-Mead",
+  tol=0.01
+)
 
 optimal_theta.x
 ```

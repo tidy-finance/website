@@ -180,51 +180,69 @@ No doubt, there are many other ways to evaluate a portfolio. The function below 
 
 ```{r}
 evaluate_portfolio <- function(weights_crsp,
-                               full_evaluation = TRUE) {
+                               capm_evaluation = TRUE,
+                               full_evaluation = TRUE,
+                               length_year = 12) {
+  
   evaluation <- weights_crsp |>
     group_by(month) |>
     summarize(
-      return_tilt = weighted.mean(ret_excess, weight_tilt),
-      return_benchmark = weighted.mean(ret_excess, weight_benchmark)
+      tilt = weighted.mean(ret_excess, weight_tilt),
+      benchmark = weighted.mean(ret_excess, weight_benchmark)
     ) |>
     pivot_longer(-month,
       values_to = "portfolio_return",
       names_to = "model"
-    ) |>
+    ) 
+  
+  evaluation_stats <- evaluation |>
     group_by(model) |>
-    left_join(factors_ff_monthly, by = "month") |>
     summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
-      "Average return" = 100 * mean(12 * portfolio_return),
-      "SD return" = 100 * sqrt(12) * sd(portfolio_return),
-      "Sharpe ratio" = sqrt(12) * mean(portfolio_return) / sd(portfolio_return),
+      "Average return" = 100 * mean(length_year * portfolio_return),
+      "SD return" = 100 * sqrt(length_year) * sd(portfolio_return),
+      "Sharpe ratio" = sqrt(length_year) * mean(portfolio_return) / sd(portfolio_return),
+
+    )) |>
+    mutate(model = str_remove(model, "return_")) 
+  
+  if (capm_evaluation) {
+    evaluation_capm <- evaluation |> 
+      left_join(factors_ff_monthly, by = "month") |>
+      group_by(model) |>
+      summarize(
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
       "Market beta" = coefficients(lm(portfolio_return ~ mkt_excess))[2]
-    )) |>
-    mutate(model = str_remove(model, "return_")) |>
-    pivot_longer(-model, names_to = "measure") |>
-    pivot_wider(names_from = model, values_from = value)
+      )
+    
+    evaluation_stats <- evaluation_stats |> 
+      left_join(evaluation_capm, by = "model")
+  }
 
   if (full_evaluation) {
-    weight_evaluation <- weights_crsp |>
+    evaluation_weights <- weights_crsp |>
       select(month, contains("weight")) |>
       pivot_longer(-month, values_to = "weight", names_to = "model") |>
       group_by(model, month) |>
-      transmute(tibble(
+      mutate(
         "Absolute weight" = abs(weight),
         "Max. weight" = max(weight),
         "Min. weight" = min(weight),
         "Avg. sum of negative weights" = -sum(weight[weight < 0]),
-        "Avg. fraction of negative weights" = sum(weight < 0) / n()
-      )) |>
+        "Avg. fraction of negative weights" = sum(weight < 0) / n(),
+        .keep = "none"
+      ) |>
       group_by(model) |>
       summarize(across(-month, ~ 100 * mean(.))) |>
-      mutate(model = str_remove(model, "weight_")) |>
-      pivot_longer(-model, names_to = "measure") |>
-      pivot_wider(names_from = model, values_from = value)
-    evaluation <- bind_rows(evaluation, weight_evaluation)
+      mutate(model = str_remove(model, "weight_")) 
+    
+    evaluation_stats <- evaluation_stats |> 
+      left_join(evaluation_weigths, by = "model")
   }
-  return(evaluation)
+  
+  evaluation_stats |> 
+    pivot_longer(cols = -model, names_to = "measure") |> 
+    pivot_wider(names_from = model)
 }
 ```
 
@@ -255,7 +273,9 @@ compute_objective_function <- function(theta,
     allow_short_selling
   )
 
-  objective_function <- evaluate_portfolio(processed_data,
+  objective_function <- evaluate_portfolio(
+    processed_data,
+    capm_evaluation = FALSE,
     full_evaluation = FALSE
   ) |>
     filter(measure == objective_measure) |>
@@ -271,11 +291,12 @@ In its most basic form, R optimization relies on the function `optim()`. As main
 ```{r}
 optimal_theta <- optim(
   par = theta,
-  compute_objective_function,
+  fn = compute_objective_function,
   objective_measure = "Expected utility",
   data = data_portfolios,
   value_weighting = TRUE,
-  allow_short_selling = TRUE
+  allow_short_selling = TRUE,
+  method = "Nelder-Mead"
 )
 
 optimal_theta$par
@@ -326,6 +347,7 @@ performance_table <- full_model_grid |>
     ),
     portfolio_evaluation = map(processed_data,
       evaluate_portfolio,
+      capm_evaluation = TRUE,
       full_evaluation = TRUE
     )
   ) |>
