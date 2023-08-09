@@ -21,9 +21,9 @@ import pandas as pd
 import numpy as np
 import sqlite3
 
-import itertools
 import statsmodels.api as sm
 from scipy.optimize import minimize
+from itertools import product
 ```
 
 ## Data Preparation
@@ -204,12 +204,13 @@ def evaluate_portfolio(weights_crsp,
                   ("Average return", lambda x: np.mean(length_year * x) * 100),
                   ("SD return", lambda x: np.std(x) * np.sqrt(length_year) * 100),
                   ("Sharpe ratio", lambda x: np.mean(x) / np.std(x) * np.sqrt(length_year))])
+      .reset_index()
     )
 
     if capm_evaluation:
         evaluation_capm = (evaluation
           .merge(factors_ff_monthly, how="left", on="month")
-          .groupby("model", group_keys = True)
+          .groupby("model", group_keys = False)
           .apply(lambda x: sm.OLS(x["portfolio_return"], 
                            sm.add_constant(x["mkt_excess"])).fit().params)
           .rename(columns={"const":"CAPM alpha", 
@@ -242,14 +243,21 @@ def evaluate_portfolio(weights_crsp,
           .merge(evaluation_weights, how="left", on="model")
         )
         
-    return evaluation_stats.transpose()
+    evaluation_output = (evaluation_stats 
+      .melt(id_vars=["model"], var_name="measure")
+      .pivot_table(index="measure", columns='model', values='value')
+      .reset_index()
+    )
+        
+    return evaluation_output
 ```
 
 \index{Sharpe Ratio}
 Let us take a look at the different portfolio strategies and evaluation measures.
 
 ```{python}
-evaluate_portfolio(weights_crsp)
+test = evaluate_portfolio(weights_crsp)
+test.loc[test["measure"]=="Expected utility", "tilt"]
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
@@ -273,8 +281,10 @@ def objective_function(theta,
     objective_function = evaluate_portfolio(processed_data, 
                                             capm_evaluation=False,
                                             full_evaluation=False)
- 
-    return -objective_function.loc[objective_measure, "tilt"]
+                                            
+    objective_function = objective_function.loc[objective_function["measure"]==objective_measure, "tilt"]
+    
+    return -objective_function
 ```
 
 You may wonder why we return the negative value of the objective function. This is simply due to the common convention for optimization procedures to search for minima as a default. By minimizing the negative value of the objective function, we get the maximum value as a result.
@@ -283,7 +293,7 @@ In its most basic form, Python optimization relies on the function `minimize()`.
 ```{python}
 optimal_theta = minimize(
   fun=objective_function,
-  x0=[1.5]*n_parameters,
+  x0=[1.5] * n_parameters,
   args=(data_portfolios, "Expected utility", True, True),
   method="Nelder-Mead",
   tol=0.01
@@ -300,48 +310,70 @@ How does the portfolio perform for different model specifications? For this purp
 
 ```{python}
 def evaluate_optimal_performance(data, 
+                                 objective_measure,
                                  value_weighting, 
-                                 allow_short_selling, 
-                                 objective_measure):
-  optimal_theta = minimize(fun=objective_function, 
-                         x0=[1.5] * n_parameters,
-                         args=(data, 
-                               objective_measure,
-                               value_weighting, 
-                               allow_short_selling),
-                         method="Nelder-Mead",
-                         tol = 10).x
+                                 allow_short_selling):
+  optimal_theta = minimize(
+    fun=objective_function, 
+    x0=[1.5] * n_parameters,
+    args=(data, objective_measure, value_weighting, allow_short_selling),
+    method="Nelder-Mead",
+    tol=0.01
+  )
 
-  processed_data = compute_portfolio_weights(optimal_theta, 
+  processed_data = compute_portfolio_weights(optimal_theta.x, 
                                              data,
                                              value_weighting,
                                              allow_short_selling)
  
   portfolio_evaluation = evaluate_portfolio(processed_data)
-  portfolio_evaluation = (portfolio_evaluation
-    .append(pd.Series({"benchmark": "VW" if value_weighting else "EW", 
-                       "tilt": "Optimal (no s.)" if allow_short_selling else "Optimal"}, 
-    index=portfolio_evaluation.columns, 
-    name = "Value"))
-  )
-  
+
   return(portfolio_evaluation)
 
-# Create the grid of parameter combinations
-data = [data_portfolios]
-value_weighting = [True, False]
-allow_short_selling = [True, False]
-objective_measure = ["Expected utility"]
+specifications = pd.DataFrame(
+  product(
+    [data_portfolios], 
+    ["Expected utility"], 
+    [True, False], 
+    [True, False]),
+  columns=["data_portfolios_list", "objective_measure", 
+           "value_weighting", "allow_short_selling"]
+)
 
-permutations = itertools.product(data, value_weighting, allow_short_selling, objective_measure)
+specifications["portfolio_evaluation"] = specifications.apply(
+  lambda x: evaluate_optimal_performance(
+    x["data_portfolios_list"],
+    x["objective_measure"], 
+    x["value_weighting"], 
+    x["allow_short_selling"]
+  ),
+  axis=1
+)
 ```
 
 Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted toward maximizing expected utility. 
 
 ```{python}
-results = list(itertools.starmap(evaluate_optimal_performance, permutations))
+# TODO: THIS UNNESTING DOES NOT WORK AAAAAHHHHH
+performance_table = (specifications
+  .get(["value_weighting", "allow_short_selling", "portfolio_evaluation"])
+  .explode("portfolio_evaluation")
+)
 
-pd.concat(results, axis = 1)
+performance_table = (performance_table
+  .rename(columns={"benchmark": " ", "tilt": "Optimal"})
+  .assign(
+    value_weighting=lambda x: x["value_weighting"].map({True: "VW", False: "EW"}),
+    allow_short_selling=lambda x: x["allow_short_selling"].map({True: "", False: "(no s.)"})
+  )
+  .pivot(columns=["value_weighting", "allow_short_selling"], values=[" ", "Optimal"])
+  .reset_index()
+  .set_axis([f"{i[2]} {i[1]} {i[0]}" if i[0] in [" ", "Optimal"] else i[0] for i in performance_table.columns], axis=1, inplace=False)
+)
+
+selected_columns = ["measure", "EW    ", "VW    "] + sorted([col for col in performance_table.columns if "Optimal" in col])
+performance_table = performance_table[selected_columns]
+performance_table.head(11)
 ``` 
 
 The results indicate that the average annualized Sharpe ratio of the equal-weighted portfolio exceeds the Sharpe ratio of the value-weighted benchmark portfolio. Nevertheless, starting with the weighted value portfolio as a benchmark and tilting optimally with respect to momentum and small stocks yields the highest Sharpe ratio across all specifications. Finally, imposing no short-sale constraints does not improve the performance of the portfolios in our application.

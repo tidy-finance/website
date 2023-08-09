@@ -237,12 +237,14 @@ evaluate_portfolio <- function(weights_crsp,
       mutate(model = str_remove(model, "weight_")) 
     
     evaluation_stats <- evaluation_stats |> 
-      left_join(evaluation_weigths, by = "model")
+      left_join(evaluation_weights, by = "model")
   }
   
-  evaluation_stats |> 
+  evaluation_output <- evaluation_stats |> 
     pivot_longer(cols = -model, names_to = "measure") |> 
     pivot_wider(names_from = model)
+  
+  return(evaluation_output)
 }
 ```
 
@@ -309,48 +311,54 @@ The resulting values of $\hat\theta$ are easy to interpret: intuitively, expecte
 How does the portfolio perform for different model specifications? For this purpose, we compute the performance of a number of different modeling choices based on the entire CRSP sample. The next code chunk performs all the heavy lifting.
 
 ```{r}
-full_model_grid <- expand_grid(
+evaluate_optimal_performance <- function(data, 
+                                         objective_measure,
+                                         value_weighting, 
+                                         allow_short_selling) {
+  optimal_theta <- optim(
+    par = theta,
+    fn = compute_objective_function,
+    data = data,
+    objective_measure = "Expected utility",
+    value_weighting = TRUE,
+    allow_short_selling = TRUE,
+    method = "Nelder-Mead"
+  )
+
+  processed_data = compute_portfolio_weights(
+    optimal_theta$par, 
+    data,
+    value_weighting,
+    allow_short_selling
+  )
+  
+  portfolio_evaluation = evaluate_portfolio(
+    processed_data,
+    capm_evaluation = TRUE,
+    full_evaluation = TRUE
+  )
+ 
+  return(portfolio_evaluation) 
+}
+
+specifications <- expand_grid(
+  data = list(data_portfolios),
+  objective_measure = "Expected utility",
   value_weighting = c(TRUE, FALSE),
-  allow_short_selling = c(TRUE, FALSE),
-  data = list(data_portfolios)
-) |>
-  mutate(optimal_theta = pmap(
-    .l = list(
-      data,
-      value_weighting,
-      allow_short_selling
-    ),
-    .f = ~ optim(
-      par = theta,
-      compute_objective_function,
-      data = ..1,
-      objective_measure = "Expected utility",
-      value_weighting = ..2,
-      allow_short_selling = ..3
-    )$par
-  ))
+  allow_short_selling = c(TRUE, FALSE)
+) |> 
+  mutate(
+    portfolio_evaluation = pmap(
+      .l = list(data, objective_measure, value_weighting, allow_short_selling),
+      .f = evaluate_optimal_performance
+    )
+)
 ```
 
 Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted toward maximizing expected utility. 
 
 ```{r}
-performance_table <- full_model_grid |>
-  mutate(
-    processed_data = pmap(
-      .l = list(
-        optimal_theta,
-        data,
-        value_weighting,
-        allow_short_selling
-      ),
-      .f = ~ compute_portfolio_weights(..1, ..2, ..3, ..4)
-    ),
-    portfolio_evaluation = map(processed_data,
-      evaluate_portfolio,
-      capm_evaluation = TRUE,
-      full_evaluation = TRUE
-    )
-  ) |>
+performance_table <- specifications |>
   select(
     value_weighting,
     allow_short_selling,
