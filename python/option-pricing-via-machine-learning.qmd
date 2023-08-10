@@ -79,10 +79,12 @@ where $C(S, T)$ is the price of the option as a function of today's stock price 
 The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters $S, K, r_f, T$, and $\sigma$ are specified (arguably, in a realistic context, all parameters are easy to specify except for $\sigma$ which has to be estimated). A simple R function allows computing the price as we do below. 
 
 ```{python}
-def black_scholes_price(S, K=70, r=0, T=1, sigma=0.2):
-    d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
-    value = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d1 - sigma * np.sqrt(T))
-    return value
+def black_scholes_price(S, K, r, T, sigma):
+  
+    d1 = (np.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    
+    return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
 ```
 
 ## Learning Black-Scholes
@@ -96,23 +98,27 @@ To that end, we start with simulated data. We compute option prices for call opt
 In order to keep the analysis reproducible, we use `np.random.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 ```{python}
-S = range(40, 61)
-K = range(20, 91)
+np.random.seed(420)
+
+S = np.arange(40, 61)
+K = np.arange(20, 91)
 r = np.arange(0, 0.051, 0.01)
 T = np.arange(3 / 12, 2.01, 1 / 12)
 sigma = np.arange(0.1, 0.81, 0.1)
 
-# Create the Cartesian product of the input parameter values
-option_prices = pd.DataFrame(list(product(S, K, r, T, sigma)), 
+option_prices = pd.DataFrame(product(S, K, r, T, sigma), 
                              columns=["S", "K", "r", "T", "sigma"])
 
-# TODO: assign black_scholes is embarassingly slow. Should we think about vectorization at this stage?
-# TODO: right now we do not compute 2 random.normal innovations per price. 
-np.random.seed(420)
+option_prices["black_scholes"] = black_scholes_price(
+  option_prices["S"].values, 
+  option_prices["K"].values, 
+  option_prices["r"].values, 
+  option_prices["T"].values, 
+  option_prices["sigma"].values
+)
 
 option_prices = (option_prices
-  .assign(black_scholes = lambda x: x.apply(lambda row: black_scholes_price(*row), axis=1),
-          observed_price = lambda x: x["black_scholes"] + np.random.normal(scale=0.15))
+  .assign(observed_price = lambda x: x["black_scholes"] + np.random.normal(scale=0.15))
 )
 ```
 
