@@ -346,6 +346,18 @@ cookieconsent.run({
  <span class="menu-text">Fixed Effects and Clustered Standard Errors</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/difference-in-differences.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Difference in Differences</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/option-pricing-via-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Option Pricing via Machine Learning</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -405,7 +417,7 @@ Note
 </div>
 <p>In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model <span class="citation" data-cites="Fama1993">(see <a href="#ref-Fama1993" role="doc-biblioref">Fama and French 1993</a>)</span> is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts.</p>
 <p>The current chapter relies on this set of packages.</p>
-<div class="cell" data-execution_count="1">
+<div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -415,7 +427,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in Chapters 2-4.</p>
-<div class="cell" data-execution_count="2">
+<div class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>data_ff <span class="op">=</span> (pd.read_sql_query(</span>
@@ -442,7 +454,7 @@ Note
 <p>Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year <span class="math inline">\(t\)</span>, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year <span class="math inline">\(t+1\)</span>.</p>
 <p>Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year <span class="math inline">\(t - 1\)</span> and the book equity reported in year <span class="math inline">\(t-1\)</span>, i.e., the <code>datadate</code> is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.</p>
 <p>To implement all these time lags, we again employ the temporary <code>sorting_date</code>-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of <code>drop_duplicates()</code> at the end of the chunk below.</p>
-<div class="cell" data-execution_count="3">
+<div class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>me_ff <span class="op">=</span> (data_ff</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"month.dt.month == 6"</span>)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
@@ -479,7 +491,7 @@ Note
 <section id="portfolio-sorts" class="level2">
 <h2 class="anchored" data-anchor-id="portfolio-sorts">Portfolio Sorts</h2>
 <p>Next, we construct our portfolios with an adjusted <code>assign_portfolio()</code> function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the <code>seq()</code> we would produce does not produce the right breakpoints. Instead of <code>n_portfolios</code>, we now specify <code>percentiles</code>, which take the breakpoint-sequence as an object specified in the function’s call. Specifically, we give <code>percentiles = c(0, 0.3, 0.7, 1)</code> to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.</p>
-<div class="cell" data-execution_count="4">
+<div class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, sorting_variable, percentiles):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> (data</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        .query(<span class="st">"exchange == 'NYSE'"</span>)</span>
@@ -507,7 +519,7 @@ Note
 <span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column <code>sorting_date</code> in our return data by setting the date to sort on to July of <span class="math inline">\(t-1\)</span> if the month is June (of year <span class="math inline">\(t\)</span>) or earlier or to July of year <span class="math inline">\(t\)</span> if the month is July or later.</p>
-<div class="cell" data-execution_count="5">
+<div class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>portfolios_ff <span class="op">=</span> (data_ff</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: pd.to_datetime(</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>            x[<span class="st">"month"</span>].<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="bu">str</span>(x.year <span class="op">-</span> <span class="dv">1</span>) <span class="op">+</span> <span class="st">"0701"</span> <span class="cf">if</span> x.month <span class="op">&lt;=</span> <span class="dv">6</span> <span class="cf">else</span> <span class="bu">str</span>(x.year) <span class="op">+</span> <span class="st">"0701"</span>)))</span>
@@ -518,7 +530,7 @@ Note
 <section id="fama-and-french-factor-returns" class="level2">
 <h2 class="anchored" data-anchor-id="fama-and-french-factor-returns">Fama and French Factor Returns</h2>
 <p>Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.</p>
-<div class="cell" data-execution_count="6">
+<div class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly_replicated <span class="op">=</span> (portfolios_ff</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_me"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"month"</span>])</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({<span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])}))</span>
@@ -535,7 +547,7 @@ Note
 <section id="replication-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="replication-evaluation">Replication Evaluation</h2>
 <p>In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using <code>smf.ols()</code>. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).</p>
-<div class="cell" data-execution_count="7">
+<div class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>test <span class="op">=</span> (factors_ff_monthly</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .merge(factors_ff_monthly_replicated, </span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
@@ -543,10 +555,10 @@ Note
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%.</p>
-<div class="cell" data-execution_count="8">
+<div class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model_smb <span class="op">=</span> smf.ols(formula<span class="op">=</span><span class="st">"smb ~ smb_replicated"</span>, data<span class="op">=</span>test).fit()</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>model_smb.summary(slim<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
+<div class="cell-output cell-output-display" data-execution_count="9">
 <table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
 <caption>OLS Regression Results</caption>
 <tbody>
@@ -611,10 +623,10 @@ Note
 </div>
 </div>
 <p>The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 94%.</p>
-<div class="cell" data-execution_count="9">
+<div class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>model_hml <span class="op">=</span> smf.ols(formula<span class="op">=</span><span class="st">"hml ~ hml_replicated"</span>, data<span class="op">=</span>test).fit()</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>model_hml.summary(slim<span class="op">=</span><span class="va">True</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
+<div class="cell-output cell-output-display" data-execution_count="10">
 <table class="simpletable table table-sm table-striped small" data-quarto-postprocess="true">
 <caption>OLS Regression Results</caption>
 <tbody>
