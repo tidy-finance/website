@@ -83,8 +83,9 @@ def black_scholes_price(S, K, r, T, sigma):
   
     d1 = (np.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
+    price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
     
-    return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+    return price
 ```
 
 ## Learning Black-Scholes
@@ -98,7 +99,8 @@ To that end, we start with simulated data. We compute option prices for call opt
 In order to keep the analysis reproducible, we use `np.random.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 ```{python}
-np.random.seed(420)
+random_state = 420
+np.random.seed(random_state)
 
 S = np.arange(40, 61)
 K = np.arange(20, 91)
@@ -118,7 +120,9 @@ option_prices["black_scholes"] = black_scholes_price(
 )
 
 option_prices = (option_prices
-  .assign(observed_price = lambda x: x["black_scholes"] + np.random.normal(scale=0.15))
+  .assign(
+    observed_price = lambda x: x["black_scholes"] + np.random.normal(scale=0.15)
+  )
 )
 ```
 
@@ -127,11 +131,13 @@ The code above generates more than 1.5 million random parameter constellations. 
 Next, we split the data into a training set (which contains 1\% of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains `python len(option_prices.columns)` different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.
 
 ```{python}
-train_data, test_data = train_test_split(option_prices, 
-                                         test_size=0.01, random_state=42)
+train_data, test_data = train_test_split(
+  option_prices, 
+  test_size=0.01, random_state=random_state
+)
 ```
 
-We process the training dataset further before we fit the different ML models. We define a `ColumnTransformer()` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in column `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
+We process the training dataset further before we fit the different ML models. We define a `ColumnTransformer()` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in column `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors via `StandardScaler()` to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
 
 ```{python}
 preprocessor = ColumnTransformer(
@@ -144,12 +150,14 @@ preprocessor = ColumnTransformer(
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `max_iter = 500`. 
+Next, we show how to fit a neural network to the data. The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `max_iter=500`. 
 
 ```{python}
-nnet_model = MLPRegressor(hidden_layer_sizes=(10, ), 
-                          max_iter=500, 
-                          random_state=42)
+nnet_model = MLPRegressor(
+  hidden_layer_sizes=(10, ), 
+  max_iter=500, 
+  random_state=random_state
+)
 ```
 
 We can follow the straightforward workflow as in the chapter before: define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data. 
@@ -160,18 +168,22 @@ nnet_pipeline = Pipeline([
   ("regressor", nnet_model)
 ])
 
-nnet_fit = nnet_pipeline.fit(train_data.drop(columns = ["observed_price"]), 
-                             train_data.get("observed_price"))
+nnet_fit = nnet_pipeline.fit(
+  train_data.drop(columns=["observed_price"]), 
+  train_data.get("observed_price")
+)
 ```
 
 Once you are familiar with the `scikit-learn` workflow, it is a piece of cake to fit other models. 
 For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node.
-The random forests are trained using the function `RandomForestRegressor()`, which is required to be installed in order to run the code below. 
+The random forests are trained using the function `RandomForestRegressor()`. 
 
 ```{python}
-rf_model = RandomForestRegressor(n_estimators=50, 
-                                 min_samples_leaf=2000, 
-                                 random_state=42)
+rf_model = RandomForestRegressor(
+  n_estimators=50, 
+  min_samples_leaf=2000, 
+  random_state=random_state
+)
 ```
 
 Fitting the model follows exactly the same convention as for the neural network before.
@@ -182,8 +194,10 @@ rf_pipeline = Pipeline([
   ("regressor", rf_model)
 ])
 
-rf_fit = rf_pipeline.fit(train_data.drop(columns = ["observed_price"]), 
-                         train_data.get("observed_price"))
+rf_fit = rf_pipeline.fit(
+  train_data.drop(columns=["observed_price"]), 
+  train_data.get("observed_price")
+)
 ```
 
 ### Deep neural networks
@@ -191,19 +205,23 @@ rf_fit = rf_pipeline.fit(train_data.drop(columns = ["observed_price"]),
 A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used [for applications of deep neural networks in finance, see, for instance, @Jiang2022; @Jensen2022].
 
 ```{python}
-deepnnet_model = MLPRegressor(hidden_layer_sizes=(10, 10, 10), 
-                              activation="logistic", 
-                              solver="lbfgs", 
-                              max_iter=500, 
-                              random_state=42)
+deepnnet_model = MLPRegressor(
+  hidden_layer_sizes=(10, 10, 10),
+  activation="logistic", 
+  solver="lbfgs",
+  max_iter=500, 
+  random_state=random_state
+)
                               
 deepnnet_pipeline = Pipeline([
   ("preprocessor", preprocessor),
   ("regressor", deepnnet_model)
 ])
 
-deepnnet_fit = deepnnet_pipeline.fit(train_data.drop(columns = ["observed_price"]), 
-                                     train_data.get("observed_price"))
+deepnnet_fit = deepnnet_pipeline.fit(
+  train_data.drop(columns=["observed_price"]),
+  train_data.get("observed_price")
+)
 ```
 
 ### Universal approximation
@@ -212,18 +230,22 @@ Before we evaluate the results, we implement one more model. In principle, any n
 
 ```{python} 
 lm_pipeline = Pipeline([
-  ("polynomial", PolynomialFeatures(degree=5, interaction_only=False, include_bias=True)),
+  ("polynomial", PolynomialFeatures(degree=5, 
+                                    interaction_only=False, 
+                                    include_bias=True)),
   ("scaler", StandardScaler()),
   ("regressor", Lasso(alpha=0.01))
 ])
 
-lm_fit = lm_pipeline.fit(train_data.get(["S", "K", "r", "T", "sigma"]), 
-                         train_data.get("observed_price"))
+lm_fit = lm_pipeline.fit(
+  train_data.get(["S", "K", "r", "T", "sigma"]),
+  train_data.get("observed_price")
+)
 ```
 
 ## Prediction Evaluation
 
-Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on ten thousand new data points. Note that for the evaluation, we use the call to `extract_mold()` to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in `forge()`, which provides an easy, consistent, and robust pre-processor at prediction time. 
+Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on ten thousand new data points. 
 
 ```{python}
 test_X = test_data.get(["S", "K", "r", "T", "sigma"])
@@ -236,11 +258,15 @@ predictive_performance = (pd.concat(
                  "Deep NN": deepnnet_fit.predict(test_X),
                  "Lasso": lm_fit.predict(test_X)})
   ], axis = 1)
-  .melt(id_vars=["S", "K", "r", "T", "sigma", "black_scholes", "observed_price"], 
-        var_name="Model", 
-        value_name="Predicted")
-  .assign(moneyness = lambda x: x["S"] - x["K"], 
-          pricing_error = lambda x: np.abs(x["Predicted"] - x["black_scholes"]))
+  .melt(
+    id_vars=["S", "K", "r", "T", "sigma", "black_scholes", "observed_price"],
+    var_name="Model",
+    value_name="Predicted"
+  )
+  .assign(
+    moneyness = lambda x: x["S"] - x["K"],
+    pricing_error = lambda x: np.abs(x["Predicted"] - x["black_scholes"])
+  )
 )
 ```
 
@@ -249,10 +275,11 @@ In the lines above, we use each of the fitted models to generate predictions for
 ```{python, fig431, fig.cap = "Absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.", fig.alt = "Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money."}
 predictive_performance_plot = (
   ggplot(predictive_performance, 
-         aes(x="moneyness", y="pricing_error", color="Model", linetype="Model")) 
-  + geom_jitter(alpha=0.05)
-  + geom_smooth(se=False) 
-  + labs(
+         aes(x="moneyness", y="pricing_error", 
+             color="Model", linetype="Model")) +
+  geom_jitter(alpha=0.05) +
+  geom_smooth(se=False) +
+  labs(
     x="Moneyness (S - K)", y="Absolut prediction error (USD)",
     color=None, linetype=None,
     title="Prediction errors of call option prices for different models",
@@ -272,7 +299,7 @@ The results can be summarized as follows:
 
 1. Write a function that takes `y` and a matrix of predictors `X` as inputs and returns a characterization of the relevant parameters of a regression tree with 1 branch. 
 1. Create a function that creates predictions for a new matrix of predictors `newX` based on the estimated regression tree. 
-1. Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing.
-1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
-1. Use `keras` to initialize a sequential neural network that can take the predictors from the training data set as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simple [regression example here.](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/) How many parameters does the neural network you aim to fit have? 
-1. Compile the object from the previous exercise. It is important that you specify a loss function. Illustrate the difference in predictive accuracy for different architecture choices.
+<!-- 1. Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing. -->
+<!-- 1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree. -->
+<!-- 1. Use `keras` to initialize a sequential neural network that can take the predictors from the training data set as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simple [regression example here.](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/) How many parameters does the neural network you aim to fit have?  -->
+<!-- 1. Compile the object from the previous exercise. It is important that you specify a loss function. Illustrate the difference in predictive accuracy for different architecture choices. -->
