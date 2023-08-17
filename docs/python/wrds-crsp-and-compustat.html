@@ -147,10 +147,7 @@ cookieconsent.run({
 <link rel="stylesheet" href="../styling/styles.css">
 <meta property="og:title" content="Tidy Finance - WRDS, CRSP, and Compustat">
 <meta property="og:description" content="">
-<meta property="og:image" content="https://www.tidy-finance.org/python/wrds-crsp-and-compustat_files/figure-html/fig-211-output-1.png">
 <meta property="og:site-name" content="Tidy Finance">
-<meta property="og:image:height" content="960">
-<meta property="og:image:width" content="1280">
 </head>
 
 <body class="nav-sidebar floating nav-fixed">
@@ -329,6 +326,39 @@ cookieconsent.run({
 </li>
       </ul>
   </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="true">
+ <span class="menu-text">Modeling and Machine Learning</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/fixed-effects-and-clustered-standard-errors.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Fixed Effects and Clustered Standard Errors</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/difference-in-differences.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Difference in Differences</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/option-pricing-via-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Option Pricing via Machine Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <span class="sidebar-item-text sidebar-link text-start">
+ <span class="menu-text">Portfolio Optimization</span></span>
+  </li>
     </ul>
     </div>
 </nav>
@@ -382,22 +412,24 @@ Note
 <p>You are reading the work-in-progress edition of <strong>Tidy Finance with Python</strong>. Code chunks and text might change over the next couple of months. We are always looking for feedback via <a href="mailto:contact@tidy-finance.org">contact@tidy-finance.org</a>. Meanwhile, you can find the complete R version <a href="../r/index.html">here</a>.</p>
 </div>
 </div>
-<p>This chapter shows how to connect to <a href="https://wrds-www.wharton.upenn.edu/">Wharton Research Data Services (WRDS)</a>, a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the <code>DuckDB</code>-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.</p>
+<p>This chapter shows how to connect to <a href="https://wrds-www.wharton.upenn.edu/">Wharton Research Data Services (WRDS)</a>, a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the <code>sqlite</code>-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.</p>
 <p>First, we load the packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them.</p>
-<div class="cell" data-execution_count="1">
+<div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pandas.tseries.offsets <span class="im">import</span> DateOffset</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pandas.tseries.offsets <span class="im">import</span> DateOffset</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="accessing-wrds" class="level2">
 <h2 class="anchored" data-anchor-id="accessing-wrds">Accessing WRDS</h2>
-<p>WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the <a href="https://www.postgresql.org/">PostgreSQL</a> engine. This database engine is just as easy to handle with R as DuckDB. We use the <code>sqlalchemy</code> package to establish a connection to the WRDS database because it already contains a suitable driver.</p>
-<div class="cell" data-execution_count="2">
+<p>WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the <a href="https://www.postgresql.org/">PostgreSQL</a> engine. This database engine is just as easy to handle with Python as SQL. We use the <code>sqlalchemy</code> package to establish a connection to the WRDS database because it already contains a suitable driver.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<div class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sqlalchemy <span class="im">import</span> create_engine</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>To establish a connection, you use the function <code>create_engine()</code> with a connection string. Note that you need to replace the <code>user</code> and <code>password</code> arguments with your own credentials. We defined system variables for the purpose of this book because we obviously do not want (and are not allowed) to share our credentials with the rest of the world (these system variables are stored in the Python environment and loaded with the <code>os.environ()</code> function).</p>
 <p>Additionally, you have to use multi-factor (i.e., two-factor) authentication since May 2023 when establishing a remote connection to WRDS. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires multi-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.</p>
-<div class="cell" data-execution_count="3">
+<div class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os </span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>connection_string <span class="op">=</span> (<span class="st">"postgresql+psycopg2://"</span> <span class="op">+</span> </span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>                      os.environ[<span class="st">"USER"</span>] <span class="op">+</span> <span class="st">":"</span> <span class="op">+</span> </span>
@@ -411,7 +443,7 @@ Note
 <h2 class="anchored" data-anchor-id="downloading-and-preparing-crsp">Downloading and Preparing CRSP</h2>
 <p><a href="https://crsp.org/">The Center for Research in Security Prices (CRSP)</a> provides the most widely used data for US stocks. We use the <code>wrds</code> engine object that we just created to first access monthly CRSP return data. Actually, we need three tables to get the desired data: (i) the CRSP monthly security file <code>msf</code>, (ii) the identifying information <code>msenames</code>, and (iii) the delisting information <code>msedelist</code>.</p>
 <p>We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes <code>shrcd</code> 10 and 11, and (iii) we keep only months within permno-specific start dates <code>namedt</code> and end dates <code>nameendt</code>. In addition, we add delisting codes and returns. You can read up in the great textbook of <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span> for an extensive discussion on the filters we apply in the code below.</p>
-<div class="cell" data-execution_count="4">
+<div class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly_query <span class="op">=</span> (</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"""SELECT msf.permno, msf.date, </span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="st">            date_trunc('month', msf.date)::date as month,</span></span>
@@ -441,18 +473,14 @@ Note
 </div>
 <p>Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters.</p>
 <p>The first additional variable we create is market capitalization (<code>mktcap</code>), which is the product of the number of outstanding shares <code>shrout</code> and the last traded price in a month <code>altprc</code>. Note that in contrast to returns <code>ret</code>, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the <code>altprc</code> is negative whenever the last traded price does not exist, and CRSP decides to report the mid-quote of the last available order book instead. Hence, we take the absolute value of the market cap. We also keep the market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).</p>
-<div class="cell" data-execution_count="5">
+<div class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    mktcap <span class="op">=</span> <span class="kw">lambda</span> x: <span class="bu">abs</span>(x[<span class="st">"shrout"</span>] <span class="op">*</span> x[<span class="st">"altprc"</span>] <span class="op">/</span> <span class="dv">1000000</span>)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    mktcap <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"mktcap"</span>].replace(<span class="dv">0</span>, np.nan)</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .assign(mktcap <span class="op">=</span> <span class="kw">lambda</span> x: <span class="bu">abs</span>(x[<span class="st">"shrout"</span>] <span class="op">*</span> x[<span class="st">"altprc"</span>] <span class="op">/</span> <span class="dv">1000000</span>))</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  .assign(mktcap <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"mktcap"</span>].replace(<span class="dv">0</span>, np.nan))</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The next variable we frequently use is the one-month <em>lagged</em> market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.</p>
-<div class="cell" data-execution_count="6">
+<div class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>mktcap_lag <span class="op">=</span> (crsp_monthly</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    month <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> DateOffset(months<span class="op">=</span><span class="dv">1</span>),</span>
@@ -462,25 +490,27 @@ Note
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  .merge(mktcap_lag, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"month"</span>])</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  .merge(mktcap_lag, </span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"month"</span>])</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we follow <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span> in transforming listing exchange codes to explicit exchange names.</p>
-<div class="cell" data-execution_count="7">
+<div class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_exchange(exchcd):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> exchcd <span class="kw">in</span> [<span class="dv">1</span>, <span class="dv">31</span>]:</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"NYSE"</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> exchcd <span class="kw">in</span> [<span class="dv">2</span>, <span class="dv">32</span>]:</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"AMEX"</span></span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">elif</span> exchcd <span class="kw">in</span> [<span class="dv">3</span>, <span class="dv">33</span>]:</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"NASDAY"</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"NASDAQ"</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">else</span>:</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Other"</span></span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>crsp_monthly[<span class="st">"exchange"</span>] <span class="op">=</span> crsp_monthly[<span class="st">"exchcd"</span>].<span class="bu">apply</span>(assign_exchange)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Similarly, we transform industry codes to industry descriptions following <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. Notice that there are also other categorizations of industries <span class="citation" data-cites="FamaFrench1997">(e.g., <a href="#ref-FamaFrench1997" role="doc-biblioref">Fama and French 1997</a>)</span> that are commonly used.</p>
-<div class="cell" data-execution_count="8">
+<div class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_industry(siccd):</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="dv">1</span> <span class="op">&lt;=</span> siccd <span class="op">&lt;=</span> <span class="dv">999</span>:</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="st">"Agriculture"</span></span>
@@ -510,7 +540,7 @@ Note
 <span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>crsp_monthly[<span class="st">"industry"</span>] <span class="op">=</span> crsp_monthly[<span class="st">"siccd"</span>].<span class="bu">apply</span>(assign_industry)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We also construct returns adjusted for delistings as described by <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. The delisting of a security usually results when a company ceases operations, declares bankruptcy, merges, does not meet listing requirements, or seeks to become private. The adjustment tries to reflect the returns of investors who bought the stock in the month before the delisting and held it until the delisting date. After this transformation, we can drop the delisting returns and codes.</p>
-<div class="cell" data-execution_count="9">
+<div class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>conditions_delisting <span class="op">=</span> [</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    crsp_monthly[<span class="st">"dlstcd"</span>].isna(),</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    (<span class="op">~</span>crsp_monthly[<span class="st">"dlstcd"</span>].isna()) <span class="op">&amp;</span> (<span class="op">~</span>crsp_monthly[<span class="st">"dlret"</span>].isna()),</span>
@@ -534,46 +564,50 @@ Note
 <span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data. As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the tibble <code>factors_ff_monthly</code>.</p>
-<div class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly <span class="op">=</span> pd.read_sql_query(</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  sql<span class="op">=</span><span class="st">"SELECT * FROM factors_ff_monthly"</span>,</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  con<span class="op">=</span>tidy_finance,</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}}</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  .merge(factors_ff_monthly, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly <span class="op">=</span> pd.read_sql_query(</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  sql<span class="op">=</span><span class="st">"SELECT month, rf FROM factors_ff_monthly"</span>,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  con<span class="op">=</span>tidy_finance,</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}}</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  .merge(factors_ff_monthly, </span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span><span class="st">"month"</span>)</span>
 <span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  .assign(ret_excess <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"ret_adj"</span>] <span class="op">-</span> x[<span class="st">"rf"</span>])</span>
 <span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  .assign(ret_excess <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"ret_excess"</span>].clip(lower<span class="op">=-</span><span class="dv">1</span>))</span>
 <span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  .drop(columns <span class="op">=</span> [<span class="st">"ret_adj"</span>, <span class="st">"rf"</span>])</span>
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization.</p>
-<div class="cell" data-execution_count="11">
+<div class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  .dropna(subset <span class="op">=</span> [<span class="st">"ret_excess"</span>, <span class="st">"mktcap"</span>, <span class="st">"mktcap_lag"</span>])</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  .dropna(subset<span class="op">=</span>[<span class="st">"ret_excess"</span>, <span class="st">"mktcap"</span>, <span class="st">"mktcap_lag"</span>])</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Finally, we store the monthly CRSP file in our database.</p>
-<div class="cell" data-execution_count="12">
+<div class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>(crsp_monthly</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    date <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"date"</span>]<span class="op">-</span> pd.Timestamp(<span class="st">"1970-01-01"</span>)) <span class="op">//</span> pd.Timedelta(<span class="st">"1d"</span>),</span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    month <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"month"</span>]<span class="op">-</span> pd.Timestamp(<span class="st">"1970-01-01"</span>)) <span class="op">//</span> pd.Timedelta(<span class="st">"1d"</span>)</span>
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"crsp_monthly"</span>, con<span class="op">=</span>tidy_finance, if_exists<span class="op">=</span><span class="st">"replace"</span>)</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"crsp_monthly"</span>, </span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>          con<span class="op">=</span>tidy_finance, </span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>          if_exists<span class="op">=</span><span class="st">"replace"</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>          index <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="first-glimpse-of-the-crsp-sample" class="level2">
 <h2 class="anchored" data-anchor-id="first-glimpse-of-the-crsp-sample">First Glimpse of the CRSP Sample</h2>
 <p>Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns.</p>
 <p><a href="#fig-211">Figure&nbsp;1</a> shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerably large number of stocks. The number of stocks listed on AMEX decreased steadily over the last couple of decades. By the end of 2021, there were 2,779 stocks with a primary listing on NASDAQ, 1,395 on NYSE, 145 on AMEX, and only one belonged to the other category.</p>
-<div class="cell" data-execution_count="14">
+<div id="fig-211" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.formatters <span class="im">import</span> comma_format</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -593,17 +627,12 @@ Note
 <span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>comma_format())</span>
 <span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>securities_per_exchange_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="3">
-<div id="fig-211" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="wrds-crsp-and-compustat_files/figure-html/fig-211-output-1.png" class="img-fluid figure-img" alt="Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2021. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."></p>
-<figcaption class="figure-caption">Figure&nbsp;1: Number of stocks in the CRSP sample listed at each of the US exchanges.</figcaption>
+<figcaption class="figure-caption">Figure&nbsp;1: <strong>?(caption)</strong></figcaption>
 </figure>
 </div>
-</div>
-</div>
 <p>Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in <a href="#fig-212">Figure&nbsp;2</a>. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange. All values in <a href="#fig-212">Figure&nbsp;2</a> are at the end of 2021 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.</p>
-<div class="cell" data-execution_count="15">
+<div id="fig-212" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>cpi_monthly <span class="op">=</span> pd.read_sql_query(</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  sql<span class="op">=</span><span class="st">"SELECT * FROM cpi_monthly"</span>,</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  con<span class="op">=</span>tidy_finance,</span>
@@ -611,39 +640,36 @@ Note
 <span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>market_cap_per_exchange <span class="op">=</span> (crsp_monthly</span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  .merge(cpi_monthly, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"exchange"</span>])</span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">lambda</span> group: pd.Series({</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mktcap"</span>: (group[<span class="st">"mktcap"</span>].<span class="bu">sum</span>() <span class="op">/</span> group[<span class="st">"cpi"</span>].mean())</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    })</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>market_cap_per_exchange_figure <span class="op">=</span> (ggplot(market_cap_per_exchange, </span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        aes(x<span class="op">=</span><span class="st">"month"</span>, y<span class="op">=</span><span class="st">"mktcap / 1000"</span>, </span>
-<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>            color<span class="op">=</span><span class="st">"exchange"</span>, linetype<span class="op">=</span><span class="st">"exchange"</span>))</span>
-<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_line()</span>
-<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(</span>
-<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>      x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">""</span>, color<span class="op">=</span><span class="st">""</span>, linetype<span class="op">=</span><span class="st">""</span>,</span>
-<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>      title<span class="op">=</span><span class="st">"Monthly market cap by listing exchange in billions of Dec 2021 USD"</span></span>
-<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"10 years"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
-<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>comma_format())</span>
-<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>market_cap_per_exchange_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="4">
-<div id="fig-212" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="wrds-crsp-and-compustat_files/figure-html/fig-212-output-1.png" class="img-fluid figure-img" alt="Title: Monthly market cap by listing exchange in billion USD as of Dec 2021. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2021, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."></p>
-<figcaption class="figure-caption">Figure&nbsp;2: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2021.</figcaption>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  .merge(cpi_monthly, </span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"exchange"</span>])</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    <span class="kw">lambda</span> group: pd.Series({</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mktcap"</span>: (group[<span class="st">"mktcap"</span>].<span class="bu">sum</span>() <span class="op">/</span> group[<span class="st">"cpi"</span>].mean())</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>market_cap_per_exchange_figure <span class="op">=</span> (ggplot(market_cap_per_exchange, </span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>        aes(x<span class="op">=</span><span class="st">"month"</span>, y<span class="op">=</span><span class="st">"mktcap / 1000"</span>, </span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>            color<span class="op">=</span><span class="st">"exchange"</span>, linetype<span class="op">=</span><span class="st">"exchange"</span>))</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_line()</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>      x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">""</span>, color<span class="op">=</span><span class="st">""</span>, linetype<span class="op">=</span><span class="st">""</span>,</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>      title<span class="op">=</span><span class="st">"Monthly market cap by listing exchange in billions of Dec 2021 USD"</span></span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"10 years"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>comma_format())</span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>market_cap_per_exchange_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<figcaption class="figure-caption">Figure&nbsp;2: <strong>?(caption)</strong></figcaption>
 </figure>
 </div>
-</div>
-</div>
 <p>Next, we look at the same descriptive statistics by industry. <a href="#fig-213">Figure&nbsp;3</a> plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.</p>
-<div class="cell" data-execution_count="16">
+<div id="fig-213" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>securities_per_industry <span class="op">=</span> (crsp_monthly</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"industry"</span>, <span class="st">"date"</span>])</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  .size()</span>
@@ -659,17 +685,12 @@ Note
 <span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>comma_format())</span>
 <span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>securities_per_industry_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<div id="fig-213" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="wrds-crsp-and-compustat_files/figure-html/fig-213-output-1.png" class="img-fluid figure-img" alt="Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2021 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2021, the segment of firms within public administration is the largest in terms of the number of listed stocks."></p>
-<figcaption class="figure-caption">Figure&nbsp;3: Number of stocks in the CRSP sample associated with different industries.</figcaption>
+<figcaption class="figure-caption">Figure&nbsp;3: <strong>?(caption)</strong></figcaption>
 </figure>
 </div>
-</div>
-</div>
 <p>We also compute the market cap of all stocks belonging to the respective industries and show the evolution over time in <a href="#fig-214">Figure&nbsp;4</a>. All values are again in terms of billions of end of 2021 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Toward the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.</p>
-<div class="cell" data-execution_count="17">
+<div id="fig-214" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>market_cap_per_industry <span class="op">=</span> (crsp_monthly</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  .merge(cpi_monthly, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"industry"</span>])</span>
@@ -692,14 +713,8 @@ Note
 <span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>comma_format())</span>
 <span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>market_cap_per_industry_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="6">
-<div id="fig-214" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="wrds-crsp-and-compustat_files/figure-html/fig-214-output-1.png" class="img-fluid figure-img" alt="Title: Monthly total market cap by industry in billions as of Dec 2021 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2021 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. "></p>
-<figcaption class="figure-caption">Figure&nbsp;4: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2021.</figcaption>
+<figcaption class="figure-caption">Figure&nbsp;4: <strong>?(caption)</strong></figcaption>
 </figure>
-</div>
-</div>
 </div>
 </section>
 <section id="daily-crsp-data" class="level2">
@@ -754,7 +769,7 @@ Note
 <span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  .sort_values(<span class="st">"datadate"</span>)</span>
 <span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"gvkey"</span>, <span class="st">"year"</span>], as_index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  .last()</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  .tail(<span class="dv">1</span>)</span>
 <span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database.</p>
@@ -763,14 +778,17 @@ Note
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    datadate <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"datadate"</span>]<span class="op">-</span> pd.Timestamp(<span class="st">"1970-01-01"</span>)) <span class="op">//</span> pd.Timedelta(<span class="st">"1d"</span>)</span>
 <span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"compustat"</span>, con<span class="op">=</span>tidy_finance, if_exists<span class="op">=</span><span class="st">"replace"</span>)</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"compustat"</span>, </span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>          con<span class="op">=</span>tidy_finance, </span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>          if_exists<span class="op">=</span><span class="st">"replace"</span>,</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>          index <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="merging-crsp-with-compustat" class="level2">
 <h2 class="anchored" data-anchor-id="merging-crsp-with-compustat">Merging CRSP with Compustat</h2>
 <p>Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses <code>permno</code> for stocks, while Compustat uses <code>gvkey</code> to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the <em>CRSP-Compustat Merged</em> table (provided by CRSP). The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. Note also that currently active links have no end date, so we just enter the current date via the SQL verb <code>CURRENT_DATE</code>.</p>
-<div class="cell" data-execution_count="24">
+<div class="cell" data-execution_count="23">
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>ccmxpf_linktable_query <span class="op">=</span> (</span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"""SELECT lpermno AS permno, gvkey, linkdt, </span></span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="st">            COALESCE(linkenddt, CURRENT_DATE) AS linkenddt</span></span>
@@ -788,7 +806,7 @@ Note
 <span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat <code>gvkey</code> to our monthly stock data.</p>
-<div class="cell" data-execution_count="25">
+<div class="cell" data-execution_count="24">
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>ccm_links <span class="op">=</span> (crsp_monthly</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  .merge(ccmxpf_linktable, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"permno"</span>)</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"~gvkey.isnull() &amp; (date &gt;= linkdt) &amp; (date &lt;= linkenddt)"</span>)</span>
@@ -800,17 +818,21 @@ Note
 <span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>As the last step, we update the previously prepared monthly CRSP file with the linking information in our local database.</p>
-<div class="cell" data-execution_count="26">
+<div class="cell" data-execution_count="25">
 <div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>(crsp_monthly</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    date <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"date"</span>]<span class="op">-</span> pd.Timestamp(<span class="st">"1970-01-01"</span>)) <span class="op">//</span> pd.Timedelta(<span class="st">"1d"</span>),</span>
 <span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    month <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"month"</span>]<span class="op">-</span> pd.Timestamp(<span class="st">"1970-01-01"</span>)) <span class="op">//</span> pd.Timedelta(<span class="st">"1d"</span>)</span>
 <span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"crsp_monthly"</span>, con<span class="op">=</span>tidy_finance, if_exists<span class="op">=</span><span class="st">"replace"</span>)</span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  .to_sql(name<span class="op">=</span><span class="st">"crsp_monthly"</span>, </span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>          con<span class="op">=</span>tidy_finance, </span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>          if_exists<span class="op">=</span><span class="st">"replace"</span>,</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>          index <span class="op">=</span> <span class="va">False</span>)</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, <a href="#fig-215">Figure&nbsp;5</a> plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 60s but hovers around 80% for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.</p>
-<div class="cell" data-execution_count="27">
+<div id="fig-215" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure">
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.formatters <span class="im">import</span> percent_format</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>share_with_be <span class="op">=</span> (crsp_monthly</span>
@@ -819,7 +841,7 @@ Note
 <span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  .sort_values(<span class="st">"date"</span>)</span>
 <span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"permno"</span>, <span class="st">"year"</span>], as_index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  .last()</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  .tail(<span class="dv">1</span>)</span>
 <span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  .merge(compustat, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"year"</span>])</span>
 <span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"exchange"</span>, <span class="st">"year"</span>])</span>
 <span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
@@ -837,14 +859,8 @@ Note
 <span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> coord_cartesian(ylim<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">1</span>))</span>
 <span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>share_with_be_figure.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<div id="fig-215" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure">
-<p><img src="wrds-crsp-and-compustat_files/figure-html/fig-215-output-1.png" class="img-fluid figure-img" alt="Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2021 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."></p>
-<figcaption class="figure-caption">Figure&nbsp;5: End-of-year share of securities with book equity values by listing exchange.</figcaption>
+<figcaption class="figure-caption">Figure&nbsp;5: <strong>?(caption)</strong></figcaption>
 </figure>
-</div>
-</div>
 </div>
 </section>
 <section id="exercises" class="level2">
@@ -861,6 +877,7 @@ Note
 
 </section>
 
+
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="list">
 <div id="ref-BaliEngleMurray2016" class="csl-entry" role="listitem">
 Bali, Turan G, Robert F Engle, and Scott Murray. 2016. <em><span class="nocase">Empirical asset pricing: The cross section of stock returns</span></em>. John Wiley &amp; Sons. <a href="https://doi.org/10.1002/9781118445112.stat07954">https://doi.org/10.1002/9781118445112.stat07954</a>.
@@ -871,7 +888,12 @@ Fama, Eugene F., and Kenneth R. French. 1992. <span>“<span class="nocase">The 
 <div id="ref-FamaFrench1997" class="csl-entry" role="listitem">
 ———. 1997. <span>“Industry Costs of Equity.”</span> <em>Journal of Financial Economics</em> 43 (2): 153–93. <a href="https://doi.org/10.1016/s0304-405x(96)00896-3">https://doi.org/10.1016/s0304-405x(96)00896-3</a>.
 </div>
-</div></section></div></main> <!-- /main -->
+</div></section><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>An alternative to establish a connection to WRDS is to use the (WRDS-Py)[https://pypi.org/project/wrds/] library. We chose to work with <code>sqlalchemy</code> to show how to access `PostgreSQL´ engines in general.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {

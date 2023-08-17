@@ -505,36 +505,36 @@ cookieconsent.run({
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>mergent <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"mergent"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(complete_cusip, maturity, offering_amt, sic_code) <span class="sc">|&gt;</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"trace_enhanced"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt)<span class="sc">|&gt;</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"trace_enhanced"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt)<span class="sc">|&gt;</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries <span class="citation" data-cites="Seltzer2022">(in line with <a href="#ref-Seltzer2022" role="doc-biblioref">Seltzer, Starks, and Zhu 2022</a>)</span>.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>treatment_date <span class="ot">&lt;-</span> <span class="fu">ymd</span>(<span class="st">"2015-12-12"</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>bonds <span class="ot">&lt;-</span> mergent <span class="sc">|&gt;</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_to_maturity =</span> <span class="fu">as.numeric</span>(maturity <span class="sc">-</span> treatment_date),</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_to_maturity =</span> time_to_maturity <span class="sc">/</span> <span class="dv">365</span>,</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">sic_code =</span> <span class="fu">as.integer</span>(<span class="fu">substr</span>(sic_code, <span class="dv">1</span>, <span class="dv">2</span>)),</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">log_offering_amt =</span> <span class="fu">log</span>(offering_amt)</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_to_maturity <span class="sc">&gt;=</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">cusip_id =</span> complete_cusip,</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    time_to_maturity, log_offering_amt, sic_code</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>polluting_industries <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  <span class="dv">49</span>, <span class="dv">13</span>, <span class="dv">45</span>, <span class="dv">29</span>, <span class="dv">28</span>, <span class="dv">33</span>, <span class="dv">40</span>, <span class="dv">20</span>,</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  <span class="dv">26</span>, <span class="dv">42</span>, <span class="dv">10</span>, <span class="dv">53</span>, <span class="dv">32</span>, <span class="dv">99</span>, <span class="dv">37</span></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>bonds <span class="ot">&lt;-</span> bonds <span class="sc">|&gt;</span></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">polluter =</span> sic_code <span class="sc">%in%</span> polluting_industries)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>polluting_industries <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="dv">49</span>, <span class="dv">13</span>, <span class="dv">45</span>, <span class="dv">29</span>, <span class="dv">28</span>, <span class="dv">33</span>, <span class="dv">40</span>, <span class="dv">20</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dv">26</span>, <span class="dv">42</span>, <span class="dv">10</span>, <span class="dv">53</span>, <span class="dv">32</span>, <span class="dv">99</span>, <span class="dv">37</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>bonds <span class="ot">&lt;-</span> mergent <span class="sc">|&gt;</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(offering_amt <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">time_to_maturity =</span> <span class="fu">as.numeric</span>(maturity <span class="sc">-</span> treatment_date) <span class="sc">/</span> <span class="dv">365</span>,</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">sic_code =</span> <span class="fu">as.integer</span>(<span class="fu">substr</span>(sic_code, <span class="dv">1</span>, <span class="dv">2</span>)),</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">log_offering_amt =</span> <span class="fu">log</span>(offering_amt)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(time_to_maturity <span class="sc">&gt;=</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">cusip_id =</span> complete_cusip,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    time_to_maturity, log_offering_amt, sic_code</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">polluter =</span> sic_code <span class="sc">%in%</span> polluting_industries)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond’s last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature <span class="citation" data-cites="Bessembinder2008">(see, e.g., <a href="#ref-Bessembinder2008" role="doc-biblioref">Bessembinder et al. 2008</a>)</span>. We weigh each transaction by volume to reflect a trade’s relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices <code>rptd_pr</code> larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions). </p>
 <div class="cell">
@@ -563,10 +563,8 @@ cookieconsent.run({
 <p>Before we can run the first regression, we need to define the <code>treated</code> indicator, which is the product of the <code>post_period</code> (i.e., all months after the signing of the PA) and the <code>polluter</code> indicator defined above.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="ot">&lt;-</span> bonds_panel <span class="sc">|&gt;</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">post_period =</span> month <span class="sc">&gt;=</span> <span class="fu">floor_date</span>(treatment_date, <span class="st">"months"</span>))</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="ot">&lt;-</span> bonds_panel <span class="sc">|&gt;</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">treated =</span> polluter <span class="sc">&amp;</span> post_period)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">post_period =</span> month <span class="sc">&gt;=</span> <span class="fu">floor_date</span>(treatment_date, <span class="st">"months"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">treated =</span> polluter <span class="sc">&amp;</span> post_period)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.</p>
 <div class="cell">
@@ -591,9 +589,9 @@ cookieconsent.run({
 <pre><code># A tibble: 3 × 9
   measure           mean    sd    min   q05   q50   q95   max      n
   &lt;chr&gt;            &lt;dbl&gt; &lt;dbl&gt;  &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt; &lt;dbl&gt;  &lt;int&gt;
-1 avg_yield         4.08 4.21  0.0595  1.27  3.37  8.07 128.  127428
-2 log_offering_amt 13.3  0.823 4.64   12.2  13.2  14.5   16.5 127428
-3 time_to_maturity  8.54 8.41  1.01    1.50  5.81 27.4  101.  127428</code></pre>
+1 avg_yield         4.08 4.21  0.0595  1.27  3.37  8.07 128.  127436
+2 log_offering_amt 13.3  0.823 4.64   12.2  13.2  14.5   16.5 127436
+3 time_to_maturity  8.54 8.41  1.01    1.50  5.81 27.4  101.  127436</code></pre>
 </div>
 </div>
 </section>
@@ -620,10 +618,10 @@ cookieconsent.run({
 <pre><code>                    model_without_fe     model_with_fe
 Dependent Var.:            avg_yield         avg_yield
                                                       
-Constant            10.66*** (56.60)                  
-treatedTRUE        0.4610*** (9.284) 0.9807*** (29.43)
-post_periodTRUE  -0.1747*** (-5.940)                  
-polluterTRUE       0.4745*** (15.05)                  
+Constant            10.66*** (56.59)                  
+treatedTRUE        0.4606*** (9.277) 0.9807*** (29.43)
+post_periodTRUE  -0.1745*** (-5.936)                  
+polluterTRUE       0.4751*** (15.07)                  
 log_offering_amt -0.5451*** (-38.55)                  
 time_to_maturity   0.0573*** (41.29)                  
 Fixed-Effects:   ------------------- -----------------
@@ -631,8 +629,8 @@ cusip_id                          No               Yes
 month                             No               Yes
 ________________ ___________________ _________________
 VCOV type                        IID               IID
-Observations                 127,428           127,428
-R2                           0.03151           0.64689
+Observations                 127,436           127,436
+R2                           0.03151           0.64691
 Within R2                         --           0.00713
 ---
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>

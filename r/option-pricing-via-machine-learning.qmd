@@ -72,10 +72,12 @@ The Black-Scholes equation provides a way to compute the arbitrage-free price of
 
 ```{r, eval = TRUE}
 black_scholes_price <- function(S, K = 70, r = 0, T = 1, sigma = 0.2) {
+  
   d1 <- (log(S / K) + (r + sigma^2 / 2) * T) / (sigma * sqrt(T))
-  value <- S * pnorm(d1) - K * exp(-r * T) * pnorm(d1 - sigma * sqrt(T))
-
-  return(value)
+  d2 <- d1 - sigma * sqrt(T)
+  price <- S * pnorm(d1) - K * exp(-r * T) * pnorm(d2)
+  
+  return(price)
 }
 ```
 
@@ -101,12 +103,11 @@ option_prices <- expand_grid(
 ) |>
   mutate(
     black_scholes = black_scholes_price(S, K, r, T, sigma),
-    observed_price = map(
+    observed_price = map_dbl(
       black_scholes,
-      function(x) x + rnorm(2, sd = 0.15)
+      function(x) x + rnorm(1, sd = 0.15)
     )
-  ) |>
-  unnest(observed_price)
+  )
 ```
 
 The code above generates more than 1.5 million random parameter constellations. For each of these values, two *observed* prices reflecting the Black-Scholes prices are given and a random innovation term *pollutes* the observed prices. The intuition of this application is simple: the simulated data provides many observations of option prices - by using the Black-Scholes equation we can evaluate the actual predictive performance of a ML method, which would be hard in a realistic context were the actual arbitrage-free price would be unknown. 
@@ -267,7 +268,7 @@ predictive_performance |>
     linetype = Model
     )) +
   geom_jitter(alpha = 0.05) +
-  geom_smooth(se = FALSE, method = "gam") +
+  geom_smooth(se = FALSE, method = "gam", formula = "y ~ s(x, bs = 'cs')") +
   labs(
     x = "Moneyness (S - K)", color = NULL,
     y = "Absolut prediction error (USD)",
