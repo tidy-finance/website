@@ -381,8 +381,8 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 
 ```{python}
 compustat_query = (
-  """SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, 
-            itcb, pstkrv, pstkl, pstk, capx, oancf
+  """SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,
+            pstkrv, pstkl, pstk, capx, oancf, sale, cogs, xint, xsga
         FROM comp.funda
         WHERE indfmt = 'INDL' AND 
               datafmt = 'STD' AND 
@@ -398,7 +398,7 @@ compustat = (pd.read_sql_query(
 )
 ```
 
-Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}
+Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}\index{Operating profitability}
 
 ```{python}
 compustat = (compustat
@@ -409,6 +409,10 @@ compustat = (compustat
             .fillna(0)))
   .assign(
     be = lambda x: x["be"].apply(lambda y: np.nan if y <= 0 else y)
+  )
+  .assign(
+    op = lambda x: ((x["sale"] - x["cogs"].fillna(0) - 
+                      x["xsga"].fillna(0) - x["xint"].fillna(0)) / be)
   )
 )
 ```
@@ -426,7 +430,23 @@ compustat = (compustat
 )
 ```
 
+We also compute the investment ratio `inv` according to Ken French's variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.\index{Investment ratio}
+
+```{python}
+compustat_lag = (compustat
+  .get(["gvkey", "year", "at"])
+  .assign(year=lambda x: x["year"] + 1)
+  .rename(columns={"at": "at_lag"})
+)
+
+compustat = (compustat
+  .merge(compustat_lag, how="left", on=["gvkey", "year"])
+  .assign(inv = lambda x: x["at"] / x["at_lag"] - 1)
+)
+```
+
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
+
 ```{python}
 (compustat
   .assign(

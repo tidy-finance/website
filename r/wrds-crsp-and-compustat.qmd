@@ -420,12 +420,16 @@ compustat <- funda_db |>
     pstkl, # Preferred stock liquidating value
     pstk, # Preferred stock par value
     capx, # Capital investment
-    oancf # Operating cash flow
+    oancf, # Operating cash flow
+    sale,  # Revenue
+    cogs, # Costs of goods sold
+    xint, # Interest expense
+    xsga # Selling, general, and administrative expenses
   ) |>
   collect()
 ```
 
-Next, we calculate the book value of preferred stock and equity inspired by the [variable definition in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}
+Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}\index{Operating profitability}
 
 ```{r}
 compustat <- compustat |>
@@ -433,7 +437,8 @@ compustat <- compustat |>
     be = coalesce(seq, ceq + pstk, at - lt) +
       coalesce(txditc, txdb + itcb, 0) -
       coalesce(pstkrv, pstkl, pstk, 0),
-    be = if_else(be <= 0, as.numeric(NA), be)
+    be = if_else(be <= 0, as.numeric(NA), be),
+    op = (sale - coalesce(cogs, 0) - coalesce(xsga, 0) - coalesce(xint, 0)) / be,
   )
 ```
 
@@ -447,7 +452,22 @@ compustat <- compustat |>
   ungroup()
 ```
 
-With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
+We also compute the investment ratio `inv` according to Ken French's variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.\index{Investment ratio}
+
+```{r}
+compustat <- compustat |> 
+  left_join(
+    compustat |> 
+      select(gvkey, year, at_lag = at) |> 
+      mutate(year = year + 1), by = c("gvkey", "year")
+  ) |> 
+  mutate(
+    inv = at / at_lag - 1
+  )
+```
+
+With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database.
+
 ```{r}
   dbWriteTable(tidy_finance,
     "compustat",
