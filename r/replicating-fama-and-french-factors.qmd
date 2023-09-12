@@ -4,7 +4,7 @@ aliases:
   - ../replicating-fama-and-french-factors.html
 ---
 
-In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
+In this chapter, we provide a replication of the famous five Fama and French factor portfolios. The Fama and French factor models are a cornerstone of empirical asset pricing [see @Fama1992 and @Fama2015]. On top of the market factor represented by the traditional CAPM beta, the model includes the size, value, profitability and investment factors to explain the cross section of returns. We introduced the size and value factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. We extend these definitions by the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates. 
 
 The current chapter relies on this set of packages. 
 ```{r, eval = TRUE, message = FALSE}
@@ -14,7 +14,7 @@ library(RSQLite)
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -23,7 +23,7 @@ tidy_finance <- dbConnect(
   extended_types = TRUE
 )
 
-data_ff <- tbl(tidy_finance, "crsp_monthly") |>
+crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   select(
     permno, gvkey, month, ret_excess,
     mktcap, mktcap_lag, exchange
@@ -31,49 +31,51 @@ data_ff <- tbl(tidy_finance, "crsp_monthly") |>
   collect() |>
   drop_na()
 
-book_equity <- tbl(tidy_finance, "compustat") |>
-    select(gvkey, datadate, be) |>
+compustat <- tbl(tidy_finance, "compustat") |>
+    select(gvkey, datadate, be, op, inv) |>
     collect() |>
     drop_na()
 
 factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
-  select(month, smb, hml) |>
+  select(month, smb, hml, rmw, cma) |>
   collect()
 ```
 
 Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
-Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
+Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year  $t-1$.
 
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `distinct()` at the end of the chunk below.
 
 ```{r}
-me_ff <- data_ff |>
+size <- crsp_monthly |>
   filter(month(month) == 6) |>
   mutate(sorting_date = month %m+% months(1)) |>
-  select(permno, sorting_date, me_ff = mktcap)
+  select(permno, exchange, sorting_date, size = mktcap)
 
-me_ff_dec <- data_ff |>
+market_equity <- crsp_monthly |>
   filter(month(month) == 12) |>
   mutate(sorting_date = ymd(str_c(year(month) + 1, "0701)"))) |>
-  select(permno, gvkey, sorting_date, bm_me = mktcap)
+  select(permno, gvkey, sorting_date, me = mktcap)
 
-bm_ff <- book_equity |>
+other_sorting_variables <- compustat |>
   mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
-  select(gvkey, sorting_date, bm_be = be) |>
-  inner_join(me_ff_dec, by = c("gvkey", "sorting_date")) |>
-  mutate(bm_ff = bm_be / bm_me) |>
-  select(permno, sorting_date, bm_ff)
+  select(gvkey, sorting_date, be, op, inv) |>
+  inner_join(market_equity, by = c("gvkey", "sorting_date")) |>
+  mutate(bm = be / me) |>
+  select(permno, sorting_date, me, be, bm, op, inv)
 
-variables_ff <- me_ff |>
-  inner_join(bm_ff, by = c("permno", "sorting_date")) |>
+sorting_variables <- size |>
+  inner_join(
+    other_sorting_variables, by = c("permno", "sorting_date")
+    ) |>
   drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
 ## Portfolio Sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of each other sorting variable at the 30%- and 70%-percentiles, and they use dependent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ```{r}
 assign_portfolio <- function(data, 
@@ -100,80 +102,136 @@ assign_portfolio <- function(data,
   return(assigned_portfolios)
 }
 
-portfolios_ff <- variables_ff |>
-  inner_join(data_ff, by = c("permno" = "permno", "sorting_date" = "month")) |>
+portfolios <- sorting_variables |>
   group_by(sorting_date) |>
   mutate(
-    portfolio_me = assign_portfolio(
+    portfolio_size = assign_portfolio(
       data = pick(everything()),
-      sorting_variable = me_ff,
+      sorting_variable = size,
       percentiles = c(0, 0.5, 1)
-    ),
-    portfolio_bm = assign_portfolio(
-      data = pick(everything()),
-      sorting_variable = bm_ff,
-      percentiles = c(0, 0.3, 0.7, 1)
+    )) |> 
+  group_by(sorting_date, portfolio_size) |> 
+  mutate(
+    across(c(bm, op, inv), ~assign_portfolio(
+      data = pick(everything()), 
+      sorting_variable = ., 
+      percentiles = c(0, 0.3, 0.7, 1)),
+      .names = "portfolio_{.col}"
     )
   ) |>
-  select(permno, sorting_date, portfolio_me, portfolio_bm)
+  ungroup() |> 
+  select(permno, sorting_date, 
+         portfolio_size, portfolio_bm,
+         portfolio_op, portfolio_inv)
 ```
 
 Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 ```{r}
-portfolios_ff <- data_ff |>
+portfolios <- crsp_monthly |>
   mutate(sorting_date = case_when(
     month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
     month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
   )) |>
-  inner_join(portfolios_ff, by = c("permno", "sorting_date"))
+  inner_join(portfolios, by = c("permno", "sorting_date"))
 ```
-
 
 ## Fama and French Factor Returns
 
-Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size!Size factor}\index{Value factor}
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the  portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally. For the profitability factor (i.e., RMW), we take a long position in the two high profitability portfolios and a short position in the two low profitability poertfolios. Finally, for the investment factor (i.e., CMA), we go long the two low investment portfolios and short the two high investment portfolios. \index{Factor!Size factor}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}
 
 ```{r}
-factors_ff_monthly_replicated <- portfolios_ff |>
-  group_by(portfolio_me, portfolio_bm, month) |>
+factors_size <- portfolios |>
+  group_by(portfolio_size, month) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag),
-    portfolio_me = unique(portfolio_me),
-    portfolio_bm = unique(portfolio_bm), .groups = "drop"
+    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
   ) |>
   group_by(month) |>
   summarize(
-    smb_replicated = mean(ret[portfolio_me == 1]) -
-      mean(ret[portfolio_me == 2]),
+    smb_replicated = mean(ret[portfolio_size == 1]) -
+      mean(ret[portfolio_size == 2])
+  )
+
+factors_book_to_market <- portfolios |>
+  group_by(portfolio_size, portfolio_bm, month) |>
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
+  ) |>
+  group_by(month) |>
+  summarize(
     hml_replicated = mean(ret[portfolio_bm == 3]) -
       mean(ret[portfolio_bm == 1])
+  )
+
+factors_profitability <- portfolios |>
+  group_by(portfolio_size, portfolio_op, month) |>
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
+  ) |>
+  group_by(month) |>
+  summarize(
+    rmw_replicated = mean(ret[portfolio_op == 3]) -
+      mean(ret[portfolio_op == 1])
+  )
+
+factors_investment <- portfolios |>
+  group_by(portfolio_size, portfolio_inv, month) |>
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
+  ) |>
+  group_by(month) |>
+  summarize(
+    cma_replicated = mean(ret[portfolio_inv == 1]) -
+      mean(ret[portfolio_inv == 3])
+  )
+
+factors <- factors_size |> 
+  full_join(
+    factors_book_to_market, by = "month"
+  ) |> 
+  full_join(
+    factors_profitability, by = "month"
+  ) |> 
+  full_join(
+    factors_investment, by = "month"
   )
 ```
 
 ## Replication Evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
+In the previous section, we replicated the size, value, profitability, and investment premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium}\index{Profitability premium}\index{Investment premium} The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `lm()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 ```{r}
 test <- factors_ff_monthly |>
-  inner_join(factors_ff_monthly_replicated, by = "month") |>
+  inner_join(factors, by = "month") |>
   mutate(
-    smb_replicated = round(smb_replicated, 4),
-    hml_replicated = round(hml_replicated, 4)
+    across(c(smb_replicated, hml_replicated,
+             rmw_replicated, cma_replicated), ~round(., 4))
   )
 ```
 
-The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%. 
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is around 0.95 and R-squared is at 98%. 
 
 ```{r}
 summary(lm(smb ~ smb_replicated, data = test))
 ```
 
-The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 96%. 
+The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.99 and R-squared around 93%. 
 
 ```{r}
 summary(lm(hml ~ hml_replicated, data = test))
+```
+
+We are also able to replicate the RMW factor quite well with a coefficient of 0.96 and an R-squared of 94%.
+
+```{r}
+summary(lm(rmw ~ rmw_replicated, data = test))
+```
+
+Finally, the CMA factor also replicates well with a coefficient of 0.97 and an R-squared of 95%.
+
+```{r}
+summary(lm(cma ~ cma_replicated, data = test))
 ```
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. 
