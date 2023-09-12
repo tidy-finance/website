@@ -30,17 +30,20 @@ We start by downloading some famous Fama-French factors [e.g., @Fama1993] and po
 library(frenchdata)
 ```
 
-We can use the main function of the package to download monthly Fama-French factors. The set *3 Factors* includes the return time series of the market, size, and value factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately, as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the site, check the raw data files to appreciate the time you can save thanks to `frenchdata`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Risk-free rate}
+We can use the main function of the package to download monthly Fama-French factors. The set *5 Factors (2x3)* includes the return time series of the market `mkt_excess`, size `smb`, value `hml`, profitability `rmw`, and investment `cma` factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately, as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to `frenchdata`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
 
 ```{r, message=FALSE}
-factors_ff_monthly_raw <- download_french_data("Fama/French 3 Factors")
+factors_ff_monthly_raw <- download_french_data("Fama/French 5 Factors (2x3)")
 factors_ff_monthly <- factors_ff_monthly_raw$subsets$data[[1]] |>
-  transmute(
+  mutate(
     month = floor_date(ymd(str_c(date, "01")), "month"),
     rf = as.numeric(RF) / 100,
     mkt_excess = as.numeric(`Mkt-RF`) / 100,
     smb = as.numeric(SMB) / 100,
-    hml = as.numeric(HML) / 100
+    hml = as.numeric(HML) / 100,
+    rmw = as.numeric(RMW) / 100,
+    cma = as.numeric(CMA) / 100,
+    .keep = "none"
   ) |>
   filter(month >= start_date & month <= end_date)
 ```
@@ -48,14 +51,17 @@ factors_ff_monthly <- factors_ff_monthly_raw$subsets$data[[1]] |>
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function. 
 
 ```{r, message=FALSE}
-factors_ff_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
+factors_ff_daily_raw <- download_french_data("Fama/French 5 Factors (2x3) [Daily]")
 factors_ff_daily <- factors_ff_daily_raw$subsets$data[[1]] |>
-  transmute(
+  mutate(
     date = ymd(date),
     rf = as.numeric(RF) / 100,
     mkt_excess = as.numeric(`Mkt-RF`) / 100,
     smb = as.numeric(SMB) / 100,
-    hml = as.numeric(HML) / 100
+    hml = as.numeric(HML) / 100,
+    rmw = as.numeric(RMW) / 100,
+    cma = as.numeric(CMA) / 100,
+    .keep = "none"
   ) |>
   filter(date >= start_date & date <= end_date)
 ```
@@ -182,9 +188,10 @@ cpi_monthly <- tq_get("CPIAUCNS",
   from = start_date,
   to = end_date
 ) |>
-  transmute(
+  mutate(
     month = floor_date(date, "month"),
-    cpi = price / price[month == max(month)]
+    cpi = price / price[month == max(month)],
+    .keep = "none"
   )
 ```
 
