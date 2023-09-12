@@ -483,7 +483,7 @@ cookieconsent.run({
 
 </header>
 
-<p>In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model <span class="citation" data-cites="Fama1993">(see <a href="#ref-Fama1993" role="doc-biblioref">Fama and French 1993</a>)</span> is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts.</p>
+<p>In this chapter, we provide a replication of the famous five Fama and French factor portfolios. The Fama and French factor models are a cornerstone of empirical asset pricing <span class="citation" data-cites="Fama1992">Fama and French (<a href="#ref-FamaFrench2015" role="doc-biblioref">2015</a>)</span>. On top of the market factor represented by the traditional CAPM beta, the model includes the size, value, profitability and investment factors to explain the cross section of returns. We introduced the size and value factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. We extend these definitions by the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates.</p>
 <p>The current chapter relies on this set of packages.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
@@ -491,7 +491,7 @@ cookieconsent.run({
 </div>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our <code>SQLite</code>-database introduced in Chapters 2-4.</p>
+<p>We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our <code>SQLite</code>-database introduced in Chapters 2-4.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SQLite</span>(),</span>
@@ -499,7 +499,7 @@ cookieconsent.run({
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">extended_types =</span> <span class="cn">TRUE</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>data_ff <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"crsp_monthly"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"crsp_monthly"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    permno, gvkey, month, ret_excess,</span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    mktcap, mktcap_lag, exchange</span>
@@ -507,45 +507,47 @@ cookieconsent.run({
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>book_equity <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"compustat"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(gvkey, datadate, be) <span class="sc">|&gt;</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>compustat <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"compustat"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(gvkey, datadate, be, op, inv) <span class="sc">|&gt;</span></span>
 <span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">drop_na</span>()</span>
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"factors_ff_monthly"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(month, smb, hml) <span class="sc">|&gt;</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(month, smb, hml, rmw, cma) <span class="sc">|&gt;</span></span>
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year <span class="math inline">\(t\)</span>, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year <span class="math inline">\(t+1\)</span>.</p>
-<p>Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year <span class="math inline">\(t - 1\)</span> and the book equity reported in year <span class="math inline">\(t-1\)</span>, i.e., the <code>datadate</code> is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.</p>
+<p>Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year <span class="math inline">\(t - 1\)</span> and the book equity reported in year <span class="math inline">\(t-1\)</span>, i.e., the <code>datadate</code> is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year <span class="math inline">\(t-1\)</span>.</p>
 <p>To implement all these time lags, we again employ the temporary <code>sorting_date</code>-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of <code>distinct()</code> at the end of the chunk below.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>me_ff <span class="ot">&lt;-</span> data_ff <span class="sc">|&gt;</span></span>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>size <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">month</span>(month) <span class="sc">==</span> <span class="dv">6</span>) <span class="sc">|&gt;</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sorting_date =</span> month <span class="sc">%m+%</span> <span class="fu">months</span>(<span class="dv">1</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, sorting_date, <span class="at">me_ff =</span> mktcap)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, exchange, sorting_date, <span class="at">size =</span> mktcap)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>me_ff_dec <span class="ot">&lt;-</span> data_ff <span class="sc">|&gt;</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>market_equity <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">month</span>(month) <span class="sc">==</span> <span class="dv">12</span>) <span class="sc">|&gt;</span></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sorting_date =</span> <span class="fu">ymd</span>(<span class="fu">str_c</span>(<span class="fu">year</span>(month) <span class="sc">+</span> <span class="dv">1</span>, <span class="st">"0701)"</span>))) <span class="sc">|&gt;</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, gvkey, sorting_date, <span class="at">bm_me =</span> mktcap)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, gvkey, sorting_date, <span class="at">me =</span> mktcap)</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>bm_ff <span class="ot">&lt;-</span> book_equity <span class="sc">|&gt;</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>other_sorting_variables <span class="ot">&lt;-</span> compustat <span class="sc">|&gt;</span></span>
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sorting_date =</span> <span class="fu">ymd</span>(<span class="fu">str_c</span>(<span class="fu">year</span>(datadate) <span class="sc">+</span> <span class="dv">1</span>, <span class="st">"0701"</span>))) <span class="sc">|&gt;</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, sorting_date, <span class="at">bm_be =</span> be) <span class="sc">|&gt;</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(me_ff_dec, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bm_ff =</span> bm_be <span class="sc">/</span> bm_me) <span class="sc">|&gt;</span></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, sorting_date, bm_ff)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(gvkey, sorting_date, be, op, inv) <span class="sc">|&gt;</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(market_equity, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bm =</span> be <span class="sc">/</span> me) <span class="sc">|&gt;</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, sorting_date, me, be, bm, op, inv)</span>
 <span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>variables_ff <span class="ot">&lt;-</span> me_ff <span class="sc">|&gt;</span></span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(bm_ff, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>() <span class="sc">|&gt;</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(permno, sorting_date, <span class="at">.keep_all =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>sorting_variables <span class="ot">&lt;-</span> size <span class="sc">|&gt;</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    other_sorting_variables, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>)</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>() <span class="sc">|&gt;</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(permno, sorting_date, <span class="at">.keep_all =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="portfolio-sorts" class="level2">
 <h2 class="anchored" data-anchor-id="portfolio-sorts">Portfolio Sorts</h2>
-<p>Next, we construct our portfolios with an adjusted <code>assign_portfolio()</code> function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the <code>seq()</code> we would produce does not produce the right breakpoints. Instead of <code>n_portfolios</code>, we now specify <code>percentiles</code>, which take the breakpoint-sequence as an object specified in the function’s call. Specifically, we give <code>percentiles = c(0, 0.3, 0.7, 1)</code> to the function. Additionally, we perform an <code>inner_join()</code> with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.</p>
+<p>Next, we construct our portfolios with an adjusted <code>assign_portfolio()</code> function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of each other sorting variable at the 30%- and 70%-percentiles, and they use dependent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the <code>seq()</code> we would produce does not produce the right breakpoints. Instead of <code>n_portfolios</code>, we now specify <code>percentiles</code>, which take the breakpoint-sequence as an object specified in the function’s call. Specifically, we give <code>percentiles = c(0, 0.3, 0.7, 1)</code> to the function. Additionally, we perform an <code>inner_join()</code> with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>assign_portfolio <span class="ot">&lt;-</span> <span class="cf">function</span>(data, </span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                             sorting_variable, </span>
@@ -571,65 +573,110 @@ cookieconsent.run({
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(assigned_portfolios)</span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>portfolios_ff <span class="ot">&lt;-</span> variables_ff <span class="sc">|&gt;</span></span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(data_ff, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span> <span class="ot">=</span> <span class="st">"permno"</span>, <span class="st">"sorting_date"</span> <span class="ot">=</span> <span class="st">"month"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(sorting_date) <span class="sc">|&gt;</span></span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio_me =</span> <span class="fu">assign_portfolio</span>(</span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">pick</span>(<span class="fu">everything</span>()),</span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>      <span class="at">sorting_variable =</span> me_ff,</span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>      <span class="at">percentiles =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>)</span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio_bm =</span> <span class="fu">assign_portfolio</span>(</span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">pick</span>(<span class="fu">everything</span>()),</span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>      <span class="at">sorting_variable =</span> bm_ff,</span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>      <span class="at">percentiles =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>)</span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, sorting_date, portfolio_me, portfolio_bm)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>portfolios <span class="ot">&lt;-</span> sorting_variables <span class="sc">|&gt;</span></span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(sorting_date) <span class="sc">|&gt;</span></span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio_size =</span> <span class="fu">assign_portfolio</span>(</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">pick</span>(<span class="fu">everything</span>()),</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>      <span class="at">sorting_variable =</span> size,</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>      <span class="at">percentiles =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>)</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">|&gt;</span> </span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(sorting_date, portfolio_size) <span class="sc">|&gt;</span> </span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>    <span class="fu">across</span>(<span class="fu">c</span>(bm, op, inv), <span class="sc">~</span><span class="fu">assign_portfolio</span>(</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">pick</span>(<span class="fu">everything</span>()), </span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>      <span class="at">sorting_variable =</span> ., </span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>      <span class="at">percentiles =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>)),</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>      <span class="at">.names =</span> <span class="st">"portfolio_{.col}"</span></span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">|&gt;</span> </span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, sorting_date, </span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>         portfolio_size, portfolio_bm,</span>
+<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>         portfolio_op, portfolio_inv)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column <code>sorting_date</code> in our return data by setting the date to sort on to July of <span class="math inline">\(t-1\)</span> if the month is June (of year <span class="math inline">\(t\)</span>) or earlier or to July of year <span class="math inline">\(t\)</span> if the month is July or later.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>portfolios_ff <span class="ot">&lt;-</span> data_ff <span class="sc">|&gt;</span></span>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>portfolios <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sorting_date =</span> <span class="fu">case_when</span>(</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">month</span>(month) <span class="sc">&lt;=</span> <span class="dv">6</span> <span class="sc">~</span> <span class="fu">ymd</span>(<span class="fu">str_c</span>(<span class="fu">year</span>(month) <span class="sc">-</span> <span class="dv">1</span>, <span class="st">"0701"</span>)),</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">month</span>(month) <span class="sc">&gt;=</span> <span class="dv">7</span> <span class="sc">~</span> <span class="fu">ymd</span>(<span class="fu">str_c</span>(<span class="fu">year</span>(month), <span class="st">"0701"</span>))</span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(portfolios_ff, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(portfolios, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="fama-and-french-factor-returns" class="level2">
 <h2 class="anchored" data-anchor-id="fama-and-french-factor-returns">Fama and French Factor Returns</h2>
-<p>Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.</p>
+<p>Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally. For the profitability factor (i.e., RMW), we take a long position in the two high profitability portfolios and a short position in the two low profitability poertfolios. Finally, for the investment factor (i.e., CMA), we go long the two low investment portfolios and short the two high investment portfolios. </p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly_replicated <span class="ot">&lt;-</span> portfolios_ff <span class="sc">|&gt;</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio_me, portfolio_bm, month) <span class="sc">|&gt;</span></span>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>factors_size <span class="ot">&lt;-</span> portfolios <span class="sc">|&gt;</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio_size, month) <span class="sc">|&gt;</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag),</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio_me =</span> <span class="fu">unique</span>(portfolio_me),</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio_bm =</span> <span class="fu">unique</span>(portfolio_bm), <span class="at">.groups =</span> <span class="st">"drop"</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">smb_replicated =</span> <span class="fu">mean</span>(ret[portfolio_me <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_me <span class="sc">==</span> <span class="dv">2</span>]),</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">hml_replicated =</span> <span class="fu">mean</span>(ret[portfolio_bm <span class="sc">==</span> <span class="dv">3</span>]) <span class="sc">-</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_bm <span class="sc">==</span> <span class="dv">1</span>])</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">smb_replicated =</span> <span class="fu">mean</span>(ret[portfolio_size <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_size <span class="sc">==</span> <span class="dv">2</span>])</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>factors_book_to_market <span class="ot">&lt;-</span> portfolios <span class="sc">|&gt;</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio_size, portfolio_bm, month) <span class="sc">|&gt;</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">hml_replicated =</span> <span class="fu">mean</span>(ret[portfolio_bm <span class="sc">==</span> <span class="dv">3</span>]) <span class="sc">-</span></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_bm <span class="sc">==</span> <span class="dv">1</span>])</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>factors_profitability <span class="ot">&lt;-</span> portfolios <span class="sc">|&gt;</span></span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio_size, portfolio_op, month) <span class="sc">|&gt;</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">rmw_replicated =</span> <span class="fu">mean</span>(ret[portfolio_op <span class="sc">==</span> <span class="dv">3</span>]) <span class="sc">-</span></span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_op <span class="sc">==</span> <span class="dv">1</span>])</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>factors_investment <span class="ot">&lt;-</span> portfolios <span class="sc">|&gt;</span></span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(portfolio_size, portfolio_inv, month) <span class="sc">|&gt;</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">weighted.mean</span>(ret_excess, mktcap_lag), <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>    <span class="at">cma_replicated =</span> <span class="fu">mean</span>(ret[portfolio_inv <span class="sc">==</span> <span class="dv">1</span>]) <span class="sc">-</span></span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mean</span>(ret[portfolio_inv <span class="sc">==</span> <span class="dv">3</span>])</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>factors <span class="ot">&lt;-</span> factors_size <span class="sc">|&gt;</span> </span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">full_join</span>(</span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>    factors_book_to_market, <span class="at">by =</span> <span class="st">"month"</span></span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">full_join</span>(</span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>    factors_profitability, <span class="at">by =</span> <span class="st">"month"</span></span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">full_join</span>(</span>
+<span id="cb6-53"><a href="#cb6-53" aria-hidden="true" tabindex="-1"></a>    factors_investment, <span class="at">by =</span> <span class="st">"month"</span></span>
+<span id="cb6-54"><a href="#cb6-54" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="replication-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="replication-evaluation">Replication Evaluation</h2>
-<p>In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using <code>lm()</code>. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).</p>
+<p>In the previous section, we replicated the size, value, profitability, and investment premiums following the procedure outlined by Fama and French. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using <code>lm()</code>. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>test <span class="ot">&lt;-</span> factors_ff_monthly <span class="sc">|&gt;</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(factors_ff_monthly_replicated, <span class="at">by =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(factors, <span class="at">by =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">smb_replicated =</span> <span class="fu">round</span>(smb_replicated, <span class="dv">4</span>),</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">hml_replicated =</span> <span class="fu">round</span>(hml_replicated, <span class="dv">4</span>)</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">across</span>(<span class="fu">c</span>(smb_replicated, hml_replicated,</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>             rmw_replicated, cma_replicated), <span class="sc">~</span><span class="fu">round</span>(., <span class="dv">4</span>))</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%.</p>
+<p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is around 0.95 and R-squared is at 98%.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">lm</span>(smb <span class="sc">~</span> smb_replicated, <span class="at">data =</span> test))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -638,22 +685,22 @@ Call:
 lm(formula = smb ~ smb_replicated, data = test)
 
 Residuals:
-     Min       1Q   Median       3Q      Max 
--0.02035 -0.00159  0.00001  0.00156  0.01483 
+      Min        1Q    Median        3Q       Max 
+-0.022181 -0.002197  0.000025  0.002129  0.017469 
 
 Coefficients:
-                Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept)    -0.000129   0.000131   -0.98     0.33    
-smb_replicated  0.995344   0.004344  229.14   &lt;2e-16 ***
+               Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)    9.52e-05   1.59e-04     0.6     0.55    
+smb_replicated 9.45e-01   4.99e-03   189.1   &lt;2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-Residual standard error: 0.00353 on 724 degrees of freedom
-Multiple R-squared:  0.986, Adjusted R-squared:  0.986 
-F-statistic: 5.25e+04 on 1 and 724 DF,  p-value: &lt;2e-16</code></pre>
+Residual standard error: 0.0042 on 700 degrees of freedom
+Multiple R-squared:  0.981, Adjusted R-squared:  0.981 
+F-statistic: 3.58e+04 on 1 and 700 DF,  p-value: &lt;2e-16</code></pre>
 </div>
 </div>
-<p>The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 96%.</p>
+<p>The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.99 and R-squared around 93%.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">lm</span>(hml <span class="sc">~</span> hml_replicated, <span class="at">data =</span> test))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
@@ -662,19 +709,67 @@ Call:
 lm(formula = hml ~ hml_replicated, data = test)
 
 Residuals:
-      Min        1Q    Median        3Q       Max 
--0.023348 -0.002983 -0.000091  0.002269  0.028783 
+     Min       1Q   Median       3Q      Max 
+-0.04444 -0.00409 -0.00030  0.00416  0.03671 
 
 Coefficients:
                Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept)    0.000317   0.000219    1.45     0.15    
-hml_replicated 0.965357   0.007477  129.12   &lt;2e-16 ***
+(Intercept)    0.000477   0.000300    1.59     0.11    
+hml_replicated 0.988879   0.010607   93.23   &lt;2e-16 ***
 ---
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-Residual standard error: 0.00587 on 724 degrees of freedom
-Multiple R-squared:  0.958, Adjusted R-squared:  0.958 
-F-statistic: 1.67e+04 on 1 and 724 DF,  p-value: &lt;2e-16</code></pre>
+Residual standard error: 0.00793 on 700 degrees of freedom
+Multiple R-squared:  0.925, Adjusted R-squared:  0.925 
+F-statistic: 8.69e+03 on 1 and 700 DF,  p-value: &lt;2e-16</code></pre>
+</div>
+</div>
+<p>We are also able to replicate the RMW factor quite well with a coefficient of 0.96 and an R-squared of 94%.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">lm</span>(rmw <span class="sc">~</span> rmw_replicated, <span class="at">data =</span> test))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = rmw ~ rmw_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.019844 -0.003084  0.000133  0.003369  0.018769 
+
+Coefficients:
+               Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)    8.62e-05   2.05e-04    0.42     0.67    
+rmw_replicated 9.55e-01   9.06e-03  105.33   &lt;2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.00539 on 700 degrees of freedom
+Multiple R-squared:  0.941, Adjusted R-squared:  0.941 
+F-statistic: 1.11e+04 on 1 and 700 DF,  p-value: &lt;2e-16</code></pre>
+</div>
+</div>
+<p>Finally, the CMA factor also replicates well with a coefficient of 0.97 and an R-squared of 95%.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(<span class="fu">lm</span>(cma <span class="sc">~</span> cma_replicated, <span class="at">data =</span> test))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = cma ~ cma_replicated, data = test)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.015137 -0.002776 -0.000209  0.002452  0.021725 
+
+Coefficients:
+               Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)    0.000738   0.000173    4.27  2.2e-05 ***
+cma_replicated 0.965387   0.008599  112.27  &lt; 2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.00455 on 700 degrees of freedom
+Multiple R-squared:  0.947, Adjusted R-squared:  0.947 
+F-statistic: 1.26e+04 on 1 and 700 DF,  p-value: &lt;2e-16</code></pre>
 </div>
 </div>
 <p>The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.</p>
@@ -691,8 +786,14 @@ F-statistic: 1.67e+04 on 1 and 724 DF,  p-value: &lt;2e-16</code></pre>
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-Fama1992" class="csl-entry" role="listitem">
+Fama, Eugene F., and Kenneth R. French. 1992. <span>“<span class="nocase">The cross-section of expected stock returns</span>.”</span> <em><span>The Journal of Finance</span></em> 47 (2): 427–65. <a href="https://doi.org/2329112">https://doi.org/2329112</a>.
+</div>
 <div id="ref-Fama1993" class="csl-entry" role="listitem">
-Fama, Eugene F., and Kenneth R. French. 1993. <span>“<span class="nocase">Common risk factors in the returns on stocks and bonds</span>.”</span> <em><span>Journal of Financial Economics</span></em> 33 (1): 3–56. <a href="https://doi.org/10.1016/0304-405X(93)90023-5">https://doi.org/10.1016/0304-405X(93)90023-5</a>.
+———. 1993. <span>“<span class="nocase">Common risk factors in the returns on stocks and bonds</span>.”</span> <em><span>Journal of Financial Economics</span></em> 33 (1): 3–56. <a href="https://doi.org/10.1016/0304-405X(93)90023-5">https://doi.org/10.1016/0304-405X(93)90023-5</a>.
+</div>
+<div id="ref-FamaFrench2015" class="csl-entry" role="listitem">
+———. 2015. <span>“A Five-Factor Asset Pricing Model.”</span> <em>Journal of Financial Economics</em> 116 (1): 1–22. <a href="https://doi.org/10.1016/j.jfineco.2014.10.010">https://doi.org/10.1016/j.jfineco.2014.10.010</a>.
 </div>
 </div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
