@@ -6,54 +6,344 @@ author:
     affiliations:
       - name: wikifolio Financial Technologies AG
 date: "2023-09-11"
-description: R code to generate dummy data that can be used to run the examples in Tidy Finance with R
+description: R code to generate dummy data that can be used to run the examples in Tidy Finance with R or Python
 image: thumbnail.png
 image-alt: An image of a stylized company building on a screen in the middle of a room. The room has a futuristic setting, with a backdrop of a digital, grid-like landscape symbolizing the internet. The color palette should be a combination of cool blues and warm yellow. Created with DALL-E 2.
 categories: 
   - Data
 ---
 
-
 ```{r}
 library(tidyverse)
 library(RSQLite)
 
+set.seed(1234)
+
 tidy_finance <- dbConnect(
   SQLite(),
-  "data/tidy_finance.sqlite",
+  "../../data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 
-DBI::dbListTables(tidy_finance)
-
-## Create CRSP Dummy Data
-
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |> 
-  collect()
-
-beta <- tbl(tidy_finance, "beta") |> 
-  collect()
-
-
-## Create Compustat Dummy Data
-
-compustat <- tbl(tidy_finance, "compustat") |> 
-  collect()
-
-crsp_monthly |> 
-  
-
-compustat |> 
-  filter(year == 2019) |> 
-  drop_na()
-
-tibble(
-  gvkey = seq(1:1000)
+tidy_finance_simulated <- dbConnect(
+  SQLite(),
+  "../../data/tidy_finance_simulated.sqlite",
+  extended_types = TRUE
 )
 
-## Create Mergent Dummy Data
+start_date <- as.Date("2000-01-01")
+end_date <- as.Date("2023-08-01")
 
-## Create TRACE Dummy Data
-
-
+time_series_years <- seq(year(start_date), year(end_date), 1)
+time_series_months <- seq(start_date, end_date, "1 month")
+time_series_days <- seq(start_date, end_date, "1 day")
 ```
+
+
+## Create macro dummy data
+
+```{r}
+macro_tables <- c(
+  "cpi_monthly", "factors_ff_daily", 
+  "factors_ff_monthly", "factors_q_monthly",
+  "industries_ff_monthly", "macro_predictors"
+)
+
+for (table_name in macro_tables) {
+  data_original <- tbl(tidy_finance, table_name) |>
+    collect() |> 
+    drop_na()
+  
+  if ("month" %in% names(data_original)) {
+    time_series <- time_series_months
+    date_column <- "month"
+  } else if ("date" %in% names(data_original)) {
+    time_series <- time_series_days
+    date_column <- "date"
+  }
+  
+  ## TODO: this trick to create columns is actually quite nice, 
+  ##       will put it into a function because I reuse it below
+  relevant_columns <- data_original |> 
+    select(-contains(c("month", "date"))) |> 
+    names()
+  
+  commands <- unlist(
+    map(
+      relevant_columns, 
+      ~rlang::exprs(!!..1 := runif(n()))
+    )
+  )
+  
+  data_simulated <- tibble(
+    !!sym(date_column) := time_series
+    ) |> 
+    mutate(
+      !!!commands
+    )
+  
+  dbWriteTable(tidy_finance_simulated, table_name, 
+               data_simulated, overwrite = TRUE)
+}
+```
+
+## Create stock dummy data
+
+```{r}
+number_of_stocks <- 1000
+
+crsp_stocks <- tbl(tidy_finance, "crsp_monthly") |>
+  group_by(permno) |> 
+  filter(month == max(month, na.rm = TRUE)) |> 
+  ungroup() |> 
+  select(permno, gvkey, industry, exchange, exchcd, siccd) |> 
+  collect()
+
+industries <- crsp_stocks |> 
+  filter(industry != "Missing") |> 
+  count(industry) |> 
+  mutate(prob = n / sum(n))
+
+exchanges <- crsp_stocks |> 
+  filter(exchange != "Other") |> 
+  count(exchange) |> 
+  mutate(prob = n / sum(n))
+
+stock_identifiers <- 1:number_of_stocks |> 
+  map_df(
+    function(x) {
+      tibble(
+        permno = x,
+        gvkey = as.character(x + 10000),
+        exchange = sample(exchanges$exchange, 1, 
+                          prob = exchanges$prob),
+        industry = sample(industries$industry, 1, 
+                          prob = industries$prob)
+      ) |> 
+        mutate(
+          exchcd = case_when(
+            exchange == "NYSE" ~ sample(c(1, 31), 1),
+            exchange == "AMEX" ~ sample(c(2, 32), 1),
+            exchange == "NASDAQ" ~ sample(c(3, 33), 1)
+          ),
+          siccd = case_when(
+            industry == "Agriculture" ~ sample(1:999, 1),
+            industry == "Mining" ~ sample(1000:1499, 1),
+            industry == "Construction" ~ sample(1500:1799, 1),
+            industry == "Manufacturing" ~ sample(1800:3999, 1),
+            industry == "Transportation" ~ sample(4000:4899, 1),
+            industry == "Utilities" ~ sample(4900:4999, 1),
+            industry == "Wholesale" ~ sample(5000:5199, 1),
+            industry == "Retail" ~ sample(5200:5999, 1),
+            industry == "Finance" ~ sample(6000:6799, 1),
+            industry == "Services" ~ sample(7000:8999, 1),
+            industry == "Public" ~ sample(9000:9999, 1)
+          )
+        )
+    }
+  )
+
+## Construct panels with different time horizons
+stock_panel_yearly <- crossing(
+  stock_identifiers, 
+  tibble(year = time_series_years)
+) |> 
+  select(gvkey, year)
+
+stock_panel_monthly <- crossing(
+  stock_identifiers, 
+  tibble(month = time_series_months)
+) |> 
+  select(permno, gvkey, month, siccd, industry, exchcd, exchange)
+
+stock_panel_daily <- crossing(
+  stock_identifiers, 
+  tibble(date = time_series_days)
+)|> 
+  select(permno, date)
+
+## Simulate beta table
+tbl(tidy_finance, "beta")
+
+beta_simulated <- stock_panel_monthly |> 
+  mutate(
+    beta_monthly = runif(n()),
+    beta_daily = runif(n())
+  )
+
+dbWriteTable(tidy_finance_simulated, "beta", 
+             beta_simulated, overwrite = TRUE)
+
+## Create compustat dummy data
+tbl(tidy_finance, "compustat")
+
+relevant_columns <- tbl(tidy_finance, "compustat") |> 
+  select(-c(gvkey, datadate, year)) |> 
+  names()
+
+commands <- unlist(
+  map(
+    relevant_columns, 
+    ~rlang::exprs(!!..1 := runif(n()))
+  )
+)
+
+compustat_simulated <- stock_panel_yearly |> 
+  mutate(
+    datadate = ymd(str_c(year, "12", "31")),
+    !!!commands
+  )
+
+dbWriteTable(tidy_finance_simulated, "compustat", 
+             compustat_simulated, overwrite = TRUE)
+
+## Create crsp_monthly dummy data
+tbl(tidy_finance, "crsp_monthly")
+
+crsp_monthly_simulated <- stock_panel_monthly |> 
+  mutate(
+    date = ceiling_date(month, "month") - 1,
+    ret = pmax(rnorm(n()), -1),
+    ret_excess = ret - runif(n(), 0, 0.0025),
+    shrout = runif(n(), 1, 50) * 1000,
+    altprc = runif(n(), 0, 1000),
+    mktcap = shrout * altprc
+  ) |> 
+  group_by(permno) |> 
+  arrange(month) |> 
+  mutate(mktcap_lag = lag(mktcap)) |> 
+  ungroup()
+
+dbWriteTable(tidy_finance_simulated, "crsp_monthly", 
+             crsp_monthly_simulated, overwrite = TRUE)
+
+## Create crsp_daily dummy data
+tbl(tidy_finance, "crsp_daily")
+
+crsp_daily_simulated <- stock_panel_daily |> 
+  mutate(
+    month = floor_date(date, "month"),
+    ret_excess = pmax(rnorm(n()), -1)
+  )
+
+dbWriteTable(tidy_finance_simulated, "crsp_daily", 
+             crsp_daily_simulated, overwrite = TRUE)
+
+tbl(tidy_finance_simulated, "crsp_daily")
+```
+
+## Create bond dummy data
+
+```{r}
+number_of_bonds <- 1000
+
+## Create mergent dummy data
+mergent <- tbl(tidy_finance, "mergent") |> 
+  collect()
+
+maturities <- mergent |> 
+  count(days = maturity - offering_date) |> 
+  mutate(probability = n / sum(n))
+
+amounts <- mergent |> 
+  count(offering_amt) |> 
+  mutate(probability = n / sum(n))
+
+frequencies <- mergent |> 
+  count(interest_frequency) |> 
+  mutate(probability = n / sum(n))
+
+coupons <- mergent |> 
+  count(coupon) |> 
+  mutate(probability = n / sum(n))
+
+sic <- mergent |> 
+  count(sic_code) |> 
+  mutate(probability = n / sum(n))
+
+mergent_simulated <- 1:number_of_bonds |> 
+  map_df(
+    function(x) {
+      tibble(
+        complete_cusip = str_to_upper(
+          str_c(
+            sample(c(letters, 0:9), 12, replace = TRUE), 
+            collapse = ""
+          )
+        ),
+      )
+    }
+  ) |> 
+  mutate(
+    maturity = sample(time_series_days, n(), replace = TRUE),
+    offering_amt = sample(
+      amounts$offering_amt, n(), 
+      prob = amounts$probability, 
+      replace = TRUE
+    ),
+    offering_date = maturity - sample(
+      maturities$days, n(),
+      prob = maturities$probability, 
+      replace = TRUE
+    ),
+    dated_date = offering_date - sample(-10:10, n(), replace = TRUE),
+    interest_frequency = sample(
+      frequencies$interest_frequency, n(), 
+      prob = frequencies$probability, 
+      replace = TRUE
+    ),
+    coupon = sample(
+      coupons$coupon, n(), 
+      prob = coupons$probability, 
+      replace = TRUE
+    ),
+    last_interest_date = pmax(maturity, offering_date, dated_date),
+    issue_id = row_number(),
+    issuer_id = sample(1:250, n(), replace = TRUE),
+    sic_code = sample(
+      sic$sic_code, n(), 
+      prob = sic$probability, 
+      replace = TRUE
+    )
+  )
+  
+dbWriteTable(tidy_finance_simulated, "mergent", 
+             mergent_simulated, overwrite = TRUE)
+
+## Create trace_enhanced dummy data
+start_date <- as.Date("2014-01-01")
+end_date <- as.Date("2016-11-30")
+
+bonds_panel <- crossing(
+  mergent_simulated |> 
+    select(cusip_id = complete_cusip),
+  tibble(
+    trd_exctn_dt = seq(start_date, end_date, "1 day")
+  )
+)
+
+trace_enhanced_simulated <- bind_rows(
+  bonds_panel, bonds_panel, 
+  bonds_panel, bonds_panel, 
+  bonds_panel) |> 
+  mutate(
+    trd_exctn_tm = str_c(
+      sample(0:24, n(), replace = TRUE), ":", 
+      sample(0:60, n(), replace = TRUE), ":", 
+      sample(0:60, n(), replace = TRUE)
+    ),
+    rptd_pr = runif(n(), 10, 200),
+    entrd_vol_qt = sample(1:20, n(), replace = TRUE) * 1000,
+    yld_pt = runif(n(), -10, 10),
+    rpt_side_cd = sample(c("B", "S"), n(), replace = TRUE),
+    cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
+  )
+  
+dbWriteTable(tidy_finance_simulated, "trace_enhanced", 
+             trace_enhanced_simulated, overwrite = TRUE)
+```
+
+```{r}
+dbSendQuery(tidy_finance_simulated, "VACUUM;")
+```
+
