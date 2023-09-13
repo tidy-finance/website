@@ -44,6 +44,8 @@ for (table_name in macro_tables) {
     date_column <- "date"
   }
   
+  ## TODO: this trick to create columns is actually quite nice, 
+  ##       will put it into a function because I reuse it below
   relevant_columns <- data_original |> 
     select(-contains(c("month", "date"))) |> 
     names()
