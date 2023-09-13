@@ -62,8 +62,6 @@ for (table_name in macro_tables) {
     date_column <- "date"
   }
   
-  ## TODO: this trick to create columns is actually quite nice, 
-  ##       will put it into a function because I reuse it below
   relevant_columns <- data_original |> 
     select(-contains(c("month", "date"))) |> 
     names()
@@ -163,12 +161,13 @@ stock_panel_daily <- crossing(
   select(permno, date)
 
 ## Simulate beta table
-tbl(tidy_finance, "beta")
+tbl(tidy_finance, "beta") |> 
+  summarize(mean(beta_monthly))
 
 beta_simulated <- stock_panel_monthly |> 
   mutate(
-    beta_monthly = runif(n()),
-    beta_daily = runif(n())
+    beta_monthly = rnorm(n(), mean = 1.1, sd = 0.71),
+    beta_daily = beta_monthly + rnorm(n()) / 100
   )
 
 dbWriteTable(tidy_finance_simulated, "beta", 
@@ -204,7 +203,7 @@ crsp_monthly_simulated <- stock_panel_monthly |>
   mutate(
     date = ceiling_date(month, "month") - 1,
     ret = pmax(rnorm(n()), -1),
-    ret_excess = ret - runif(n(), 0, 0.0025),
+    ret_excess = pmax(ret - runif(n(), 0, 0.0025), -1),
     shrout = runif(n(), 1, 50) * 1000,
     altprc = runif(n(), 0, 1000),
     mktcap = shrout * altprc
