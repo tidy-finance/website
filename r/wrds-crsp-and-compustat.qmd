@@ -175,7 +175,7 @@ crsp_monthly <- crsp_monthly |>
   select(-c(dlret, dlstcd))
 ```
 
-Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
+Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the table `factors_ff3_monthly`.
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -184,12 +184,12 @@ tidy_finance <- dbConnect(
   extended_types = TRUE
 )
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   select(month, rf) |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff_monthly,
+  left_join(factors_ff3_monthly,
     by = "month"
   ) |>
   mutate(
@@ -335,7 +335,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 ```{r, eval = FALSE}
 dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
 
-factors_ff_daily <- tbl(tidy_finance, "factors_ff_daily") |>
+factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
   collect()
 
 permnos <- tbl(tidy_finance, "crsp_monthly") |>
@@ -361,7 +361,7 @@ for (j in 1:length(permnos)) {
   if (nrow(crsp_daily_sub) > 0) {
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
-      left_join(factors_ff_daily |>
+      left_join(factors_ff3_daily |>
         select(date, rf), by = "date") |>
       mutate(
         ret_excess = ret - rf,
