@@ -25,9 +25,9 @@ tidy_finance <- dbConnect(
   extended_types = TRUE
 )
 
-tidy_finance_simulated <- dbConnect(
+tidy_finance_dummy <- dbConnect(
   SQLite(),
-  "../../data/tidy_finance_simulated.sqlite",
+  "../../data/tidy_finance_dummy.sqlite",
   extended_types = TRUE
 )
 
@@ -41,6 +41,8 @@ time_series_days <- seq(start_date, end_date, "1 day")
 
 
 ## Create macro dummy data
+
+The code aims to create dummy data for the macroeconomic tables. It does this by replacing the original data with random numbers while preserving the time structure (either daily or monthly) and column names. We iterate over each table name in the macro_tables vector. For each table, the data is fetched from the database and stored in the `data_original` data frame. The code checks the column names of the `data_original` to determine if the data is structured by months or by days. Depending on the structure, it sets the appropriate time series and date column name. For each relevant column (i.e., not a date column), the code generates a command to replace its values with random numbers between 0 and 1. Finally, the table with the dummy data is written to the nwe database with dummy data
 
 ```{r}
 macro_tables <- c(
@@ -73,15 +75,15 @@ for (table_name in macro_tables) {
     )
   )
   
-  data_simulated <- tibble(
+  data_dummy <- tibble(
     !!sym(date_column) := time_series
     ) |> 
     mutate(
       !!!commands
     )
   
-  dbWriteTable(tidy_finance_simulated, table_name, 
-               data_simulated, overwrite = TRUE)
+  dbWriteTable(tidy_finance_dummy, table_name, 
+               data_dummy, overwrite = TRUE)
 }
 ```
 
@@ -141,7 +143,7 @@ stock_identifiers <- 1:number_of_stocks |>
     }
   )
 
-## Construct panels with different time horizons
+## Construct panels with different frequencies
 stock_panel_yearly <- crossing(
   stock_identifiers, 
   tibble(year = time_series_years)
@@ -164,14 +166,14 @@ stock_panel_daily <- crossing(
 tbl(tidy_finance, "beta") |> 
   summarize(mean(beta_monthly))
 
-beta_simulated <- stock_panel_monthly |> 
+beta_dummy <- stock_panel_monthly |> 
   mutate(
     beta_monthly = rnorm(n(), mean = 1.1, sd = 0.71),
     beta_daily = beta_monthly + rnorm(n()) / 100
   )
 
-dbWriteTable(tidy_finance_simulated, "beta", 
-             beta_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "beta", 
+             beta_dummy, overwrite = TRUE)
 
 ## Create compustat dummy data
 tbl(tidy_finance, "compustat")
@@ -187,19 +189,19 @@ commands <- unlist(
   )
 )
 
-compustat_simulated <- stock_panel_yearly |> 
+compustat_dummy <- stock_panel_yearly |> 
   mutate(
     datadate = ymd(str_c(year, "12", "31")),
     !!!commands
   )
 
-dbWriteTable(tidy_finance_simulated, "compustat", 
-             compustat_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "compustat", 
+             compustat_dummy, overwrite = TRUE)
 
 ## Create crsp_monthly dummy data
 tbl(tidy_finance, "crsp_monthly")
 
-crsp_monthly_simulated <- stock_panel_monthly |> 
+crsp_monthly_dummy <- stock_panel_monthly |> 
   mutate(
     date = ceiling_date(month, "month") - 1,
     ret = pmax(rnorm(n()), -1),
@@ -213,22 +215,22 @@ crsp_monthly_simulated <- stock_panel_monthly |>
   mutate(mktcap_lag = lag(mktcap)) |> 
   ungroup()
 
-dbWriteTable(tidy_finance_simulated, "crsp_monthly", 
-             crsp_monthly_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "crsp_monthly", 
+             crsp_monthly_dummy, overwrite = TRUE)
 
 ## Create crsp_daily dummy data
 tbl(tidy_finance, "crsp_daily")
 
-crsp_daily_simulated <- stock_panel_daily |> 
+crsp_daily_dummy <- stock_panel_daily |> 
   mutate(
     month = floor_date(date, "month"),
     ret_excess = pmax(rnorm(n()), -1)
   )
 
-dbWriteTable(tidy_finance_simulated, "crsp_daily", 
-             crsp_daily_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "crsp_daily", 
+             crsp_daily_dummy, overwrite = TRUE)
 
-tbl(tidy_finance_simulated, "crsp_daily")
+tbl(tidy_finance_dummy, "crsp_daily")
 ```
 
 ## Create bond dummy data
@@ -260,7 +262,7 @@ sic <- mergent |>
   count(sic_code) |> 
   mutate(probability = n / sum(n))
 
-mergent_simulated <- 1:number_of_bonds |> 
+mergent_dummy <- 1:number_of_bonds |> 
   map_df(
     function(x) {
       tibble(
@@ -306,22 +308,22 @@ mergent_simulated <- 1:number_of_bonds |>
     )
   )
   
-dbWriteTable(tidy_finance_simulated, "mergent", 
-             mergent_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "mergent", 
+             mergent_dummy, overwrite = TRUE)
 
 ## Create trace_enhanced dummy data
 start_date <- as.Date("2014-01-01")
 end_date <- as.Date("2016-11-30")
 
 bonds_panel <- crossing(
-  mergent_simulated |> 
+  mergent_dummy |> 
     select(cusip_id = complete_cusip),
   tibble(
     trd_exctn_dt = seq(start_date, end_date, "1 day")
   )
 )
 
-trace_enhanced_simulated <- bind_rows(
+trace_enhanced_dummy <- bind_rows(
   bonds_panel, bonds_panel, 
   bonds_panel, bonds_panel, 
   bonds_panel) |> 
@@ -338,11 +340,11 @@ trace_enhanced_simulated <- bind_rows(
     cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
   )
   
-dbWriteTable(tidy_finance_simulated, "trace_enhanced", 
-             trace_enhanced_simulated, overwrite = TRUE)
+dbWriteTable(tidy_finance_dummy, "trace_enhanced", 
+             trace_enhanced_dummy, overwrite = TRUE)
 ```
 
 ```{r}
-dbSendQuery(tidy_finance_simulated, "VACUUM;")
+dbSendQuery(tidy_finance_dummy, "VACUUM;")
 ```
 
