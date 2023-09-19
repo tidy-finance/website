@@ -5,23 +5,26 @@ author:
     url: https://christophscheuch.github.io/
     affiliations:
       - name: wikifolio Financial Technologies AG
-date: "2023-09-11"
-description: R code to generate dummy data that can be used to run the examples in Tidy Finance with R or Python
+date: "2023-09-19"
+description: R code to generate dummy data that can be used to run the code chunks in Tidy Finance with R or Python
 image: thumbnail.png
 image-alt: An image of a stylized company building on a screen in the middle of a room. The room has a futuristic setting, with a backdrop of a digital, grid-like landscape symbolizing the internet. The color palette should be a combination of cool blues and warm yellow. Created with DALL-E 2.
 categories: 
   - Data
 ---
 
-Since we published our book [Tidy Finance with R](../../r/index.qmd), we have received emails from readers who don't have access to WRDS and hence cannot run the code we provide. To alleviate their constraints, we decided to create a dummy database that contains all tables and corresponding columns such that all code chunks in our book can be executed with this dummy database. We deliberately use the *dummy* label because the data is not meaningful in the sense that it allows readers to replicate the results of the book. For legal reasons, the data is also *not* a sample of the original data.
+Since we published our book [Tidy Finance with R](../../r/index.qmd), we have received feedback from readers who don't have access to WRDS and hence cannot run the code we provide. To alleviate their constraints, we decided to create a dummy database that contains all tables and corresponding columns such that all code chunks in our book can be executed with this dummy database. The resulting database can be found here (TODO INSERT A LINK HERE). 
 
-In this blog post, we use the following packages:
+We deliberately use the *dummy* label because the data is not meaningful in the sense that it allows readers to replicate the results of the book. For legal reasons, the data is also *not* a sample of the original data. We merely generate random numbers for all columns of the dummy tables. 
+
+To generate the dummy database, we use the following packages:
 
 ```{r}
 library(tidyverse)
 library(RSQLite)
 ```
 
+We use the original database as an input and initialize a dummy version to store the output tables. 
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -37,31 +40,31 @@ tidy_finance_dummy <- dbConnect(
 )
 ```
 
-Since we draw
+Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over 10 years that we later use to create yearly, monthly, and daily data, respectively. 
+
 ```{r}
 set.seed(1234)
 
-start_date <- as.Date("2000-01-01")
-end_date <- as.Date("2023-08-01")
+start_date <- as.Date("2003-01-01")
+end_date <- as.Date("2022-12-31")
 
 time_series_years <- seq(year(start_date), year(end_date), 1)
 time_series_months <- seq(start_date, end_date, "1 month")
 time_series_days <- seq(start_date, end_date, "1 day")
 ```
 
-
 ## Create macro dummy data
 
-The code aims to create dummy data for the macroeconomic tables. It does this by replacing the original data with random numbers while preserving the time structure (either daily or monthly) and column names. We iterate over each table name in the macro_tables vector. For each table, the data is fetched from the database and stored in the `data_original` table. The code checks the column names of the `data_original` to determine if the data is structured by months or by days. Depending on the structure, it sets the appropriate time series and date column name. For each relevant column (i.e., not a date column), the code generates a command to replace its values with random numbers drawn from a uniform distribution between 0 and 1. Finally, the table with the dummy data is written to the nwe database with dummy data.
+We start by creating dummy data for the macroeconomic tables. The following code does this by replacing the original data with random numbers while preserving the time structure (either daily or monthly) and column names. We iterate over each table name in the `macro_tables` vector. For each table, the data is fetched from the database and stored in the `data_original` table. The code checks the column names of `data_original` to determine if the data is structured by months or by days. Depending on the structure, it sets the appropriate time series and date column name. For each relevant column (i.e., excluding colums of type date), the code generates a command to replace its values with random numbers drawn from a uniform distribution between 0 and 1. We then use the `!!!` operator to unlist and execute the list of commands. This trick actually helps us to avoid typing the same function for each column individually. Finally, the table with the dummy data is written to the new database with dummy data.
 
-We do not put any meaningful structure on the macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](../../r/accessing-and-managing-financial-data.qmd).
+Note that we do not put any meaningful structure on the macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](../../r/accessing-and-managing-financial-data.qmd) to get the actual data.
 
 ```{r}
 macro_tables <- c(
   "cpi_monthly", "factors_ff3_daily", 
-  "factors_ff3_monthly",
-  "factors_ff5_monthly", "factors_q_monthly",
-  "industries_ff_monthly", "macro_predictors"
+  "factors_ff3_monthly", "factors_ff5_monthly", 
+  "factors_q_monthly", "industries_ff_monthly", 
+  "macro_predictors"
 )
 
 for (table_name in macro_tables) {
@@ -102,7 +105,7 @@ for (table_name in macro_tables) {
 
 ## Create stock dummy data
 
-The next code generates a dataset of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchange`, `industry`, `exchcd`, and `siccd` values. The generated dataset is based on the characteristics of stocks in the `crsp_monthly` table of the `tidy_finance` database, ensuring that the generated stocks reflect the distribution of industries and exchanges in the original data.
+Let us move on the core data used throughout the book: stock and firm characteristics. We first generate a table of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchange`, `industry`, `exchcd`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the `tidy_finance` database, ensuring that the generated stocks reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are not to be used for actual CRSP or Compustat data, as they are purely constructed. 
 
 ```{r}
 number_of_stocks <- 100
@@ -159,11 +162,11 @@ stock_identifiers <- 1:number_of_stocks |>
   )
 ```
 
-In this code chunk, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` dataset with a new dataset containing the variable `year` from `time_series_years`. The `crossing()` function ensures that we get all possible combinations of the two datasets. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
+Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `time_series_years`. The `crossing()` function ensures that we get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
 
-Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `crossing()` function to combine `stock_identifiers` with a new dataset that has the `month` variable from `time_series_months`. After merging, we select the columns `permno`, `gvkey`, `month`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
+Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `crossing()` function to combine `stock_identifiers` with a new table that has the `month` variable from `time_series_months`. After merging, we select the columns `permno`, `gvkey`, `month`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
 
-Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a dataset containing the `date` variable from `time_series_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
+Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `time_series_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
 
 ```{r}
 stock_panel_yearly <- crossing(
@@ -185,18 +188,14 @@ stock_panel_daily <- crossing(
   select(permno, date)
 ```
 
-In this code chunk, we simulate and structure a beta table for stocks, and subsequently write this simulated data to a database. We first extract the "beta" table from the `tidy_finance` dataset using the `tbl()` function. From this table, we compute the mean of the `beta_monthly` column using the `summarize()` function. This gives us an idea of the average monthly beta value in our original dataset.
+### Dummy `beta` table
 
-We then proceed to simulate beta values for our `stock_panel_monthly` dataset. We generate simulated monthly beta values (`beta_monthly`) using the `rnorm()` function. This function generates random numbers from a normal distribution. We specify the number of values to generate using `n()`, set the mean to 1.1, and the standard deviation to 0.71. For daily beta values (`beta_daily`), we take the simulated monthly beta and add a small random noise to it. This noise is generated again using the `rnorm()` function, but this time we divide the random values by 100 to ensure they are small deviations from the monthly beta.
+We then proceed to simulate beta values for our `stock_panel_monthly` table. We generate simulated monthly beta values `beta_monthly` using the `rnorm()` function. For daily beta values `beta_daily`, we take the simulated monthly beta and add a small random noise to it. This noise is generated again using the `rnorm()` function, but this time we divide the random values by 100 to ensure they are small deviations from the monthly beta.
 
 ```{r}
-## Simulate beta table
-tbl(tidy_finance, "beta") |> 
-  summarize(mean(beta_monthly), sd(beta_monthly))
-
 beta_dummy <- stock_panel_monthly |> 
   mutate(
-    beta_monthly = rnorm(n(), mean = 1.1, sd = 0.71),
+    beta_monthly = rnorm(n()),
     beta_daily = beta_monthly + rnorm(n()) / 100
   )
 
@@ -204,11 +203,11 @@ dbWriteTable(tidy_finance_dummy, "beta",
              beta_dummy, overwrite = TRUE)
 ```
 
+### Dummy `compustat` table
+
+To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1 using the same trick as with the macro data tables. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. 
 
 ```{r}
-## Create compustat dummy data
-tbl(tidy_finance, "compustat")
-
 relevant_columns <- tbl(tidy_finance, "compustat") |> 
   select(-c(gvkey, datadate, year)) |> 
   names()
@@ -230,9 +229,11 @@ dbWriteTable(tidy_finance_dummy, "compustat",
              compustat_dummy, overwrite = TRUE)
 ```
 
+### Dummy `crsp_monthly` table
+
+The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the return `ret` drawn from a normal distribution, the excess return `ret_excess` with small deviations from the return, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distrinbutions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`.
 
 ```{r}
-## Create crsp_monthly dummy data
 tbl(tidy_finance, "crsp_monthly")
 
 crsp_monthly_dummy <- stock_panel_monthly |> 
@@ -253,9 +254,11 @@ dbWriteTable(tidy_finance_dummy, "crsp_monthly",
              crsp_monthly_dummy, overwrite = TRUE)
 ```
 
+### Dummy `crsp_daily` table
+
+The `crsp_daily` table only contains a `month` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.  
 
 ```{r}
-## Create crsp_daily dummy data
 tbl(tidy_finance, "crsp_daily")
 
 crsp_daily_dummy <- stock_panel_daily |> 
@@ -275,7 +278,6 @@ tbl(tidy_finance_dummy, "crsp_daily")
 ```{r}
 number_of_bonds <- 100
 
-## Create mergent dummy data
 mergent <- tbl(tidy_finance, "mergent") |> 
   collect()
 
@@ -351,7 +353,6 @@ dbWriteTable(tidy_finance_dummy, "mergent",
 
 
 ```{r}
-## Create trace_enhanced dummy data
 start_date <- as.Date("2014-01-01")
 end_date <- as.Date("2016-11-30")
 
