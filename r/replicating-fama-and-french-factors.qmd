@@ -6,9 +6,12 @@ aliases:
 
 In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French factor models are a cornerstone of empirical asset pricing [see @Fama1992 and @FamaFrench2015]. On top of the market factor represented by the traditional CAPM beta, the three factor model includes the size and value factors to explain the cross section of returns. Its successor, the five factor model, additionally includes profitability and investment as explanatory factors. 
 
-We start with the three factor model. We already introduced the size and value factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. After the replication of the three factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates. 
+We start with the three factor model. We already introduced the size and value factors in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd), and their definition remains the same: size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
+
+After the replication of the three factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates. 
 
 The current chapter relies on this set of packages. 
+
 ```{r, eval = TRUE, message = FALSE}
 library(tidyverse)
 library(RSQLite)
@@ -16,7 +19,7 @@ library(RSQLite)
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -45,7 +48,7 @@ factors_ff5_monthly <- tbl(tidy_finance, "factors_ff5_monthly") |>
   collect()
 ```
 
-Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
+Yet when we start merging our data set for computing the premiums, there are a few differences to [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year  $t-1$.
 
@@ -168,6 +171,7 @@ test <- factors_ff3_monthly |>
 ```
 
 The results for the SMB factor are really convincing as all three criteria outlined above are met and the coefficient is around 0.99 and R-squared is at 99%. 
+
 ```{r}
 summary(lm(smb ~ smb_replicated, data = test))
 ```
@@ -182,7 +186,7 @@ The evidence hence allows us to conclude that we did a relatively good job in re
 
 ## Fama and French Five Factor Model
 
-Now, let us move to the replication of the five factor model. We extend the `other_sorting_variables` data frame from above with the additional characteristics operating profitability `op` and investment `inv`. The re
+Now, let us move to the replication of the five factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `drop_na()` statement yields to different sample sizes as some firms with `be` values might not have `op` or `inv` values. 
 
 ```{r}
 other_sorting_variables <- compustat |>
@@ -200,7 +204,7 @@ sorting_variables <- size |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
 
-In each month, we indepedently sort all stocks into the two size portfolios. The value, profitability, and investment, on the other hand, are the results of dependent sorts based on the size portfolios. We then merge the portfolios to the return data for the rest of the year just as above. 
+In each month, we independently sort all stocks into the two size portfolios. The value, profitability, and investment portfolios, on the other hand, are the results of dependent sorts based on the size portfolios. We then merge the portfolios to the return data for the rest of the year just as above. 
 
 ```{r}
 portfolios <- sorting_variables |>
@@ -233,7 +237,7 @@ portfolios <- crsp_monthly |>
   inner_join(portfolios, by = c("permno", "sorting_date"))
 ```
 
-Now, we want to construct each of the factors, but this time the size factor actually comes last because it is the result of averaging across all other factor portfolios. This depdency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor as above by going long the two porfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.
+Now, we want to construct each of the factors, but this time the size factor actually comes last because it is the result of averaging across all other factor portfolios. This dependency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor, HML, as above by going long the two portfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.
 
 ```{r}
 portfolios_value <- portfolios |>
@@ -250,7 +254,7 @@ factors_value <- portfolios_value |>
   )
 ```
 
-For the profitability factor (i.e., RMW), we take a long position in the two high profitability portfolios and a short position in the two low profitability poertfolios.\index{Factor!Profitability}
+For the profitability factor, RMW, we take a long position in the two high profitability portfolios and a short position in the two low profitability portfolios.\index{Factor!Profitability}
 
 ```{r}
 portfolios_profitability <- portfolios |>
@@ -267,7 +271,7 @@ factors_profitability <- portfolios_profitability |>
   )
 ```
 
-For the investment factor (i.e., CMA), we go long the two low investment portfolios and short the two high investment portfolios.\index{Factor!Investment}
+For the investment factor, CMA, we go long the two low investment portfolios and short the two high investment portfolios.\index{Factor!Investment}
 
 ```{r}
 portfolios_investment <- portfolios |>
@@ -284,7 +288,7 @@ factors_investment <- portfolios_investment |>
   )
 ```
 
-Finally, the size factor (i.e., SMB) is constructed by going long the six small portfolios and short the six large portfolios. 
+Finally, the size factor, SMB, is constructed by going long the six small portfolios and short the six large portfolios. 
 
 ```{r}
 factors_size <- bind_rows(
@@ -344,7 +348,7 @@ Finally, the CMA factor also replicates well with a coefficient of 0.97 and an R
 summary(lm(cma ~ cma_replicated, data = test))
 ```
 
-Overall, our approach seems to replicate the Fama-French three and five factor models quite well. We are curious to hear about any tweaks that could move the code above closer to the original factors.
+Overall, our approach seems to replicate the Fama-French three and five factor models just as well as the three factors. 
 
 ## Exercises
 
