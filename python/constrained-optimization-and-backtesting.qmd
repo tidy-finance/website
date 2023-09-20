@@ -181,22 +181,56 @@ Note that `np.allclose()` is a safe way to compare two vectors for pairwise equa
 
 ```{python}
 w_initial = np.ones(n_industries) / n_industries
-equality_constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
+
+def objective_mvp(w):
+    return 0.5 * w.T @ Sigma @ w
+  
+def gradient_mvp(w):
+    return Sigma @ w
+
+def equality_constraint(w):
+    return np.sum(w) - 1
+
+def jacobian_equality(w):
+    return np.ones_like(w)
+
+constraints = (
+  {"type": "eq", "fun": equality_constraint, 
+                 "jac": jacobian_equality}
+)
+
+options = {
+  "tol":1e-20,
+  "maxiter": 10000,
+  "method":"SLSQP"
+}
 
 w_mvp_numerical = minimize(
-  fun=lambda w: 0.5 * w.T @ Sigma @ w,
   x0=w_initial,
-  constraints=equality_constraints,
-  tol = 1e-20
+  fun=objective_mvp,
+  jac=gradient_mvp,
+  constraints=constraints,
+  tol=options["tol"],
+  options={"maxiter": options["maxiter"]},
+  method=options["method"]
 )
                   
 np.allclose(w_mvp, w_mvp_numerical.x, atol = 1e-3)
 
+def objective_efficient(w):
+    return 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w
+
+def gradient_efficient(w):
+    return 2 * Sigma @ w - (1 + mu)
+
 w_efficient_numerical = minimize(
-  fun=lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
   x0=w_initial,
-  constraints=equality_constraints,
-  tol=1e-20
+  fun=objective_efficient,
+  jac=gradient_efficient,
+  constraints=constraints,
+  tol=options["tol"],
+  options={"maxiter": options["maxiter"]},
+  method=options["method"]
 )
 
 np.allclose(w_efficient, w_efficient_numerical.x, atol = 1e-3)
@@ -208,11 +242,14 @@ Next, we approach problems where no analytical solutions exist. First, we additi
 
 ```{python}
 w_no_short_sale = minimize(
-  fun=lambda w: 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w,
   x0=w_initial,
-  constraints=equality_constraints,
+  fun=objective_efficient,
+  jac=gradient_efficient,
+  constraints=constraints,
   bounds=((0, None),) * n_industries,
-  tol=1e-20
+  tol=options["tol"],
+  options={"maxiter": options["maxiter"]},
+  method=options["method"]
 )
 np.round(w_no_short_sale.x, 3)
 ```
@@ -226,19 +263,38 @@ Fortunately, we can still rely on `minimize()` to handle equality and ineqality 
 
 ```{python}
 reg_t = 1.5
-inequality_constraints = {"type": "ineq",
-                          "fun": lambda w: reg_t - np.sum(np.abs(w))}
-constraints = [equality_constraints, inequality_constraints]
 
-w_reg_t = minimize(
-  fun=lambda w: - w.T @ (1 + mu) + 2 * 0.5 * w.T @ Sigma @ w,
-  x0=w_initial,
-  constraints=constraints,
-  tol=1e-20,
-  options={"maxiter": 10000}
+def inequality_constraints(w):
+    return reg_t - np.sum(np.abs(w))
+
+def jacobian_inequality(w):
+    return -np.sign(w)
+
+def objective_reg_t(w):
+    return - w @ (1 + mu) + 2 * 0.5 * w.T @ Sigma @ w
+
+def gradient_reg_t(w):
+    return - (1 + mu) + 2 * np.dot(Sigma, w)
+
+constraints = (
+  {"type": "eq", "fun": equality_constraints, 
+                 "jac": jacobian_equality},
+  {"type": "ineq", "fun": inequality_constraints, 
+                   "jac": jacobian_inequality}
 )
 
-np.round(w_reg_t.x, 3)
+w_reg_t_result = minimize(
+  x0=w_initial,
+  fun=objective_reg_t,
+  jac=gradient_reg_t,
+  constraints=constraints,
+  tol=options["tol"],
+  options={"maxiter": options["maxiter"]},
+  method=options["method"]
+)
+
+w_reg_t_solution = w_reg_t_result.x
+np.round(w_reg_t_solution, 3)
 ```
 
 Note that the function `minimize()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `minimize()` performs numerical optimization by searching for a local minimum of the objective function (subject to the equality constraints `equality_constraints` and the inequality constraints `inequality_constraints`).Note that the starting point should not matter if the algorithm identifies a global minimum.
@@ -284,19 +340,33 @@ Before we move on, we want to propose a final allocation strategy, which reflect
 ```{python}
 def compute_efficient_weight_L1_TC(mu, 
                                    Sigma, 
-                                   gamma=2, 
-                                   beta=0, 
-                                   w_prev=np.ones(Sigma.shape[1]) / Sigma.shape[1]):
+                                   gamma, 
+                                   beta, 
+                                   initial_weights):
+                                     
+    def objective(w):
+      return (gamma * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w
+                + (beta / 10000) / 2 * np.sum(np.abs(w - initial_weights)))
 
-    n = Sigma.shape[1]
-    constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
-
-    result = minimize(lambda w: gamma * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w
-                      + (beta / 10000) / 2 * np.sum(np.abs(w - w_prev)),
-                      w_prev,
-                      constraints=constraints,
-                      tol=1e-20
-                      )
+    def gradient(w):
+      return (-mu + gamma * Sigma @ w 
+               + (beta / 10000) * 0.5 * np.sign(w - initial_weights))
+      
+    constraints = (
+      {"type": "eq", "fun": equality_constraint, 
+                     "jac": jacobian_equality}
+    )
+    
+    result = minimize(
+        x0=initial_weights,
+        fun=objective,
+        jac=gradient,
+        constraints=constraints,
+        tol=options["tol"],
+        options={"maxiter": options["maxiter"]},
+        method=options["method"]
+    )
+    
     return result.x
 ```
 
@@ -355,7 +425,7 @@ for p in range(periods):
         Sigma=Sigma_window, 
         beta=beta, 
         gamma=gamma, 
-        w_prev=w_prev_1)
+        initial_weights=w_prev_1)
 
     performance_values["MV (TC)"][p, :] = evaluate_performance(
         w_1, w_prev_1, next_return, beta=beta)
@@ -384,12 +454,14 @@ for i in enumerate(performance_values.keys()):
     tmp_data["strategy"] = i[1]
     performance_df = pd.concat([performance_df, tmp_data], axis=0)
 
+length_year = 12
+
 # Calculate the desired summary statistics
 summary_df = performance_df.groupby("strategy").agg(
-    Mean=("net_return", lambda x: 12 * 100 * x.mean()),
-    SD=("net_return", lambda x: np.sqrt(12) * 100 * x.std()),
-    Sharpe_ratio=("net_return", lambda x: (12 * 100 * x.mean()) /
-                  (np.sqrt(12) * 100 * x.std()) if x.mean() > 0 else np.nan),
+    Mean=("net_return", lambda x: length_year * 100 * x.mean()),
+    SD=("net_return", lambda x: np.sqrt(length_year) * 100 * x.std()),
+    Sharpe_ratio=("net_return", lambda x: (length_year * 100 * x.mean()) /
+                  (np.sqrt(length_year) * 100 * x.std()) if x.mean() > 0 else np.nan),
     Turnover=("turnover", lambda x: 100 * x.mean())
 ).reset_index()
 
