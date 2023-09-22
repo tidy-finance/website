@@ -8,7 +8,7 @@
 
 <meta name="author" content="Christoph Scheuch">
 <meta name="dcterms.date" content="2023-09-20">
-<meta name="description" content="An explanation for the difference in the value factors of FF3 and FF5 data">
+<meta name="description" content="An explanation for the difference in the size factors of Fama and French 3 and 5 factor data">
 
 <title>Tidy Finance - Comparing Fama-French Three vs Five Factors</title>
 <style>
@@ -128,7 +128,7 @@ cookieconsent.run({
 
 <link rel="stylesheet" href="../../styling/styles.css">
 <meta property="og:title" content="Tidy Finance - Comparing Fama-French Three vs Five Factors">
-<meta property="og:description" content="An explanation for the difference in the value factors of FF3 and FF5 data">
+<meta property="og:description" content="An explanation for the difference in the size factors of Fama and French 3 and 5 factor data">
 <meta property="og:image" content="https://www.tidy-finance.org/blog/fama-french-three-vs-five-factors/thumbnail.png">
 <meta property="og:site-name" content="Tidy Finance">
 <meta property="og:image:height" content="1024">
@@ -201,12 +201,13 @@ cookieconsent.run({
       <h1 class="title">Comparing Fama-French Three vs Five Factors</h1>
                   <div>
         <div class="description">
-          An explanation for the difference in the value factors of FF3 and FF5 data
+          An explanation for the difference in the size factors of Fama and French 3 and 5 factor data
         </div>
       </div>
                           <div class="quarto-categories">
                 <div class="quarto-category">Data</div>
                 <div class="quarto-category">Replication</div>
+                <div class="quarto-category">R</div>
               </div>
                   </div>
   </div>
@@ -251,31 +252,35 @@ cookieconsent.run({
 
 
 
-<p>In our book chapter <a href="../../r/replicating-fama-and-french-factors">Replicating Fama and French Factors</a>, we show how to construct factor portfolios that are fairly close to the popular data from <a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Prof.&nbsp;Kenneth French finance data library</a>. In this blog post, I want to elaborate a bit more on the subtle differences between the size and value data in the Fama-French three (FF3) and five (FF5) factor data.</p>
+<p>In our book chapter <a href="../../r/replicating-fama-and-french-factors">Replicating Fama and French Factors</a>, we show how to construct factor portfolios that are fairly close to the popular data from <a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">Prof.&nbsp;Kenneth French finance data library</a>. In this blog post, I want to elaborate a bit more on the subtle differences between the size and value data in the Fama-French three (FF3)<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> and five (FF5)<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> factor data.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SQLite</span>(), </span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"../../data/tidy_finance.sqlite"</span>, </span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">extended_types =</span> <span class="cn">TRUE</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"factors_ff3_monthly"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>factors_ff5_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"factors_ff5_monthly"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>factors_ff <span class="ot">&lt;-</span> factors_ff3_monthly <span class="sc">|&gt;</span> </span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="at">.cols =</span> <span class="fu">c</span>(mkt_excess, rf, smb, hml),</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>              <span class="sc">~</span><span class="fu">str_c</span>(.x, <span class="st">"_ff3"</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    factors_ff5_monthly <span class="sc">|&gt;</span> </span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(month, mkt_excess, rf, smb, hml) <span class="sc">|&gt;</span> </span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>      <span class="fu">rename_with</span>(<span class="at">.cols =</span> <span class="fu">c</span>(mkt_excess, rf, smb, hml),</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>              <span class="sc">~</span><span class="fu">str_c</span>(.x, <span class="st">"_ff5"</span>)), <span class="at">by =</span> <span class="st">"month"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(fixest)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SQLite</span>(), </span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"../../data/tidy_finance.sqlite"</span>, </span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">extended_types =</span> <span class="cn">TRUE</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"factors_ff3_monthly"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>factors_ff5_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"factors_ff5_monthly"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>factors_ff <span class="ot">&lt;-</span> factors_ff3_monthly <span class="sc">|&gt;</span> </span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="at">.cols =</span> <span class="fu">c</span>(mkt_excess, rf, smb, hml),</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>              <span class="sc">~</span><span class="fu">str_c</span>(.x, <span class="st">"_ff3"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    factors_ff5_monthly <span class="sc">|&gt;</span> </span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(month, mkt_excess, rf, smb, hml) <span class="sc">|&gt;</span> </span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>      <span class="fu">rename_with</span>(<span class="at">.cols =</span> <span class="fu">c</span>(mkt_excess, rf, smb, hml),</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>              <span class="sc">~</span><span class="fu">str_c</span>(.x, <span class="st">"_ff5"</span>)), <span class="at">by =</span> <span class="st">"month"</span>)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>industries_ff_monthly <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"industries_ff_monthly"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let us first inspect the summary statistics of each factor.</p>
 <div class="cell">
@@ -309,7 +314,7 @@ cookieconsent.run({
 8 smb_ff5  0.00228 0.0303  -0.153 -0.0431 0.001   0.0494 0.183    702</code></pre>
 </div>
 </div>
-<p>The above table shows that <code>rf</code>, <code>mkt_excess</code>, and <code>hml</code> show de facto identical value across all statistics for FF3 and FF5. However, the <code>smb</code> vales seem to be different between the both data sets. Another way to show the difference is running regressions, as we do in <a href="../../r/replicating-fama-and-french-factors">Replicating Fama and French Factors</a>:</p>
+<p>The above table shows that risk free rates <code>rf_*</code>, market excess returns <code>mkt_excess_*</code>, and value factors <code>hml_*</code> show de facto identical value across all statistics for FF3 and FF5. However, the size factors <code>smb_*</code> seem to be different between the data sets. Another way to show the difference is running regressions, as we do in <a href="../../r/replicating-fama-and-french-factors">Replicating Fama and French Factors</a>:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>model_smb <span class="ot">&lt;-</span> <span class="fu">lm</span>(smb_ff3 <span class="sc">~</span> smb_ff5, <span class="at">data =</span> factors_ff)</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(model_smb)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -334,17 +339,62 @@ Multiple R-squared:  0.964, Adjusted R-squared:  0.964
 F-statistic: 1.89e+04 on 1 and 700 DF,  p-value: &lt;2e-16</code></pre>
 </div>
 </div>
-<p>Regressing the FF3 SMB factor on its FF5 counterpart yields a coefficient of 0.99 and an R-squared around 96%, so definitely no perfect co-movement. Where does this difference come from?</p>
-<p>There are actually two explanations for the differences:</p>
+<p>Regressing the FF3 size factor on its FF5 counterpart yields a coefficient of 0.99 and an R-squared around 96%, so definitely no perfect co-movement. Where does this difference come from?</p>
+<p>There are two potential explanations for the differences:</p>
 <ol type="1">
-<li>The value portfolios <code>portfolio_bm</code> are constructed as independent sorts in FF3, while they are the result of dependent sorts in FF5 (depending on <code>portfolio_size</code>).</li>
-<li>The FF3 and FF5 data are based on slightly different samples: while the FF3 data considers all stocks with valid <code>bm</code> values, the FF5 data requires valid <code>bm</code>, <code>op</code>, and <code>inv</code> values. So if firms don’t report any of the values that enter into these three sorting variables, then they are dropped from the portfolio sorts.</li>
+<li>The FF3 and FF5 data are based on slightly different samples: while the FF3 data considers all stocks with valid <code>market_cap</code> and <code>bm</code> values, the FF5 data requires valid <code>bm</code>, <code>op</code>, and <code>inv</code> values. So if firms don’t report any of the values that enter into these three sorting variables, then they are dropped from the portfolio sorts.</li>
+<li>The size portfolios <code>portfolio_size</code> and value portfolios <code>portfolio_bm</code> are constructed as independent sorts in FF3, while <code>portfolio_bm</code>, <code>portfolio_op</code>, and <code>portfolio_inv</code> are the result of dependent sorts in FF5 (depending on <code>portfolio_size</code>). In FF5, <code>portfolio_size</code> is then calculated on averages based on <code>portfolio_bm</code>, <code>portfolio_op</code>, and <code>portfolio_inv</code> portfolios. As all portfolios are the result of value-weighted return aggregation, it is hence very likely that these aggregations lead to different values.</li>
 </ol>
+<p>These subtle differences might even impact your statistical tests. As an example, let us consider one of the industry portfolios from <code>industry_ff_monthly</code>. We use the “Other” portfolio, which contains sectors such as mines, construction, entertainment, finance, etc. We run a gression of the corresponding industry portfolios against the market, size, and value factors of FF3 and FF5, respectively.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>industry_returns <span class="ot">&lt;-</span> industries_ff_monthly <span class="sc">|&gt;</span> </span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(month, <span class="at">ret_other =</span> Other) <span class="sc">|&gt;</span> </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(factors_ff, <span class="at">by =</span> <span class="st">"month"</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>model_ff3 <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  ret_other <span class="sc">~</span> mkt_excess_ff3 <span class="sc">+</span> smb_ff3 <span class="sc">+</span> hml_ff3, </span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  industry_returns</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>model_ff5 <span class="ot">&lt;-</span> <span class="fu">feols</span>(</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  ret_other <span class="sc">~</span> mkt_excess_ff5 <span class="sc">+</span> smb_ff5 <span class="sc">+</span> hml_ff5, </span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  industry_returns</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="fu">etable</span>(model_ff3, model_ff5, <span class="at">coefstat =</span> <span class="st">"tstat"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                        model_ff3         model_ff5
+Dependent Var.:         ret_other         ret_other
+                                                   
+Constant         0.0017** (2.668)  0.0017** (2.659)
+mkt_excess_ff3   1.145*** (75.12)                  
+smb_ff3           0.0417. (1.890)                  
+hml_ff3         0.4008*** (17.72)                  
+mkt_excess_ff5                     1.141*** (74.77)
+smb_ff5                            0.0609** (2.783)
+hml_ff5                           0.3936*** (17.53)
+_______________ _________________ _________________
+VCOV type                     IID               IID
+Observations                  702               702
+R2                        0.89853           0.89913
+Adj. R2                   0.89810           0.89870
+---
+Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+</div>
+</div>
+<p>The results show that the size vactor is only significant at the 10% level for the FF3 data, but it is significant at the 1% level for the FF5 version!</p>
 <p>What are the implications for empirical applications? You should be careful when you want to test your portfolios against FF3 and FF5 factors. It is strictly speaking not correct to just use a subsample of factors from FF5 if you want to test against the FF3 factors. I rather recommend downloading both FF3 and FF5 and run tests with each data set separately.</p>
 
 
 
-</main> <!-- /main -->
+
+<div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
+
+<ol>
+<li id="fn1"><p>Fama, E. F.; French, K. R. (1993). “Common risk factors in the returns on stocks and bonds”. Journal of Financial Economics. 33: 3–56. <a href="https://doi.org/10.1016/0304-405X(93)90023-5">https://doi.org/10.1016/0304-405X(93)90023-5</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Fama, E. F.; French, K. R. (2015). “A Five-Factor Asset Pricing Model”. Journal of Financial Economics. 116: 1–22. CiteSeerX 10.1.1.645.3745. <a href="https://doi.org/10.1016/j.jfineco.2014.10.010">https://doi.org/10.1016/j.jfineco.2014.10.010</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
