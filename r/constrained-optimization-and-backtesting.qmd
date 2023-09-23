@@ -8,6 +8,7 @@ aliases:
 We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R.\index{Efficient portfolio} We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter. 
 
 Throughout this chapter, we use the following packages:
+
 ```{r}
 #| message: false
 library(tidyverse)
@@ -15,7 +16,8 @@ library(RSQLite)
 library(scales)
 library(nloptr)
 ```
-Compared to previous chapters, we introduce the `quadprog` package [@quadprog] to perform numerical constrained optimization for quadratic objective functions and `alabama` [@alabama] for more general non-linear objective functions and constraints. \index{Optimization}\index{Portfolio choice}
+
+Compared to previous chapters, we introduce the `nloptr` package [@nloptr] to perform numerical constrained optimization for portfolio choice problems.\index{Optimization}\index{Portfolio choice}
 
 ## Data Preparation
 
@@ -32,8 +34,6 @@ industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
   select(-month) |>
   collect() |> 
   drop_na()
-
-industry_returns
 ```
 
 ## Recap of Portfolio Choice 
@@ -99,7 +99,6 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 
 The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). 
 For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$. 
-
 ```{r}
 compute_efficient_weight <- function(Sigma,
                                      mu,
@@ -153,6 +152,7 @@ transaction_costs <- expand_grid(
     concentration = map_dbl(weights, ~ sum(abs(. - w_mvp)))
   )
 ```
+
 The code chunk above computes the optimal weight in presence of transaction cost for different values of $\beta$ and $\gamma$ but with the same initial allocation, the theoretical optimal minimum variance portfolio. 
 Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. 
 If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.\index{Graph!Comparative statics}
@@ -183,28 +183,14 @@ transaction_costs |>
 
 ## Constrained Optimization
 
-Next, we introduce constraints to the above optimization procedure. 
-Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). 
-However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `solve.QP()` function from the package `quadprog`.\index{Optimization!Constrained}
+Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). However, numerical optimization allows computing the solutions to such constrained problems. 
 
-The function `solve.QP()` delivers numerical solutions to quadratic programming problems of the form 
-$$\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega >= b_0.$$
-The function takes one argument (`meq`) for the number of equality constraints. Therefore, the above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix $A$ is of the form 
-$$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
+We rely on the powerful `nloptr` package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of @Kraft1994 because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian. 
 
-Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
-Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
+We illustrate the use of the `nloptr()` function by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. 
 
 ```{r}
 w_initial <- rep(1 / n_industries, n_industries)
-
-equality_constraint <- function(w) {
-  sum(w) - 1
-}
-
-jacobian_equality <- function(w) {
-  rep(1, n_industries)
-}
 
 objective_mvp <- function(w) {
   0.5 * t(w) %*% Sigma %*% w
@@ -212,6 +198,14 @@ objective_mvp <- function(w) {
 
 gradient_mvp <- function(w) {
   Sigma %*% w
+}
+
+equality_constraint <- function(w) {
+  sum(w) - 1
+}
+
+jacobian_equality <- function(w) {
+  rep(1, n_industries)
 }
 
 options <- list(
@@ -251,10 +245,9 @@ w_efficient_numerical <- nloptr(
 all(near(w_efficient, w_efficient_numerical$solution))
 ```
 
-The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. 
-For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the vast optimization landscape. \index{Optimization}
+The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the vast optimization landscape. \index{Optimization}
 
-Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. 
+Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. We can implement the short sale constraints by imposing a vector of lower bounds `lb = rep(0, n_industries)`.
 
 ```{r}
 w_no_short_sale <- nloptr(
@@ -269,13 +262,12 @@ w_no_short_sale <- nloptr(
 
 round(w_no_short_sale$solution, 3)
 ```
-As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
-You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
 
-`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
+As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
+You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `nloptr()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
+
+`nloptr()` can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
-Thus, we can no longer rely on `solve.QP()`, which is defined as solving quadratic programming problems with linear constraints. 
-Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
 
 ```{r}
 reg_t <- 1.5
@@ -310,9 +302,6 @@ w_reg_t <- nloptr(
 
 round(w_reg_t$solution, 3)
 ```
-
-Note that the function `constrOptim.nl()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraint()` and the inequality constraints `inequality_constraint()`).
-Note that the starting point should not matter if the algorithm identifies a global minimum.
 
 @fig-1702 shows the optimal allocation weights across all `r ncol(industry_returns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.\index{Graph!Bar chart}
 

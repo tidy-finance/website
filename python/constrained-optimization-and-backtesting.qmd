@@ -2,6 +2,11 @@
 title: Constrained Optimization and Backtesting
 ---
 
+```{python}
+#| echo: false
+import pre_render_script
+```
+
 ::: {.callout-note}
 You are reading the work-in-progress edition of **Tidy Finance with Python**. Code chunks and text might change over the next couple of months. We are always looking for feedback via [contact\@tidy-finance.org](mailto:contact@tidy-finance.org). Meanwhile, you can find the complete R version [here](../r/index.qmd).
 :::
@@ -10,6 +15,7 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R.\index{Efficient portfolio} We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter. 
 
 Throughout this chapter, we use the following packages:
+
 ```{python}
 import pandas as pd
 import numpy as np
@@ -37,8 +43,6 @@ industry_returns  = (pd.read_sql_query(
   .dropna()
   .drop(columns=["month"])
 )
-
-industry_returns
 ```
 
 ## Recap of Portfolio Choice 
@@ -103,7 +107,7 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 ## Optimal Portfolio Choice
 
 The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). 
-For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$. 
+For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$.
 
 ```{python}
 def compute_efficient_weight(Sigma, mu, gamma=2, beta=0,
@@ -142,6 +146,7 @@ transaction_costs = (pd.DataFrame(list(product(gammas, betas)),
               .apply(lambda x: np.sum(np.abs(x - w_mvp))))
 )
 ```
+
 The code chunk above computes the optimal weight in presence of transaction cost for different values of $\beta$ and $\gamma$ but with the same initial allocation, the theoretical optimal minimum variance portfolio. 
 Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. 
 If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.\index{Graph!Comparative statics}
@@ -167,17 +172,11 @@ plot_rebalancing.draw()
 
 ## Constrained Optimization
 
-Next, we introduce constraints to the above optimization procedure. 
-Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). 
-However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `minimize()` function from the module `scipy.optimize`.\index{Optimization!Constrained}
+Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). However, numerical optimization allows computing the solutions to such constrained problems. 
 
-The function `minimize()` delivers numerical solutions to quadratic programming problems of an arbitrary form. For our purpose, we consider the form 
-$$\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega >= b_0.$$
-The function takes the argument `constraints` for equality and inequality constraints. Therefore, the above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix $A$ is of the form 
-$$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
+We rely on the powerful `scipy.optimize` package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of @Kraft1994 because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian. 
 
-Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
-Note that `np.allclose()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `np.allclose()` has a built-in tolerance. 
+We illustrate the use of `minimize()` by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `np.allclose()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `np.allclose()` has a built-in tolerance. 
 
 ```{python}
 w_initial = np.ones(n_industries) / n_industries
@@ -215,7 +214,8 @@ w_mvp_numerical = minimize(
   method=options["method"]
 )
                   
-np.allclose(w_mvp, w_mvp_numerical.x, atol = 1e-3)
+np.allclose(w_mvp, w_mvp_numerical.x, 
+            atol = 1e-3)
 
 def objective_efficient(w):
     return 2 * 0.5 * w.T @ Sigma @ w - (1 + mu) @ w
@@ -233,12 +233,13 @@ w_efficient_numerical = minimize(
   method=options["method"]
 )
 
-np.allclose(w_efficient, w_efficient_numerical.x, atol = 1e-3)
+np.allclose(w_efficient, w_efficient_numerical.x, 
+            atol = 1e-3)
 ```
 
-The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. \index{Optimization}
+The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution.
 
-Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. 
+Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. We can implement the short sale constraints by imposing a vector of lower bounds `lb = rep(0, n_industries)`.
 
 ```{python}
 w_no_short_sale = minimize(
@@ -255,16 +256,15 @@ np.round(w_no_short_sale.x, 3)
 ```
 
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
-You can verify that `sum(w_no_short_sale.x)` returns 1. In other words: `minimize()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
+You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `minimize()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
 
-`minimize()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
+`minimize()` can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
-Fortunately, we can still rely on `minimize()` to handle equality and ineqality constraints at the same time. 
 
 ```{python}
 reg_t = 1.5
 
-def inequality_constraints(w):
+def inequality_constraint(w):
     return reg_t - np.sum(np.abs(w))
 
 def jacobian_inequality(w):
@@ -277,13 +277,13 @@ def gradient_reg_t(w):
     return - (1 + mu) + 2 * np.dot(Sigma, w)
 
 constraints = (
-  {"type": "eq", "fun": equality_constraints, 
+  {"type": "eq", "fun": equality_constraint, 
                  "jac": jacobian_equality},
-  {"type": "ineq", "fun": inequality_constraints, 
+  {"type": "ineq", "fun": inequality_constraint, 
                    "jac": jacobian_inequality}
 )
 
-w_reg_t_result = minimize(
+w_reg_t = minimize(
   x0=w_initial,
   fun=objective_reg_t,
   jac=gradient_reg_t,
@@ -293,11 +293,8 @@ w_reg_t_result = minimize(
   method=options["method"]
 )
 
-w_reg_t_solution = w_reg_t_result.x
-np.round(w_reg_t_solution, 3)
+np.round(w_reg_t.x, 3)
 ```
-
-Note that the function `minimize()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `minimize()` performs numerical optimization by searching for a local minimum of the objective function (subject to the equality constraints `equality_constraints` and the inequality constraints `inequality_constraints`).Note that the starting point should not matter if the algorithm identifies a global minimum.
 
 @fig-1702 shows the optimal allocation weights across all `python len(industry_returns.columns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.\index{Graph!Bar chart}
 
