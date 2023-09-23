@@ -444,25 +444,34 @@ for p in range(periods):
 Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations. \index{Sharpe Ratio}
 
 ```{python}
-performance_df = pd.DataFrame()
+performance = pd.DataFrame()
 for i in enumerate(performance_values.keys()):
-    tmp_data = pd.DataFrame(performance_values[i[1]], columns=[
-                            "raw_return", "turnover", "net_return"])
+    tmp_data = pd.DataFrame(
+      performance_values[i[1]], 
+      columns=["raw_return", "turnover", "net_return"]
+    )
     tmp_data["strategy"] = i[1]
-    performance_df = pd.concat([performance_df, tmp_data], axis=0)
+    performance = pd.concat([performance, tmp_data], axis=0)
 
 length_year = 12
 
 # Calculate the desired summary statistics
-summary_df = performance_df.groupby("strategy").agg(
-    Mean=("net_return", lambda x: length_year * 100 * x.mean()),
-    SD=("net_return", lambda x: np.sqrt(length_year) * 100 * x.std()),
-    Sharpe_ratio=("net_return", lambda x: (length_year * 100 * x.mean()) /
-                  (np.sqrt(length_year) * 100 * x.std()) if x.mean() > 0 else np.nan),
+performance_table = (performance
+  .groupby("strategy", as_index=False)
+  .agg(
+    Mean=("net_return", 
+          lambda x: length_year * 100 * x.mean()),
+    SD=("net_return", 
+        lambda x: np.sqrt(length_year) * 100 * x.std()),
+    Sharpe_ratio=("net_return", 
+                  lambda x: ((length_year * 100 * x.mean()) /
+                    (np.sqrt(length_year) * 100 * x.std()) 
+                    if x.mean() > 0 else np.nan)),
     Turnover=("turnover", lambda x: 100 * x.mean())
-).reset_index()
+  )
+)
 
-summary_df
+np.round(performance_table, 4)
 ``` 
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 
