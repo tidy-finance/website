@@ -25,7 +25,7 @@ from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import percent_format, date_format
 
-from pandarallel import pandarallel
+import joblib
 ```
 
 Compared to previous chapters, we introduce `statsmodels` for regression analysis and for sliding window regressions, and `pandarallel` to apply mapping functions in parallel.
@@ -173,6 +173,58 @@ beta_monthly = (crsp_monthly
   .dropna()
 )
 ```
+This is how to do it with the joblib package to use multiple cores:
+
+```{python}
+import joblib  # should go to the top
+number_of_cores = 4
+
+def roll_capm_estimation_for_joblib(permno, group):
+    # First calculate rolling betas
+    beta_values = (RollingOLS.from_formula(formula="ret_excess ~ mkt_excess",
+                                           data=group,
+                                           window=window_size,
+                                           min_nobs=min_obs
+                                           )
+                   .fit()
+                   .params["mkt_excess"]
+                   )
+    # put all in Pandas DataFrame
+    result_df = pd.DataFrame(beta_values)
+    result_df.columns = ['beta']
+    result_df['month'] = group['month'].values
+    result_df['permno'] = permno
+    result_df['ret_excess'] = group['ret_excess'].values
+    result_df['mkt_excess'] = group['mkt_excess'].values
+    try:  # to handle daily
+        result_df['industry'] = group['industry'].values
+        result_df['counts'] = group['counts'].values
+    except(KeyError):
+        pass
+    result_df = result_df[list(result_df.columns[1:]) + [result_df.columns[0]]]
+    return result_df
+
+
+# Group permno data and calculate beta for each group
+permno_groups = (crsp_monthly
+                 .merge(valid_permnos, how="inner", on="permno")
+                 .dropna()
+                 .groupby('permno', group_keys=False)
+                 )
+
+# Calculate beta values using joblib parallel processing
+beta_monthly_joblib = (
+    pd.concat(joblib.Parallel(n_jobs=number_of_cores)
+              (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
+               for name, group in permno_groups)
+              )
+    .dropna()
+    )
+
+# To check if all the betas are the same:
+print((beta_monthly['beta_monthly'] - beta_monthly_joblib['beta']).sum())
+
+```
 
 ## Estimating Beta using Daily Returns
 
@@ -230,15 +282,20 @@ crsp_daily = (crsp_daily
 Even though we could now just apply the function using `groupby()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).
 
 ```{python}
-pandarallel.initialize(progress_bar=False, verbose = 0)
+permno_groups = (crsp_daily
+                 .merge(valid_permnos, how="inner", on="permno")
+                 .dropna()
+                 .groupby('permno', group_keys=False)
+                 )
 
-betas = (crsp_daily
-  .groupby(["permno"], group_keys=False)
-  .parallel_apply(roll_capm_estimation, window_size, min_obs)
-  .dropna()
-)
-
-beta_daily = crsp_daily.assign(beta_daily=betas)
+# Calculate beta values using joblib parallel processing
+betas = (
+    pd.concat(joblib.Parallel(n_jobs=number_of_cores)
+              (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
+               for name, group in permno_groups)
+              )
+    .dropna()
+    )
 ```
 
 ## Comparing Beta Estimates
