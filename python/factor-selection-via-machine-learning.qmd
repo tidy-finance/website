@@ -77,11 +77,16 @@ from mizani.breaks import date_breaks
 
 from itertools import product
 
-from sklearn.model_selection import train_test_split, GridSearchCV, TimeSeriesSplit, cross_val_score
+from sklearn.model_selection import (
+  train_test_split, GridSearchCV, 
+  TimeSeriesSplit, cross_val_score
+)
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import ElasticNet, Lasso, lasso_path, enet_path
+from sklearn.linear_model import (
+  ElasticNet, Lasso, lasso_path, enet_path
+)
 ```
 
 In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in Chapters 2-4. We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
@@ -99,35 +104,43 @@ In line with many existing papers, we use monthly portfolio returns from 10 diff
 ```{python, eval = TRUE}
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 
-factors_ff_monthly = (
-   pd.read_sql_query(sql="SELECT * FROM factors_ff_monthly",
-                     con=tidy_finance,
-                     parse_dates={"month": {"unit": "D", "origin": "unix"}})
+factors_ff3_monthly = (
+   pd.read_sql_query(
+     sql="SELECT * FROM factors_ff3_monthly",
+     con=tidy_finance,
+     parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  )
   .dropna()
   .add_prefix("factor_ff_")
 )
 
 factors_q_monthly = (
-  pd.read_sql_query(sql="SELECT * FROM factors_q_monthly",
-                    con=tidy_finance,
-                    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  pd.read_sql_query(
+    sql="SELECT * FROM factors_q_monthly",
+    con=tidy_finance,
+    parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  )
   .dropna()
   .add_prefix("factor_q_")
 )
 
 macro_predictors = (
-  pd.read_sql_query(sql="SELECT * FROM macro_predictors",
-                    con=tidy_finance,
-                    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  pd.read_sql_query(
+    sql="SELECT * FROM macro_predictors",
+    con=tidy_finance,
+    parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  )
  .dropna()
  .add_prefix("macro_")
  .drop(columns="macro_rp_div")
 )
 
 industries_ff_monthly = (
-  pd.read_sql_query(sql="SELECT * FROM industries_ff_monthly",
-                    con=tidy_finance,
-                    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  pd.read_sql_query(
+    sql="SELECT * FROM industries_ff_monthly",
+    con=tidy_finance,
+    parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  )
   .dropna()
   .melt(id_vars="month", 
         var_name="industry", 
@@ -139,7 +152,7 @@ We combine all the monthly observations into one data frame.
 
 ```{python}
 data = (industries_ff_monthly
-  .merge(factors_ff_monthly, 
+  .merge(factors_ff3_monthly, 
          how="left", 
          left_on="month", 
          right_on="factor_ff_month")
@@ -153,7 +166,8 @@ data = (industries_ff_monthly
          right_on="macro_month") 
   .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_rf"]) 
   .dropna()
-  .drop(columns=["ret", "factor_ff_month", "factor_q_month", "macro_month"])
+  .drop(columns=["ret", "factor_ff_month",
+                 "factor_q_month", "macro_month"])
 )
 ```
 
@@ -175,150 +189,132 @@ data_plot = (ggplot(data,
 data_plot.draw()
 ```
 
-## The scikit-learn Workflow
+## The Machine Learning Workflow
 
-To illustrate penalized linear regressions, we employ the `scikit-learn` collection of packages for modeling and ML.
-
-The `scikit-learn` workflow encompasses the main stages of the modeling process: pre-processing of data, model fitting, and post-processing of results. As we demonstrate below, `scikit-learn` provides efficient workflows that you can update with low effort.
-
-Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
-
-To start, we restrict our analysis to just one industry: Manufacturing. We first split the sample into a *training* and a *test* set. 
-For that purpose, `scikit-learn` provides the function `initial_time_split()` from the `rsample` package [@rsample]. 
-The split takes the last 20% of the data as a test set, which is not used for any model tuning. 
-We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
-
-```{python}
-split <- initial_time_split(
-  data |>
-    filter(industry == "Manuf") |>
-    select(-industry),
-  prop = 4 / 5
-)
-split
-```
-
-The object `split` simply keeps track of the observations of the training and the test set. 
-We can call the training set with `training(split)`, while we can extract the test set with `testing(split)`.
+To illustrate penalized linear regressions, we employ the `scikit-learn` collection of packages for modeling and ML. Using the ideas of Ridge and Lasso regressions, the following example guides you through (i) pre-processing the data (data split and variable mutation), (ii) building models, (iii) fitting models, and (iv) tuning models to create the "best" possible predictions.
 
 ### Pre-process data
 
-Recipes help you pre-process your data before training your model. Recipes are a series of pre-processing steps such as variable selection, transformation, or conversion of qualitative predictors to indicator variables. Each recipe starts with a `formula` that defines the general structure of the dataset and the role of each variable (regressor or dependent variable). For our dataset, our recipe contains the following steps before we fit any model:
+We want to explain excess returns with all available predictors. The regression equation thus takes the form 
+$$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t $$ where $r_t$ is the vector of industry excess returns at time $t$ and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables. 
 
--   Our formula defines that we want to explain excess returns with all available predictors. The regression equation thus takes the form 
-$$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t $$ where $r_t$ is the vector of industry excess returns at time $t$ and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables
+We hence perform the following pre-processing steps: 
+
 - We exclude the column *month* from the analysis
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
+
+Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged.
 
 ```{python}
 macro_variables = data.filter(like = "macro").columns
 factor_variables = data.filter(like = "factor").columns
 
-column_combinations = list(product(macro_variables, factor_variables))
+column_combinations = list(
+  product(macro_variables, factor_variables)
+)
 
 new_column_values = []
 for macro_column, factor_column in column_combinations:
-    new_column_values.append(data[macro_column] * data[factor_column])
+    new_column_values.append(
+      data[macro_column] * data[factor_column]
+    )
+
 
 column_names = [" x ".join(t) for t in column_combinations]
+new_columns = pd.DataFrame(
+  dict(zip(column_names, new_column_values))
+)
 
-data = data.assign(**dict(zip(column_names, new_column_values)))
+data = pd.concat([data, new_columns], axis=1)
 
-preprocessor = ColumnTransformer(
+pre_processor = ColumnTransformer(
     transformers=[
         ("scale", StandardScaler(), 
-         [col for col in data.columns if col not in ["ret_excess", "month", "industry"]])
+         [col for col in data.columns 
+          if col not in ["ret_excess", "month", "industry"]])
         ],
     remainder="drop",
     verbose_feature_names_out = False
 )
 ```
 
-A table of all available recipe steps can be found [in the `tidymodels` documentation.](https://www.tidymodels.org/find/recipes/) As of `r format(Sys.Date(), "%Y")`, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
-In the example above, it does not make a difference whether you use the input `data = training(split)` or `data = testing(split)`. 
-All that matters at this early stage are the column names and types.
-
-We can apply the recipe to any data with a suitable structure. The code below combines two different functions: `prep()` estimates the required parameters from a training set that can be applied to other data sets later. `bake()` applies the processed computations to new data.
-
-```{python}
-data_prep <- prep(rec, training(split))
-```
-The object `data_prep` contains information related to the different preprocessing steps applied to the training data: E.g., it is necessary to compute sample means and standard deviations to center and scale the variables. 
-
-```{python}
-data_bake <- bake(data_prep,
-  new_data = testing(split)
-)
-data_bake
-```
-
-Note that the resulting data contains the 132 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially. 
-
-You may ask at this stage: why should I use a recipe instead of simply using the data wrangling commands such as `mutate()` or `select()`? `tidymodels` beauty is that a lot is happening under the hood. Recall, that for the simple scaling step, you actually have to compute the standard deviation of each column, then *store* this value, and apply the identical transformation to a different dataset, e.g., `testing(split)`. A prepped `recipe` stores these values and hands them on once you `bake()` a novel dataset. Easy as pie with `tidymodels`, isn't it?
-
 ### Build a model
 
 \index{Regression}
 Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
-$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the `tidymodels` workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. The structure is always as follows: create a so-called `workflow()` and use the `fit()` function. A table with all available model APIs is available [here.](https://www.tidymodels.org/find/parsnip/)
-For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
+
+$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ 
+
+We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1.0` implies the Lasso.
 
 ```{python}
-elastic_net_model = ElasticNet(alpha=0.0001, l1_ratio = 1.0, max_iter = 5000, fit_intercept=False)  
+lm_model = ElasticNet(
+  alpha=0.0001, 
+  l1_ratio=1.0, 
+  max_iter=5000, 
+  fit_intercept=False
+)  
 
-elastic_net_pipeline = Pipeline([
-    ("preprocessor", preprocessor),
-    ("regressor", elastic_net_model)
+lm_pipeline = Pipeline([
+  ("pre_processor", pre_processor),
+  ("regressor", lm_model)
 ])
 ```
 
-That's it - we are done! The object `lm_model` contains the definition of our model with all required information. Note that `set_engine("glmnet")` indicates the API character of the `tidymodels` workflow: Under the hood, the package `glmnet` is doing the heavy lifting, while `linear_reg()` provides a unified framework to collect the inputs. The `workflow`  ends with combining everything necessary for the serious data science workflow, namely, a recipe and a model.
-
-```{python}
-# Only proceed with manufacturing data
-data_manufacturing = data.query("industry == 'Manuf'")
-
-# Apply pipeline to training data: 
-pd.DataFrame(elastic_net_pipeline[:1].fit_transform(data_manufacturing.drop(columns = "ret_excess")), 
-             columns = elastic_net_pipeline[:-1].get_feature_names_out())
-             
-lm_fit = elastic_net_pipeline.fit(data_manufacturing.drop(columns = "ret_excess"), 
-                                  data_manufacturing.get("ret_excess"))
-```
+That's it - we are done! The object `lm_model_pipeline` contains the definition of our model with all required information, in particular the pre-processing steps and the regression model.
 
 ### Fit a model
 
-With the `workflow` from above, we are ready to use `fit()`. Typically, we use training data to fit the model. 
-The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. 
-First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ @fig-1402 illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. 
+The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufactoring industry for now.
 
 ```{python}
-predicted_values = (pd.DataFrame({
-        "Fitted value": lm_fit.predict(data_manufacturing.drop(columns = "ret_excess")),
-        "Realization": data_manufacturing.get("ret_excess")
-    })
-  .assign(month = data_manufacturing["month"])
-  .melt(id_vars="month", 
-        var_name="Variable", 
-        value_name="return")
+data_manufacturing = data.query("industry == 'Manuf'")
+
+pd.DataFrame(
+  lm_pipeline[:1].fit_transform(
+    data_manufacturing
+    ), 
+  columns = lm_pipeline[:-1].get_feature_names_out()
+)
+             
+lm_fit = lm_pipeline.fit(
+  data_manufacturing, 
+  data_manufacturing.get("ret_excess")
 )
 ```
+
+First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ @fig-1402 illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns.
 
 ```{python}
 #| label: fig-1402 
 #| fig-cap: "The grey area corresponds to the out of sample period."
 #| fig-alt: "Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premiums. The figure seems to indicate that the predictions capture most of the return dynamics."
+predicted_values = (pd.DataFrame({
+    "Fitted value": lm_fit.predict(
+      data_manufacturing
+    ),
+    "Realization": data_manufacturing.get("ret_excess")
+  })
+  .assign(month = data_manufacturing["month"])
+  .melt(id_vars="month", 
+        var_name="Variable", 
+        value_name="return")
+)
+
 predicted_values_plot = (
   ggplot(predicted_values, 
-         aes(x="month", y="return", color="Variable", linetype="Variable")) +
+         aes(x="month", y="return", 
+             color="Variable", linetype="Variable")) +
   geom_line() +
   labs(
     x="",
     y="",
     color="",
     linetype="",
-    title="Monthly realized and fitted manufacturing industry risk premia"
+    title=("Monthly realized and fitted manufacturing" +
+           "industry risk premia")
   ) +
   scale_x_datetime(
       breaks=date_breaks("5 years"),
@@ -326,19 +322,27 @@ predicted_values_plot = (
       labels=date_format("%Y"),
       expand=(0, 0)
   ) +
-  scale_y_continuous(labels=percent_format()))   
+  scale_y_continuous(labels=percent_format()))
 predicted_values_plot.draw()
 ```
 
-What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
+What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. 
 
 ```{python}
-alphas_lasso, coefs_lasso, _ = lasso_path(preprocessor.fit_transform(data_manufacturing.drop(columns = "ret_excess")), 
-                                         data_manufacturing.get("ret_excess"))
+alphas_lasso, coefs_lasso, _ = lasso_path(
+  pre_processor.fit_transform(
+    data_manufacturing
+  ), 
+  data_manufacturing.get("ret_excess")
+)
 
-alphas_ridge, coefs_ridge, _ = enet_path(preprocessor.fit_transform(data_manufacturing.drop(columns = "ret_excess")), 
-                                       data_manufacturing.get("ret_excess"),  
-                                       l1_ratio=1e-2)
+alphas_ridge, coefs_ridge, _ = enet_path(
+  pre_processor.fit_transform(
+    data_manufacturing
+  ), 
+  data_manufacturing.get("ret_excess"),
+  l1_ratio=1e-2
+)
 
 lasso_coefficients = (pd.DataFrame(coefs_lasso)
   .transpose()
@@ -353,7 +357,7 @@ ridge_coefficients = (pd.DataFrame(coefs_ridge)
 )
 ```
 
-The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. @fig-1403 illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.\index{Graph!ML prediction path}
+The data frames `lasso_coefficients` and `ridge_coefficients` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. @fig-1403 illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.\index{Graph!ML prediction path}
 
 ```{python}
 #| label: fig-1403 
@@ -367,21 +371,17 @@ coefficients_plot = (
   facet_wrap("model", scales = "free_x") +
   labs(
     x = "Penalty factor (lambda)", y = "",
-    title = "Estimated coefficient paths for different penalty factors"
+    title = ("Estimated coefficient paths for different" +
+             "penalty factors")
   ) +
   theme(legend_position="none"))
 
 coefficients_plot.draw()
 ```
 
-::: {.rmdnote}
-One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. 
-As a result, the estimated coefficients for the [special case](https://parsnip.tidymodels.org/reference/glmnet-details.html) with no regularization ($\lambda = 0$) can deviate from the standard OLS estimates.
-:::
-
 ### Tune a model
 
-To compute $\hat\beta_\lambda^\text{Lasso}$ , we simply imposed a value for the penalty hyperparameter $\lambda$. Model tuning is the process of optimally selecting such hyperparameters. `tidymodels` provides extensive tuning options based on so-called *cross-validation*. Again, we refer to any treatment of cross-validation to get a more detailed  discussion of the statistical underpinnings. Here we focus on the general idea and the implementation with `tidymodels`. 
+To compute $\hat\beta_\lambda^\text{Lasso}$ , we simply imposed a value for the penalty hyperparameter $\lambda$. Model tuning is the process of optimally selecting such hyperparameters through *cross-validation*.
 
 The goal for choosing $\lambda$ (or any other hyperparameter, e.g., $\rho$ for the Elastic Net) is to find a way to produce predictors $\hat{Y}$ for an outcome $Y$ that minimizes the mean squared prediction error $\text{MSPE} = E\left( \frac{1}{T}\sum_{t=1}^T (\hat{y}_t - y_t)^2 \right)$. Unfortunately, the MSPE is not directly observable. We can only compute an estimate because our data is random and because we do not observe the entire population.
 
@@ -400,32 +400,41 @@ How should you pick $K$? Large values of $K$ are preferable because the training
 
 For our sample, we consider a time-series cross-validation sample. This means that we tune our models with 20 random samples of length five years with a validation period of four years. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
 
-Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
+Then, we evaluate the performance for a grid of different penalty values. `scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
 
 ```{python}
+#| warning: false
 initial_years = 5
 assessment_months = 48
 n_splits = len(data_manufacturing) // assessment_months
 length_of_year = 12
 
-data_folds = TimeSeriesSplit(n_splits=n_splits, 
-                             test_size=assessment_months, 
-                             max_train_size=initial_years * length_of_year)
+data_folds = TimeSeriesSplit(
+  n_splits=n_splits, 
+  test_size=assessment_months, 
+  max_train_size=initial_years * length_of_year
+)
 
 params = {
-    "regressor__alpha":np.linspace(start = 0, stop = 1, num = 20),
-    "regressor__l1_ratio":(0.0, 0.5, 1)
+  "regressor__alpha":np.linspace(
+    start = 0, 
+    stop = 1, 
+    num = 20
+  ),
+  "regressor__l1_ratio":(0.0, 0.5, 1)
 }
 
 finder = GridSearchCV(
-  elastic_net_pipeline,
+  lm_pipeline,
   param_grid=params,
   scoring="neg_mean_squared_error",
   cv = data_folds
 )
 
-finder = finder.fit(data_manufacturing.drop(columns="ret_excess"), 
-                    data_manufacturing.get("ret_excess"))
+finder = finder.fit(
+  data_manufacturing,
+  data_manufacturing.get("ret_excess")
+)
 ```
 
 After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. @fig-1404 illustrates the average validation set's root mean-squared error for each value of $\lambda$ and $\rho$.
@@ -434,8 +443,16 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 #| label: fig-1404 
 #| fig-cap: "Evaluation of manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net, and 0.0 indicates Ridge."
 #| fig-alt: "Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values."
-validation_plot = (
-  ggplot(pd.DataFrame(finder.cv_results_).assign(mspe = lambda x: np.sqrt(-x["mean_test_score"])), 
+validation = (pd.DataFrame(finder.cv_results_)
+  .assign(
+    mspe = lambda x: np.sqrt(-x["mean_test_score"]),
+    param_regressor__alpha = lambda x: pd.to_numeric(
+      x['param_regressor__alpha'], errors='coerce'
+    )
+  )
+)
+
+validation_plot = (ggplot(validation, 
   aes(x = "param_regressor__alpha", 
       y = "mspe", 
       color = "param_regressor__l1_ratio",
@@ -452,30 +469,33 @@ validation_plot = (
 validation_plot.draw()
 ```
 
-@fig-1404 shows that the cross-validated MSPE drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE.
+@fig-1404 shows that ...
 
-### Parallelized workflow
+### Full workflow
 
 Our starting point was the question: Which factors determine industry returns? While @Avramov2022b provide a Bayesian analysis related to the research question above, we choose a simplified approach: To illustrate the entire workflow, we now run the penalized regressions for all ten industries. 
 We want to identify relevant variables by fitting Lasso models for each industry returns time series. More specifically, we perform cross-validation for each industry to identify the optimal penalty factor $\lambda$. 
-Then, we use the set of `finalize_*()`-functions that take a list or tibble of tuning parameter values and update objects with those values. After determining the best model, we compute the final fit on the entire training set and analyze the estimated coefficients. 
 
 First, we define the Lasso model with one tuning parameter.
 
 ```{python}
-lm_model = Lasso(fit_intercept = False, max_iter = 5000)  
+lm_model = Lasso(fit_intercept=False, max_iter=5000)  
 
 params = {
-    "regressor__alpha":np.linspace(start = 0.001, stop = 1, num = 20),
+  "regressor__alpha":np.linspace(
+    start=0.001, 
+    stop=1, 
+    num=20
+  ),
 }
 
 lm_pipeline = Pipeline([
-    ("preprocessor", preprocessor),
-    ("regressor", lm_model)
+  ("pre_processor", pre_processor),
+  ("regressor", lm_model)
 ])
 ```
 
-The following task can be easily parallelized to reduce computing time substantially. We use the parallelization capabilities of `furrr`. Note that we can also just recycle all the steps from above and collect them in a function.
+The following task can be easily parallelized to reduce computing time, but we use a simple loop for ease of exposition.
 
 ```{python}
 all_industries = data["industry"].drop_duplicates()
@@ -490,20 +510,30 @@ for industry in all_industries:
     cv = data_folds
   )
 
-  finder = finder.fit(data.query("industry==@industry"), 
-                      data.query("industry==@industry").get("ret_excess"))
-  results.append(pd.DataFrame(finder.best_estimator_.named_steps.regressor.coef_ != 0))
+  finder = finder.fit(
+    data.query("industry==@industry"),
+    data.query("industry==@industry").get("ret_excess")
+  )
+  results.append(
+    pd.DataFrame(
+      finder.best_estimator_.named_steps.regressor.coef_ != 0
+    )
+  )
 
-selected_factors  = (pd.DataFrame(lm_pipeline[:-1].get_feature_names_out(), 
-                                  columns = ["variable"])
-  .assign(variable = lambda x: x["variable"].str.replace("factor_|ff_|q_|macro_",""))
+selected_factors = (
+  pd.DataFrame(
+    lm_pipeline[:-1].get_feature_names_out(),
+    columns = ["variable"]
+  )
+  .assign(variable = lambda x: (
+    x["variable"].str.replace("factor_|ff_|q_|macro_",""))
+  )
   .assign(**dict(zip(all_industries, results)))
   .melt(id_vars="variable", var_name ="industry")
 )
 ```
 
-What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible. 
-Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in @fig-1405.\index{Graph!Heat map}
+What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten sequentially. Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in @fig-1405.\index{Graph!Heat map}
 
 ```{python}
 #| label: fig-1405 
@@ -511,33 +541,36 @@ Now, we just have to do some housekeeping and keep only variables that Lasso doe
 #| fig-cap: "Grey areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero."
 #| fig-alt: "Title: Selected variables for different industries. The figure shows which factors and macroeconomic predictors the Lasso model selected for the different industries. In general, there are not many selected variables. The market excess return is selected across all industries except for utilities."
 selected_factors = (selected_factors
-  .assign(n = lambda x: x.groupby("variable")["value"].transform("sum"),
-          variable = lambda x: pd.Categorical(x["variable"],
-          categories = x.groupby("variable")["n"].mean().sort_values().index),
-          term_temp = lambda x: pd.cut(x["n"], 
-                                       bins=[-0, 2, float("inf")], 
-                                      include_lowest = True, 
-                                      labels=["Other", "Unique"]))
+  .assign(
+    n = lambda x: x.groupby("variable")["value"].transform("sum"),
+    variable = lambda x: pd.Categorical(x["variable"],
+    categories = x.groupby("variable")["n"].mean().sort_values().index),
+    term_temp = lambda x: pd.cut(
+      x["n"],
+      bins=[-0, 2, float("inf")], 
+      include_lowest = True, 
+      labels=["Other", "Unique"])
+    )
   .query("term_temp=='Unique'")
   .drop(columns="term_temp")
 )
 
 selected_factors_plot = (
-  ggplot(selected_factors, aes(x="variable", y="industry", fill="value")) +
+  ggplot(selected_factors, 
+         aes(x="variable", y="industry", fill="value")) +
   geom_tile() +
   scale_fill_manual(values=["white", "grey"]) +
   theme(axis_text_x=element_text(rotation=70, hjust=1), 
         legend_position = "None") +
-  labs(x="", y="", title="Selected variables for different industries") +
+  labs(x="", y="", 
+       title="Selected variables for different industries") +
   coord_flip()
 )
 
 selected_factors_plot.draw()
 ```
 
-The heat map in @fig-1405 conveys two main insights. 
-First, we see a lot of white, which means that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only the market factor and the return-on-equity factor play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While barely any variable is selected by Lasso for Utilities, many factors are selected for, e.g., High-Tech and Durable, but they do not coincide at all. 
-In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide a factor that consistently provides pricing abilities across industries.
+The heat map in @fig-1405 conveys ...
 
 ## Exercises 
 
