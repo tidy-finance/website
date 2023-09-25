@@ -88,7 +88,7 @@ tidy_finance <- dbConnect(
   extended_types = TRUE
 )
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   collect() |>
   rename_with(~ str_c("factor_ff_", .), -month)
 
@@ -106,6 +106,7 @@ industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
   pivot_longer(-month,
     names_to = "industry", values_to = "ret"
   ) |>
+  arrange(desc(industry)) |> 
   mutate(industry = as_factor(industry))
 ```
 
@@ -113,7 +114,7 @@ We combine all the monthly observations into one data frame.
 
 ```{r, eval = TRUE}
 data <- industries_ff_monthly |>
-  left_join(factors_ff_monthly, by = "month") |>
+  left_join(factors_ff3_monthly, by = "month") |>
   left_join(factors_q_monthly, by = "month") |>
   left_join(macro_predictors, by = "month") |>
   mutate(
@@ -184,8 +185,7 @@ $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t
 rec <- recipe(ret_excess ~ ., data = training(split)) |>
   step_rm(month) |>
   step_interact(terms = ~ contains("factor"):contains("macro")) |>
-  step_normalize(all_predictors()) |>
-  step_center(ret_excess, skip = TRUE)
+  step_normalize(all_predictors())
 ```
 
 A table of all available recipe steps can be found [in the `tidymodels` documentation.](https://www.tidymodels.org/find/recipes/) As of `r format(Sys.Date(), "%Y")`, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input. 
@@ -404,7 +404,7 @@ Then, we evaluate the performance for a grid of different penalty values. `tidym
 lm_tune <- lm_fit |>
   tune_grid(
     resample = data_folds,
-    grid = grid_regular(penalty(), mixture(), levels = c(10, 3)),
+    grid = grid_regular(penalty(), mixture(), levels = c(20, 3)),
     metrics = metric_set(rmse)
   )
 ```
@@ -422,7 +422,8 @@ autoplot(lm_tune) +
     x = "Penalty factor (lambda)",
     y = "Root MSPE",
     title = "Root MSPE for different penalty factors"
-  )
+  ) + 
+  scale_x_log10()
 ```
 
 @fig-1404 shows that the cross-validated MSPE drops for Lasso and Elastic Net and spikes afterward. For Ridge regression, the MSPE increases above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. Thus, we would choose the model with the lowest MSPE.

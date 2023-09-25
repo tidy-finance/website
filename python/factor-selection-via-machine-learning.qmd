@@ -20,7 +20,7 @@ Therefore, given the multitude of proposed risk factors, the challenge these day
 
 ## Brief Theoretical Background
 
-This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by @Hastie2009, @Hastie2013, and @DePrado2018. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `scikit-learn` workflow.
+This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by @Hastie2009, @Hastie2013, and @DePrado2018. Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models with the `scikit-learn` package.
 
 To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$, where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. 
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$ 
@@ -165,9 +165,9 @@ data = (industries_ff_monthly
          left_on="month", 
          right_on="macro_month") 
   .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_rf"]) 
-  .dropna()
   .drop(columns=["ret", "factor_ff_month",
                  "factor_q_month", "macro_month"])
+  .dropna()
 )
 ```
 
@@ -246,12 +246,12 @@ Next, we can build an actual model based on our pre-processed data. In line with
 
 $$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ 
 
-We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1.0` implies the Lasso.
+We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
 ```{python}
 lm_model = ElasticNet(
   alpha=0.0001, 
-  l1_ratio=1.0, 
+  l1_ratio=1, 
   max_iter=5000, 
   fit_intercept=False
 )  
@@ -267,7 +267,7 @@ That's it - we are done! The object `lm_model_pipeline` contains the definition 
 ### Fit a model
 
 With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. 
-The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufactoring industry for now.
+The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
 
 ```{python}
 data_manufacturing = data.query("industry == 'Manuf'")
@@ -323,26 +323,19 @@ predicted_values_plot = (
       expand=(0, 0)
   ) +
   scale_y_continuous(labels=percent_format()))
+  
 predicted_values_plot.draw()
 ```
 
 What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. 
 
 ```{python}
-alphas_lasso, coefs_lasso, _ = lasso_path(
-  pre_processor.fit_transform(
-    data_manufacturing
-  ), 
-  data_manufacturing.get("ret_excess")
-)
+x = pre_processor.fit_transform(data_manufacturing)
+y = data_manufacturing["ret_excess"]
 
-alphas_ridge, coefs_ridge, _ = enet_path(
-  pre_processor.fit_transform(
-    data_manufacturing
-  ), 
-  data_manufacturing.get("ret_excess"),
-  l1_ratio=1e-2
-)
+alphas_lasso, coefs_lasso, _ = enet_path(x, y, l1_ratio=1)
+
+alphas_ridge, coefs_ridge, _ = enet_path(x, y, l1_ratio=0.01)
 
 lasso_coefficients = (pd.DataFrame(coefs_lasso)
   .transpose()
@@ -427,7 +420,7 @@ params = {
 finder = GridSearchCV(
   lm_pipeline,
   param_grid=params,
-  scoring="neg_mean_squared_error",
+  scoring="neg_root_mean_squared_error",
   cv = data_folds
 )
 
@@ -445,7 +438,7 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 #| fig-alt: "Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values."
 validation = (pd.DataFrame(finder.cv_results_)
   .assign(
-    mspe = lambda x: np.sqrt(-x["mean_test_score"]),
+    mspe = lambda x: -x["mean_test_score"],
     param_regressor__alpha = lambda x: pd.to_numeric(
       x['param_regressor__alpha'], errors='coerce'
     )
