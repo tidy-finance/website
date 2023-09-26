@@ -13,7 +13,7 @@ categories:
   - Data
 ---
 
-Since we published our book [Tidy Finance with R](../../r/index.qmd), we have received feedback from readers who don't have access to WRDS that they cannot run the code we provide. To alleviate their constraints, we decided to create a dummy database that contains all tables and corresponding columns such that all code chunks in our book can be executed with this dummy database. The resulting database can be found through [this link](https://1drv.ms/u/s!ArgZyNRLSLEXgspompdvaUcBIzfekw?e=3R1L0t) (around 50 MB). Just download the database and put it into your `data` folder (I already renamed it to `tidy_finance.sqlite`).
+Since we published our book [Tidy Finance with R](../../r/index.qmd), we have received feedback from readers who don't have access to WRDS that they cannot run the code we provide. To alleviate their constraints, we decided to create a dummy database that contains the WRDS tables and corresponding columns such that all code chunks in our book can be executed with this dummy database. The resulting database can be found through [this link](https://github.com/tidy-finance/website/tree/main/blog/tidy-finance-dummy-data/data) (around 50 MB). Just download the database and put it into your `data` folder (I already renamed it to `tidy_finance.sqlite`). Note that we do create dummy data for macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](../../r/accessing-and-managing-financial-data.qmd).
 
 We deliberately use the *dummy* label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does *not* contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books. 
 
@@ -25,18 +25,12 @@ library(tidyverse)
 library(RSQLite)
 ```
 
-We use the original database as an input and initialize a dummy version where we later store the output tables. 
+Let us initialize you `tidy_finance.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
 
 ```{r}
 tidy_finance <- dbConnect(
   SQLite(),
-  "../../data/tidy_finance.sqlite",
-  extended_types = TRUE
-)
-
-tidy_finance_dummy <- dbConnect(
-  SQLite(),
-  "../../data/tidy_finance_dummy.sqlite",
+  "data/tidy_finance.sqlite",
   extended_types = TRUE
 )
 ```
@@ -54,83 +48,29 @@ time_series_months <- seq(start_date, end_date, "1 month")
 time_series_days <- seq(start_date, end_date, "1 day")
 ```
 
-## Create macro dummy data
-
-We start by creating dummy data for the macroeconomic tables. The following code does this by replacing the original data with random numbers while preserving the time structure (either daily or monthly) and column names. We iterate over each table name in the `macro_tables` vector. For each table, we fetch the data from the database and store it in a `data_original` table. The code checks the column names of `data_original` to determine if the data is structured by months or by days. Depending on the structure, it sets the appropriate time series and date column name. For each relevant column (i.e., excluding columns with dates), the code generates a command to replace its values with random numbers drawn from a uniform distribution between 0 and 1. We then use the `!!!` operator to unlist and execute the list of commands. This trick actually helps us to avoid typing the same function for each column individually. Finally, each table with dummy data is written to the new database with dummy data.
-
-Note that we do not put any meaningful structure on the macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](../../r/accessing-and-managing-financial-data.qmd) to replace the dummy data with the actual data.
-
-```{r}
-macro_tables <- c(
-  "cpi_monthly", "factors_ff3_daily", 
-  "factors_ff3_monthly", "factors_ff5_monthly", 
-  "factors_q_monthly", "industries_ff_monthly", 
-  "macro_predictors"
-)
-
-for (table_name in macro_tables) {
-  data_original <- tbl(tidy_finance, table_name) |>
-    collect() |> 
-    drop_na()
-  
-  if ("month" %in% names(data_original)) {
-    time_series <- time_series_months
-    date_column <- "month"
-  } else if ("date" %in% names(data_original)) {
-    time_series <- time_series_days
-    date_column <- "date"
-  }
-  
-  relevant_columns <- data_original |> 
-    select(-contains(c("month", "date"))) |> 
-    names()
-  
-  commands <- unlist(
-    map(
-      relevant_columns, 
-      ~rlang::exprs(!!..1 := runif(n()))
-    )
-  )
-  
-  data_dummy <- tibble(
-    !!sym(date_column) := time_series
-    ) |> 
-    mutate(
-      !!!commands
-    )
-  
-  dbWriteTable(
-    tidy_finance_dummy, 
-    table_name,
-    data_dummy,
-    overwrite = TRUE
-  )
-}
-```
-
 ## Create stock dummy data
 
-Let us move on the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original database, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data. 
+Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original database, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data. 
 
 ```{r}
 number_of_stocks <- 100
 
-crsp_stocks <- tbl(tidy_finance, "crsp_monthly") |>
-  group_by(permno) |> 
-  filter(month == max(month, na.rm = TRUE)) |> 
-  ungroup() |> 
-  select(permno, gvkey, industry, exchange, exchcd, siccd) |> 
-  collect()
+industries <- tibble(
+  industry = c("Agriculture", "Construction", "Finance", 
+               "Manufacturing", "Mining", "Public", "Retail", 
+               "Services", "Transportation", "Utilities", 
+               "Wholesale"),
+  n = c(81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 
+        457, 904),
+  prob = c(0.00319, 0.0113, 0.185, 0.339, 0.0508, 0.0779, 
+           0.0620, 0.169, 0.0493, 0.0180, 0.0357)
+)
 
-industries <- crsp_stocks |> 
-  filter(industry != "Missing") |> 
-  count(industry) |> 
-  mutate(prob = n / sum(n))
-
-exchanges <- crsp_stocks |> 
-  filter(exchange != "Other") |> 
-  count(exchange) |> 
-  mutate(prob = n / sum(n))
+exchanges <- exchanges <- tibble(
+  exchange = c("AMEX", "NASDAQ", "NYSE"),
+  n = c(2893, 17236, 5553),
+  prob = c(0.113, 0.671, 0.216)
+)
 
 stock_identifiers <- 1:number_of_stocks |> 
   map_df(
@@ -205,7 +145,7 @@ beta_dummy <- stock_panel_monthly |>
   )
 
 dbWriteTable(
-  tidy_finance_dummy,
+  tidy_finance,
   "beta", 
   beta_dummy, 
   overwrite = TRUE
@@ -216,10 +156,14 @@ dbWriteTable(
 
 To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1 using the same trick as with the macro data tables. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. 
 
+We then use the `!!!` operator to unlist and execute a list of commands. This trick actually helps us to avoid typing the same function for each column individually. Finally, each table with dummy data is written to the new database with dummy data.
+
 ```{r}
-relevant_columns <- tbl(tidy_finance, "compustat") |> 
-  select(-c(gvkey, datadate, year)) |> 
-  names()
+relevant_columns <- c(
+  "seq", "ceq", "at", "lt", "txditc", "txdb", "itcb", 
+  "pstkrv", "pstkl", "pstk", "capx", "oancf", "sale", 
+  "cogs", "xint", "xsga", "be", "op", "at_lag", "inv"
+)
 
 commands <- unlist(
   map(
@@ -235,7 +179,7 @@ compustat_dummy <- stock_panel_yearly |>
   )
 
 dbWriteTable(
-  tidy_finance_dummy, 
+  tidy_finance, 
   "compustat", 
   compustat_dummy,
   overwrite = TRUE
@@ -247,8 +191,6 @@ dbWriteTable(
 The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`.
 
 ```{r}
-tbl(tidy_finance, "crsp_monthly")
-
 crsp_monthly_dummy <- stock_panel_monthly |> 
   mutate(
     date = ceiling_date(month, "month") - 1,
@@ -264,7 +206,7 @@ crsp_monthly_dummy <- stock_panel_monthly |>
   ungroup()
 
 dbWriteTable(
-  tidy_finance_dummy, 
+  tidy_finance, 
   "crsp_monthly",
   crsp_monthly_dummy,
   overwrite = TRUE
@@ -283,7 +225,7 @@ crsp_daily_dummy <- stock_panel_daily |>
   )
 
 dbWriteTable(
-  tidy_finance_dummy,
+  tidy_finance,
   "crsp_daily",
   crsp_daily_dummy, 
   overwrite = TRUE
@@ -301,29 +243,6 @@ To create dummy data with the structure of Mergent FISD, we calculate the empiri
 ```{r}
 number_of_bonds <- 100
 
-mergent <- tbl(tidy_finance, "mergent") |> 
-  collect()
-
-maturities <- mergent |> 
-  count(days = maturity - offering_date) |> 
-  mutate(probability = n / sum(n))
-
-amounts <- mergent |> 
-  count(offering_amt) |> 
-  mutate(probability = n / sum(n))
-
-frequencies <- mergent |> 
-  count(interest_frequency) |> 
-  mutate(probability = n / sum(n))
-
-coupons <- mergent |> 
-  count(coupon) |> 
-  mutate(probability = n / sum(n))
-
-sic <- mergent |> 
-  count(sic_code) |> 
-  mutate(probability = n / sum(n))
-
 mergent_dummy <- 1:number_of_bonds |> 
   map_df(
     function(x) {
@@ -339,39 +258,19 @@ mergent_dummy <- 1:number_of_bonds |>
   ) |> 
   mutate(
     maturity = sample(time_series_days, n(), replace = TRUE),
-    offering_amt = sample(
-      amounts$offering_amt, n(), 
-      prob = amounts$probability, 
-      replace = TRUE
-    ),
-    offering_date = maturity - sample(
-      maturities$days, n(),
-      prob = maturities$probability, 
-      replace = TRUE
-    ),
+    offering_amt = sample(seq(1:100) * 100000, n(), replace = TRUE),
+    offering_date = maturity - sample(seq(1:25) * 365, n(),replace = TRUE),
     dated_date = offering_date - sample(-10:10, n(), replace = TRUE),
-    interest_frequency = sample(
-      frequencies$interest_frequency, n(), 
-      prob = frequencies$probability, 
-      replace = TRUE
-    ),
-    coupon = sample(
-      coupons$coupon, n(), 
-      prob = coupons$probability, 
-      replace = TRUE
-    ),
+    interest_frequency = sample(c(0, 1, 2, 4, 12), n(), replace = TRUE),
+    coupon = sample(seq(0, 2, by = 0.1), n(), replace = TRUE),
     last_interest_date = pmax(maturity, offering_date, dated_date),
     issue_id = row_number(),
     issuer_id = sample(1:250, n(), replace = TRUE),
-    sic_code = sample(
-      sic$sic_code, n(), 
-      prob = sic$probability, 
-      replace = TRUE
-    )
+    sic_code = as.character(sample(seq(1:9)*1000, n(), replace = TRUE))
   )
   
 dbWriteTable(
-  tidy_finance_dummy, 
+  tidy_finance, 
   "mergent", 
   mergent_dummy, 
   overwrite = TRUE
@@ -412,7 +311,7 @@ trace_enhanced_dummy <- bind_rows(
   ) 
   
 dbWriteTable(
-  tidy_finance_dummy, 
+  tidy_finance, 
   "trace_enhanced", 
   trace_enhanced_dummy, 
   overwrite = TRUE
