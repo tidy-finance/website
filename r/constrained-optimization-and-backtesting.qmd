@@ -8,20 +8,22 @@ aliases:
 We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R.\index{Efficient portfolio} We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter. 
 
 Throughout this chapter, we use the following packages:
-```{r, eval = TRUE, message = FALSE}
+
+```{r}
+#| message: false
 library(tidyverse)
 library(RSQLite)
 library(scales)
-library(quadprog)
-library(alabama)
+library(nloptr)
 ```
-Compared to previous chapters, we introduce the `quadprog` package [@quadprog] to perform numerical constrained optimization for quadratic objective functions and `alabama` [@alabama] for more general non-linear objective functions and constraints. \index{Optimization}\index{Portfolio choice}
+
+Compared to previous chapters, we introduce the `nloptr` package [@nloptr] to perform numerical constrained optimization for portfolio choice problems.\index{Optimization}\index{Portfolio choice}
 
 ## Data Preparation
 
 We start by loading the required data from our `SQLite`-database introduced in Chapters 2-4. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
-```{r, eval = TRUE}
+```{r}
 tidy_finance <- dbConnect(
   SQLite(),
   "data/tidy_finance.sqlite",
@@ -30,9 +32,8 @@ tidy_finance <- dbConnect(
 
 industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
   select(-month) |>
-  collect()
-
-industry_returns
+  collect() |> 
+  drop_na()
 ```
 
 ## Recap of Portfolio Choice 
@@ -98,7 +99,6 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 
 The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). 
 For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$. 
-
 ```{r}
 compute_efficient_weight <- function(Sigma,
                                      mu,
@@ -119,19 +119,24 @@ compute_efficient_weight <- function(Sigma,
   w_opt <- w_mvp + 1 / gamma *
     (Sigma_inverse - w_mvp %*% t(iota) %*% Sigma_inverse) %*%
       mu_processed
+  
   return(as.vector(w_opt))
 }
 
-compute_efficient_weight(Sigma, mu)
+w_efficient <- compute_efficient_weight(Sigma, mu)
+round(w_efficient, 3)
 ```
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. \index{Short-selling}
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 ```{r}
+gammas <- c(2, 4, 8, 20)
+betas <- 20 * qexp((1:99) / 100)
+                   
 transaction_costs <- expand_grid(
-  gamma = c(2, 4, 8, 20),
-  beta = 20 * qexp((1:99) / 100)
+  gamma = gammas,
+  beta = betas
 ) |>
   mutate(
     weights = map2(
@@ -147,6 +152,7 @@ transaction_costs <- expand_grid(
     concentration = map_dbl(weights, ~ sum(abs(. - w_mvp)))
   )
 ```
+
 The code chunk above computes the optimal weight in presence of transaction cost for different values of $\beta$ and $\gamma$ but with the same initial allocation, the theoretical optimal minimum variance portfolio. 
 Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. 
 If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.\index{Graph!Comparative statics}
@@ -177,94 +183,125 @@ transaction_costs |>
 
 ## Constrained Optimization
 
-Next, we introduce constraints to the above optimization procedure. 
-Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). 
-However, numerical optimization allows computing the solutions to such constrained problems. For the purpose of mean-variance optimization, we rely on the `solve.QP()` function from the package `quadprog`.\index{Optimization!Constrained}
+Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that $w_i \geq 0\quad \forall i$). However, numerical optimization allows computing the solutions to such constrained problems. 
 
-The function `solve.QP()` delivers numerical solutions to quadratic programming problems of the form 
-$$\min(-\mu \omega + 1/2 \omega' \Sigma \omega) \text{ s.t. } A' \omega >= b_0.$$
-The function takes one argument (`meq`) for the number of equality constraints. Therefore, the above matrix $A$ is simply a vector of ones to ensure that the weights sum up to one. In the case of short-selling constraints, the matrix $A$ is of the form 
-$$A' = \begin{pmatrix}1 & 1& \ldots&1 \\1 & 0 &\ldots&0\\0 & 1 &\ldots&0\\\vdots&&\ddots&\vdots\\0&0&\ldots&1\end{pmatrix}'\qquad b_0 = \begin{pmatrix}1\\0\\\vdots\\0\end{pmatrix}.$$
+We rely on the powerful `nloptr` package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of @Kraft1994 because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian. 
 
-Before we dive into constrained optimization, we revisit the *unconstrained* problem and replicate the analytical solutions for the minimum variance and efficient portfolio weights from above. We verify that the output is equal to the above solution. 
-Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. As just discussed, we set `Amat` to a matrix with a column of ones and `bvec` to 1 to enforce the constraint that weights must sum up to one. `meq=1` means that one (out of one) constraints must be satisfied with equality.   
+We illustrate the use of the `nloptr()` function by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. 
 
 ```{r}
-w_mvp_numerical <- solve.QP(
-  Dmat = Sigma,
-  dvec = rep(0, n_industries),
-  Amat = cbind(rep(1, n_industries)),
-  bvec = 1,
-  meq = 1
+w_initial <- rep(1 / n_industries, n_industries)
+
+objective_mvp <- function(w) {
+  0.5 * t(w) %*% Sigma %*% w
+}
+
+gradient_mvp <- function(w) {
+  Sigma %*% w
+}
+
+equality_constraint <- function(w) {
+  sum(w) - 1
+}
+
+jacobian_equality <- function(w) {
+  rep(1, n_industries)
+}
+
+options <- list(
+  "xtol_rel"=1e-20, 
+  "algorithm" = "NLOPT_LD_SLSQP", 
+  "maxeval" = 10000
+)
+
+w_mvp_numerical <- nloptr(
+  x0 = w_initial, 
+  eval_f = objective_mvp, 
+  eval_grad_f = gradient_mvp,
+  eval_g_eq = equality_constraint,
+  eval_jac_g_eq = jacobian_equality,
+  opts = options
 )
 
 all(near(w_mvp, w_mvp_numerical$solution))
 
-w_efficient_numerical <- solve.QP(
-  Dmat = 2 * Sigma,
-  dvec = mu,
-  Amat = cbind(rep(1, n_industries)),
-  bvec = 1,
-  meq = 1
+objective_efficient <- function(w) {
+  2 * 0.5 * t(w) %*% Sigma %*% w - sum((1 + mu) * w)
+}
+
+gradient_efficient <- function(w) {
+  2 * Sigma %*% w - (1 + mu)
+}
+
+w_efficient_numerical <- nloptr(
+  x0 = w_initial, 
+  eval_f = objective_efficient, 
+  eval_grad_f = gradient_efficient,
+  eval_g_eq = equality_constraint, 
+  eval_jac_g_eq = jacobian_equality,
+  opts = options
 )
 
-all(near(compute_efficient_weight(Sigma, mu), w_efficient_numerical$solution))
+all(near(w_efficient, w_efficient_numerical$solution))
 ```
 
-The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. 
-For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the vast optimization landscape. \index{Optimization}
+The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. For more complex optimization routines, [R's optimization task view](https://cran.r-project.org/web/views/Optimization.html) provides an overview of the vast optimization landscape. \index{Optimization}
 
-Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. 
+Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. We can implement the short sale constraints by imposing a vector of lower bounds `lb = rep(0, n_industries)`.
 
 ```{r}
-w_no_short_sale <- solve.QP(
-  Dmat = 2 * Sigma,
-  dvec = mu,
-  Amat = cbind(1, diag(n_industries)),
-  bvec = c(1, rep(0, n_industries)),
-  meq = 1
+w_no_short_sale <- nloptr(
+  x0 = w_initial, 
+  eval_f = objective_efficient, 
+  eval_grad_f = gradient_efficient,
+  eval_g_eq = equality_constraint, 
+  eval_jac_g_eq = jacobian_equality,
+  lb = rep(0, n_industries),
+  opts = options
 )
-w_no_short_sale$solution
+
+round(w_no_short_sale$solution, 3)
 ```
+
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. 
-You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `solve.QP()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
+You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words: `nloptr()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden. 
 
-`solve.QP()` is fast because it benefits from a very clear problem structure with a quadratic objective and linear constraints. However, optimization often requires more flexibility. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
+`nloptr()` can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called [Regulation T-constraint,](https://en.wikipedia.org/wiki/Regulation_T) which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is $\sum_{i=1}^N |\omega_i| \leq 1.5$. 
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
-Thus, we can no longer rely on `solve.QP()`, which is defined as solving quadratic programming problems with linear constraints. 
-Instead, we rely on the package `alabama`, which requires a separate definition of objective and constraint functions. 
 
 ```{r}
-initial_weights <- rep(
-  1 / n_industries,
-  n_industries
+reg_t <- 1.5
+
+inequality_constraint <- function(w) {
+  sum(abs(w)) - reg_t
+}
+
+jacobian_inequality <- function(w) {
+  sign(w)
+}
+
+objective_reg_t <- function(w) {
+  - t(w) %*% (1 + mu) +
+    2 * 0.5 * t(w) %*% Sigma %*% w
+}
+
+gradient_reg_t <- function(w) {
+  - (1 + mu) + 2 * Sigma %*% w
+}
+
+w_reg_t <- nloptr(
+  x0 = w_initial,
+  eval_f = objective_reg_t, 
+  eval_grad_f = gradient_reg_t,
+  eval_g_eq = equality_constraint, 
+  eval_jac_g_eq = jacobian_equality, 
+  eval_g_ineq = inequality_constraint, 
+  eval_jac_g_ineq = jacobian_inequality,
+  opts = options
 )
 
-objective <- function(w, gamma = 2) {
-  -t(w) %*% (1 + mu) +
-    gamma / 2 * t(w) %*% Sigma %*% w
-}
-
-inequality_constraints <- function(w, reg_t = 1.5) {
-  reg_t - sum(abs(w))
-}
-
-equality_constraints <- function(w) {
-  sum(w) - 1
-}
-
-w_reg_t <- constrOptim.nl(
-  par = initial_weights,
-  hin = inequality_constraints,
-  fn = objective,
-  heq = equality_constraints,
-  control.outer = list(trace = FALSE)
-)
-w_reg_t$par
+round(w_reg_t$solution, 3)
 ```
-
-Note that the function `constrOptim.nl()` requires a starting vector of parameter values, i.e., an initial portfolio. Under the hood, `alamaba` performs numerical optimization by searching for a local minimum of the function `objective()` (subject to the equality constraints `equality_constraints()` and the inequality constraints `inequality_constraints()`).
-Note that the starting point should not matter if the algorithm identifies a global minimum.
 
 @fig-1702 shows the optimal allocation weights across all `r ncol(industry_returns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with $\gamma$ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.\index{Graph!Bar chart}
 
@@ -307,28 +344,30 @@ Before we move on, we want to propose a final allocation strategy, which reflect
 ```{r}
 compute_efficient_weight_L1_TC <- function(mu,
                                            Sigma,
-                                           gamma = 2,
-                                           beta = 0,
-                                           initial_weights = rep(
-                                             1 / ncol(Sigma),
-                                             ncol(Sigma)
-                                           )) {
+                                           gamma,
+                                           beta,
+                                           initial_weights) {
   objective <- function(w) {
     -t(w) %*% mu +
       gamma / 2 * t(w) %*% Sigma %*% w +
       (beta / 10000) / 2 * sum(abs(w - initial_weights))
   }
+  
+  gradient <- function(w) {
+    -mu + gamma * Sigma %*% w + 
+      (beta / 10000) * 0.5 * sign(w - initial_weights)
+  }
 
-  w_optimal <- constrOptim.nl(
-    par = initial_weights,
-    fn = objective,
-    heq = function(w) {
-      sum(w) - 1
-    },
-    control.outer = list(trace = FALSE)
+  w_optimal <- nloptr(
+    x0 = initial_weights,
+    eval_f = objective, 
+    eval_grad_f = gradient,
+    eval_g_eq = equality_constraint, 
+    eval_jac_g_eq = jacobian_equality, 
+    opts = options
   )
 
-  return(w_optimal$par)
+  return(w_optimal$solution)
 }
 ```
 
@@ -445,17 +484,22 @@ performance <- lapply(
 ) |>
   bind_rows(.id = "strategy")
 
-performance |>
-  group_by(strategy) |>
+length_year <- 12
+
+performance_table <- performance |>
+  group_by(Strategy = strategy) |>
   summarize(
-    Mean = 12 * mean(100 * net_return),
-    SD = sqrt(12) * sd(100 * net_return),
+    Mean = length_year * mean(100 * net_return),
+    SD = sqrt(length_year) * sd(100 * net_return),
     `Sharpe ratio` = if_else(Mean > 0,
       Mean / SD,
       NA_real_
     ),
     Turnover = 100 * mean(turnover)
   )
+
+performance_table |> 
+  mutate(across(-Strategy, ~round(., 4)))
 ``` 
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio's expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$indicate that the current allocation is too far away from the optimal theoretical portfolio. 
