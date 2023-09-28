@@ -1,0 +1,114 @@
+---
+title: "Comparing Fama-French Three vs Five Factors"
+author:
+  - name: Christoph Scheuch
+    url: https://christophscheuch.github.io/
+    affiliations:
+      - name: wikifolio Financial Technologies AG
+date: "2023-10-02"
+description: An explanation for the difference in the size factors of Fama and French 3 and 5 factor data
+image: thumbnail.png
+image-alt: Two stylized high rise office buildings, one small building and one large building, both buildings visible in the frame. The background has a futuristic setting, with a backdrop of a digital, grid-like landscape symbolizing the internet. The color palette should be a combination of cool blues and warm yellow. Created with DALL-E 2.
+categories: 
+  - Data
+  - Replication
+  - R
+draft: true
+--- 
+
+In our book chapter [Replicating Fama and French Factors](../../r/replicating-fama-and-french-factors), we show how to construct factor portfolios that are fairly close to the popular data from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html). In this blog post, I want to elaborate a bit more on the subtle differences between the size and value data in the Fama-French three (FF3)[^1] and five (FF5)[^2] factor data. 
+
+```{r}
+#| message: false
+library(tidyverse)
+library(fixest)
+library(RSQLite)
+
+tidy_finance <- dbConnect(
+  SQLite(), 
+  "../../data/tidy_finance.sqlite", 
+  extended_types = TRUE
+)
+
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |> 
+  collect()
+
+factors_ff5_monthly <- tbl(tidy_finance, "factors_ff5_monthly") |> 
+  collect()
+
+factors_ff <- factors_ff3_monthly |> 
+  rename_with(.cols = c(mkt_excess, rf, smb, hml),
+              ~str_c(.x, "_ff3")) |> 
+  inner_join(
+    factors_ff5_monthly |> 
+      select(month, mkt_excess, rf, smb, hml) |> 
+      rename_with(.cols = c(mkt_excess, rf, smb, hml),
+              ~str_c(.x, "_ff5")), by = "month")
+
+industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
+  collect()
+```
+
+Let us first inspect the summary statistics of each factor.
+
+```{r}
+factors_ff |> 
+  pivot_longer(cols = - month) |> 
+  select(name, value) |>
+  drop_na() |>
+  group_by(name) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q50 = quantile(value, 0.50),
+    q95 = quantile(value, 0.95),
+    max = max(value),
+    n = n()
+  ) |> 
+  print(n = Inf)
+```
+
+The above table shows that risk free rates `rf_*`, market excess returns `mkt_excess_*`, and value factors `hml_*` show de facto identical value across all statistics for FF3 and FF5. However, the size factors `smb_*`  seem to be different between the data sets. Another way to show the difference is running regressions, as we do in [Replicating Fama and French Factors](../../r/replicating-fama-and-french-factors):
+
+```{r}
+model_smb <- lm(smb_ff3 ~ smb_ff5, data = factors_ff)
+summary(model_smb)
+```
+
+Regressing the FF3 size factor on its FF5 counterpart yields a coefficient of `r round(model_smb$coefficients[2], 2)` and an R-squared around `r round(summary(model_smb)$adj.r.squared, 2) * 100`%, so definitely no perfect co-movement. Where does this difference come from?
+
+There are two potential explanations for the differences:
+
+1. The FF3 and FF5 data are based on slightly different samples: while the FF3 data considers all stocks with valid `market_cap` and `bm` values, the FF5 data requires valid `bm`, `op`, and `inv` values. So if firms don't report any of the values that enter into these three sorting variables, then they are dropped from the portfolio sorts. 
+1. The size portfolios `portfolio_size` and value portfolios `portfolio_bm` are constructed as independent sorts in FF3, while `portfolio_bm`, `portfolio_op`, and `portfolio_inv` are the result of dependent sorts in FF5 (depending on `portfolio_size`). In FF5, `portfolio_size` is then calculated on averages based on `portfolio_bm`, `portfolio_op`, and `portfolio_inv` portfolios. As all portfolios are the result of value-weighted return aggregation, it is hence very likely that these aggregations lead to different values. 
+
+These subtle differences might even impact your statistical tests. As an example, let us consider one of the industry portfolios from `industry_ff_monthly`. We use the "Other" portfolio, which contains sectors such as mines, construction, entertainment, finance, etc. We run a gression of the corresponding industry portfolios against the market, size, and value factors of FF3 and FF5, respectively.
+
+```{r}
+industry_returns <- industries_ff_monthly |> 
+  select(month, ret_other = Other) |> 
+  inner_join(factors_ff, by = "month")
+
+model_ff3 <- feols(
+  ret_other ~ mkt_excess_ff3 + smb_ff3 + hml_ff3, 
+  industry_returns
+)
+
+model_ff5 <- feols(
+  ret_other ~ mkt_excess_ff5 + smb_ff5 + hml_ff5, 
+  industry_returns
+)
+
+etable(model_ff3, model_ff5, coefstat = "tstat")
+```
+
+The results show that the size vactor is only significant at the 10% level for the FF3 data, but it is significant at the 1% level for the FF5 version!
+
+What are the implications for empirical applications? You should be careful when you want to test your portfolios against FF3 and FF5 factors. It is strictly speaking not correct to just use a subsample of factors from FF5 if you want to test against the FF3 factors. I rather recommend downloading both FF3 and FF5 and run tests with each data set separately. 
+
+
+[^1]: Fama, E. F.; French, K. R. (1993). "Common risk factors in the returns on stocks and bonds". Journal of Financial Economics. 33: 3–56. [https://doi.org/10.1016/0304-405X(93)90023-5](https://doi.org/10.1016/0304-405X(93)90023-5)
+
+[^2]: Fama, E. F.; French, K. R. (2015). "A Five-Factor Asset Pricing Model". Journal of Financial Economics. 116: 1–22. CiteSeerX 10.1.1.645.3745. [https://doi.org/10.1016/j.jfineco.2014.10.010](https://doi.org/10.1016/j.jfineco.2014.10.010)

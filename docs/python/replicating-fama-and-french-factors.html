@@ -396,8 +396,9 @@ cookieconsent.run({
   <ul>
   <li><a href="#data-preparation" id="toc-data-preparation" class="nav-link active" data-scroll-target="#data-preparation">Data Preparation</a></li>
   <li><a href="#portfolio-sorts" id="toc-portfolio-sorts" class="nav-link" data-scroll-target="#portfolio-sorts">Portfolio Sorts</a></li>
-  <li><a href="#fama-and-french-factor-returns" id="toc-fama-and-french-factor-returns" class="nav-link" data-scroll-target="#fama-and-french-factor-returns">Fama and French Factor Returns</a></li>
+  <li><a href="#fama-and-french-three-factor-model" id="toc-fama-and-french-three-factor-model" class="nav-link" data-scroll-target="#fama-and-french-three-factor-model">Fama and French Three Factor Model</a></li>
   <li><a href="#replication-evaluation" id="toc-replication-evaluation" class="nav-link" data-scroll-target="#replication-evaluation">Replication Evaluation</a></li>
+  <li><a href="#fama-and-french-five-factor-model" id="toc-fama-and-french-five-factor-model" class="nav-link" data-scroll-target="#fama-and-french-five-factor-model">Fama and French Five Factor Model</a></li>
   <li><a href="#exercises" id="toc-exercises" class="nav-link" data-scroll-target="#exercises">Exercises</a></li>
   </ul>
 <div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/tidy-finance/website/edit/main/python/replicating-fama-and-french-factors.qmd" class="toc-action">Edit this page</a></p><p><a href="https://github.com/tidy-finance/website/issues/new" class="toc-action">Report an issue</a></p></div></div></nav>
@@ -435,7 +436,9 @@ Note
 <p>You are reading the work-in-progress edition of <strong>Tidy Finance with Python</strong>. Code chunks and text might change over the next couple of months. We are always looking for feedback via <a href="mailto:contact@tidy-finance.org">contact@tidy-finance.org</a>. Meanwhile, you can find the complete R version <a href="../r/index.html">here</a>.</p>
 </div>
 </div>
-<p>In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model <span class="citation" data-cites="Fama1993">(see <a href="#ref-Fama1993" role="doc-biblioref">Fama and French 1993</a>)</span> is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts.</p>
+<p>In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French factor models are a cornerstone of empirical asset pricing <span class="citation" data-cites="Fama1992">Fama and French (<a href="#ref-FamaFrench2015" role="doc-biblioref">2015</a>)</span>. On top of the market factor represented by the traditional CAPM beta, the three factor model includes the size and value factors to explain the cross section of returns. Its successor, the five factor model, additionally includes profitability and investment as explanatory factors.</p>
+<p>We start with the three factor model. We already introduced the size and value factors in <a href="../python/value-and-bivariate-sorts.html">Value and Bivariate Sorts</a>, and their definition remains the same: size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts.</p>
+<p>After the replication of the three factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates.</p>
 <p>The current chapter relies on this set of packages.</p>
 <div class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
@@ -450,67 +453,88 @@ Note
 <div class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(<span class="st">"data/tidy_finance.sqlite"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>data_ff <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT permno, gvkey, month, ret_excess, mktcap, mktcap_lag, exchange FROM crsp_monthly"</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>book_equity <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT gvkey, datadate, be FROM compustat"</span>,</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"datadate"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT month, smb, hml FROM factors_ff_monthly"</span>,</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"""SELECT permno, gvkey, month, ret_excess, mktcap, </span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="st">                  mktcap_lag, exchange </span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM crsp_monthly"""</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>compustat <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"""SELECT gvkey, datadate, be, op, inv </span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM compustat"""</span>,</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"datadate"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"""SELECT month, smb, hml </span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM factors_ff3_monthly"""</span>,</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>factors_ff5_monthly <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"""SELECT month, smb, hml, rmw, cma </span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM factors_ff5_monthly"""</span>,</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>: {<span class="st">"unit"</span>: <span class="st">"D"</span>, <span class="st">"origin"</span>: <span class="st">"unix"</span>}})</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year <span class="math inline">\(t\)</span>, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year <span class="math inline">\(t+1\)</span>.</p>
+<p>Yet when we start merging our data set for computing the premiums, there are a few differences to <a href="../python/value-and-bivariate-sorts.html">Value and Bivariate Sorts</a>. First, Fama and French form their portfolios in June of year <span class="math inline">\(t\)</span>, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year <span class="math inline">\(t+1\)</span>.</p>
 <p>Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year <span class="math inline">\(t - 1\)</span> and the book equity reported in year <span class="math inline">\(t-1\)</span>, i.e., the <code>datadate</code> is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.</p>
 <p>To implement all these time lags, we again employ the temporary <code>sorting_date</code>-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of <code>drop_duplicates()</code> at the end of the chunk below.</p>
 <div class="cell" data-execution_count="4">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>me_ff <span class="op">=</span> (data_ff</span>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>size <span class="op">=</span> (crsp_monthly</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"month.dt.month == 6"</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"mktcap"</span>])</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"mktcap"</span>: <span class="st">"me_ff"</span>})</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>me_ff_dec <span class="op">=</span> (data_ff</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"month.dt.month == 12"</span>)</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">7</span>))</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>, <span class="st">"mktcap"</span>])</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"mktcap"</span>: <span class="st">"bm_me"</span>})</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>bm_ff <span class="op">=</span> (book_equity</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: pd.to_datetime((x[<span class="st">"datadate"</span>].dt.year <span class="op">+</span> <span class="dv">1</span>).astype(<span class="bu">str</span>) <span class="op">+</span> <span class="st">"0701"</span>, <span class="bu">format</span><span class="op">=</span><span class="st">"%Y%m</span><span class="sc">%d</span><span class="st">"</span>)</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"be"</span>: <span class="st">"bm_be"</span>})</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  .merge(me_ff_dec, </span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>])</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>  .assign(bm_ff <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"bm_be"</span>] <span class="op">/</span> x[<span class="st">"bm_me"</span>])</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"bm_ff"</span>])</span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>variables_ff <span class="op">=</span> (me_ff</span>
-<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>  .merge(bm_ff, </span>
-<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
-<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"month"</span>] <span class="op">+</span> </span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>                                pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"exchange"</span>, <span class="st">"sorting_date"</span>, <span class="st">"mktcap"</span>])</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"mktcap"</span>: <span class="st">"size"</span>})</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>market_equity <span class="op">=</span> (crsp_monthly</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"month.dt.month == 12"</span>)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"month"</span>] <span class="op">+</span> </span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>                                pd.DateOffset(months<span class="op">=</span><span class="dv">7</span>))</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>, <span class="st">"mktcap"</span>])</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"mktcap"</span>: <span class="st">"me"</span>})</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>book_to_market <span class="op">=</span> (compustat</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (pd.to_datetime(</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>      (x[<span class="st">"datadate"</span>].dt.year <span class="op">+</span> <span class="dv">1</span>).astype(<span class="bu">str</span>) <span class="op">+</span> </span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">"0701"</span>, <span class="bu">format</span><span class="op">=</span><span class="st">"%Y%m</span><span class="sc">%d</span><span class="st">"</span>))</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>  .merge(market_equity,</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>,</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>  .assign(bm <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"be"</span>] <span class="op">/</span> x[<span class="st">"me"</span>])</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"me"</span>, <span class="st">"bm"</span>])</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>sorting_variables <span class="op">=</span> (size</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>  .merge(book_to_market, </span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>  .drop_duplicates(subset<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="portfolio-sorts" class="level2">
 <h2 class="anchored" data-anchor-id="portfolio-sorts">Portfolio Sorts</h2>
-<p>Next, we construct our portfolios with an adjusted <code>assign_portfolio()</code> function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the <code>seq()</code> we would produce does not produce the right breakpoints. Instead of <code>n_portfolios</code>, we now specify <code>percentiles</code>, which take the breakpoint-sequence as an object specified in the function’s call. Specifically, we give <code>percentiles = c(0, 0.3, 0.7, 1)</code> to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.</p>
+<p>Next, we construct our portfolios with an adjusted <code>assign_portfolio()</code> function. Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because it would not produce the right breakpoints. Instead of <code>n_portfolios</code>, we now specify <code>percentiles</code>, which take the breakpoint-sequence as an object specified in the function’s call. Specifically, we give <code>percentiles = [0, 0.3, 0.7, 1]</code> to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.</p>
 <div class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, sorting_variable, percentiles):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> (data</span>
@@ -520,109 +544,371 @@ Note
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        )</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    breakpoints.iloc[<span class="dv">0</span>] <span class="op">=</span> <span class="op">-</span>np.Inf</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    breakpoints.iloc[breakpoints.size<span class="op">-</span><span class="dv">1</span>] <span class="op">=</span> np.Inf</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(data[sorting_variable],</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>                                 bins<span class="op">=</span>breakpoints,</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>                                 labels<span class="op">=</span>pd.Series(<span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size)),</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>                                 include_lowest<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>portfolios_ff <span class="op">=</span> (variables_ff</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  .merge(data_ff,</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>,</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>         left_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>], right_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"month"</span>])</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"sorting_date"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x</span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>         .assign(portfolio_me <span class="op">=</span> assign_portfolio(x, <span class="st">'me_ff'</span>, [<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>]),</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>                 portfolio_bm <span class="op">=</span> assign_portfolio(x, <span class="st">'bm_ff'</span>, [<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>])))</span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"portfolio_me"</span>, <span class="st">"portfolio_bm"</span>])</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>      data[sorting_variable],</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>      bins<span class="op">=</span>breakpoints,</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>      labels<span class="op">=</span>pd.Series(<span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size)),</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>      include_lowest<span class="op">=</span><span class="va">True</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>portfolios <span class="op">=</span> (sorting_variables</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"sorting_date"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>         .assign(portfolio_size <span class="op">=</span> assign_portfolio(</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"size"</span>, [<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>]</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>                  ),</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>                 portfolio_bm <span class="op">=</span> assign_portfolio(</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"bm"</span>, [<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>]))</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, </span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>        <span class="st">"portfolio_size"</span>, <span class="st">"portfolio_bm"</span>])</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column <code>sorting_date</code> in our return data by setting the date to sort on to July of <span class="math inline">\(t-1\)</span> if the month is June (of year <span class="math inline">\(t\)</span>) or earlier or to July of year <span class="math inline">\(t\)</span> if the month is July or later.</p>
 <div class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>portfolios_ff <span class="op">=</span> (data_ff</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: pd.to_datetime(</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>            x[<span class="st">"month"</span>].<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="bu">str</span>(x.year <span class="op">-</span> <span class="dv">1</span>) <span class="op">+</span> <span class="st">"0701"</span> <span class="cf">if</span> x.month <span class="op">&lt;=</span> <span class="dv">6</span> <span class="cf">else</span> <span class="bu">str</span>(x.year) <span class="op">+</span> <span class="st">"0701"</span>)))</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  .merge(portfolios_ff, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>portfolios <span class="op">=</span> (crsp_monthly</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (pd.to_datetime(</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"month"</span>].<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="bu">str</span>(x.year <span class="op">-</span> <span class="dv">1</span>) <span class="op">+</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"0701"</span> <span class="cf">if</span> x.month <span class="op">&lt;=</span> <span class="dv">6</span> <span class="cf">else</span> <span class="bu">str</span>(x.year) <span class="op">+</span> <span class="st">"0701"</span>)))</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  .merge(portfolios,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="fama-and-french-factor-returns" class="level2">
-<h2 class="anchored" data-anchor-id="fama-and-french-factor-returns">Fama and French Factor Returns</h2>
+<section id="fama-and-french-three-factor-model" class="level2">
+<h2 class="anchored" data-anchor-id="fama-and-french-three-factor-model">Fama and French Three Factor Model</h2>
 <p>Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.</p>
 <div class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly_replicated <span class="op">=</span> (portfolios_ff</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_me"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"month"</span>])</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({<span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])}))</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"smb_replicated"</span>: x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_me"</span>] <span class="op">==</span> <span class="dv">1</span>].mean() <span class="op">-</span> x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_me"</span>] <span class="op">==</span> <span class="dv">2</span>].mean(),</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"hml_replicated"</span>: x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">3</span>].mean() <span class="op">-</span> x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">1</span>].mean()</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    }))</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">round</span>(decimals<span class="op">=</span><span class="dv">4</span>)</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>factors_replicated <span class="op">=</span> (portfolios</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_size"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"month"</span>])</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], </span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>                       weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])})</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>   )</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"smb_replicated"</span>: x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_size"</span>] <span class="op">==</span> <span class="dv">1</span>].mean() <span class="op">-</span> x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_size"</span>] <span class="op">==</span> <span class="dv">2</span>].mean(),</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"hml_replicated"</span>: x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">3</span>].mean() <span class="op">-</span> x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">1</span>].mean()</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    }))</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="replication-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="replication-evaluation">Replication Evaluation</h2>
-<p>In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using <code>smf.ols()</code>. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).</p>
+<p>In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using <code>smf.ols()</code>. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).</p>
 <div class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>test <span class="op">=</span> (factors_ff_monthly</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .merge(factors_ff_monthly_replicated, </span>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>test <span class="op">=</span> (factors_ff3_monthly</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .merge(factors_replicated, </span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span><span class="st">"month"</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">round</span>(decimals<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%.</p>
+<p>To test the success of the SMB factor, we hence run the following regression:</p>
 <div class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model_smb <span class="op">=</span> (smf.ols(formula<span class="op">=</span><span class="st">"smb ~ smb_replicated"</span>, data<span class="op">=</span>test)</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  .summary(slim<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_smb.tables:</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model_smb <span class="op">=</span> (smf.ols(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"smb ~ smb_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_smb.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                            OLS Regression Results                            
 ==============================================================================
 Dep. Variable:                    smb   R-squared:                       0.986
 Model:                            OLS   Adj. R-squared:                  0.986
-No. Observations:                 726   F-statistic:                 5.223e+04
+No. Observations:                 714   F-statistic:                 5.169e+04
 Covariance Type:            nonrobust   Prob (F-statistic):               0.00
 ==============================================================================
 ==================================================================================
                      coef    std err          t      P&gt;|t|      [0.025      0.975]
 ----------------------------------------------------------------------------------
-Intercept         -0.0001      0.000     -0.993      0.321      -0.000       0.000
-smb_replicated     0.9957      0.004    228.540      0.000       0.987       1.004
+Intercept         -0.0002      0.000     -1.387      0.166      -0.000    7.67e-05
+smb_replicated     0.9936      0.004    227.345      0.000       0.985       1.002
 ==================================================================================</code></pre>
 </div>
 </div>
-<p>The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 96%.</p>
+<p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is <code>python np.round(model_smb.params["smb_replicated"], 2)</code> and R-squared are at <code>python np.round(model_smb.rsquared_adj, 2) * 100</code>%.</p>
 <div class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>model_hml <span class="op">=</span> (smf.ols(formula<span class="op">=</span><span class="st">"hml ~ hml_replicated"</span>, data<span class="op">=</span>test)</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  .summary(slim<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_hml.tables:</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>model_hml <span class="op">=</span> (smf.ols(</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"hml ~ hml_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_hml.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>                            OLS Regression Results                            
 ==============================================================================
-Dep. Variable:                    hml   R-squared:                       0.958
-Model:                            OLS   Adj. R-squared:                  0.958
-No. Observations:                 726   F-statistic:                 1.671e+04
+Dep. Variable:                    hml   R-squared:                       0.959
+Model:                            OLS   Adj. R-squared:                  0.959
+No. Observations:                 714   F-statistic:                 1.652e+04
 Covariance Type:            nonrobust   Prob (F-statistic):               0.00
 ==============================================================================
 ==================================================================================
                      coef    std err          t      P&gt;|t|      [0.025      0.975]
 ----------------------------------------------------------------------------------
-Intercept          0.0003      0.000      1.431      0.153      -0.000       0.001
-hml_replicated     0.9656      0.007    129.258      0.000       0.951       0.980
+Intercept          0.0004      0.000      1.666      0.096   -6.56e-05       0.001
+hml_replicated     0.9622      0.007    128.544      0.000       0.948       0.977
 ==================================================================================</code></pre>
 </div>
 </div>
-<p>The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.</p>
+<p>The replication of the HML factor is also a success, although at a slightly lower level with coefficient of <code>python np.round(model_hml.params["hml_replicated"], 2)</code> and R-squared around <code>python np.round(model_hml.rsquared_adj, 2) * 100</code>%.</p>
+<p>The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French size and value premiums, although we do not know their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.</p>
+</section>
+<section id="fama-and-french-five-factor-model" class="level2">
+<h2 class="anchored" data-anchor-id="fama-and-french-five-factor-model">Fama and French Five Factor Model</h2>
+<p>Now, let us move to the replication of the five factor model. We extend the <code>other_sorting_variables</code> table from above with the additional characteristics operating profitability <code>op</code> and investment <code>inv</code>. Note that the <code>dropna()</code> statement yields different sample sizes as some firms with <code>be</code> values might not have <code>op</code> or <code>inv</code> values.</p>
+<div class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>other_sorting_variables <span class="op">=</span> (compustat</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (pd.to_datetime(</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>      (x[<span class="st">"datadate"</span>].dt.year <span class="op">+</span> <span class="dv">1</span>).astype(<span class="bu">str</span>) <span class="op">+</span> </span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>        <span class="st">"0701"</span>, <span class="bu">format</span><span class="op">=</span><span class="st">"%Y%m</span><span class="sc">%d</span><span class="st">"</span>))</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  .merge(market_equity,</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  .assign(bm <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"be"</span>] <span class="op">/</span> x[<span class="st">"me"</span>])</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"me"</span>, <span class="st">"bm"</span>, <span class="st">"op"</span>, <span class="st">"inv"</span>])</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>sorting_variables <span class="op">=</span> (size</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>  .merge(other_sorting_variables, </span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  .drop_duplicates(subset<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a> )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>In each month, we independently sort all stocks into the two size portfolios. The value, profitability, and investment portfolios, on the other hand, are the results of dependent sorts based on the size portfolios. We then merge the portfolios to the return data for the rest of the year just as above.</p>
+<div class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>portfolios <span class="op">=</span> (sorting_variables</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"sorting_date"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>         .assign(portfolio_size <span class="op">=</span> assign_portfolio(</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"size"</span>, [<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>]))</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"sorting_date"</span>, <span class="st">"portfolio_size"</span>], as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>         .assign(portfolio_bm <span class="op">=</span> assign_portfolio(</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"bm"</span>, [<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>]),</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>                 portfolio_op <span class="op">=</span> assign_portfolio(</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"op"</span>, [<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>]),</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>                 portfolio_inv <span class="op">=</span> assign_portfolio(</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>                    x, <span class="st">"inv"</span>, [<span class="dv">0</span>, <span class="fl">0.3</span>, <span class="fl">0.7</span>, <span class="dv">1</span>]))</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>,</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>        <span class="st">"portfolio_size"</span>, <span class="st">"portfolio_bm"</span>,</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>        <span class="st">"portfolio_op"</span>, <span class="st">"portfolio_inv"</span>])</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>portfolios <span class="op">=</span> (crsp_monthly</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: (pd.to_datetime(</span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"month"</span>].<span class="bu">apply</span>(<span class="kw">lambda</span> x: <span class="bu">str</span>(x.year <span class="op">-</span> <span class="dv">1</span>) <span class="op">+</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">"0701"</span> <span class="cf">if</span> x.month <span class="op">&lt;=</span> <span class="dv">6</span> <span class="cf">else</span> <span class="bu">str</span>(x.year) <span class="op">+</span> <span class="st">"0701"</span>)))</span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>  .merge(portfolios,</span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>         on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, we want to construct each of the factors, but this time the size factor actually comes last because it is the result of averaging across all other factor portfolios. This dependency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor, HML, as above by going long the two portfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.</p>
+<div class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>portfolios_value <span class="op">=</span> (portfolios</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_size"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"month"</span>], </span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>           as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>      <span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], </span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>                        weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])})</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>factors_value <span class="op">=</span> (portfolios_value</span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"hml_replicated"</span>: (</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">3</span>].mean() <span class="op">-</span> </span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> <span class="dv">1</span>].mean())})</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For the profitability factor, RMW, we take a long position in the two high profitability portfolios and a short position in the two low profitability portfolios.</p>
+<div class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>portfolios_profitability <span class="op">=</span> (portfolios</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_size"</span>, <span class="st">"portfolio_op"</span>, <span class="st">"month"</span>], </span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>           as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>      <span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], </span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>                        weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])})</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>factors_profitability <span class="op">=</span> (portfolios_profitability</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"rmw_replicated"</span>: (</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_op"</span>] <span class="op">==</span> <span class="dv">3</span>].mean() <span class="op">-</span> </span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_op"</span>] <span class="op">==</span> <span class="dv">1</span>].mean())})</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For the investment factor, CMA, we go long the two low investment portfolios and short the two high investment portfolios.</p>
+<div class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>portfolios_investment <span class="op">=</span> (portfolios</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio_size"</span>, <span class="st">"portfolio_inv"</span>, <span class="st">"month"</span>], </span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>           as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>      <span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], </span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>                       weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])})</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>factors_investment <span class="op">=</span> (portfolios_investment</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cma_replicated"</span>: (</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_inv"</span>] <span class="op">==</span> <span class="dv">1</span>].mean() <span class="op">-</span> </span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_inv"</span>] <span class="op">==</span> <span class="dv">3</span>].mean())})</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Finally, the size factor, SMB, is constructed by going long the six small portfolios and short the six large portfolios.</p>
+<div class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>factors_size <span class="op">=</span> (</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  pd.concat([portfolios_value, portfolios_profitability, </span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>             portfolios_investment], ignore_index<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"smb_replicated"</span>: (</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_size"</span>] <span class="op">==</span> <span class="dv">1</span>].mean() <span class="op">-</span> </span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"ret"</span>][x[<span class="st">"portfolio_size"</span>] <span class="op">==</span> <span class="dv">2</span>].mean())})</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We then join all factors together into one data frame and construct again a suitable table to run tests for evaluating our replication.</p>
+<div class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>factors_replicated <span class="op">=</span> (factors_size</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  .merge(factors_value, how<span class="op">=</span><span class="st">"outer"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  .merge(factors_profitability, how<span class="op">=</span><span class="st">"outer"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  .merge(factors_investment, how<span class="op">=</span><span class="st">"outer"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>test <span class="op">=</span> (factors_ff5_monthly</span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  .merge(factors_replicated, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"month"</span>)</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">round</span>(decimals<span class="op">=</span><span class="dv">4</span>)</span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let us start the replication evaluation again with the size factor:</p>
+<div class="cell" data-execution_count="18">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>model_smb <span class="op">=</span> (smf.ols(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"smb ~ smb_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_smb.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                    smb   R-squared:                       0.986
+Model:                            OLS   Adj. R-squared:                  0.986
+No. Observations:                 702   F-statistic:                 5.035e+04
+Covariance Type:            nonrobust   Prob (F-statistic):               0.00
+==============================================================================
+==================================================================================
+                     coef    std err          t      P&gt;|t|      [0.025      0.975]
+----------------------------------------------------------------------------------
+Intercept         -0.0002      0.000     -1.376      0.169      -0.000     7.9e-05
+smb_replicated     0.9699      0.004    224.381      0.000       0.961       0.978
+==================================================================================</code></pre>
+</div>
+</div>
+<p>The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is <code>python np.round(model_smb.params["smb_replicated"], 2)</code> and the R-squared is at <code>python np.round(model_smb.rsquared_adj, 2) * 100</code>%.</p>
+<div class="cell" data-execution_count="19">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>model_hml <span class="op">=</span> (smf.ols(</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"hml ~ hml_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_hml.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                    hml   R-squared:                       0.926
+Model:                            OLS   Adj. R-squared:                  0.926
+No. Observations:                 702   F-statistic:                     8732.
+Covariance Type:            nonrobust   Prob (F-statistic):               0.00
+==============================================================================
+==================================================================================
+                     coef    std err          t      P&gt;|t|      [0.025      0.975]
+----------------------------------------------------------------------------------
+Intercept          0.0005      0.000      1.649      0.100   -9.42e-05       0.001
+hml_replicated     0.9898      0.011     93.446      0.000       0.969       1.011
+==================================================================================</code></pre>
+</div>
+</div>
+<p>The replication of the HML factor is also a success, although at a slightly higher coefficient of <code>python np.round(model_hml.params["hml_replicated"], 2)</code> and an R-squared around <code>python np.round(model_hml.rsquared_adj, 2) * 100</code>%.</p>
+<div class="cell" data-execution_count="20">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>model_rmw <span class="op">=</span> (smf.ols(</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"rmw ~ rmw_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_rmw.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                    rmw   R-squared:                       0.941
+Model:                            OLS   Adj. R-squared:                  0.941
+No. Observations:                 702   F-statistic:                 1.119e+04
+Covariance Type:            nonrobust   Prob (F-statistic):               0.00
+==============================================================================
+==================================================================================
+                     coef    std err          t      P&gt;|t|      [0.025      0.975]
+----------------------------------------------------------------------------------
+Intercept       8.837e-05      0.000      0.433      0.665      -0.000       0.000
+rmw_replicated     0.9547      0.009    105.800      0.000       0.937       0.972
+==================================================================================</code></pre>
+</div>
+</div>
+<p>We are also able to replicate the RMW factor quite well with a coefficient of <code>python np.round(model_rmw.params["rmw_replicated"], 2)</code> and an R-squared around <code>python np.round(model_rmw.rsquared_adj, 2) * 100</code>%.</p>
+<div class="cell" data-execution_count="21">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>model_cma <span class="op">=</span> (smf.ols(</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"cma ~ cma_replicated"</span>, data<span class="op">=</span>test</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  .fit()</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> model_cma.summary(slim<span class="op">=</span><span class="va">True</span>).tables:</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                    cma   R-squared:                       0.948
+Model:                            OLS   Adj. R-squared:                  0.948
+No. Observations:                 702   F-statistic:                 1.274e+04
+Covariance Type:            nonrobust   Prob (F-statistic):               0.00
+==============================================================================
+==================================================================================
+                     coef    std err          t      P&gt;|t|      [0.025      0.975]
+----------------------------------------------------------------------------------
+Intercept          0.0007      0.000      4.107      0.000       0.000       0.001
+cma_replicated     0.9651      0.009    112.872      0.000       0.948       0.982
+==================================================================================</code></pre>
+</div>
+</div>
+<p>Finally, the CMA factor also replicates well with a coefficient of <code>python np.round(model_cma.params["cma_replicated"], 2)</code> and an R-squared around <code>python np.round(model_cma.rsquared_adj, 2) * 100</code>%.</p>
+<p>Overall, our approach seems to replicate the Fama-French three and five factor models just as well as the three factors.</p>
 </section>
 <section id="exercises" class="level2">
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
@@ -636,8 +922,14 @@ hml_replicated     0.9656      0.007    129.258      0.000       0.951       0.9
 </section>
 
 <div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" role="list">
+<div id="ref-Fama1992" class="csl-entry" role="listitem">
+Fama, Eugene F., and Kenneth R. French. 1992. <span>“<span class="nocase">The cross-section of expected stock returns</span>.”</span> <em><span>The Journal of Finance</span></em> 47 (2): 427–65. <a href="https://doi.org/2329112">https://doi.org/2329112</a>.
+</div>
 <div id="ref-Fama1993" class="csl-entry" role="listitem">
-Fama, Eugene F., and Kenneth R. French. 1993. <span>“<span class="nocase">Common risk factors in the returns on stocks and bonds</span>.”</span> <em><span>Journal of Financial Economics</span></em> 33 (1): 3–56. <a href="https://doi.org/10.1016/0304-405X(93)90023-5">https://doi.org/10.1016/0304-405X(93)90023-5</a>.
+———. 1993. <span>“<span class="nocase">Common risk factors in the returns on stocks and bonds</span>.”</span> <em><span>Journal of Financial Economics</span></em> 33 (1): 3–56. <a href="https://doi.org/10.1016/0304-405X(93)90023-5">https://doi.org/10.1016/0304-405X(93)90023-5</a>.
+</div>
+<div id="ref-FamaFrench2015" class="csl-entry" role="listitem">
+———. 2015. <span>“A Five-Factor Asset Pricing Model.”</span> <em>Journal of Financial Economics</em> 116 (1): 1–22. <a href="https://doi.org/10.1016/j.jfineco.2014.10.010">https://doi.org/10.1016/j.jfineco.2014.10.010</a>.
 </div>
 </div></section></div></main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">

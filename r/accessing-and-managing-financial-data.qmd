@@ -30,33 +30,48 @@ We start by downloading some famous Fama-French factors [e.g., @Fama1993] and po
 library(frenchdata)
 ```
 
-We can use the main function of the package to download monthly Fama-French factors. The set *3 Factors* includes the return time series of the market, size, and value factors alongside the risk-free rates. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately, as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the site, check the raw data files to appreciate the time you can save thanks to `frenchdata`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Risk-free rate}
+We can use the `download_french_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market `mkt_excess`, size `smb` and value `hml` alongside the risk-free rates `rf`. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately, as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to `frenchdata`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
 
 ```{r, message=FALSE}
-factors_ff_monthly_raw <- download_french_data("Fama/French 3 Factors")
-factors_ff_monthly <- factors_ff_monthly_raw$subsets$data[[1]] |>
-  transmute(
+factors_ff3_monthly_raw <- download_french_data("Fama/French 3 Factors")
+factors_ff3_monthly <- factors_ff3_monthly_raw$subsets$data[[1]] |>
+  mutate(
     month = floor_date(ymd(str_c(date, "01")), "month"),
-    rf = as.numeric(RF) / 100,
-    mkt_excess = as.numeric(`Mkt-RF`) / 100,
-    smb = as.numeric(SMB) / 100,
-    hml = as.numeric(HML) / 100
+    across(c(RF, `Mkt-RF`, SMB, HML), ~as.numeric(.) / 100),
+    .keep = "none"
   ) |>
+  rename_with(str_to_lower) |>
+  rename(mkt_excess = `mkt-rf`) |> 
+  filter(month >= start_date & month <= end_date)
+```
+
+We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the  monthly factors are constructed in the chapter [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
+ 
+```{r, message=FALSE}
+factors_ff5_monthly_raw <- download_french_data("Fama/French 5 Factors (2x3)")
+factors_ff5_monthly <- factors_ff5_monthly_raw$subsets$data[[1]] |>
+  mutate(
+    month = floor_date(ymd(str_c(date, "01")), "month"),
+    across(c(RF, `Mkt-RF`, SMB, HML, RMW, CMA), ~as.numeric(.) / 100),
+    .keep = "none"
+  ) |>
+  rename_with(str_to_lower) |>
+  rename(mkt_excess = `mkt-rf`) |> 
   filter(month >= start_date & month <= end_date)
 ```
 
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function. 
 
 ```{r, message=FALSE}
-factors_ff_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
-factors_ff_daily <- factors_ff_daily_raw$subsets$data[[1]] |>
-  transmute(
+factors_ff3_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
+factors_ff3_daily <- factors_ff3_daily_raw$subsets$data[[1]] |>
+  mutate(
     date = ymd(date),
-    rf = as.numeric(RF) / 100,
-    mkt_excess = as.numeric(`Mkt-RF`) / 100,
-    smb = as.numeric(SMB) / 100,
-    hml = as.numeric(HML) / 100
+    across(c(RF, `Mkt-RF`, SMB, HML), ~as.numeric(.) / 100),
+    .keep = "none"
   ) |>
+  rename_with(str_to_lower) |>
+  rename(mkt_excess = `mkt-rf`) |>
   filter(date >= start_date & date <= end_date)
 ```
 
@@ -182,9 +197,10 @@ cpi_monthly <- tq_get("CPIAUCNS",
   from = start_date,
   to = end_date
 ) |>
-  transmute(
+  mutate(
     month = floor_date(date, "month"),
-    cpi = price / price[month == max(month)]
+    cpi = price / price[month == max(month)],
+    .keep = "none"
   )
 ```
 
@@ -217,8 +233,8 @@ Next, we create a remote table with the monthly Fama-French factor data. We do s
 
 ```{r}
   dbWriteTable(tidy_finance,
-    "factors_ff_monthly",
-    value = factors_ff_monthly,
+    "factors_ff3_monthly",
+    value = factors_ff3_monthly,
     overwrite = TRUE
   )
 ```
@@ -230,20 +246,20 @@ attributes(tidy_finance)$dbname <- "data/tidy_finance.sqlite"
 ```
 
 ```{r}
-factors_ff_monthly_db <- tbl(tidy_finance, "factors_ff_monthly")
+factors_ff3_monthly_db <- tbl(tidy_finance, "factors_ff3_monthly")
 ```
 
 All `dplyr` calls are evaluated lazily, i.e., the data is not in our R session's memory, and the database does most of the work. You can see that by noticing that the output below does not show the number of rows. In fact, the following code chunk only fetches the top 10 rows from the database for printing.  
 
 ```{r}
-factors_ff_monthly_db |>
+factors_ff3_monthly_db |>
   select(month, rf)
 ```
 
 If we want to have the whole table in memory, we need to `collect()` it. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Fetch}
 
 ```{r}
-factors_ff_monthly_db |>
+factors_ff3_monthly_db |>
   select(month, rf) |>
   collect()
 ```
@@ -254,8 +270,14 @@ Before we move on to the next data source, let us also store the other five tabl
 
 ```{r}
   dbWriteTable(tidy_finance,
-    "factors_ff_daily",
-    value = factors_ff_daily,
+    "factors_ff5_monthly",
+    value = factors_ff5_monthly,
+    overwrite = TRUE
+  )
+
+  dbWriteTable(tidy_finance,
+    "factors_ff3_daily",
+    value = factors_ff3_daily,
     overwrite = TRUE
   )
 
@@ -330,4 +352,4 @@ This function comes in handy if you are unsure about the correct naming of the t
 ## Exercises
 
 1. Download the monthly Fama-French factors manually from [Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `read_csv()`. Validate that you get the same data as via the `frenchdata` package. 
-1. Download the Fama-French 5 factors using the `frenchdata` package. Use `get_french_data_list()` to find the corresponding table name. After the successful download and conversion to the column format that we used above, compare the resulting `rf`, `mkt_excess`, `smb`, and `hml` columns to `factors_ff_monthly`. Explain any differences you might find. 
+1. Compare the `rf`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_monthly` to `factors_ff5_monthly`. Explain any differences you might find. 
