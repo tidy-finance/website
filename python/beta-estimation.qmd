@@ -14,6 +14,7 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 In this chapter, we introduce an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of @Sharpe1964, @Lintner1965, and @Mossin1966, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio.\index{CAPM} The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas.\index{Beta} We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization.
 
 We use the following packages throughout this chapter:
+
 ```{python}
 import pandas as pd
 import numpy as np
@@ -28,7 +29,7 @@ from mizani.formatters import percent_format, date_format
 import joblib
 ```
 
-Compared to previous chapters, we introduce `statsmodels` for regression analysis and for sliding window regressions, and `pandarallel` to apply mapping functions in parallel.
+Compared to previous chapters, we introduce `statsmodels` for regression analysis and for sliding window regressions, and `joblib` for parallelization.
 
 ## Estimating Beta using Monthly Returns
 
@@ -38,7 +39,8 @@ The estimation procedure is based on a rolling-window estimation, where we may u
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
 
 crsp_monthly = (pd.read_sql_query(
-  sql="SELECT permno, month, industry, ret_excess FROM crsp_monthly",
+  sql="""SELECT permno, month, industry, ret_excess 
+          FROM crsp_monthly""",
   con=tidy_finance,
   parse_dates={"month": {"unit": "D","origin": "unix"}})
   .dropna()
@@ -80,13 +82,11 @@ model_fit_coefs
 
 ## Rolling-Window Estimation
 
-After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
+After we estimated the regression coefficients on an example, we scale the estimation of $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
 
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
-    # `RollingOLS` must be defined inside function for parallel_apply
-    # from statsmodels.regression.rolling import RollingOLS
-    
+
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
       data=data,
@@ -103,15 +103,18 @@ def roll_capm_estimation(data, window_size, min_obs):
 ```
 
 Before we attack the whole CRSP sample, let us focus on a couple of examples for well-known firms.
+
 ```{python}
-examples = pd.DataFrame(
-  {"permno": [14593, 10107, 93436, 17778],
-   "company": ["Apple", "Microsoft", "Tesla", "Berkshire Hathaway"]
-  })
+examples = pd.DataFrame({
+  "permno": [14593, 10107, 93436, 17778],
+  "company": ["Apple", "Microsoft", 
+              "Tesla", "Berkshire Hathaway"]
+})
 
 window_size = 60
 min_obs = 48
 ```
+
 We take a total of 5 years of data and require at least 48 months with return data to compute our betas. 
 Check out the exercises if you want to compute beta for different time periods. 
 It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk and the resulting @fig-601. 
@@ -123,7 +126,9 @@ beta_example = (crsp_monthly
          on="permno")
   .groupby(["permno"], group_keys=False)
   .apply(
-    lambda x: x.assign(beta=roll_capm_estimation(x, window_size, min_obs))
+    lambda x: x.assign(
+      beta=roll_capm_estimation(x, window_size, min_obs)
+    )
   )
   .dropna()
 )
@@ -133,22 +138,23 @@ beta_example = (crsp_monthly
 #| label: fig-601
 #| fig-cap: "The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library."
 #| fig-alt: "Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock."
-plot_beta = (ggplot(beta_example,
-  aes(x="month", 
-      y="beta", 
-      color="company", 
-      linetype="company")) + 
+plot_beta = (
+  ggplot(beta_example, 
+         aes(x="month", y="beta", 
+         color="company", linetype="company")) + 
   geom_line() + 
-  scale_x_datetime(breaks=date_breaks("5 year"), labels=date_format("%Y")) + 
+  scale_x_datetime(breaks=date_breaks("5 year"), 
+                   labels=date_format("%Y")) + 
   labs(x="", y="", color="", linetype="",
-       title="Monthly beta estimates for example stocks using 5 years of data")
+       title=("Monthly beta estimates for example stocks " +
+              "using 5 years of data"))
 )
 plot_beta.draw()
 ```
 
 ## Estimating Beta using Monthly Returns
 
-Next, we perform the rolling window estimation for the entire cross-section of stocks in the CRSP sample. For that purpose, we first identify firm identifiers (`permno`) for which CRSP contains sufficiently many records.  
+Next, we perform the rolling window estimation for the entire cross-section of stocks in the CRSP sample. For that purpose, we first identify firm identifiers (`permno`) for which CRSP contains sufficiently many records.
 
 ```{python}
 valid_permnos = (crsp_monthly
@@ -159,53 +165,50 @@ valid_permnos = (crsp_monthly
 )
 ```
 
-Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the joblib package to use multiple cores:
+Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the `joblib` package to use multiple cores:
 
 ```{python}
 number_of_cores = 8
 
 def roll_capm_estimation_for_joblib(permno, group):
-    # First calculate rolling betas
-    beta_values = (RollingOLS.from_formula(formula="ret_excess ~ mkt_excess",
-                                           data=group,
-                                           window=window_size,
-                                           min_nobs=min_obs
-                                           )
-                   .fit()
-                   .params["mkt_excess"]
-                   )
-    # put all in Pandas DataFrame
-    result_df = pd.DataFrame(beta_values)
-    result_df.columns = ['beta']
-    result_df['month'] = group['month'].values
-    result_df['permno'] = permno
-    result_df['ret_excess'] = group['ret_excess'].values
-    result_df['mkt_excess'] = group['mkt_excess'].values
-    try:  # to handle daily
-        result_df['industry'] = group['industry'].values
-        result_df['counts'] = group['counts'].values
+
+    beta_values = (RollingOLS.from_formula(
+        formula="ret_excess ~ mkt_excess",
+        data=group,
+        window=window_size,
+        min_nobs=min_obs
+      )
+      .fit()
+      .params["mkt_excess"]
+    )
+    
+    result = pd.DataFrame(beta_values)
+    result.columns = ["beta"]
+    result["month"] = group["month"].values
+    result["permno"] = permno
+    try:
+       result["date"] = group["date"].values
+       result = result[result.groupby("month")["date"].transform("max") == result["date"]]
     except(KeyError):
-        pass
-    result_df = result_df[list(result_df.columns[1:]) + [result_df.columns[0]]]
-    return result_df
+      pass
+    
+    return result
 
-
-# Group permno data and calculate beta for each group
 permno_groups = (crsp_monthly
   .query("permno >= 10066 & permno <= 10100")
   .merge(valid_permnos, how="inner", on="permno")
   .dropna()
-  .groupby('permno', group_keys=False)
+  .groupby("permno", group_keys=False)
 )
 
-# Calculate beta values using joblib parallel processing
 beta_monthly = (
-  pd.concat(joblib.Parallel(n_jobs=number_of_cores)
-            (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
-               for name, group in permno_groups)
-              )
-    .dropna()
-    .rename(columns={"beta_monthly": "beta"})
+  pd.concat(
+    joblib.Parallel(n_jobs=number_of_cores)
+    (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
+    for name, group in permno_groups)
+  )
+  .dropna()
+  .rename(columns={"beta": "beta_monthly"})
 )
 ```
 
@@ -218,7 +221,8 @@ Note that the sample is large compared to the monthly data, so make sure to have
 
 ```{python}
 crsp_daily = (pd.read_sql_query(
-    sql="SELECT permno, month, date, ret_excess FROM crsp_daily WHERE permno >= 10066 AND permno <= 10100",
+    sql="""SELECT permno, month, date, ret_excess 
+            FROM crsp_daily""",
     con=tidy_finance,
     parse_dates={"month": {"unit": "D","origin": "unix"},
                  "date": {"unit": "D","origin": "unix"}})
@@ -237,11 +241,11 @@ factors_ff3_daily = (pd.read_sql_query(
 )
 ```
 
-We make sure to keep only relevant data to save memory space. 
+For the daily data, we consider around 3 months of data (i.e., 60 trading days) and require at least 50 observations. We make again sure to keep only relevant data to save memory space. 
 However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops. 
 
 ```{python}
-window_size = 90
+window_size = 60
 min_obs = 50
 
 valid_permnos = (crsp_daily
@@ -268,17 +272,17 @@ Even though we could now just apply the function using `groupby()` on the whole 
 permno_groups = (crsp_daily
   .merge(valid_permnos, how="inner", on="permno")
   .dropna()
-  .groupby('permno', group_keys=False)
+  .groupby("permno", group_keys=False)
 )
 
-# Calculate beta values using joblib parallel processing
 beta_daily = (
-    pd.concat(joblib.Parallel(n_jobs=number_of_cores)
-              (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
-               for name, group in permno_groups)
-              )
+  pd.concat(
+    joblib.Parallel(n_jobs=number_of_cores)
+    (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
+    for name, group in permno_groups)
+  )
   .dropna()
-  .rename(columns={"beta_daily": "beta"})
+  .rename(columns={"beta": "beta_daily"})
 )
 ```
 
@@ -291,6 +295,7 @@ What is a typical value for stock betas? To get some feeling, we illustrate the 
 #| fig-cap: "The box plots show the average firm-specific beta estimates by industry."
 #| fig.alt: "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
 beta_industries = (beta_monthly
+  .merge(crsp_monthly, how="inner", on=["permno", "month"])
   .dropna(subset="beta_monthly")
   .groupby(["industry","permno"])["beta_monthly"]
   .aggregate("mean")
@@ -304,7 +309,7 @@ industry_order = (beta_industries
 )
 
 plot_beta_industries = (
-  ggplot(beta_monthly, 
+  ggplot(beta_industries, 
          aes(x="industry", y="beta_monthly")) +
   geom_boxplot() +
   coord_flip() +
@@ -326,15 +331,19 @@ beta_quantiles = (beta_monthly
   .quantile(q=np.arange(0.1, 1.0, 0.1))
   .reset_index()
   .rename(columns={"level_1": "quantile"})
-  .assign(quantile=lambda x: (x["quantile"] * 100).astype(int))
+  .assign(
+    quantile=lambda x: (x["quantile"] * 100).astype(int)
+  )
   .dropna()
 )
 
 plot_beta_quantiles = (
   ggplot(beta_quantiles, 
-         aes(x="month", y="beta_monthly", color="factor(quantile)")) +
+         aes(x="month", y="beta_monthly", 
+             color="factor(quantile)")) +
   geom_line() +
-  scale_x_datetime(breaks=date_breaks("10 year"), labels=date_format("%Y")) +
+  scale_x_datetime(breaks=date_breaks("10 year"), 
+                   labels=date_format("%Y")) +
   labs(x="", y="", color="",
        title="Monthly deciles of estimated betas")
 )
@@ -370,7 +379,8 @@ plot_beta_comparison = (
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x="", y="", color="",
-       title="Comparison of beta estimates using monthly and daily data")
+       title=("Comparison of beta estimates using monthly " +
+              "and daily data"))
 )
 plot_beta_comparison.draw()
 ```
@@ -401,19 +411,23 @@ beta_long = (crsp_monthly
         value_vars=["beta_monthly", "beta_daily"],
         var_name="name", value_name="value")
   .groupby(["month", "name"])
-  .aggregate(share=("value", lambda x: sum(~x.isna()) / len(x)))
+  .aggregate(
+    share=("value", lambda x: sum(~x.isna()) / len(x))
+  )
   .reset_index()
 )
 
 plot_beta_long = (
   ggplot(beta_long, 
-         aes(x="month", y="share", color="name", linetype="name")) +
+         aes(x="month", y="share", color="name", 
+             linetype="name")) +
   geom_line() +
   scale_y_continuous(labels=percent_format()) +
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x=None, y=None, color=None, linetype=None,
-       title="End-of-month share of securities with beta estimates")
+       title=("End-of-month share of securities with beta " +
+              "estimates"))
 )
 plot_beta_long.draw()
 ```
