@@ -7,6 +7,7 @@ aliases:
 In this chapter, we introduce an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of @Sharpe1964, @Lintner1965, and @Mossin1966, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio.\index{CAPM} The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas.\index{Beta} We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization.
 
 We use the following packages throughout this chapter:
+
 ```{r, eval = TRUE, message = FALSE}
 library(tidyverse)
 library(RSQLite)
@@ -14,6 +15,7 @@ library(scales)
 library(slider)
 library(furrr)
 ```
+
 Compared to previous chapters, we introduce `slider` [@slider] for sliding window functions, and `furrr` [@furrr] to apply mapping functions in parallel.
 
 ## Estimating Beta using Monthly Returns
@@ -31,12 +33,12 @@ crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   select(permno, month, industry, ret_excess) |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   select(month, mkt_excess) |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff_monthly, by = "month")
+  left_join(factors_ff3_monthly, by = "month")
 ```
 
 To estimate the CAPM regression coefficients  
@@ -206,7 +208,7 @@ Depending on the application, you might either use longer horizon beta estimates
 First, we load daily CRSP data. 
 Note that the sample is large compared to the monthly data, so make sure to have enough memory available.
 
-```{r crsp_daily}
+```{r}
 crsp_daily <- tbl(tidy_finance, "crsp_daily") |>
   select(permno, month, date, ret_excess) |>
   collect()
@@ -215,7 +217,7 @@ crsp_daily <- tbl(tidy_finance, "crsp_daily") |>
 We also need the daily Fama-French market excess returns.
 
 ```{r}
-factors_ff_daily <- tbl(tidy_finance, "factors_ff_daily") |>
+factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
   select(date, mkt_excess) |>
   collect()
 ```
@@ -225,7 +227,7 @@ However, note that your machine might not have enough memory to read the whole d
 
 ```{r}
 crsp_daily <- crsp_daily |>
-  inner_join(factors_ff_daily, by = "date") |>
+  inner_join(factors_ff3_daily, by = "date") |>
   select(permno, month, ret_excess, mkt_excess)
 ```
 
@@ -352,11 +354,11 @@ The estimates in @fig-604 look as expected. As you can see, it really depends on
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
 ```{r}
-  dbWriteTable(tidy_finance,
-    "beta",
-    value = beta,
-    overwrite = TRUE
-  )
+dbWriteTable(tidy_finance,
+  "beta",
+  value = beta,
+  overwrite = TRUE
+)
 ```
 
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. 
