@@ -44,15 +44,15 @@ crsp_monthly = (pd.read_sql_query(
   .dropna()
 )
 
-factors_ff_monthly = (pd.read_sql_query(
-    sql="SELECT month, mkt_excess FROM factors_ff_monthly",
+factors_ff3_monthly = (pd.read_sql_query(
+    sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
     con=tidy_finance,
     parse_dates={"month": {"unit": "D","origin": "unix"}})
   .dropna()
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(factors_ff_monthly, 
+  .merge(factors_ff3_monthly, 
          how="left", 
          on="month")
 )
@@ -70,10 +70,9 @@ model_fit = (smf.ols(
     formula="ret_excess ~ mkt_excess",
     data=crsp_monthly.query("permno == 14593"))
   .fit()
-  .summary(slim=True)
 )
 
-model_fit_coefs = model_fit.tables[1]
+model_fit_coefs = model_fit.summary(slim=True).tables[1]
 model_fit_coefs
 ```
 
@@ -86,7 +85,7 @@ After we estimated the regression coefficients on an example, we scale the estim
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
     # `RollingOLS` must be defined inside function for parallel_apply
-    from statsmodels.regression.rolling import RollingOLS
+    # from statsmodels.regression.rolling import RollingOLS
     
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
@@ -160,24 +159,10 @@ valid_permnos = (crsp_monthly
 )
 ```
 
-Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. 
-```{python}
-beta_monthly = (crsp_monthly
-  .merge(valid_permnos, 
-         how="inner", 
-         on="permno")
-  .groupby(["permno"], group_keys=False)
-  .apply(
-    lambda x: x.assign(beta_monthly=roll_capm_estimation(x, window_size, min_obs))
-  )
-  .dropna()
-)
-```
-This is how to do it with the joblib package to use multiple cores:
+Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the joblib package to use multiple cores:
 
 ```{python}
-import joblib  # should go to the top
-number_of_cores = 4
+number_of_cores = 8
 
 def roll_capm_estimation_for_joblib(permno, group):
     # First calculate rolling betas
@@ -207,23 +192,21 @@ def roll_capm_estimation_for_joblib(permno, group):
 
 # Group permno data and calculate beta for each group
 permno_groups = (crsp_monthly
-                 .merge(valid_permnos, how="inner", on="permno")
-                 .dropna()
-                 .groupby('permno', group_keys=False)
-                 )
+  .query("permno >= 10066 & permno <= 10100")
+  .merge(valid_permnos, how="inner", on="permno")
+  .dropna()
+  .groupby('permno', group_keys=False)
+)
 
 # Calculate beta values using joblib parallel processing
-beta_monthly_joblib = (
-    pd.concat(joblib.Parallel(n_jobs=number_of_cores)
-              (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
+beta_monthly = (
+  pd.concat(joblib.Parallel(n_jobs=number_of_cores)
+            (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
                for name, group in permno_groups)
               )
     .dropna()
-    )
-
-# To check if all the betas are the same:
-print((beta_monthly['beta_monthly'] - beta_monthly_joblib['beta']).sum())
-
+    .rename(columns={"beta_monthly": "beta"})
+)
 ```
 
 ## Estimating Beta using Daily Returns
@@ -235,7 +218,7 @@ Note that the sample is large compared to the monthly data, so make sure to have
 
 ```{python}
 crsp_daily = (pd.read_sql_query(
-    sql="SELECT permno, month, date, ret_excess FROM crsp_daily",
+    sql="SELECT permno, month, date, ret_excess FROM crsp_daily WHERE permno >= 10066 AND permno <= 10100",
     con=tidy_finance,
     parse_dates={"month": {"unit": "D","origin": "unix"},
                  "date": {"unit": "D","origin": "unix"}})
@@ -246,8 +229,8 @@ crsp_daily = (pd.read_sql_query(
 We also need the daily Fama-French market excess returns.
 
 ```{python}
-factors_ff_daily = (pd.read_sql_query(
-    sql="SELECT date, mkt_excess FROM factors_ff_daily",
+factors_ff3_daily = (pd.read_sql_query(
+    sql="SELECT date, mkt_excess FROM factors_ff3_daily",
     con=tidy_finance,
     parse_dates={"date": {"unit": "D","origin": "unix"}})
   .dropna()
@@ -270,7 +253,7 @@ valid_permnos = (crsp_daily
 )
 
 crsp_daily = (crsp_daily
-  .merge(factors_ff_daily, 
+  .merge(factors_ff3_daily, 
          how="inner", 
          on="date")
   .merge(valid_permnos, 
@@ -283,19 +266,20 @@ Even though we could now just apply the function using `groupby()` on the whole 
 
 ```{python}
 permno_groups = (crsp_daily
-                 .merge(valid_permnos, how="inner", on="permno")
-                 .dropna()
-                 .groupby('permno', group_keys=False)
-                 )
+  .merge(valid_permnos, how="inner", on="permno")
+  .dropna()
+  .groupby('permno', group_keys=False)
+)
 
 # Calculate beta values using joblib parallel processing
-betas = (
+beta_daily = (
     pd.concat(joblib.Parallel(n_jobs=number_of_cores)
               (joblib.delayed(roll_capm_estimation_for_joblib)(name, group)
                for name, group in permno_groups)
               )
-    .dropna()
-    )
+  .dropna()
+  .rename(columns={"beta_daily": "beta"})
+)
 ```
 
 ## Comparing Beta Estimates
