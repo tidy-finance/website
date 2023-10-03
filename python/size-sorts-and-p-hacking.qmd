@@ -17,6 +17,7 @@ We also introduce new choices in the formation of portfolios. In particular, we 
 There is arguably a thin line between p-hacking and conducting robustness tests. Our purpose here is to illustrate the substantial variation that can arise along the evidence-generating process.
 
 The chapter relies on the following set of packages:
+
 ```{python}
 import pandas as pd
 import numpy as np
@@ -25,13 +26,13 @@ import sqlite3
 from plotnine import *
 from mizani.formatters import percent_format
 
-import itertools
-from multiprocessing import Pool, cpu_count
+from itertools import product
+from joblib import Parallel, delayed
 ```
 
 ## Data Preparation
 
-First, we retrieve the relevant data from our `SQLite`-database introduced in Chapters 2-4. Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we retrieve the relevant data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
 tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
@@ -66,16 +67,25 @@ Then, we aggregate the firms within each bucket and compute the buckets' share o
 #| fig-alt: "Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."
 market_cap_concentration = (crsp_monthly
   .groupby("month", group_keys = False)
-  .apply(lambda x: x.assign(top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
-                            top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
-                            top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
-                            top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75))))
+  .apply(lambda x: x.assign(
+    top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
+    top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
+    top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
+    top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)))
+  )
   .reset_index(drop=True)
   .groupby("month")
-  .apply(lambda x: pd.Series({"Largest 1% of stocks": (x["mktcap"][x["top01"]].sum()) / x["mktcap"].sum(),
-                              "Largest 5% of stocks": (x["mktcap"][x["top05"]].sum()) / x["mktcap"].sum(),
-                              "Largest 10% of stocks": (x["mktcap"][x["top10"]].sum()) / x["mktcap"].sum(),
-                              "Largest 25% of stocks": (x["mktcap"][x["top25"]].sum()) / x["mktcap"].sum() }))
+  .apply(lambda x: pd.Series({
+    "Largest 1% of stocks": ((x["mktcap"][x["top01"]].sum()) 
+                              / x["mktcap"].sum()),
+    "Largest 5% of stocks": ((x["mktcap"][x["top05"]].sum()) 
+                              / x["mktcap"].sum()),
+    "Largest 10% of stocks": ((x["mktcap"][x["top10"]].sum()) 
+                              / x["mktcap"].sum()),
+    "Largest 25% of stocks": ((x["mktcap"][x["top25"]].sum()) 
+                              / x["mktcap"].sum())
+    })
+  )
   .reset_index()
   .melt(id_vars="month", 
         var_name="name", 
@@ -90,11 +100,9 @@ plot_market_cap_concentration = (
   scale_y_continuous(labels=percent_format()) +
   scale_x_date(name="", date_labels="%Y") +
   labs(x="", y="", color="", linetype="", 
-       title="Percentage of total market capitalization in largest stocks") +
-  theme(subplots_adjust={"bottom": 0.12},
-        legend_position=(.5, 0), 
-        legend_direction="horizontal", 
-        legend_title=element_blank())
+       title="Percentage of total market capitalization in "
+             "largest stocks") +
+  theme(legend_title=element_blank())
 )
 plot_market_cap_concentration.draw()
 ```
@@ -107,11 +115,15 @@ Next, firm sizes also differ across listing exchanges. Stocks' primary listings 
 #| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 market_cap_share = (crsp_monthly
   .groupby(["month", "exchange"])
-  .apply(lambda x: pd.DataFrame({"mktcap": x["mktcap"].sum()}, index=[0]))
+  .apply(lambda x: pd.DataFrame({
+    "mktcap": x["mktcap"].sum()
+    }, index=[0])
+  )
   .reset_index(drop=False)
   .assign(
-    total_market_cap=lambda x: x.groupby("month")["mktcap"].transform("sum"),
-    share=lambda x: x["mktcap"] / x["total_market_cap"]
+    total_market_cap = lambda x: 
+      (x.groupby("month")["mktcap"].transform("sum")),
+    share = lambda x: x["mktcap"] / x["total_market_cap"]
   )
 )
 
@@ -124,11 +136,9 @@ plot_market_cap_share = (
   scale_y_continuous(labels=percent_format()) +
   scale_x_date(name="", date_labels="%Y") +
   labs(x="", y="", fill="", color="",
-       title="Share of total market capitalization per listing exchange") +
-  theme(subplots_adjust={"bottom": 0.12}, 
-        legend_position=(.5, 0), 
-        legend_direction="horizontal", 
-        legend_title=element_blank())
+       title="Share of total market capitalization per "
+             "listing exchange") +
+  theme(legend_title=element_blank())
 )
 plot_market_cap_share.draw()
 ```
@@ -162,20 +172,26 @@ get_summary_statistics(
 
 ## Univariate Size Portfolios with Flexible Breakpoints
 
-In Chapter 7, we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
+In [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.\index{Portfolio sorts!Univariate}\index{Breakpoints} 
 
 To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function from [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd). The exchange-specific argument then enters in the filter `data["exchanges"].isin(exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = ["NYSE", "NASDAQ", "AMEX"]`, which keeps all stocks listed on either of these exchanges. 
 
 ```{python}
-def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
+def assign_portfolio(
+  data, exchanges, sorting_variable, n_portfolios
+  ):
     data_filtered = data[data["exchange"].isin(exchanges)]
-    breakpoints = np.quantile(data_filtered[sorting_variable].dropna(), 
-                              np.linspace(0, 1, n_portfolios + 1), 
-                              method = "linear")
-    assigned_portfolios = pd.cut(data_filtered[sorting_variable],
-                                 bins=breakpoints,
-                                 labels=range(1, breakpoints.size),
-                                 include_lowest=True)
+    breakpoints = np.quantile(
+      data_filtered[sorting_variable].dropna(), 
+      np.linspace(0, 1, n_portfolios + 1), 
+      method = "linear"
+    )
+    assigned_portfolios = pd.cut(
+      data_filtered[sorting_variable],
+      bins=breakpoints,
+      labels=range(1, breakpoints.size),
+      include_lowest=True
+    )
     return assigned_portfolios
 ```
 
@@ -183,7 +199,7 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
 
 Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock's return the same weight, i.e., a simple average of the constituents' returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.\index{Weighting!Value}\index{Weighting!Equal}
 
-We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = True`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in Chapter 7.
+We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = True`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd).
 
 ```{python}
 def compute_portfolio_returns(n_portfolios=10, 
@@ -251,7 +267,7 @@ From a malicious perspective, these modeling choices give the researcher multipl
 
 Nevertheless, the multitude of options creates a problem since there is no single correct way of sorting portfolios. How should a researcher convince a reader that their results do not come from a p-hacking exercise? To circumvent this dilemma, academics are encouraged to present evidence from different sorting schemes as *robustness tests* and report multiple approaches to show that a result does not depend on a single choice. Thus, the robustness of premiums is a key feature.\index{Robustness tests}
 
-Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `expand_grid()` produces a table of all possible permutations of its arguments. Note that we use the argument `data` to exclude financial firms and truncate the time series. 
+Below we conduct a series of robustness tests which could also be interpreted as a p-hacking exercise. To do so, we examine the size premium in different specifications presented in the table `p_hacking_setup`. The function `itertools.product()` produces all possible permutations of its arguments. Note that we use the argument `data` to exclude financial firms and truncate the time series. 
 
 ```{python}
 n_portfolios = [2, 5, 10]
@@ -262,19 +278,17 @@ data = [crsp_monthly,
         crsp_monthly[crsp_monthly["month"] < "1990-06-01"],
         crsp_monthly[crsp_monthly["month"] >= "1990-06-01"],
         ]
-p_hacking_setup = list(itertools.product(n_portfolios, exchanges, value_weighted, data))
+p_hacking_setup = list(product(n_portfolios, exchanges, value_weighted, data))
 ```
 
-To speed the computation up we parallelize the (many) different sorting procedures, as in the beta estimation of Chapter 6. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
+To speed the computation up we parallelize the (many) different sorting procedures, as in [Beta Estimation](beta-estimation.qmd). Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
 
 ```{python}
-p_hacking_results = pd.DataFrame(p_hacking_setup)
-p_hacking_results.columns = ["n_portfolios", "exchanges", "value_weighted", "data"]
-all_size_premia = pd.DataFrame()
-for i in p_hacking_setup:
-    tmp_ret = compute_portfolio_returns(i[0], i[1], i[2], i[3])
-    all_size_premia = pd.concat([all_size_premia, tmp_ret])
-
+p_hacking_results = pd.concat(
+  Parallel(n_jobs=-1)
+  (delayed(compute_portfolio_returns)(x, y, z, w) 
+   for x, y, z, w in p_hacking_setup)
+)
 p_hacking_results["size_premium"] = all_size_premia.values
 p_hacking_results
 ```
