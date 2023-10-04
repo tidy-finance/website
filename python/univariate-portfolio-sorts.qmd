@@ -12,7 +12,7 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 :::
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing [e.g., @BaliEngleMurray2016]. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
-We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in Chapter 9. 
+We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). 
 
 A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$.\index{Portfolio sorts!Univariate}
 Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
@@ -33,7 +33,7 @@ from mizani.formatters import percent_format
 
 ## Data Preparation
 
-We start with loading the required data from our `SQLite`-database introduced in Chapters 2-4. In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
+We start with loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
 Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors}
 `beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
 
@@ -48,8 +48,8 @@ crsp_monthly = (pd.read_sql_query(
   .dropna()
 )
 
-factors_ff_monthly = (pd.read_sql_query(
-    sql="SELECT month, mkt_excess FROM factors_ff_monthly",
+factors_ff3_monthly = (pd.read_sql_query(
+    sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
     con=tidy_finance,
     parse_dates={"month": {"unit": "D","origin": "unix"}})
   .dropna()
@@ -159,7 +159,7 @@ beta_portfolios = (data_for_sorts
   .groupby(["portfolio", "month"], group_keys=False)
   .apply(lambda x: x.assign(ret=np.average(x["ret_excess"], 
                                            weights=x["mktcap_lag"])))
-  .merge(factors_ff_monthly, 
+  .merge(factors_ff3_monthly, 
          how="left", 
          on="month")
 )
@@ -189,13 +189,14 @@ beta_portfolios_summary = (beta_portfolios
 #| label: fig-701
 #| fig-cap: "Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period." 
 #| fig-alt: "Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low beta portfolios are positive, while high beta portfolios show negative alphas."
-plot_beta_portfolios_summary = (ggplot(beta_portfolios_summary, 
-    aes(x="portfolio", y="alpha", fill="portfolio"))
-  + geom_bar(stat="identity")
-  + labs(title="CAPM alphas of beta-sorted portfolios",
-         x="Portfolio", y="CAPM alpha", fill="Portfolio")
-  + scale_y_continuous(labels=percent_format())
-  + theme(legend_position="none"))
+plot_beta_portfolios_summary = (
+  ggplot(beta_portfolios_summary, 
+         aes(x="portfolio", y="alpha", fill="portfolio")) +
+  geom_bar(stat="identity") +
+  labs(title="CAPM alphas of beta-sorted portfolios",
+       x="Portfolio", y="CAPM alpha", fill="Portfolio") +
+  scale_y_continuous(labels=percent_format()) +
+  theme(legend_position="none"))
 plot_beta_portfolios_summary.draw()
 ```
 
@@ -212,20 +213,21 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 sml_capm = (sm.OLS.from_formula("ret ~ 1 + beta", data=beta_portfolios_summary)
             .fit().params)
 
-plot_sml_capm = (ggplot(beta_portfolios_summary,
-    aes(x="beta", y="ret", color="portfolio"))
-  + geom_point()
-  + geom_abline(intercept=0,
-                slope=factors_ff_monthly["mkt_excess"].mean(),
-                linetype="solid")
-  + geom_abline(intercept=sml_capm["Intercept"],
+plot_sml_capm = (
+  ggplot(beta_portfolios_summary,
+         aes(x="beta", y="ret", color="portfolio")) +
+  geom_point()
+  geom_abline(intercept=0,
+              slope=factors_ff3_monthly["mkt_excess"].mean(),
+              linetype="solid") +
+  geom_abline(intercept=sml_capm["Intercept"],
                 slope=sml_capm["beta"],
-                linetype="dashed")
-  + scale_y_continuous(labels=percent_format(),
-                       limits=(0, factors_ff_monthly["mkt_excess"].mean()*2))
-  + scale_x_continuous(limits=(0, 2))
-  + labs(x="Beta", y="Excess return", color="Portfolio",
-         title="Average portfolio excess returns and average beta estimates")
+                linetype="dashed") +
+  scale_y_continuous(labels=percent_format(),
+                     limits=(0, factors_ff3_monthly["mkt_excess"].mean()*2)) +
+  scale_x_continuous(limits=(0, 2)) +
+  labs(x="Beta", y="Excess return", color="Portfolio",
+       title="Average portfolio excess returns and average beta estimates")
 )
 plot_sml_capm.draw()
 ```
@@ -241,7 +243,7 @@ beta_longshort = (beta_portfolios
   .query("portfolio in ['low', 'high']")
   .pivot_table(index="month", columns="portfolio", values="ret")
   .assign(long_short=lambda x: x["high"] - x["low"])
-  .merge(factors_ff_monthly, how="left", on="month")
+  .merge(factors_ff3_monthly, how="left", on="month")
 )
 ```
 
@@ -283,14 +285,15 @@ beta_longshort_year = (beta_longshort
   .melt(id_vars="year", var_name="name", value_name="value")
 )
 
-plot_beta_longshort_year = (ggplot(
-  beta_longshort_year, aes(x="year", y="value", fill="name"))
-  + geom_col(position='dodge')
-  + facet_wrap("~name", ncol=1)
-  + theme(legend_position="none")
-  + scale_color_discrete(guide=False)
-  + scale_y_continuous(labels=percent_format())
-  + labs(x="", y="", title="Annual returns of beta portfolios")
+plot_beta_longshort_year = (
+  ggplot(beta_longshort_year, 
+         aes(x="year", y="value", fill="name")) +
+  geom_col(position='dodge') +
+  facet_wrap("~name", ncol=1) +
+  theme(legend_position="none") +
+  scale_color_discrete(guide=False) +
+  scale_y_continuous(labels=percent_format()) +
+  labs(x="", y="", title="Annual returns of beta portfolios")
 )
 plot_beta_longshort_year.draw()
 ```

@@ -11,16 +11,19 @@ We focus on a classical panel regression common to the corporate finance literat
 Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors.  
 
 The current chapter relies on the following set of packages. 
-```{r, message = FALSE}
+
+```{r}
+#| message: false
 library(tidyverse)
 library(RSQLite)
 library(fixest)
 ```
+
 Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed effects regressions, the implementation of standard error clusters, and tidy estimation output.
 
 ## Data Preparation
 
-We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in Chapters 2-4. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -165,11 +168,13 @@ model_fe_firmyear <- feols(
 )
 model_fe_firmyear
 ```
+
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
 Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the `etable()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+
 ```{r}
 etable(model_ols, model_fe_firm, model_fe_firmyear,
   coefstat = "tstat"

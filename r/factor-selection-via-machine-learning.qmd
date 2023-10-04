@@ -60,7 +60,8 @@ The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages
 To get started, we load the required packages and data. The main focus is on the workflow behind the `tidymodels` package collection [@tidymodels]. 
 @Kuhn2022 provide a thorough introduction into all `tidymodels` components. `glmnet` [@glmnet] was developed and released in sync with @Tibshirani1996 and provides an R implementation of Elastic Net estimation. The package `timetk` [@timetk] provides useful tools for time series data wrangling. 
 
-```{r, eval = TRUE, message = FALSE}
+```{r}
+#| message: false
 library(RSQLite)
 library(tidyverse)
 library(tidymodels)
@@ -70,7 +71,7 @@ library(glmnet)
 library(timetk)
 ```
 
-In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in Chapters 2-4. We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
+In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
 
 - The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993
 - Monthly q-factor returns from @Hou2015. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor
@@ -124,7 +125,7 @@ data <- industries_ff_monthly |>
   drop_na()
 ```
 
-Our data contains `r ncol(data)-2` columns of regressors with the `r ncol(macro_predictors) - 1` macro variables and `r ncol(factors_ff_monthly) + ncol(factors_q_monthly)-2` factor returns for each month. 
+Our data contains `r ncol(data)-2` columns of regressors with the `r ncol(macro_predictors) - 1` macro variables and `r ncol(factors_ff3_monthly) + ncol(factors_q_monthly)-2` factor returns for each month. 
 @fig-1401 provides summary statistics for the `r industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent.\index{Graph!Box plot}
 
 ```{r}
@@ -161,7 +162,7 @@ We use this test set to evaluate the predictive accuracy in an out-of-sample sce
 ```{r}
 split <- initial_time_split(
   data |>
-    filter(industry == "Manuf") |>
+    filter(industry == "manuf") |>
     select(-industry),
   prop = 4 / 5
 )
@@ -243,8 +244,8 @@ First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$
 ```{r}
 predicted_values <- lm_fit |>
   fit(data = training(split)) |>
-  predict(data |> filter(industry == "Manuf")) |>
-  bind_cols(data |> filter(industry == "Manuf")) |>
+  predict(data |> filter(industry == "manuf")) |>
+  bind_cols(data |> filter(industry == "manuf")) |>
   select(month,
     "Fitted value" = .pred,
     "Realization" = ret_excess
