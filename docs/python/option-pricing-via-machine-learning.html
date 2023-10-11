@@ -83,7 +83,7 @@ div.csl-indent {
 <script src="../site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="../">
 <link href="../python/parametric-portfolio-policies.html" rel="next">
-<link href="../python/difference-in-differences.html" rel="prev">
+<link href="../python/factor-selection-via-machine-learning.html" rel="prev">
 <link href="../images/favicon.png" rel="icon" type="image/png">
 <script src="../site_libs/cookie-consent/cookie-consent.js"></script>
 <link href="../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
@@ -364,6 +364,12 @@ cookieconsent.run({
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../python/factor-selection-via-machine-learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Factor Selection via Machine Learning</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../python/option-pricing-via-machine-learning.html" class="sidebar-item-text sidebar-link active">
  <span class="menu-text">Option Pricing via Machine Learning</span></a>
   </div>
@@ -453,19 +459,6 @@ Note
 </div>
 <p>This chapter covers machine learning methods in option pricing. First, we briefly introduce regression trees, random forests, and neural networks - these methods are advocated as highly flexible <em>universal approximators</em>, capable of recovering highly nonlinear structures in the data. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues. We show how to implement random forests and deep neural networks with tidy principles using <code>scikit-learn</code>.</p>
 <p> Machine learning (ML) is seen as a part of artificial intelligence. ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so. While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in option pricing. More specifically, we create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to <em>learn</em> how to price call options without prior knowledge of the theoretical underpinnings of the famous option pricing equation by <span class="citation" data-cites="Black1976">Black and Scholes (<a href="#ref-Black1976" role="doc-biblioref">1973</a>)</span>.</p>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>In order to replicate the analysis regarding neural networks in this chapter, you have to install <code>TensorFlow</code> on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow <a href="https://tensorflow.rstudio.com/installation/">these quick-start instructions.</a></p>
-</div>
-</div>
 <p>Throughout this chapter, we need the following packages.</p>
 <div class="cell" data-execution_count="1">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd </span>
@@ -488,7 +481,7 @@ Note
 <section id="regression-trees-and-random-forests" class="level2">
 <h2 class="anchored" data-anchor-id="regression-trees-and-random-forests">Regression Trees and Random Forests</h2>
 <p>Regression trees are a popular ML approach for incorporating multiway predictor interactions. In Finance, regression trees are gaining popularity, also in the context of asset pricing <span class="citation" data-cites="Bryzgalova2022">(see, e.g. <a href="#ref-Bryzgalova2022" role="doc-biblioref">Bryzgalova, Pelger, and Zhu 2022</a>)</span>. Trees possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each other. A tree <em>grows</em> in a sequence of steps. At each step, a new <em>branch</em> sorts the data leftover from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into partitions and approximates the unknown function <span class="math inline">\(f(x)\)</span> which yields the relation between the predictors <span class="math inline">\(x\)</span> and the outcome variable <span class="math inline">\(y\)</span> with the average value of the outcome variable within each partition. For a more thorough treatment of regression trees, we refer to <span class="citation" data-cites="Coqueret2020">Coqueret and Guida (<a href="#ref-Coqueret2020" role="doc-biblioref">2020</a>)</span>.</p>
-<p>Formally, we partition the predictor space into <span class="math inline">\(J\)</span> non-overlapping regions, <span class="math inline">\(R_1, R_2, \ldots, R_J\)</span>. For any predictor <span class="math inline">\(x\)</span> that falls within region <span class="math inline">\(R_j\)</span>, we estimate <span class="math inline">\(f(x)\)</span> with the average of the training observations, <span class="math inline">\(\hat y_i\)</span>, for which the associated predictor <span class="math inline">\(x_i\)</span> is also in <span class="math inline">\(R_j\)</span>. Once we select a partition <span class="math inline">\(x\)</span> to split in order to create the new partitions, we find a predictor <span class="math inline">\(j\)</span> and value <span class="math inline">\(s\)</span> that define two new partitions, called <span class="math inline">\(R_1(j,s)\)</span> and <span class="math inline">\(R_2(j,s)\)</span>, which split our observations in the current partition by asking if <span class="math inline">\(x_j\)</span> is bigger than <span class="math inline">\(s\)</span>: <span class="math display">\[R_1(j,s) = \{x \mid x_j &lt; s\} \mbox{  and  } R_2(j,s) = \{x \mid x_j \geq s\}.\]</span> To pick <span class="math inline">\(j\)</span> and <span class="math inline">\(s\)</span>, we find the pair that minimizes the residual sum of square (RSS): <span class="math display">\[\sum_{i:\, x_i \in R_1(j,s)} (y_i - \hat{y}_{R_1})^2 + \sum_{i:\, x_i \in R_2(j,s)} (y_i - \hat{y}_{R_2})^2\]</span> As in Chapter 14 in the context of penalized regressions, the first relevant question is: what are the hyperparameter decisions? Instead of a regularization parameter, trees are fully determined by the number of branches used to generate a partition (sometimes one specifies the minimum number of observations in each final branch instead of the maximum number of branches).</p>
+<p>Formally, we partition the predictor space into <span class="math inline">\(J\)</span> non-overlapping regions, <span class="math inline">\(R_1, R_2, \ldots, R_J\)</span>. For any predictor <span class="math inline">\(x\)</span> that falls within region <span class="math inline">\(R_j\)</span>, we estimate <span class="math inline">\(f(x)\)</span> with the average of the training observations, <span class="math inline">\(\hat y_i\)</span>, for which the associated predictor <span class="math inline">\(x_i\)</span> is also in <span class="math inline">\(R_j\)</span>. Once we select a partition <span class="math inline">\(x\)</span> to split in order to create the new partitions, we find a predictor <span class="math inline">\(j\)</span> and value <span class="math inline">\(s\)</span> that define two new partitions, called <span class="math inline">\(R_1(j,s)\)</span> and <span class="math inline">\(R_2(j,s)\)</span>, which split our observations in the current partition by asking if <span class="math inline">\(x_j\)</span> is bigger than <span class="math inline">\(s\)</span>: <span class="math display">\[R_1(j,s) = \{x \mid x_j &lt; s\} \mbox{  and  } R_2(j,s) = \{x \mid x_j \geq s\}.\]</span> To pick <span class="math inline">\(j\)</span> and <span class="math inline">\(s\)</span>, we find the pair that minimizes the residual sum of square (RSS): <span class="math display">\[\sum_{i:\, x_i \in R_1(j,s)} (y_i - \hat{y}_{R_1})^2 + \sum_{i:\, x_i \in R_2(j,s)} (y_i - \hat{y}_{R_2})^2\]</span> As in <a href="../python/factor-selection-via-machine-learning.html">Factor Selection via Machine Learning</a> in the context of penalized regressions, the first relevant question is: what are the hyperparameter decisions? Instead of a regularization parameter, trees are fully determined by the number of branches used to generate a partition (sometimes one specifies the minimum number of observations in each final branch instead of the maximum number of branches).</p>
 <p>Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple decision trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build <span class="math inline">\(B\)</span> decision trees <span class="math inline">\(T_1, \ldots, T_B\)</span> using the training sample. For that purpose, we randomly select features to be included in the building of each tree. For each observation in the test set we then form a prediction <span class="math inline">\(\hat{y} = \frac{1}{B}\sum\limits_{i=1}^B\hat{y}_{T_i}\)</span>.</p>
 </section>
 <section id="neural-networks" class="level2">
@@ -633,7 +626,7 @@ Note
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  train_data.get(<span class="st">"observed_price"</span>)</span>
 <span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/Users/krise/Library/r-miniconda-arm64/lib/python3.10/site-packages/sklearn/neural_network/_multilayer_perceptron.py:546: ConvergenceWarning: lbfgs failed to converge (status=1):
+<pre><code>/Users/krise/Documents/GitHub/tidy-finance/website/renv/python/virtualenvs/renv-python-3.10/lib/python3.10/site-packages/sklearn/neural_network/_multilayer_perceptron.py:546: ConvergenceWarning: lbfgs failed to converge (status=1):
 STOP: TOTAL NO. of ITERATIONS REACHED LIMIT.
 
 Increase the number of iterations (max_iter) or scale the data as shown in:
@@ -643,7 +636,7 @@ Increase the number of iterations (max_iter) or scale the data as shown in:
 </section>
 <section id="universal-approximation" class="level3">
 <h3 class="anchored" data-anchor-id="universal-approximation">Universal approximation</h3>
-<p>Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult Chapter 14 on how to tune the model hyperparameters).</p>
+<p>Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult<a href="../python/factor-selection-via-machine-learning.html">Factor Selection via Machine Learning</a> on how to tune the model hyperparameters).</p>
 <div class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>lm_pipeline <span class="op">=</span> Pipeline([</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  (<span class="st">"polynomial"</span>, PolynomialFeatures(degree<span class="op">=</span><span class="dv">5</span>, </span>
@@ -658,7 +651,7 @@ Increase the number of iterations (max_iter) or scale the data as shown in:
 <span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  train_data.get(<span class="st">"observed_price"</span>)</span>
 <span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/Users/krise/Library/r-miniconda-arm64/lib/python3.10/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.209e+05, tolerance: 1.552e+04</code></pre>
+<pre><code>/Users/krise/Documents/GitHub/tidy-finance/website/renv/python/virtualenvs/renv-python-3.10/lib/python3.10/site-packages/sklearn/linear_model/_coordinate_descent.py:628: ConvergenceWarning: Objective did not converge. You might want to increase the number of iterations, check the scale of the features or consider increasing regularisation. Duality gap: 3.209e+05, tolerance: 1.552e+04</code></pre>
 </div>
 </div>
 </section>
@@ -1007,8 +1000,8 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 </script>
 <nav class="page-navigation">
   <div class="nav-page nav-page-previous">
-      <a href="../python/difference-in-differences.html" class="pagination-link">
-        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Difference in Differences</span>
+      <a href="../python/factor-selection-via-machine-learning.html" class="pagination-link">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text">Factor Selection via Machine Learning</span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
