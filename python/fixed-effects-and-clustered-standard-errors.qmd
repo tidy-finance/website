@@ -109,7 +109,7 @@ data_investment_summary = (data_investment
   .groupby("measure")
   .describe(percentiles = [0.05, 0.5, 0.95])
 )
-data_investment_summary
+np.round(data_investment_summary, 3)
 ```
 
 ## Fixed Effects 
@@ -123,7 +123,8 @@ model_ols = lm.PanelOLS.from_formula(
   formula="investment_lead ~ cash_flows + tobins_q + 1",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_ols.summary
+for table in model_ols.summary.tables:
+  print(table)
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -138,7 +139,8 @@ model_fe_firm = lm.PanelOLS.from_formula(
   formula="investment_lead ~ cash_flows + tobins_q + EntityEffects ",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_fe_firm.summary
+for table in model_fe_firm.summary.tables:
+  print(table)
 ```
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
@@ -152,7 +154,8 @@ model_fe_firmyear = lm.PanelOLS.from_formula(
   formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_fe_firmyear.summary
+for table in model_fe_firmyear.summary.tables:
+  print(table)
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
@@ -163,7 +166,8 @@ Before we discuss the properties of our estimation errors, we want to point out 
 comparison = lm.panel.results.compare(
   [model_ols, model_fe_firm, model_fe_firmyear]
 )
-comparison.summary
+for table in comparison.summary.tables:
+  print(table)
 ```
 
 ## Clustering Standard Errors
@@ -176,7 +180,7 @@ Instead of relying on the iid assumption, we can use the `cov_type="clustered"` 
 
 ```{python}
 model_cluster_firm = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects ",
+  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit(cov_type="clustered", cluster_entity=True, cluster_time=False)
 
@@ -193,7 +197,8 @@ The table below shows the comparison of the different assumptions behind the sta
 comparison_clustered = lm.panel.results.compare(
   [model_fe_firmyear, model_cluster_firm, model_cluster_firmyear]
 )
-comparison_clustered.summary
+for table in comparison_clustered.summary.tables:
+  print(table)
 ```
 
 Inspired by @AbadieEtAl2017, we want to close this chapter by highlighting that choosing the right dimensions for clustering is a design problem. Even if the data is informative about whether clustering matters for standard errors, they do not tell you whether you should adjust the standard errors for clustering. Clustering at too aggregate levels can hence lead to unnecessarily inflated standard errors. 
