@@ -7,6 +7,11 @@ execute:
 ```{python}
 #| echo: false
 import pre_render_script
+
+# Load wrds secrets from .env
+import os
+from dotenv import load_dotenv
+load_dotenv()
 ```
 
 ::: {.callout-note}
@@ -22,18 +27,20 @@ import pandas as pd
 import numpy as np
 import sqlite3
 
+from plotnine import *
+from mizani.formatters import comma_format, percent_format
 from pandas.tseries.offsets import DateOffset
 ```
 
 ## Accessing WRDS
 
-WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with Python as SQL. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.^[An alternative to establish a connection to WRDS is to use the (WRDS-Py)[https://pypi.org/project/wrds/] library. We chose to work with `sqlalchemy` to show how to access `PostgreSQL´ engines  in general.]\index{Database!PostgreSQL} 
+WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with Python as SQL. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.^[An alternative to establish a connection to WRDS is to use the (WRDS-Py)[https://pypi.org/project/wrds/] library. We chose to work with `sqlalchemy` [@sqlalchemy] to show how to access `PostgreSQL´ engines  in general.]\index{Database!PostgreSQL} 
 
 ```{python}
 from sqlalchemy import create_engine
 ```
 
-To establish a connection, you use the function `create_engine()` with a connection string. Note that you need to replace the `user` and `password` arguments with your own credentials. We defined system variables for the purpose of this book because we obviously do not want (and are not allowed) to share our credentials with the rest of the world (these system variables are stored in the Python environment and loaded with the `os.environ()` function).
+To establish a connection, you use the function `create_engine()` with a connection string. Note that you need to replace the `user` and `password` arguments with your own credentials. We defined system variables for the purpose of this book because we obviously do not want (and are not allowed) to share our credentials with the rest of the world (these system variables are stored in the Python environment and loaded with the `os.getenv()` function).
 
 Additionally, you have to use multi-factor (i.e., two-factor) authentication since May 2023 when establishing a remote connection to WRDS. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires multi-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.\index{Two-factor authentication}\index{WRDS:Two-factor authentication}
 
@@ -41,8 +48,8 @@ Additionally, you have to use multi-factor (i.e., two-factor) authentication sin
 import os 
 connection_string = (
   "postgresql+psycopg2://" + 
-  os.environ["USER"] + ":" + 
-  os.environ["PASSWORD"] +
+  os.getenv("WRDS_USER") + ":" + 
+  os.getenv("WRDS_PASSWORD") +
   "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
 )
 wrds = create_engine(connection_string, pool_pre_ping=True)
@@ -262,9 +269,6 @@ Before we move on to other data sources, let us look at some descriptive statist
 #| label: fig-211
 #| fig-cap: "Number of stocks in the CRSP sample listed at each of the US exchanges."
 #| fig-alt: "Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2022. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."
-from plotnine import *
-from mizani.formatters import comma_format
-
 securities_per_exchange = (crsp_monthly
   .groupby(["exchange", "date"])
   .size()
@@ -623,8 +627,6 @@ Before we close this chapter, let us look at an interesting descriptive statisti
 #| label: fig-215 
 #| fig-cap: "End-of-year share of securities with book equity values by listing exchange."
 #| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2022 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
-from mizani.formatters import percent_format
-
 share_with_be = (crsp_monthly
   .assign(
     year = lambda x: pd.DatetimeIndex(x["month"]).year

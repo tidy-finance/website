@@ -1,4 +1,6 @@
-Sys.setlocale("LC_TIME", "English")
+if (Sys.info()["machine"] != "arm64") {
+  Sys.setlocale("LC_TIME", "English") 
+}
 Sys.setenv(LANG = "en")
 
 options(
