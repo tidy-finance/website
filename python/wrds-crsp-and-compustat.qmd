@@ -397,9 +397,9 @@ market_cap_per_industry_figure.draw()
 
 ## Daily CRSP Data
 
-Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
+Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your Python session. 
 
-There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `to_sql()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
+There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 20 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `print()`. Notice that we also use the function `to_sql()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
 ```{python}
 #| eval: false
@@ -413,15 +413,25 @@ permnos = pd.read_sql(
   "SELECT DISTINCT permno FROM crsp_monthly", 
   tidy_finance
 )
+
+batch_size = 100
+batches = np.ceil(len(permnos) / batch_size).astype(int)
   
-for j in range(0, len(permnos)):  
-    permno_sub = str(int(permnos.iloc[j]))
+for j in range(1, batches):  
+    
+    permno_chunk = permnos[
+      ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
+    ]
+    
+    permno_str = "('" + "', '".join(permno_chunk["permno"].astype(str)) + "')"
+  
     crsp_daily_sub_query = (
       "SELECT permno, date, ret " + 
         "FROM crsp.dsf " +
-        "WHERE permno = " + permno_sub + " " + 
+        "WHERE permno IN " + permno_str + " " + 
         "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
     )
+    
     crsp_daily_sub = (pd.read_sql_query(
         sql=crsp_daily_sub_query,
         con=wrds,
@@ -434,7 +444,7 @@ for j in range(0, len(permnos)):
     if not crsp_daily_sub.empty:
         crsp_daily_sub = (crsp_daily_sub
           .assign(
-            month=lambda x: x["date"].dt.to_period("M")
+            month = lambda x: x["date"].dt.to_period("M").dt.to_timestamp()
           )
           .merge(factors_ff3_daily[["date", "rf"]], 
                  on="date", how="left")
@@ -443,9 +453,17 @@ for j in range(0, len(permnos)):
               ((x["ret"] - x["rf"]).clip(lower=-1))
           )
           .get(["permno", "date", "month", "ret_excess"])
+          .assign(
+            date = lambda x:
+              ((x["date"]- pd.Timestamp("1970-01-01"))
+                // pd.Timedelta("1d")),
+            month = lambda x:
+              ((x["month"]- pd.Timestamp("1970-01-01"))
+                // pd.Timedelta("1d"))
+          )
         )
           
-        if j == 0:
+        if j == 1:
             crsp_daily_sub.to_sql(
               name="crsp_daily", 
               con=tidy_finance, 
@@ -459,7 +477,11 @@ for j in range(0, len(permnos)):
               if_exists="append", 
               index=False
             )
+            
+        print(f"Chunk {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
 ```
+
+Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
 
 To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.
 
