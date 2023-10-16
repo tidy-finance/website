@@ -42,7 +42,8 @@ tidy_finance = sqlite3.connect(
 )
 
 crsp_monthly = (pd.read_sql_query(
-  sql="SELECT permno, month, ret_excess, mktcap, mktcap_lag FROM crsp_monthly",
+  sql="""SELECT permno, month, ret_excess, mktcap, mktcap_lag 
+          FROM crsp_monthly""",
   con=tidy_finance,
   parse_dates={"month"})
   .dropna()
@@ -64,7 +65,9 @@ To construct the correct lagged values, we use the approach introduced in [WRDS,
 
 ```{python}
 crsp_monthly_lags = (crsp_monthly
-  .assign(month=lambda x: x["month"] + pd.DateOffset(months=13))
+  .assign(
+    month=lambda x: x["month"] + pd.DateOffset(months=13)
+  )
   .get(["permno", "month", "mktcap"])
 )
 
@@ -104,13 +107,13 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 data_portfolios = (data_portfolios
   .groupby("month", group_keys=True)
   .apply(lambda x: x.assign(
-    relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
+    relative_mktcap=x["mktcap_lag"] / x["mktcap_lag"].sum()
     )
   )
   .set_index("month")
   .groupby(level="month")
   .transform(lambda x: (x - x.mean()) / x.std()
-            if x.name.endswith("lag") else x)
+                       if x.name.endswith("lag") else x)
   .reset_index()
   .drop(["mktcap_lag"], axis=1)
 )
@@ -127,7 +130,9 @@ The allocation strategy is straightforward because the number of parameters to e
 To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta_0$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.
 
 ```{python}
-lag_columns = [i for i in data_portfolios.columns if "lag" in i]
+lag_columns = [
+  i for i in data_portfolios.columns if "lag" in i
+]
 n_parameters = len(lag_columns)
 theta = pd.DataFrame(
   {"theta": [1.5] * n_parameters}, 
@@ -154,10 +159,13 @@ def compute_portfolio_weights(theta, data,
 
     data = (data
         .groupby("month", group_keys=True)
-        .apply(lambda x: x.assign(characteristic_tilt=x[theta.index]@theta
-                                  / x.shape[0]))
+        .apply(lambda x: x.assign(
+          characteristic_tilt=x[theta.index]@theta/x.shape[0]
+          )
+        )
         .reset_index(drop=True)
-        .assign(weight_benchmark=lambda x: x["relative_mktcap"]
+        .assign(
+          weight_benchmark=lambda x: x["relative_mktcap"]
                 if value_weighting else 1 / x.shape[0],
                 weight_tilt=lambda x: x["weight_benchmark"]
                 + x["characteristic_tilt"]
@@ -166,7 +174,10 @@ def compute_portfolio_weights(theta, data,
 
     if not allow_short_selling:
         data = (data
-            .assign(weight_tilt=lambda x: np.maximum(0, x["weight_tilt"])))
+          .assign(
+            weight_tilt=lambda x: np.maximum(0, x["weight_tilt"])
+          )
+        )
 
     # Normalize
     data = (data
@@ -308,7 +319,10 @@ def objective_function(theta,
         theta, data, value_weighting, allow_short_selling)
 
     objective_function = evaluate_portfolio(
-        processed_data, capm_evaluation=False, full_evaluation=False)
+      processed_data, 
+      capm_evaluation=False, 
+      full_evaluation=False
+    )
 
     objective_function = -objective_function.loc[objective_measure, "tilt"]
 

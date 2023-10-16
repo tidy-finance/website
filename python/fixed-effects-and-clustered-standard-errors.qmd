@@ -61,7 +61,10 @@ The classical investment regressions model the capital investment of a firm as a
 
 ```{python}
 data_investment = (compustat
-  .assign(month = lambda x: pd.to_datetime(x["datadate"]).dt.to_period('M').dt.to_timestamp())
+  .assign(
+    month = lambda x: (pd.to_datetime(x["datadate"])
+                        .dt.to_period('M').dt.to_timestamp())
+  )
   .merge(compustat.get(["gvkey", "year", "at"])
           .rename(columns={"at": "at_lag"})
           .assign(year = lambda x: x["year"] + 1), 
@@ -84,8 +87,12 @@ Tobin's q is the ratio of the market value of capital to its replacement costs.\
 ```{python}
 data_investment = (data_investment
   .merge(crsp_monthly, on=["gvkey", "month"], how="left")
-  .assign(tobins_q = lambda x: (x["mktcap"] + x["at"] - x["be"] + x["txdb"]) / x["at"])
-  .get(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
+  .assign(
+    tobins_q = lambda x: ((x["mktcap"] + x["at"] - x["be"] + 
+                            x["txdb"]) / x["at"])
+  )
+  .get(["gvkey", "year", "investment_lead", 
+        "cash_flows", "tobins_q"])
   .dropna()
 )
 ```
@@ -102,9 +109,14 @@ def winsorize(x, cut):
     return tmp_x
 
 data_investment = (data_investment
-  .assign(investment_lead = lambda x: winsorize(x["investment_lead"], 0.01),
-          cash_flows = lambda x: winsorize(x["cash_flows"], 0.01),
-          tobins_q = lambda x: winsorize(x["tobins_q"], 0.01))
+  .assign(
+    investment_lead = lambda x: 
+      winsorize(x["investment_lead"], 0.01),
+    cash_flows = lambda x: 
+      winsorize(x["cash_flows"], 0.01),
+    tobins_q = lambda x: 
+      winsorize(x["tobins_q"], 0.01)
+  )
 )
 ```
 
@@ -112,9 +124,11 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 
 ```{python}
 data_investment_summary = (data_investment
-  .melt(id_vars=["gvkey", "year"],
-        value_vars=["investment_lead", "cash_flows", "tobins_q"],
-        var_name="measure")
+  .melt(
+    id_vars=["gvkey", "year"],
+    value_vars=["investment_lead", "cash_flows", "tobins_q"],
+    var_name="measure"
+  )
   .get(["measure", "value"])
   .groupby("measure")
   .describe(percentiles = [0.05, 0.5, 0.95])
@@ -146,7 +160,8 @@ where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean in
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 ```{python}
 model_fe_firm = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects ",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
 for table in model_fe_firm.summary.tables:
@@ -161,7 +176,8 @@ where $\alpha_t$ is the time fixed effect. Here you can think of higher investme
 
 ```{python}
 model_fe_firmyear = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
 for table in model_fe_firmyear.summary.tables:
@@ -190,14 +206,20 @@ Instead of relying on the iid assumption, we can use the `cov_type="clustered"` 
 
 ```{python}
 model_cluster_firm = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
-).fit(cov_type="clustered", cluster_entity=True, cluster_time=False)
+).fit(cov_type="clustered", 
+      cluster_entity=True, 
+      cluster_time=False)
 
 model_cluster_firmyear = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
-).fit(cov_type="clustered", cluster_entity=True, cluster_time=True)
+).fit(cov_type="clustered", 
+      cluster_entity=True, 
+      cluster_time=True)
 ```
 
 \index{Robustness tests}
@@ -205,7 +227,9 @@ The table below shows the comparison of the different assumptions behind the sta
 
 ```{python}
 comparison_clustered = lm.panel.results.compare(
-  [model_fe_firmyear, model_cluster_firm, model_cluster_firmyear]
+  [model_fe_firmyear, 
+   model_cluster_firm, 
+   model_cluster_firmyear]
 )
 for table in comparison_clustered.summary.tables:
   print(table)
