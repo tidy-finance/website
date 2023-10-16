@@ -1,7 +1,5 @@
 ---
 title: Accessing and Managing Financial Data
-execute:
-  cache: true
 ---
 
 ```{python}
@@ -234,23 +232,17 @@ import sqlite3
 An SQLite database is easily created - the code below is really all there is. You do not need any external software. Otherwise, date columns are stored and retrieved as integers.\index{Database!Creation}  We will use the resulting file `tidy_finance.db` in the subfolder `data` for all subsequent chapters to retrieve our data. 
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect("data/tidy_finance_python.sqlite")
 ```
 
 Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `to_sql()`, which copies the data to our SQLite-database. Before we copy the data to the database, we convert the date to UNIX integers, which allows us to smoothly share the data between R and Python. We follow the [approach recommended by `pandas`](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#from-timestamps-to-epoch) for this conversion.
 
 ```{python}
 (factors_ff3_monthly
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-          // pd.Timedelta("1d"))
-  )
-  .to_sql(
-    name="factors_ff3_monthly", 
-    con=tidy_finance, 
-    if_exists="replace",
-    index = False)
+  .to_sql(name="factors_ff3_monthly", 
+          con=tidy_finance, 
+          if_exists="replace",
+          index = False)
 )
 ```
 
@@ -260,7 +252,7 @@ If we want to have the whole table in memory, we need to call `pd.read_sql_query
 (pd.read_sql_query(
   sql="SELECT month, rf FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  parse_dates={"month"})
 )
 ```
 
@@ -271,11 +263,6 @@ Before we move on to the next data source, let us also store the other five tabl
 ```{python}
 #| output: false
 (factors_ff5_monthly
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="factors_ff5_monthly", 
           con=tidy_finance, 
           if_exists="replace",
@@ -283,55 +270,34 @@ Before we move on to the next data source, let us also store the other five tabl
 )
           
 (factors_ff3_daily
-  .assign(
-    date = lambda x: 
-      ((x["date"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="factors_ff3_daily", 
           con=tidy_finance, 
           if_exists="replace",
           index = False)
 )
+
 (industries_ff_monthly
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="industries_ff_monthly", 
           con=tidy_finance, 
           if_exists="replace",
           index = False)
 )
+
 (factors_q_monthly
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="factors_q_monthly", 
           con=tidy_finance, 
           if_exists="replace",
           index = False)
 )
+
 (macro_predictors
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="macro_predictors", 
           con=tidy_finance, 
           if_exists="replace",
           index = False)
 )
+
 (cpi_monthly
-  .assign(
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="cpi_monthly", 
           con=tidy_finance, 
           if_exists="replace",
@@ -347,11 +313,12 @@ From now on, all you need to do to access data that is stored in the database is
 import pandas
 import sqlite3
 
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect("data/tidy_finance_python.sqlite")
+
 factors_q_monthly = (pd.read_sql_query(
     sql="SELECT * FROM factors_q_monthly",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
 )
 ```
 

@@ -208,12 +208,12 @@ crsp_monthly = (crsp_monthly
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the tibble `factors_ff_monthly`.
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect("data/tidy_finance_python.sqlite")
 
 factors_ff3_monthly = pd.read_sql_query(
   sql="SELECT month, rf FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  parse_dates={"month"}
 )
   
 crsp_monthly = (crsp_monthly
@@ -242,14 +242,6 @@ Finally, we store the monthly CRSP file in our database. Note that we convert th
 
 ```{python}
 (crsp_monthly
-  .assign(
-    date = lambda x: 
-      ((x["date"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d")),
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="crsp_monthly", 
           con=tidy_finance, 
           if_exists="replace",
@@ -298,7 +290,7 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 cpi_monthly = pd.read_sql_query(
   sql="SELECT * FROM cpi_monthly",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  parse_dates={"month"}
 )
 
 market_cap_per_exchange = (crsp_monthly
@@ -404,12 +396,12 @@ There is a solution to this challenge. As with many *big data* problems, you can
 factors_ff3_daily = pd.read_sql(
   sql="SELECT * FROM factors_ff3_daily", 
   con=tidy_finance,
-  parse_dates={"date": {"unit": "D", "origin": "unix"}}
+  parse_dates={"date"}
 )
   
 permnos = pd.read_sql(
   "SELECT DISTINCT permno FROM crsp_monthly", 
-  tidy_finance
+  tidy_finance,
 )
 
 batch_size = 100
@@ -451,14 +443,6 @@ for j in range(1, batches + 1):
               ((x["ret"] - x["rf"]).clip(lower=-1))
           )
           .get(["permno", "date", "month", "ret_excess"])
-          .assign(
-            date = lambda x:
-              ((x["date"]- pd.Timestamp("1970-01-01"))
-                // pd.Timedelta("1d")),
-            month = lambda x:
-              ((x["month"]- pd.Timestamp("1970-01-01"))
-                // pd.Timedelta("1d"))
-          )
         )
           
         if j == 1:
@@ -573,11 +557,6 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 
 ```{python}
 (compustat
-  .assign(
-    datadate = lambda x: 
-      ((x["datadate"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="compustat", 
           con=tidy_finance, 
           if_exists="replace",
@@ -626,14 +605,6 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 ```{python}
 (crsp_monthly
-  .assign(
-    date = lambda x: 
-      ((x["date"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d")),
-    month = lambda x: 
-      ((x["month"]- pd.Timestamp("1970-01-01")) 
-        // pd.Timedelta("1d"))
-  )
   .to_sql(name="crsp_monthly", 
           con=tidy_finance, 
           if_exists="replace",
