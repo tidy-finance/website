@@ -2,33 +2,33 @@
 title: Option Pricing via Machine Learning
 aliases: 
   - ../option-pricing-via-machine-learning.html
+metadata:
+  pagetitle: Option Pricing via Machine Learning with R
+  description-meta: Use machine learning tools such as random forests and deep neural networks to price call options using the programming language R.
 ---
 
 This chapter covers machine learning methods in option pricing. 
 First, we briefly introduce regression trees, random forests, and neural networks - these methods are advocated as highly flexible *universal approximators*, capable of recovering highly nonlinear structures in the data.\index{Universal approximator} As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues.
-We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` or `TensorFlow` for more complicated network structures. 
+We show how to implement random forests and deep neural networks with tidy principles using `tidymodels` and the `torch` package for more complicated network structures. 
 
 \index{Machine learning} Machine learning (ML) is seen as a part of artificial intelligence. 
 ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so.
-While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. \index{Supervised learning} The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests \index{Random forests} and neural networks \index{Neural network} to a simple application in option pricing. More specifically, we create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options \index{Option pricing} without prior knowledge of the theoretical underpinnings of the famous option pricing equation by @Black1976.    
+While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. \index{Supervised learning} The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests \index{Random forests} and neural networks \index{Neural network} to a simple application in option pricing. More specifically, we create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to *learn* how to price call options \index{Option pricing} without prior knowledge of the theoretical underpinnings of the famous option pricing equation by @Black1976.  
 
-::: {.callout-note}
-In order to replicate the analysis regarding neural networks in this chapter, you have to install `TensorFlow` on your system, which requires administrator rights on your machine. Parts of this can be done from within R. Just follow [these quick-start instructions.](https://tensorflow.rstudio.com/installation/)
-:::
-
-Throughout this chapter, we need the following packages.
+Throughout this chapter, we need the following R packages.
 
 ```{r}
 #| message: false
 library(tidyverse)
 library(tidymodels)
-library(keras)
+library(torch)
+library(brulee)
 library(hardhat)
 library(ranger)
 library(glmnet)
 ```
 
-The package `keras` [@keras] is a high-level neural networks API developed with a focus on enabling fast experimentation with `Tensorflow.`
+The package `torch` [@torch] provides functionality to define and train neural networks and is based on `PyTorch` [@PyTorch2019], while `brulee` [@brulee] provides several basic modeling functions that use the `torch` infrastructure. 
 The package `ranger` [@ranger] provides a fast implementation for random forests and `hardhat` [@hardhat] is a helper function to for robust data preprocessing at fit time and prediction time.
 
 ## Regression Trees and Random Forests
@@ -55,7 +55,7 @@ $$x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\righ
 Here, $\theta$ are the parameters to fit, $N^l$ denotes the number of units (a hyperparameter to tune), and $z_j$ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layers $z_j = x_k-1$.
 While the easiest case with $f(x) = \alpha + \beta x$ resembles linear regression, typical activation functions are sigmoid (i.e., $f(x) = (1+e^{-x})^{-1}$) or ReLu (i.e., $f(x) = max(x, 0)$).
 
-Neural networks gain their flexibility from chaining multiple layers together. Naturally, this imposes many degrees of freedom on the network architecture for which no clear theoretical guidance exists. The specification of a neural network requires, at a minimum, a stance on depth (number of hidden layers), the activation function, the number of neurons, the connection structure of the units (dense or sparse), and the application of regularization techniques to avoid overfitting. Finally, *learning* means to choose optimal parameters relying on numerical optimization, which often requires specifying an appropriate learning rate. Despite these computational challenges, implementation in R is not tedious at all because we can use the API to `TensorFlow`. 
+Neural networks gain their flexibility from chaining multiple layers together. Naturally, this imposes many degrees of freedom on the network architecture for which no clear theoretical guidance exists. The specification of a neural network requires, at a minimum, a stance on depth (number of hidden layers), the activation function, the number of neurons, the connection structure of the units (dense or sparse), and the application of regularization techniques to avoid overfitting. Finally, *learning* means to choose optimal parameters relying on numerical optimization, which often requires specifying an appropriate learning rate. Despite these computational challenges, implementation in R is not tedious at all because we can use the API to `torch`. 
 
 
 ## Option Pricing
@@ -131,7 +131,7 @@ rec <- recipe(observed_price ~ .,
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. Note that this requires that `keras` is installed on your local machine. The function `mlp()` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `epochs = 500`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
+Next, we show how to fit a neural network to the data. Note that this requires that `torch` is installed on your local machine. The function `mlp()` from the package `parsnip` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with 10 hidden units. We set the number of training iterations to `epochs = 500`. The option `set_mode("regression")` specifies a linear activation function for the output layer. 
 
 ```{r}
 nnet_model <- mlp(
@@ -139,7 +139,7 @@ nnet_model <- mlp(
   hidden_units = 10,
 ) |>
   set_mode("regression") |>
-  set_engine("keras", verbose = FALSE)
+  set_engine("brulee", verbose = FALSE)
 ```
 
 The `verbose = FALSE` argument prevents logging the results to the console. We can follow the straightforward `tidymodel` workflow as in [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd): define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data. 
@@ -177,33 +177,25 @@ rf_fit <- workflow() |>
 
 A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used [for applications of deep neural networks in finance, see, for instance, @Jiang2022; @Jensen2022].
 
-Note that while the `tidymodels` workflow is extremely convenient, these more sophisticated multi-layer (so-called *deep*) neural networks are not supported by `tidymodels` yet (as of September 2022). Instead, an implementation of a deep neural network in R requires additional computational tools. For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers with 10 units per layer. \index{keras} The `keras` package provides a convenient interface and is flexible enough to handle different activation functions. The `compile()` command defines the loss function with which the model predictions are evaluated. 
+Note that while the `tidymodels` workflow is extremely convenient, these more sophisticated multi-layer (so-called *deep*) neural networks are not supported by `tidymodels` yet (as of September 2022). Instead, an implementation of a deep neural network in R requires additional computational tools. For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers ith 10 units per layer. \index{torch} The `brulee` package provides a convenient interface to `torch` and is flexible enough to handle different activation functions. 
 
 ```{r}
-model <- keras_model_sequential() |>
-  layer_dense(
-    input_shape = 5,
-    units = 10,
-    activation = "sigmoid"
-  ) |>
-  layer_dense(units = 10, activation = "sigmoid") |>
-  layer_dense(units = 10, activation = "sigmoid") |>
-  layer_dense(units = 1, activation = "linear") |>
-  compile(
-    loss = "mean_squared_error"
-  )
-model
+deep_nnet_model <- mlp(
+  epochs = 500,
+  hidden_units = c(10, 10, 10),
+  activation = "tanh"
+) |>
+  set_mode("regression") |>
+  set_engine("brulee", verbose = FALSE)
 ```
 
-To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: `fit()` alters the `keras` model - this is one of the few instances, where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
+To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nn_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: `fit()` alters the model - this is one of the few instances, where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
 
 ```{r}
-model |>
-  fit(
-    x = extract_mold(nn_fit)$predictors |> as.matrix(),
-    y = extract_mold(nn_fit)$outcomes |> pull(observed_price),
-    epochs = 500, verbose = FALSE
-  )
+deep_nn_fit <- workflow() |>
+  add_recipe(rec) |>
+  add_model(deep_nnet_model) |>
+  fit(data = training(split))
 ```
 
 ### Universal approximation
@@ -236,13 +228,9 @@ Finally, we collect all predictions to compare the *out-of-sample* prediction er
 out_of_sample_data <- testing(split) |>
   slice_sample(n = 10000)
 
-predictive_performance <- model |>
-  predict(forge(
-    out_of_sample_data,
-    extract_mold(nn_fit)$blueprint
-  )$predictors |> as.matrix()) |>
-  as.vector() |>
-  tibble("Deep NN" = _) |>
+predictive_performance <- deep_nn_fit |>
+  predict(out_of_sample_data)|>
+  rename("Deep NN" = .pred) |>
   bind_cols(nn_fit |>
     predict(out_of_sample_data)) |>
   rename("Single layer" = .pred) |>
@@ -291,5 +279,5 @@ The results can be summarized as follows:
 1. Create a function that creates predictions for a new matrix of predictors `newX` based on the estimated regression tree. 
 1. Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing.
 1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
-1. Use `keras` to initialize a sequential neural network that can take the predictors from the training data set as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simple [regression example here.](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/) How many parameters does the neural network you aim to fit have? 
+1. Use `brulee` to initialize a sequential neural network that can take the predictors from the training data set as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is: *see a simple [regression example here.](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/) How many parameters does the neural network you aim to fit have? 
 1. Compile the object from the previous exercise. It is important that you specify a loss function. Illustrate the difference in predictive accuracy for different architecture choices.

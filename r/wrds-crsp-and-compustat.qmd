@@ -2,15 +2,16 @@
 title: WRDS, CRSP, and Compustat
 aliases:
   - ../wrds-crsp-and-compustat.html
-execute:
-  cache: true
 pre-render:
   - pre_render_script.R
+metadata:
+  pagetitle: WRDS, CRSP, and Compustat with R
+  description-meta: Use the programming language R to download stock and firm data such as CRSP and Compustat from WRDS. 
 ---
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `SQLite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
 
-First, we load the packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
+First, we load the R packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
 ```{r}
 #| message: false
@@ -47,8 +48,8 @@ wrds <- dbConnect(
   dbname = "wrds",
   port = 9737,
   sslmode = "require",
-  user = Sys.getenv("user"),
-  password = Sys.getenv("password")
+  user = Sys.getenv("WRDS_USER"),
+  password = Sys.getenv("WRDS_PASSWORD")
 )
 ```
 
@@ -189,7 +190,7 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 ```{r}
 tidy_finance <- dbConnect(
   SQLite(),
-  "data/tidy_finance.sqlite",
+  "data/tidy_finance_r.sqlite",
   extended_types = TRUE
 )
 
@@ -339,7 +340,7 @@ crsp_monthly_industry |>
 
 Before we turn to accounting data, we provide a proposal for downloading daily CRSP data. While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire data set to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easy to handle.\index{Big data} That is, instead of downloading data about many stocks all at once, download the data in small batches for each stock consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a single stock in each iteration. This operation might nonetheless take a couple of hours, so you have to be patient either way (we often run such code overnight). To keep track of the progress, we create ad-hoc progress updates using `cat()`. Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
+There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 20 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `cat()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
 ```{r}
 #| eval: false
@@ -352,10 +353,17 @@ permnos <- tbl(tidy_finance, "crsp_monthly") |>
   distinct(permno) |>
   pull()
 
-for (j in 1:length(permnos)) {
-  permno_sub <- permnos[j]
+batch_size <- 100
+batches <- ceiling(length(permnos) / batch_size)
+
+for (j in 1:batches) {
+  
+  permno_chunk <- permnos[
+    ((j - 1) * batch_size + 1):min(j * batch_size, length(permnos))
+  ]
+
   crsp_daily_sub <- dsf_db |>
-    filter(permno == permno_sub &
+    filter(permno %in% permno_chunk &
       date >= start_date & date <= end_date) |>
     select(permno, date, ret) |>
     collect() |>
@@ -365,12 +373,12 @@ for (j in 1:length(permnos)) {
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
       left_join(factors_ff3_daily |>
-                  select(date, rf), by = "date") |>
+        select(date, rf), by = "date") |>
       mutate(
         ret_excess = ret - rf,
         ret_excess = pmax(ret_excess, -1)
       ) |>
-      select(permno, date, month, ret_excess)
+      select(permno, date, month, ret, ret_excess)
 
     dbWriteTable(tidy_finance,
       "crsp_daily",
@@ -379,10 +387,13 @@ for (j in 1:length(permnos)) {
       append = ifelse(j != 1, TRUE, FALSE)
     )
   }
-  cat("Index", j, "out of", length(permnos), "done (", 
-      percent(j / length(permnos)), ")\n")
+
+  cat("Chunk", j, "out of", batches, "done (", 
+      percent(j / batches), ")\n")
 }
 ```
+
+Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
 
 To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.
 
@@ -581,9 +592,10 @@ dbListObjects(wrds)
 
 ## Exercises
 
-1. Check out the structure of the WRDS database by sending queries in the spirit of ["Querying WRDS Data using R"](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/) and verify the output with `dbListObjects()`. How many tables are associated with CRSP? Can you identify what is stored within *msp500*?
-1. Compute `mkt_cap_lag` using `lag(mktcap)` rather than joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are they different?
-1. In the main part, we look at the distribution of market capitalization across exchanges and industries. Now, plot the average market capitalization of firms for each exchange and industry. What do you find?
-1. `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by *month* of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
-1. Go back to the original Compustat data in `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
+1. Check out the structure of the WRDS database by sending queries in the spirit of ["Querying WRDS Data using R"](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/) and verify the output with `dbListObjects()`. How many tables are associated with CRSP? Can you identify what is stored within `msp500`?
+1. Compute `mkt_cap_lag` using `lag(mktcap)` rather than using joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are the two measures they different?
+1. Plot the average market capitalization of firms for each exchange and industry, respectively, over time. What do you find?
+1. In the `compustat` table, `datadate` refers to the date to which the fiscal year of a corresponding firm refers to. Count the number of observations in Compustat by `month` of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
+1.  Go back to the original Compustat data in `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
+1. Keep the last observation of `crsp_monthly` by year and join it with the `compustat` table. Create the following plots: (i) aggregate  book equity by exchange over time and (ii) aggregate annual book equity by industry over time. Do you notice any different patterns to the corresponding plots based on market capitalization?
 1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, use the matched sample to plot book equity against market capitalization. How are these two variables related?

@@ -1,5 +1,8 @@
 ---
 title: Univariate Portfolio Sorts
+metadata:
+  pagetitle: Univariate Portfolio Sorts with Python
+  description-meta: Perform univariate portfolio sorts to test for return predictability in asset pricing applications using the programming language Python. 
 ---
 
 ```{python}
@@ -19,15 +22,15 @@ Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is obser
 The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. 
 To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
-The current chapter relies on the following set of packages.
+The current chapter relies on the following set of Python packages.
 
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-from plotnine import *
-
 import statsmodels.api as sm
+
+from plotnine import *
 from mizani.formatters import percent_format
 ```
 
@@ -38,20 +41,23 @@ Once we form our portfolios, we use the Fama-French market factor returns to com
 `beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, month, ret_excess, mktcap_lag FROM crsp_monthly",
+    sql="""SELECT permno, month, ret_excess, mktcap_lag 
+              FROM crsp_monthly""",
     con=tidy_finance,
     dtype={"permno": np.int32},
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
 factors_ff3_monthly = (pd.read_sql_query(
     sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
@@ -59,7 +65,7 @@ beta = (pd.read_sql_query(
     sql="SELECT permno, month, beta_monthly FROM beta",
     con=tidy_finance,
     dtype={"permno": np.int32},
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 ```
@@ -74,7 +80,9 @@ This procedure, however, does not work correctly if there are non-explicit missi
 
 ```{python}
 beta_lag = (beta
-  .assign(month = lambda x: x["month"] + pd.DateOffset(months=1))
+  .assign(
+    month = lambda x: x["month"] + pd.DateOffset(months=1)
+  )
   .get(["permno", "month", "beta_monthly"])
   .rename(columns={"beta_monthly": "beta_lag"})
   .dropna()
@@ -94,11 +102,16 @@ We then compute the value-weighted returns for each of the two resulting portfol
 ```{python}
 beta_portfolios = (data_for_sorts
     .groupby("month", group_keys=False)
-    .apply(lambda x: x.assign(portfolio=pd.qcut(x["beta_lag"], 
-                                                q=[0, 0.5, 1], 
-                                                labels=["low", "high"])))
+    .apply(lambda x: (
+      x.assign(portfolio=pd.qcut(x["beta_lag"], 
+                                 q=[0, 0.5, 1], 
+                                 labels=["low", "high"])
+        )
+      )
+    )
     .groupby(["portfolio","month"], group_keys=False)
-    .apply(lambda x: np.average(x["ret_excess"], weights=x["mktcap_lag"]))
+    .apply(lambda x: np.average(x["ret_excess"], 
+                                weights=x["mktcap_lag"]))
     .reset_index(name="ret")
     )
 ```
@@ -122,7 +135,10 @@ We compute the average return and the corresponding standard error to test wheth
 
 ```{python}
 model_fit = (sm.OLS
-  .from_formula("long_short ~ 1", data=beta_longshort)
+  .from_formula(
+    formula="long_short ~ 1",
+    data=beta_longshort
+  )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 6})
   .summary(slim=True)
 )
@@ -140,13 +156,19 @@ In some applications, the variable used for the sorting might be clustered (e.g.
 
 ```{python}
 def assign_portfolio(data, sorting_variable, n_portfolios):
-    breakpoints = np.quantile(data[sorting_variable].dropna(), 
-                              np.linspace(0, 1, n_portfolios + 1), 
-                              method="linear")
-    assigned_portfolios = pd.cut(data[sorting_variable],
-                                 bins=breakpoints,
-                                 labels=range(1, breakpoints.size),
-                                 include_lowest=True)
+    breakpoints = np.quantile(
+      data[sorting_variable].dropna(), 
+      np.linspace(0, 1, n_portfolios + 1), 
+      method="linear"
+    )
+    
+    assigned_portfolios = pd.cut(
+      data[sorting_variable],
+      bins=breakpoints,
+      labels=range(1, breakpoints.size),
+      include_lowest=True
+    )
+    
     return assigned_portfolios
 ```
 
@@ -155,10 +177,15 @@ We can use the above function to sort stocks into ten portfolios each month usin
 ```{python}
 beta_portfolios = (data_for_sorts
   .groupby("month", group_keys=False)
-  .apply(lambda x: x.assign(portfolio = assign_portfolio(x, 'beta_lag', 10)))
+  .apply(lambda x: x.assign(
+    portfolio = assign_portfolio(x, 'beta_lag', 10)
+    )
+  )
   .groupby(["portfolio", "month"], group_keys=False)
-  .apply(lambda x: x.assign(ret=np.average(x["ret_excess"], 
-                                           weights=x["mktcap_lag"])))
+  .apply(lambda x: x.assign(
+    ret=np.average(x["ret_excess"], weights=x["mktcap_lag"])
+    )
+  )
   .merge(factors_ff3_monthly, 
          how="left", 
          on="month")
@@ -172,12 +199,18 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 ```{python}
 beta_portfolios_summary = (beta_portfolios
   .groupby("portfolio", group_keys=False)
-  .apply(lambda x: x.assign(alpha=sm.OLS.from_formula(
-    formula="ret ~ 1 + mkt_excess", data=x).fit().params[0],
-                                      beta=sm.OLS.from_formula(
-                                      formula="ret ~ 1 + mkt_excess", data=x)
-                                      .fit().params[1],
-                                      ret=x["ret"].mean()).tail(1))
+  .apply(lambda x: x.assign(
+    alpha=sm.OLS.from_formula(
+      formula="ret ~ 1 + mkt_excess", 
+      data=x
+      ).fit().params[0],
+    beta=sm.OLS.from_formula(
+      formula="ret ~ 1 + mkt_excess", 
+      data=x
+      ).fit().params[1],
+    ret=x["ret"].mean()
+    ).tail(1)
+  )
   .get(["portfolio", "alpha", "beta", "ret"])
   .reset_index(drop=True)
 )
@@ -196,7 +229,8 @@ plot_beta_portfolios_summary = (
   labs(title="CAPM alphas of beta-sorted portfolios",
        x="Portfolio", y="CAPM alpha", fill="Portfolio") +
   scale_y_continuous(labels=percent_format()) +
-  theme(legend_position="none"))
+  theme(legend_position="none")
+)
 plot_beta_portfolios_summary.draw()
 ```
 
@@ -210,24 +244,32 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 #| label: fig-702
 #| fig-cap: "Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas."
 #| fig-alt: "Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."
-sml_capm = (sm.OLS.from_formula("ret ~ 1 + beta", data=beta_portfolios_summary)
-            .fit().params)
+sml_capm = (sm.OLS.from_formula(
+    formula="ret ~ 1 + beta", 
+    data=beta_portfolios_summary
+  )
+  .fit()
+  .params
+)
 
 plot_sml_capm = (
   ggplot(beta_portfolios_summary,
          aes(x="beta", y="ret", color="portfolio")) +
-  geom_point()
+  geom_point() + 
   geom_abline(intercept=0,
               slope=factors_ff3_monthly["mkt_excess"].mean(),
               linetype="solid") +
   geom_abline(intercept=sml_capm["Intercept"],
                 slope=sml_capm["beta"],
                 linetype="dashed") +
-  scale_y_continuous(labels=percent_format(),
-                     limits=(0, factors_ff3_monthly["mkt_excess"].mean()*2)) +
+  scale_y_continuous(
+    labels=percent_format(),
+    limits=(0, factors_ff3_monthly["mkt_excess"].mean()*2)
+  ) +
   scale_x_continuous(limits=(0, 2)) +
   labs(x="Beta", y="Excess return", color="Portfolio",
-       title="Average portfolio excess returns and average beta estimates")
+       title= ("Average portfolio excess returns and " + 
+               "average beta estimates"))
 )
 plot_sml_capm.draw()
 ```
@@ -236,12 +278,19 @@ To provide more evidence against the CAPM predictions, we again form a long-shor
 
 ```{python}
 beta_longshort = (beta_portfolios
-  .assign(portfolio=lambda x: x["portfolio"]
-          .apply(lambda y: "high" if y == x["portfolio"].max()
-                                 else ("low" if y == x["portfolio"].min()
-                                       else y)))
+  .assign(
+    portfolio=lambda x: (
+      x["portfolio"].apply(
+        lambda y: "high" if y == x["portfolio"].max()
+        else ("low" if y == x["portfolio"].min()
+        else y)
+      )
+    )
+  )
   .query("portfolio in ['low', 'high']")
-  .pivot_table(index="month", columns="portfolio", values="ret")
+  .pivot_table(index="month", 
+               columns="portfolio", 
+               values="ret")
   .assign(long_short=lambda x: x["high"] - x["low"])
   .merge(factors_ff3_monthly, how="left", on="month")
 )
@@ -250,22 +299,26 @@ beta_longshort = (beta_portfolios
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 
 
 ```{python}
-model_fit = (sm.OLS.from_formula("long_short ~ 1", data=beta_longshort)
+model_fit = (sm.OLS.from_formula(
+    formula="long_short ~ 1", 
+    data=beta_longshort
+  )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
-  .summary(slim=True)
 )
-model_fit_coefs = model_fit.tables[1]
+model_fit_coefs = model_fit.summary(slim=True).tables[1]
 model_fit_coefs
 ```
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor [@Frazzini2014]. Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.\index{Risk aversion}
 
 ```{python}
-model_fit = (sm.OLS.from_formula("long_short ~ 1 + mkt_excess", data=beta_longshort)
+model_fit = (sm.OLS.from_formula(
+    formula="long_short ~ 1 + mkt_excess", 
+    data=beta_longshort
+  )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
-  .summary(slim=True)
 )
-model_fit_coefs = model_fit.tables[1]
+model_fit_coefs = model_fit.summary(slim=True).tables[1]
 model_fit_coefs
 ```
 
@@ -278,9 +331,11 @@ model_fit_coefs
 beta_longshort_year = (beta_longshort
   .assign(year=lambda x: x["month"].dt.year)
   .groupby("year")
-  .aggregate(low = ("low", lambda x: 1-(1 + x).prod()),
-             high = ("high", lambda x: 1-(1 + x).prod()),
-             long_short = ("long_short", lambda x: 1-(1 + x).prod()))
+  .aggregate(
+    low = ("low", lambda x: 1-(1 + x).prod()),
+    high = ("high", lambda x: 1-(1 + x).prod()),
+    long_short = ("long_short", lambda x: 1-(1 + x).prod())
+  )
   .reset_index()
   .melt(id_vars="year", var_name="name", value_name="value")
 )

@@ -1,5 +1,8 @@
 ---
 title: Fixed Effects and Clustered Standard Errors
+metadata:
+  pagetitle: Fixed Effects and Clustered Standard Errors with Python
+  description-meta: Dive into the implementation of fixed effects regressions and clustered standard errors in finance using the programming language Python. 
 ---
 
 ```{python}
@@ -17,33 +20,40 @@ We focus on a classical panel regression common to the corporate finance literat
 
 Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors.  
 
-The current chapter relies on the following set of packages. 
+The current chapter relies on the following set of Python packages. 
+
 ```{python}
 import pandas as pd
 import numpy as np
+import sqlite3
 import datetime as dt
 import itertools
 import linearmodels as lm
-import sqlite3
 ```
+
+Compared to previous chapters, we introduce `linearmodels` [@linearmodels], which provides tools for estimating various econometric models. 
 
 ## Data Preparation
 
 We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = pd.read_sql_query(
   sql="SELECT gvkey, month, mktcap FROM crsp_monthly",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  parse_dates={"month"}
 )
 
 compustat = pd.read_sql_query(
-  sql="SELECT datadate, gvkey, year, at, be, capx, oancf, txdb FROM compustat",
+  sql="""SELECT datadate, gvkey, year, at, be, capx, oancf, 
+                txdb 
+          FROM compustat""",
   con=tidy_finance,
-  parse_dates={"datadate": {"unit": "D", "origin": "unix"}}
+  parse_dates={"datadate"}
 )
 ```
 
@@ -51,7 +61,10 @@ The classical investment regressions model the capital investment of a firm as a
 
 ```{python}
 data_investment = (compustat
-  .assign(month = lambda x: pd.to_datetime(x["datadate"]).dt.to_period('M').dt.to_timestamp())
+  .assign(
+    month = lambda x: (pd.to_datetime(x["datadate"])
+                        .dt.to_period('M').dt.to_timestamp())
+  )
   .merge(compustat.get(["gvkey", "year", "at"])
           .rename(columns={"at": "at_lag"})
           .assign(year = lambda x: x["year"] + 1), 
@@ -74,8 +87,12 @@ Tobin's q is the ratio of the market value of capital to its replacement costs.\
 ```{python}
 data_investment = (data_investment
   .merge(crsp_monthly, on=["gvkey", "month"], how="left")
-  .assign(tobins_q = lambda x: (x["mktcap"] + x["at"] - x["be"] + x["txdb"]) / x["at"])
-  .get(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
+  .assign(
+    tobins_q = lambda x: ((x["mktcap"] + x["at"] - x["be"] + 
+                            x["txdb"]) / x["at"])
+  )
+  .get(["gvkey", "year", "investment_lead", 
+        "cash_flows", "tobins_q"])
   .dropna()
 )
 ```
@@ -92,9 +109,14 @@ def winsorize(x, cut):
     return tmp_x
 
 data_investment = (data_investment
-  .assign(investment_lead = lambda x: winsorize(x["investment_lead"], 0.01),
-          cash_flows = lambda x: winsorize(x["cash_flows"], 0.01),
-          tobins_q = lambda x: winsorize(x["tobins_q"], 0.01))
+  .assign(
+    investment_lead = lambda x: 
+      winsorize(x["investment_lead"], 0.01),
+    cash_flows = lambda x: 
+      winsorize(x["cash_flows"], 0.01),
+    tobins_q = lambda x: 
+      winsorize(x["tobins_q"], 0.01)
+  )
 )
 ```
 
@@ -102,14 +124,16 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 
 ```{python}
 data_investment_summary = (data_investment
-  .melt(id_vars=["gvkey", "year"],
-        value_vars=["investment_lead", "cash_flows", "tobins_q"],
-        var_name="measure")
+  .melt(
+    id_vars=["gvkey", "year"],
+    value_vars=["investment_lead", "cash_flows", "tobins_q"],
+    var_name="measure"
+  )
   .get(["measure", "value"])
   .groupby("measure")
   .describe(percentiles = [0.05, 0.5, 0.95])
 )
-data_investment_summary
+np.round(data_investment_summary, 3)
 ```
 
 ## Fixed Effects 
@@ -123,7 +147,8 @@ model_ols = lm.PanelOLS.from_formula(
   formula="investment_lead ~ cash_flows + tobins_q + 1",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_ols.summary
+for table in model_ols.summary.tables:
+  print(table)
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -135,10 +160,12 @@ where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean in
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 ```{python}
 model_fe_firm = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects ",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_fe_firm.summary
+for table in model_fe_firm.summary.tables:
+  print(table)
 ```
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
@@ -149,10 +176,12 @@ where $\alpha_t$ is the time fixed effect. Here you can think of higher investme
 
 ```{python}
 model_fe_firmyear = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit()
-model_fe_firmyear.summary
+for table in model_fe_firmyear.summary.tables:
+  print(table)
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
@@ -163,7 +192,8 @@ Before we discuss the properties of our estimation errors, we want to point out 
 comparison = lm.panel.results.compare(
   [model_ols, model_fe_firm, model_fe_firmyear]
 )
-comparison.summary
+for table in comparison.summary.tables:
+  print(table)
 ```
 
 ## Clustering Standard Errors
@@ -176,14 +206,20 @@ Instead of relying on the iid assumption, we can use the `cov_type="clustered"` 
 
 ```{python}
 model_cluster_firm = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects ",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
-).fit(cov_type="clustered", cluster_entity=True, cluster_time=False)
+).fit(cov_type="clustered", 
+      cluster_entity=True, 
+      cluster_time=False)
 
 model_cluster_firmyear = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects + TimeEffects",
+  formula="""investment_lead ~ cash_flows + tobins_q + 
+                               EntityEffects + TimeEffects""",
   data=data_investment.set_index(["gvkey", "year"]),
-).fit(cov_type="clustered", cluster_entity=True, cluster_time=True)
+).fit(cov_type="clustered", 
+      cluster_entity=True, 
+      cluster_time=True)
 ```
 
 \index{Robustness tests}
@@ -191,9 +227,12 @@ The table below shows the comparison of the different assumptions behind the sta
 
 ```{python}
 comparison_clustered = lm.panel.results.compare(
-  [model_fe_firmyear, model_cluster_firm, model_cluster_firmyear]
+  [model_fe_firmyear, 
+   model_cluster_firm, 
+   model_cluster_firmyear]
 )
-comparison_clustered.summary
+for table in comparison_clustered.summary.tables:
+  print(table)
 ```
 
 Inspired by @AbadieEtAl2017, we want to close this chapter by highlighting that choosing the right dimensions for clustering is a design problem. Even if the data is informative about whether clustering matters for standard errors, they do not tell you whether you should adjust the standard errors for clustering. Clustering at too aggregate levels can hence lead to unnecessarily inflated standard errors. 

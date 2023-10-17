@@ -1,5 +1,8 @@
 ---
 title: Beta Estimation
+metadata:
+  pagetitle: Beta Estimation with Python
+  description-meta: Estimate CAPM betas using monthly or daily CRSP data and the programming language Python. 
 ---
 
 ```{python}
@@ -13,43 +16,44 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 
 In this chapter, we introduce an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of @Sharpe1964, @Lintner1965, and @Mossin1966, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio.\index{CAPM} The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas.\index{Beta} We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization.
 
-We use the following packages throughout this chapter:
+We use the following Python packages throughout this chapter:
 
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import statsmodels.formula.api as smf
+
 from statsmodels.regression.rolling import RollingOLS
 from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import percent_format, date_format
-
 from joblib import Parallel, delayed
 ```
 
-Compared to previous chapters, we introduce `statsmodels` for regression analysis and for sliding window regressions, and `joblib` for parallelization.
+Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmodels] for regression analysis and for sliding window regressions, and `joblib` [@joblib] for parallelization.
 
 ## Estimating Beta using Monthly Returns
 
 The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = (pd.read_sql_query(
   sql="""SELECT permno, month, industry, ret_excess 
           FROM crsp_monthly""",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D","origin": "unix"}})
+  parse_dates={"month"})
   .dropna()
 )
 
 factors_ff3_monthly = (pd.read_sql_query(
     sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
@@ -221,8 +225,7 @@ crsp_daily = (pd.read_sql_query(
     sql="""SELECT permno, month, date, ret_excess 
             FROM crsp_daily""",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D","origin": "unix"},
-                 "date": {"unit": "D","origin": "unix"}})
+    parse_dates={"month", "date"})
   .dropna()
 )
 ```
@@ -233,7 +236,7 @@ We also need the daily Fama-French market excess returns.
 factors_ff3_daily = (pd.read_sql_query(
     sql="SELECT date, mkt_excess FROM factors_ff3_daily",
     con=tidy_finance,
-    parse_dates={"date": {"unit": "D","origin": "unix"}})
+    parse_dates={"date"})
   .dropna()
 )
 ```
@@ -356,7 +359,7 @@ To compare the difference between daily and monthly data, we combine beta estima
 beta = (beta_monthly
   .get(["permno", "month", "beta_monthly"])
   .merge(beta_daily.get(["permno", "month", "beta_daily"]),
-         how="left",
+         how="outer",
          on=["permno", "month"])
 )
 
@@ -387,10 +390,13 @@ The estimates in @fig-604 look as expected. As you can see, it really depends on
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
 ```{python}
-beta.to_sql(
-  name="beta", 
-  con=tidy_finance, 
-  if_exists="replace"
+(beta
+  .to_sql(
+    name="beta", 
+    con=tidy_finance, 
+    if_exists="replace",
+    index=False
+  )
 )
 ```
 
@@ -450,10 +456,11 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 ## Exercises
 
 1. Compute beta estimates based on monthly data using 1, 3, and 5 years of data and impose a minimum number of observations of 10, 28, and 48 months with return data, respectively. How strongly correlated are the estimated betas?
-1. Compute beta estimates based on monthly data using 5 years of data and impose different numbers of minimum observations. How does the share of permno-month observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
+1. Compute beta estimates based on monthly data using 5 years of data and impose different numbers of minimum observations. How does the share of `permno`-`month` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
+1. Instead of using `joblib`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
 1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? 
 1. Compute beta estimates for multi-factor models such as the Fama-French 3 factor model. For that purpose, you extend your regression to 
 $$
 r_{i, t} - r_{f, t} = \alpha_i + \sum\limits_{j=1}^k\beta_{i,k}(r_{j, t}-r_{f,t})+\varepsilon_{i, t}
 $$
-where $r_{j, t}$ are the $k$ factor returns. Thus, you estimate 4 parameters ($\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors. 
+where $r_{j, t}$ are the $k$ factor returns. Thus, you estimate 4 parameters ($\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors.

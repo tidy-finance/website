@@ -1,5 +1,8 @@
 ---
 title: Value and Bivariate Sorts
+metadata:
+  pagetitle: Value and Bivariate Sorts with Python
+  description-meta: Perform bivariate portfolio sorts to test for return predictability in asset pricing applications using the programming language Python. 
 ---
 
 ```{python}
@@ -15,7 +18,7 @@ In this chapter, we extend univariate portfolio analysis to bivariate sorts, whi
 
 We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required, which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
 
-The current chapter relies on this set of packages. 
+The current chapter relies on this set of Python packages. 
 
 ```{python}
 import pandas as pd
@@ -24,18 +27,23 @@ import datetime as dt
 import sqlite3
 ```
 
+Compared to previous chapters, we introduce the `datetime` module that is part of the Python standard library for manipulating dates. 
+
 ## Data Preparation
 
 First, we load the necessary data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, gvkey, month, ret_excess, mktcap, mktcap_lag, exchange FROM crsp_monthly",
+    sql="""SELECT permno, gvkey, month, ret_excess, mktcap,
+                  mktcap_lag, exchange 
+            FROM crsp_monthly""",
     con=tidy_finance,
-    dtype={"permno": np.int32},
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 ```
@@ -44,9 +52,9 @@ Further, we utilize accounting data. The most common source of accounting data i
 
 ```{python}
 book_equity = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be from compustat",
+    sql="SELECT gvkey, datadate, be FROM compustat",
     con=tidy_finance, 
-    parse_dates={"datadate": {"unit":"D", "origin":"unix"}})
+    parse_dates={"datadate"})
   .dropna()
   .assign(month = lambda x: (pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()))
 )
@@ -105,6 +113,7 @@ The last step of preparation for the portfolio sorts is the computation of break
 
 ```{python}
 def assign_portfolio(data, sorting_variable, n_portfolios, exchanges):
+  
     breakpoints = (data
       .query("exchange in @exchanges")
       .get(sorting_variable)
@@ -112,11 +121,15 @@ def assign_portfolio(data, sorting_variable, n_portfolios, exchanges):
                 interpolation="linear")
       .drop_duplicates()
     )
-    assigned_portfolios = pd.cut(data[sorting_variable],
-                                 bins=breakpoints,
-                                 labels=pd.Series(range(1, breakpoints.size)),
-                                 include_lowest=True,
-                                 duplicates="drop")
+    
+    assigned_portfolios = pd.cut(
+      data[sorting_variable],
+      bins=breakpoints,
+      labels=pd.Series(range(1, breakpoints.size)),
+      include_lowest=True,
+      duplicates="drop"
+    )
+    
     return assigned_portfolios
 ```
 

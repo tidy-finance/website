@@ -1,5 +1,8 @@
 ---
 title: Replicating Fama and French Factors
+metadata:
+  pagetitle: Replicating Fama and French Factors with Python
+  description-meta: Use the programming language Python to replicate the famous Fama-French three and five factor asset pricing models.
 ---
 
 ```{python}
@@ -17,13 +20,12 @@ We start with the three factor model. We already introduced the size and value f
 
 After the replication of the three factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates. 
 
-The current chapter relies on this set of packages. 
+The current chapter relies on this set of Python packages. 
 
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import statsmodels.formula.api as smf
 ```
 
@@ -32,14 +34,16 @@ import statsmodels.formula.api as smf
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = (pd.read_sql_query(
     sql="""SELECT permno, gvkey, month, ret_excess, mktcap, 
                   mktcap_lag, exchange 
             FROM crsp_monthly""",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
@@ -47,7 +51,7 @@ compustat = (pd.read_sql_query(
     sql="""SELECT gvkey, datadate, be, op, inv 
             FROM compustat""",
     con=tidy_finance,
-    parse_dates={"datadate": {"unit": "D", "origin": "unix"}})
+    parse_dates={"datadate"})
   .dropna()
 )
 
@@ -55,7 +59,7 @@ factors_ff3_monthly = (pd.read_sql_query(
     sql="""SELECT month, smb, hml 
             FROM factors_ff3_monthly""",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
@@ -63,7 +67,7 @@ factors_ff5_monthly = (pd.read_sql_query(
     sql="""SELECT month, smb, hml, rmw, cma 
             FROM factors_ff5_monthly""",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 ```
@@ -209,7 +213,8 @@ To test the success of the SMB factor, we hence run the following regression:
 
 ```{python}
 model_smb = (smf.ols(
-    formula="smb ~ smb_replicated", data=test
+    formula="smb ~ smb_replicated", 
+    data=test
   )
   .fit()
 )
@@ -217,11 +222,12 @@ for table in model_smb.summary(slim=True).tables:
   print(table)
 ```
 
-The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `python np.round(model_smb.params["smb_replicated"], 2)` and R-squared are at `python np.round(model_smb.rsquared_adj, 2) * 100`%. 
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and R-squared are at `{python} np.round(model_smb.rsquared_adj, 2) * 100`%. 
 
 ```{python}
 model_hml = (smf.ols(
-    formula="hml ~ hml_replicated", data=test
+    formula="hml ~ hml_replicated", 
+    data=test
   )
   .fit()
 )
@@ -229,7 +235,7 @@ for table in model_hml.summary(slim=True).tables:
   print(table)
 ```
 
-The replication of the HML factor is also a success, although at a slightly lower level with coefficient of `python np.round(model_hml.params["hml_replicated"], 2)` and R-squared around `python np.round(model_hml.rsquared_adj, 2) * 100`%. 
+The replication of the HML factor is also a success, although at a slightly lower level with coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and R-squared around `{python} np.round(model_hml.rsquared_adj, 2) * 100`%. 
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French size and value premiums, although we do not know their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.
 
@@ -396,7 +402,8 @@ Let us start the replication evaluation again with the size factor:
 
 ```{python}
 model_smb = (smf.ols(
-    formula="smb ~ smb_replicated", data=test
+    formula="smb ~ smb_replicated", 
+    data=test
   )
   .fit()
 )
@@ -404,11 +411,12 @@ for table in model_smb.summary(slim=True).tables:
   print(table)
 ```
 
-The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `python np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `python np.round(model_smb.rsquared_adj, 2) * 100`%. 
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `{python} np.round(model_smb.rsquared_adj, 2) * 100`%. 
 
 ```{python}
 model_hml = (smf.ols(
-    formula="hml ~ hml_replicated", data=test
+    formula="hml ~ hml_replicated", 
+    data=test
   )
   .fit()
 )
@@ -416,11 +424,12 @@ for table in model_hml.summary(slim=True).tables:
   print(table)
 ```
 
-The replication of the HML factor is also a success, although at a slightly higher coefficient of `python np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `python np.round(model_hml.rsquared_adj, 2) * 100`%. 
+The replication of the HML factor is also a success, although at a slightly higher coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `{python} np.round(model_hml.rsquared_adj, 2) * 100`%. 
 
 ```{python}
 model_rmw = (smf.ols(
-    formula="rmw ~ rmw_replicated", data=test
+    formula="rmw ~ rmw_replicated", 
+    data=test
   )
   .fit()
 )
@@ -428,11 +437,12 @@ for table in model_rmw.summary(slim=True).tables:
   print(table)
 ```
 
-We are also able to replicate the RMW factor quite well with a coefficient of `python np.round(model_rmw.params["rmw_replicated"], 2)` and an R-squared around `python np.round(model_rmw.rsquared_adj, 2) * 100`%.
+We are also able to replicate the RMW factor quite well with a coefficient of `{python} np.round(model_rmw.params["rmw_replicated"], 2)` and an R-squared around `{python} np.round(model_rmw.rsquared_adj, 2) * 100`%.
 
 ```{python}
 model_cma = (smf.ols(
-    formula="cma ~ cma_replicated", data=test
+    formula="cma ~ cma_replicated", 
+    data=test
   )
   .fit()
 )
@@ -440,7 +450,7 @@ for table in model_cma.summary(slim=True).tables:
   print(table)
 ```
 
-Finally, the CMA factor also replicates well with a coefficient of `python np.round(model_cma.params["cma_replicated"], 2)` and an R-squared around `python np.round(model_cma.rsquared_adj, 2) * 100`%.
+Finally, the CMA factor also replicates well with a coefficient of `{python} np.round(model_cma.params["cma_replicated"], 2)` and an R-squared around `{python} np.round(model_cma.rsquared_adj, 2) * 100`%.
 
 Overall, our approach seems to replicate the Fama-French three and five factor models just as well as the three factors. 
 
