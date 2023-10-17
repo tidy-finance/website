@@ -199,6 +199,7 @@ data_plot <- industries |>
   #   value = scale(value),
   # ) |> 
   group_by(year = floor_date(date, "year"), name) |>
+  arrange(date) |> 
   summarize(
     total = prod(1+value) - 1,
     vola = sd(value),
