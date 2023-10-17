@@ -77,45 +77,77 @@ polluting_industries = [
 bonds = (mergent
   .query("offering_amt > 0")
   .assign(
-    time_to_maturity = lambda x: (x["maturity"]-treatment_date).dt.days / 365,
-    sic_code = lambda x: x["sic_code"].astype(str).str[:2].astype(int),
-    log_offering_amt = lambda x: np.log(x["offering_amt"])
+    time_to_maturity = lambda x: (
+      (x["maturity"]-treatment_date).dt.days / 365
+    ),
+    sic_code = lambda x: (
+      x["sic_code"].astype(str).str[:2].astype(int)
+    ),
+    log_offering_amt = lambda x: (
+      np.log(x["offering_amt"])
+    )
   )
   .query("time_to_maturity >= 1")
   .rename(columns={"complete_cusip": "cusip_id"})
-  .get(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
+  .get(["cusip_id", "time_to_maturity", 
+        "log_offering_amt", "sic_code"])
   .assign(
-    polluter = lambda x: x["sic_code"].isin(polluting_industries)
+    polluter = lambda x: (
+      x["sic_code"].isin(polluting_industries)
+    )
   )
   .reset_index(drop=True)
 )
 ```
 
-Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
+Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields.
+We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
 
 ```{python}
-trace_aggregated = (trace_enhanced
+trace_enhanced = (trace_enhanced
   .query("rptd_pr > 25")
+  .assign(
+    weight = lambda x: x["entrd_vol_qt"] * x["rptd_pr"],
+  )
+  .assign(
+     weighted_yield = lambda x: x["weight"] * x["yld_pt"]
+  )
+)
+
+trace_aggregated = (trace_enhanced
   .groupby(["cusip_id", "trd_exctn_dt"])
   .aggregate(
-    avg_yield = ("yld_pt", lambda x: np.average(x, weights=trace_enhanced
-                                     .loc[x.index, "entrd_vol_qt"]
-                                     * trace_enhanced
-                                     .loc[x.index, "rptd_pr"])),
+    weighted_yield_sum = ("weighted_yield", "sum"),
+    weight_sum = ("weight", "sum"),
     trades = ("rptd_pr", "count")
   )
   .reset_index()
+  .assign(
+    avg_yield = lambda x: (
+      x["weighted_yield_sum"] / x["weight_sum"]
+    )
+  )
   .dropna(subset=["avg_yield"])
   .query("trades >= 5")
   .assign(
-    trd_exctn_dt = lambda x: pd.to_datetime(x["trd_exctn_dt"])
+    trd_exctn_dt = lambda x: (
+      pd.to_datetime(x["trd_exctn_dt"])
+    )
   )
   .assign(
-    month = lambda x: x["trd_exctn_dt"] - pd.tseries.offsets.MonthBegin()
+    month = lambda x: (
+      x["trd_exctn_dt"] - pd.tseries.offsets.MonthBegin()
+    )
   )
-  .groupby(["cusip_id", "month"])
-  .apply(lambda x: x[x["trd_exctn_dt"] == x["trd_exctn_dt"].max()])
-  .reset_index(drop=True)
+)
+
+idx = (trace_aggregated
+  .groupby(["cusip_id", "month"])["trd_exctn_dt"]
+  .idxmax()
+)
+
+trace_aggregated = (trace_aggregated
+  .loc[idx]
   .get(["cusip_id", "month", "avg_yield"])
 )
 ```
@@ -133,9 +165,19 @@ Before we can run the first regression, we need to define the `treated` indicato
 
 ```{python}
 bonds_panel = (bonds_panel
-  .assign(post_period = lambda x:x["month"] >= (treatment_date- pd.tseries.offsets.MonthBegin()))
-  .assign(treated = lambda x: x["polluter"] & x["post_period"])
-  .assign(month_cat = lambda x: pd.Categorical(x["month"], ordered=True))
+  .assign(
+    post_period = lambda x: (
+      x["month"] >= (treatment_date - 
+                      pd.tseries.offsets.MonthBegin())
+    )
+  )
+  .assign(
+    treated = lambda x: x["polluter"] & x["post_period"]
+  )
+  .assign(
+    month_cat = lambda x: pd.Categorical(x["month"], 
+                                         ordered=True)
+  )
 )
 ```
 
@@ -143,13 +185,16 @@ As usual, we tabulate summary statistics of the variables that enter the regress
 
 ```{python}
 bonds_panel_summary = (bonds_panel
-  .melt(var_name="measure",
-        value_vars=["avg_yield", "time_to_maturity", "log_offering_amt"]
+  .melt(
+    var_name="measure",
+    value_vars=["avg_yield", "time_to_maturity", 
+                "log_offering_amt"]
   )
   .groupby("measure")
   .describe(percentiles=[0.05, 0.5, 0.95])
 )
-bonds_panel_summary                
+
+np.round(bonds_panel_summary, 2)
 ```
 
 ## Panel Regressions
@@ -160,18 +205,23 @@ The second model follows the typical DD regression approach by including individ
 
 ```{python}
 model_without_fe = lm.PanelOLS.from_formula(
-    formula=("avg_yield ~ treated + post_period + polluter "
-             "+ log_offering_amt + time_to_maturity + 1"),
-    data=bonds_panel.set_index(["cusip_id", "month"]),
+  formula=("avg_yield ~ treated + post_period + polluter "
+           "+ log_offering_amt + time_to_maturity + 1"),
+  data=bonds_panel.set_index(["cusip_id", "month"]),
 ).fit()
 
 model_with_fe = lm.PanelOLS.from_formula(
-    formula="avg_yield ~ treated + EntityEffects + TimeEffects",
-    data=bonds_panel.set_index(["cusip_id", "month"]),
+  formula=("avg_yield ~ treated + "
+           "EntityEffects + TimeEffects"),
+  data=bonds_panel.set_index(["cusip_id", "month"]),
 ).fit()
 
-comparison = lm.panel.results.compare([model_without_fe, model_with_fe])
-comparison
+comparison = lm.panel.results.compare(
+  [model_without_fe, model_with_fe]
+)
+
+for table in comparison.summary.tables:
+  print(table)
 ```
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
