@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 import sqlite3
 from sqlalchemy import create_engine
-
+import httpimport
 ```
 
 Compared to previous chapters, we load `httpimport` [@httpimport] to source code provided in the public [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) Note that you should be careful with loading anything from the web via this method, and it is highly discouraged to use any unsecure "HTTP" links.
@@ -150,13 +150,62 @@ The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting
 
 Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-We store code for cleaning enhanced TRACE with Python on the following Github [gist.](https://gist.github.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) \index{Github!Gist}. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with with the code below using `httpimport`. Alternatively, you can also go to the gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
+We store code for cleaning enhanced TRACE with Python on the following Github [gist.](https://gist.github.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) \index{Github!Gist}. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with with the code below using `httpimport`. In the chunk, we explicitly load the necessary function interpreting the Gist as a module (i.e., you could also use it as a module and preceed the function calls with the module's name). Alternatively, you can also go to the gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
 
 ```{python}
-gist_url = "https://gist.github.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b"
+gist_url = "https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b/raw/c2b75e9d5ee2ca96fb02c72928c8baea338b39c8"
 
 with httpimport.remote_repo(gist_url):
-  import cleaning_function
+  from clean_enhanced_TRACE_python import clean_enhanced_trace
 ```
 
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1000 bonds, which we define below.\index{Paris (Climate) Agreement}
+
+```{python}
+fisd_cusips = list(fisd["complete_cusip"].unique())
+
+batch_size = 1000
+batches = np.ceil(len(fisd_cusips) / batch_size).astype(int)
+```
+
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
+
+```{python}
+#| eval: false
+for j in range(1, batches + 1):
+  
+  cusip_chunk = fisd_cusips[
+    ((j - 1) * batch_size):(min(j * batch_size, len(fisd_cusips)))
+  ]
+
+  cusip_str = "('" + "', '".join(cusip_chunk) + "')"
+  
+  trace_enhanced_sub = clean_enhanced_trace(
+    cusips=cusip_str,
+    connection=wrds, 
+    start_date="'01/01/2002'", 
+    end_date="'12/13/2023'"
+  )
+  
+  
+```
+
+
+
+```{python}
+if j == 1:
+    trace_enhanced_sub.to_sql(
+      name="trace_enhanced", 
+      con=tidy_finance, 
+      if_exists="replace", 
+      index=False
+    )
+  else:
+    trace_enhanced_sub.to_sql(
+      name="trace_enhanced", 
+      con=tidy_finance,
+      if_exists="append", 
+      index=False
+    )
+```
 
