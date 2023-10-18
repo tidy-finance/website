@@ -28,7 +28,7 @@ from statsmodels.regression.rolling import RollingOLS
 from plotnine import *
 from mizani.breaks import date_breaks
 from mizani.formatters import percent_format, date_format
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, cpu_count
 ```
 
 Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmodels] for regression analysis and for sliding window regressions, and `joblib` [@joblib] for parallelization.
@@ -169,7 +169,7 @@ valid_permnos = (crsp_monthly
 )
 ```
 
-Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the `joblib` package to use multiple cores:
+Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the `joblib` package to use multiple cores. Note that we use `cpu_count()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs. 
 
 ```{python}
 def roll_capm_estimation_for_joblib(permno, group):
@@ -202,9 +202,11 @@ permno_groups = (crsp_monthly
   .groupby("permno", group_keys=False)
 )
 
+n_cores = cpu_count() - 1
+
 beta_monthly = (
   pd.concat(
-    Parallel(n_jobs=-1)
+    Parallel(n_jobs=n_cores)
     (delayed(roll_capm_estimation_for_joblib)(name, group)
     for name, group in permno_groups)
   )
@@ -277,7 +279,7 @@ permno_groups = (crsp_daily
 
 beta_daily = (
   pd.concat(
-    Parallel(n_jobs=-1)
+    Parallel(n_jobs=n_cores)
     (delayed(roll_capm_estimation_for_joblib)(name, group)
     for name, group in permno_groups)
   )

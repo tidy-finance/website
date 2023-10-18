@@ -474,7 +474,7 @@ Note
 </div>
 <p>In this chapter, we introduce an important concept in financial economics: the exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of <span class="citation" data-cites="Sharpe1964">Sharpe (<a href="#ref-Sharpe1964" role="doc-biblioref">1964</a>)</span>, <span class="citation" data-cites="Lintner1965">Lintner (<a href="#ref-Lintner1965" role="doc-biblioref">1965</a>)</span>, and <span class="citation" data-cites="Mossin1966">Mossin (<a href="#ref-Mossin1966" role="doc-biblioref">1966</a>)</span>, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio. The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas. We do not go into details about the foundations of market beta but simply refer to any treatment of the <a href="https://en.wikipedia.org/wiki/Capital_asset_pricing_model">CAPM</a> for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: rolling-window estimation and parallelization.</p>
 <p>We use the following Python packages throughout this chapter:</p>
-<div id="5f57af5a" class="cell" data-execution_count="2">
+<div id="e334b0fe" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -484,13 +484,13 @@ Note
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.breaks <span class="im">import</span> date_breaks</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.formatters <span class="im">import</span> percent_format, date_format</span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> joblib <span class="im">import</span> Parallel, delayed</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> joblib <span class="im">import</span> Parallel, delayed, cpu_count</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Compared to previous chapters, we introduce <code>statsmodels</code> <span class="citation" data-cites="seabold2010statsmodels">(<a href="#ref-seabold2010statsmodels" role="doc-biblioref">Seabold and Perktold 2010</a>)</span> for regression analysis and for sliding window regressions, and <code>joblib</code> <span class="citation" data-cites="joblib">(<a href="#ref-joblib" role="doc-biblioref">Team 2023</a>)</span> for parallelization.</p>
 <section id="estimating-beta-using-monthly-returns" class="level2">
 <h2 class="anchored" data-anchor-id="estimating-beta-using-monthly-returns">Estimating Beta using Monthly Returns</h2>
 <p>The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our <code>SQLite</code>-database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>.</p>
-<div id="a6722446" class="cell" data-execution_count="3">
+<div id="84a8bab6" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -520,7 +520,7 @@ Note
 <span class="math display">\[
 r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 \]</span> we regress stock excess returns <code>ret_excess</code> on excess returns of the market portfolio <code>mkt_excess</code>. Python provides a simple solution to estimate (linear) models with the function <code>smf.ols()</code>. <code>smf.ols()</code> requires a formula as input that is specified in a compact symbolic form. An expression of the form <code>y ~ model</code> is interpreted as a specification that the response <code>y</code> is modeled by a linear predictor specified symbolically by <code>model</code>. Such a model consists of a series of terms separated by <code>+</code> operators. In addition to standard linear models, <code>smf.ols()</code> provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to <code>permno</code> 14593 for Apple) and compute <span class="math inline">\(\hat\alpha_i\)</span> as well as <span class="math inline">\(\hat\beta_i\)</span>.</p>
-<div id="fe4f1ecd" class="cell" data-execution_count="4">
+<div id="659f6120" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (smf.ols(</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"ret_excess ~ mkt_excess"</span>,</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>crsp_monthly.query(<span class="st">"permno == 14593"</span>))</span>
@@ -568,7 +568,7 @@ r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 <section id="rolling-window-estimation" class="level2">
 <h2 class="anchored" data-anchor-id="rolling-window-estimation">Rolling-Window Estimation</h2>
 <p>After we estimated the regression coefficients on an example, we scale the estimation of <span class="math inline">\(\beta_i\)</span> to a whole different level and perform rolling-window estimations for the entire CRSP sample. The following function implements the CAPM regression for a data frame (or a part thereof) containing at least <code>min_obs</code> observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value.</p>
-<div id="da356ffa" class="cell" data-execution_count="5">
+<div id="3fdf2e29" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> roll_capm_estimation(data, window_size, min_obs):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> (RollingOLS.from_formula(</span>
@@ -586,7 +586,7 @@ r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 <span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Before we attack the whole CRSP sample, let us focus on a couple of examples for well-known firms.</p>
-<div id="1962064b" class="cell" data-execution_count="6">
+<div id="fe874265" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>examples <span class="op">=</span> pd.DataFrame({</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"permno"</span>: [<span class="dv">14593</span>, <span class="dv">10107</span>, <span class="dv">93436</span>, <span class="dv">17778</span>],</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"company"</span>: [<span class="st">"Apple"</span>, <span class="st">"Microsoft"</span>, </span>
@@ -597,7 +597,7 @@ r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>min_obs <span class="op">=</span> <span class="dv">48</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We take a total of 5 years of data and require at least 48 months with return data to compute our betas. Check out the exercises if you want to compute beta for different time periods. It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk and the resulting <a href="#fig-601" class="quarto-xref">Figure&nbsp;1</a>.</p>
-<div id="b73792b5" class="cell" data-execution_count="7">
+<div id="15e5215e" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>beta_example <span class="op">=</span> (crsp_monthly</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .merge(examples, </span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"inner"</span>, </span>
@@ -641,7 +641,7 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <section id="estimating-beta-using-monthly-returns-1" class="level2">
 <h2 class="anchored" data-anchor-id="estimating-beta-using-monthly-returns-1">Estimating Beta using Monthly Returns</h2>
 <p>Next, we perform the rolling window estimation for the entire cross-section of stocks in the CRSP sample. For that purpose, we first identify firm identifiers (<code>permno</code>) for which CRSP contains sufficiently many records.</p>
-<div id="29a94122" class="cell" data-execution_count="9">
+<div id="b8d8646f" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>valid_permnos <span class="op">=</span> (crsp_monthly</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"permno"</span>)[<span class="st">"permno"</span>]</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  .count()</span>
@@ -649,8 +649,8 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"counts &gt; @window_size + 1"</span>)</span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the <code>joblib</code> package to use multiple cores:</p>
-<div id="b697b518" class="cell" data-execution_count="10">
+<p>Next, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the <code>joblib</code> package to use multiple cores. Note that we use <code>cpu_count()</code> to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs.</p>
+<div id="67788f9d" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> roll_capm_estimation_for_joblib(permno, group):</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    beta_values <span class="op">=</span> (RollingOLS.from_formula(</span>
@@ -681,22 +681,24 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"permno"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>beta_monthly <span class="op">=</span> (</span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  pd.concat(</span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>    Parallel(n_jobs<span class="op">=-</span><span class="dv">1</span>)</span>
-<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>    (delayed(roll_capm_estimation_for_joblib)(name, group)</span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, group <span class="kw">in</span> permno_groups)</span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"beta"</span>: <span class="st">"beta_monthly"</span>})</span>
-<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>n_cores <span class="op">=</span> cpu_count() <span class="op">-</span> <span class="dv">1</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>beta_monthly <span class="op">=</span> (</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>  pd.concat(</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>    Parallel(n_jobs<span class="op">=</span>n_cores)</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    (delayed(roll_capm_estimation_for_joblib)(name, group)</span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, group <span class="kw">in</span> permno_groups)</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"beta"</span>: <span class="st">"beta_monthly"</span>})</span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="estimating-beta-using-daily-returns" class="level2">
 <h2 class="anchored" data-anchor-id="estimating-beta-using-daily-returns">Estimating Beta using Daily Returns</h2>
 <p>Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns.</p>
 <p>First, we load daily CRSP data. Note that the sample is large compared to the monthly data, so make sure to have enough memory available.</p>
-<div id="3f41e7c0" class="cell" data-execution_count="11">
+<div id="49082b32" class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>crsp_daily <span class="op">=</span> (pd.read_sql_query(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"""SELECT permno, month, date, ret_excess </span></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="st">            FROM crsp_daily"""</span>,</span>
@@ -706,7 +708,7 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We also need the daily Fama-French market excess returns.</p>
-<div id="e6c88668" class="cell" data-execution_count="12">
+<div id="602db580" class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>factors_ff3_daily <span class="op">=</span> (pd.read_sql_query(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT date, mkt_excess FROM factors_ff3_daily"</span>,</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
@@ -715,7 +717,7 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>For the daily data, we consider around 3 months of data (i.e., 60 trading days) and require at least 50 observations. We make again sure to keep only relevant data to save memory space. However, note that your machine might not have enough memory to read the whole daily CRSP sample. In this case, we refer you to the exercises and try working with loops.</p>
-<div id="bbd80c05" class="cell" data-execution_count="13">
+<div id="b3f8f1aa" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>window_size <span class="op">=</span> <span class="dv">60</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>min_obs <span class="op">=</span> <span class="dv">50</span></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -737,7 +739,7 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Even though we could now just apply the function using <code>groupby()</code> on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).</p>
-<div id="7b10bf31" class="cell" data-execution_count="14">
+<div id="ec37a199" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>permno_groups <span class="op">=</span> (crsp_daily</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  .merge(valid_permnos, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"permno"</span>)</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
@@ -746,7 +748,7 @@ Figure&nbsp;1: The CAPM betas are estimated with monthly data and a rolling wind
 <span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>beta_daily <span class="op">=</span> (</span>
 <span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  pd.concat(</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    Parallel(n_jobs<span class="op">=-</span><span class="dv">1</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    Parallel(n_jobs<span class="op">=</span>n_cores)</span>
 <span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    (delayed(roll_capm_estimation_for_joblib)(name, group)</span>
 <span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> name, group <span class="kw">in</span> permno_groups)</span>
 <span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>  )</span>
@@ -877,7 +879,7 @@ Figure&nbsp;4: CAPM betas are computed using 5 years of monthly or 3 months of d
 </div>
 <p>The estimates in <a href="#fig-604" class="quarto-xref">Figure&nbsp;4</a> look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out.</p>
 <p>Finally, we write the estimates to our database such that we can use them in later chapters.</p>
-<div id="c6bef0f4" class="cell" data-execution_count="18">
+<div id="1ec1ce78" class="cell" data-execution_count="18">
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>(beta</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  .to_sql(</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    name<span class="op">=</span><span class="st">"beta"</span>, </span>
@@ -887,7 +889,7 @@ Figure&nbsp;4: CAPM betas are computed using 5 years of monthly or 3 months of d
 <span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="18">
-<pre><code>3347984</code></pre>
+<pre><code>3348014</code></pre>
 </div>
 </div>
 <p>Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. This descriptive helps us discover potential errors in our data preparation or estimation procedure. For instance, suppose there was a gap in our output where we do not have any betas. In this case, we would have to go back and check all previous steps to find out what went wrong.</p>
@@ -932,7 +934,7 @@ Figure&nbsp;5: The two lines show the share of securities with beta estimates us
 </div>
 <p><a href="#fig-605" class="quarto-xref">Figure&nbsp;5</a> does not indicate any troubles, so let us move on to the next check.</p>
 <p>We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.</p>
-<div id="37b9839f" class="cell" data-execution_count="20">
+<div id="7534b629" class="cell" data-execution_count="20">
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>beta_long.groupby(<span class="st">"name"</span>)[<span class="st">"share"</span>].describe()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="20">
 <div>
@@ -978,13 +980,13 @@ Figure&nbsp;5: The two lines show the share of securities with beta estimates us
 <tr class="even">
 <td data-quarto-table-cell-role="th">beta_monthly</td>
 <td>755.0</td>
-<td>0.611292</td>
-<td>0.189495</td>
+<td>0.611264</td>
+<td>0.189519</td>
 <td>0.070661</td>
-<td>0.548065</td>
-<td>0.665791</td>
-<td>0.741440</td>
-<td>0.833887</td>
+<td>0.548215</td>
+<td>0.666492</td>
+<td>0.740584</td>
+<td>0.835271</td>
 </tr>
 </tbody>
 </table>
@@ -994,7 +996,7 @@ Figure&nbsp;5: The two lines show the share of securities with beta estimates us
 </div>
 <p>The summary statistics also look plausible for the two estimation procedures.</p>
 <p>Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods and frequencies).</p>
-<div id="46758864" class="cell" data-execution_count="21">
+<div id="7496a65f" class="cell" data-execution_count="21">
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>beta.get([<span class="st">"beta_monthly"</span>, <span class="st">"beta_daily"</span>]).corr()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="21">
 <div>
@@ -1011,13 +1013,13 @@ Figure&nbsp;5: The two lines show the share of securities with beta estimates us
 <tbody>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">beta_monthly</td>
-<td>1.00000</td>
-<td>0.31394</td>
+<td>1.000000</td>
+<td>0.314047</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">beta_daily</td>
-<td>0.31394</td>
-<td>1.00000</td>
+<td>0.314047</td>
+<td>1.000000</td>
 </tr>
 </tbody>
 </table>
