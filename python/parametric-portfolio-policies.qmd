@@ -267,13 +267,15 @@ def evaluate_portfolio(weights_data,
                   value_name="weight",
                   var_name="model")
              .groupby(["model", "month"])["weight"]
-             .aggregate([("Mean Absolute weight", lambda x: np.mean(abs(x))),
-                         ("Max. weight", lambda x: max(x)),
-                         ("Min. weight", lambda x: min(x)),
-                         ("Avg. sum of negative weights",
-                          lambda x: -np.sum(x[x < 0])),
-                         ("Avg. fraction of negative weights",
-                          lambda x: np.mean(x < 0))])
+             .aggregate(
+               [("Mean Absolute weight", lambda x: np.mean(abs(x))),
+               ("Max. weight", lambda x: max(x)),
+               ("Min. weight", lambda x: min(x)),
+               ("Avg. sum of negative weights",
+               lambda x: -np.sum(x[x < 0])),
+               ("Avg. fraction of negative weights",
+               lambda x: np.mean(x < 0))]
+              )
              .reset_index()
              .drop(columns=["month"])
              .groupby(["model"])
@@ -285,12 +287,12 @@ def evaluate_portfolio(weights_data,
         evaluation_stats = (evaluation_stats
           .merge(evaluation_weights, how="left", on="model")
           .set_index("model")
-          )
+        )
         
     evaluation_stats = (evaluation_stats            
-        .transpose()
-        .rename_axis(columns=None)
-        )
+      .transpose()
+      .rename_axis(columns=None)
+    )
 
     return evaluation_stats
 ```
@@ -299,7 +301,7 @@ def evaluate_portfolio(weights_data,
 Let us take a look at the different portfolio strategies and evaluation measures.
 
 ```{python}
-evaluate_portfolio(weights_crsp)
+evaluate_portfolio(weights_crsp).round(3)
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
@@ -344,7 +346,7 @@ optimal_theta = minimize(
 (pd.DataFrame(
   optimal_theta.x,
   columns=["Optimal Theta"],
-  index=["momentum_lag", "size_lag"]).T.round(2)
+  index=["momentum_lag", "size_lag"]).T.round(3)
 )
 ```
 
@@ -363,13 +365,15 @@ def evaluate_optimal_performance(data,
     optimal_theta = minimize(
         fun=objective_function,
         x0=[1.5]*n_parameters,
-        args=(data, objective_measure, value_weighting, allow_short_selling),
+        args=(data, objective_measure, 
+              value_weighting, allow_short_selling),
         method="Nelder-Mead",
         tol=10e-2
         ).x
 
     processed_data = compute_portfolio_weights(
-      optimal_theta, data, value_weighting, allow_short_selling
+      optimal_theta, data, 
+      value_weighting, allow_short_selling
     )
 
     portfolio_evaluation = evaluate_portfolio(processed_data)
@@ -377,11 +381,16 @@ def evaluate_optimal_performance(data,
     weight_text = "VW" if value_weighting else "EW"
     short_text = "" if allow_short_selling else " (no s.)"
 
-    strategy_name_dict = {"benchmark": weight_text,
-                          "tilt": f"{weight_text} Optimal{short_text}"}
+    strategy_name_dict = {
+      "benchmark": weight_text,
+      "tilt": f"{weight_text} Optimal{short_text}"
+    }
 
-    portfolio_evaluation.columns = [strategy_name_dict[i]
-                                    for i in portfolio_evaluation.columns]
+    portfolio_evaluation.columns = [
+      strategy_name_dict[i]
+      for i in portfolio_evaluation.columns
+    ]
+    
     return(portfolio_evaluation)
 ```
 
@@ -398,8 +407,13 @@ permutations = product(
   value_weighting, allow_short_selling
 )
                        
-results = list(starmap(evaluate_optimal_performance, permutations))
-performance_table = pd.concat(results, axis=1).T.drop_duplicates().T.round(2)
+results = list(starmap(
+  evaluate_optimal_performance, 
+  permutations
+))
+performance_table = (pd.concat(results, axis=1)
+  .T.drop_duplicates().T.round(3)
+)
 column_names = sorted(performance_table.columns, key=len)
 performance_table[column_names]
 ``` 
