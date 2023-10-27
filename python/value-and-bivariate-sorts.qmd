@@ -39,9 +39,8 @@ tidy_finance = sqlite3.connect(
 )
 
 crsp_monthly = (pd.read_sql_query(
-    sql="""SELECT permno, gvkey, month, ret_excess, mktcap,
-                  mktcap_lag, exchange 
-            FROM crsp_monthly""",
+    sql=("SELECT permno, gvkey, month, ret_excess, mktcap, " 
+         "mktcap_lag, exchange FROM crsp_monthly"),
     con=tidy_finance,
     parse_dates={"month"})
   .dropna()
@@ -77,8 +76,10 @@ me = (crsp_monthly
 
 bm = (book_equity
   .merge(crsp_monthly, how="inner", on=["gvkey", "month"])
-  .assign(bm = lambda x: x["be"] / x["mktcap"],
-          sorting_date = lambda x: x["month"] + pd.DateOffset(months=6))
+  .assign(
+    bm = lambda x: x["be"] / x["mktcap"],
+    sorting_date = lambda x: x["month"] + pd.DateOffset(months=6)
+  )
   .assign(comp_date = lambda x: x["sorting_date"])
   .get(["permno", "gvkey", "sorting_date", "comp_date", "bm"])
 )
@@ -96,13 +97,20 @@ data_for_sorts = (crsp_monthly
         "mktcap_lag", "me", "bm", "exchange", "comp_date"])
 )
 
-# TODO: only fill bm and comp_date, but keep all columns
 data_for_sorts = (data_for_sorts
   .sort_values(by=["permno", "gvkey", "month"])
   .groupby(["permno", "gvkey"])
-  .apply(lambda x: x.fillna(method="ffill"))
+  .apply(lambda x: x.assign(
+      bm = x["bm"].fillna(method="ffill"), 
+      comp_date = x["comp_date"].fillna(method="ffill")
+    )
+  )
   .reset_index(drop = True)
-  .assign(threshold_date = lambda x: x["month"] - pd.DateOffset(months=12))
+  .assign(
+    threshold_date = lambda x: (
+      x["month"] - pd.DateOffset(months=12)
+    )
+  )
   .query("comp_date > threshold_date")
   .drop(columns=["comp_date", "threshold_date"])
   .dropna()
@@ -173,16 +181,15 @@ value_premium = (value_portfolios
   .reset_index()
   .aggregate({"value_premium": "mean"})
 )
-print(value_premium * 100)
 ```
 
-The resulting annualized value premium is 4.608 percent.
+The resulting monthly value premium is `{python} round(value_premium.iloc[0]*100, 2)` percent with an annualized return of `{python} round(((1 + value_premium.iloc[0])**12 - 1) * 100, 1)` percent.
 
 ## Dependent Sorts
 
 In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable.\index{Portfolio sorts!Dependent bivariate} In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts ensure an equal amount of stocks within each portfolio.
 
-To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
+To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable="me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{python}
 value_portfolios = (data_for_sorts
@@ -214,11 +221,9 @@ value_premium = (value_portfolios
   .reset_index()
   .aggregate({"value_premium": "mean"})
 )
-
-print(value_premium * 100)
 ```
 
-The value premium from dependent sorts is 3.948 percent per year.
+The monthly value premium from dependent sorts is `{python} round(value_premium.iloc[0]*100, 2)` percent, which translates to an annualized premium of `{python} round(((1 + value_premium.iloc[0])**12 - 1) * 100, 1)` percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of Chapter 8, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 
