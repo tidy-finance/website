@@ -29,7 +29,10 @@ import numpy as np
 import sqlite3
 import httpimport
 
+from plotnine import *
 from sqlalchemy import create_engine
+from mizani.breaks import date_breaks
+from mizani.formatters import date_format, comma_format
 ```
 
 Compared to previous chapters, we load `httpimport` [@httpimport] to source code provided in the public [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) Note that you should be careful with loading anything from the web via this method, and it is highly discouraged to use any unsecure "HTTP" links.
@@ -216,14 +219,145 @@ for j in range(1, batches + 1):
 
 ```
 
+# 
+
 ```{python}
-trace_enhanced = (pd.read_sql_query(
-    sql="""SELECT cusip_id, trd_exctn_dt, rptd_pr, 
-                  entrd_vol_qt, yld_pt 
-            FROM trace_enhanced""",
-    con=tidy_finance,
-    parse_dates={"trd_exctn_dt"}
+
+```
+
+## Insights into Corporate Bonds
+
+While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.\index{Summary statistics}
+
+We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
+
+```{python}
+dates = pd.date_range(
+  start='2014-01-01', 
+  end='2016-11-30', 
+  freq='Q'
+)
+
+bonds_outstanding = (pd.DataFrame({
+      'date': dates
+  })
+  .merge(fisd[['complete_cusip']], how='cross')
+  .merge(fisd[['complete_cusip', 'offering_date', 'maturity']],
+         on='complete_cusip', how='left')
+  .assign(
+    offering_date = lambda x: x["offering_date"].dt.floor('D'),
+    maturity = lambda x: x["maturity"].dt.floor('D')
+  )
+  .query(
+    "date >= offering_date & date <= maturity"
+  )
+  .groupby('date')
+  .size()
+  .reset_index(name='count')
+  .assign(
+    type = "Outstanding"
   )
 )
 ```
 
+Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop from above.
+
+```{python}
+trace_enhanced = (pd.read_sql_query(
+    sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, " 
+                "entrd_vol_qt, yld_pt" 
+            "FROM trace_enhanced"),
+    con=tidy_finance,
+    parse_dates={"trd_exctn_dt"}
+  )
+)
+
+bonds_traded = (trace_enhanced
+  .assign(
+    date = lambda x: (x["trd_exctn_dt"] - pd.offsets.MonthBegin(1)).dt.to_period("Q").dt.start_time
+  )
+  .groupby("date", as_index=False)
+  .aggregate(count=("cusip_id", "nunique"))
+  .assign(
+    type = "Traded"
+  )
+)
+```
+
+Finally, we plot the two time series in @fig-401.
+
+```{python}
+#| label: fig-401
+#| fig-cap: "The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016."
+#| fig-alt: "Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016."
+bonds_combined = pd.concat(
+  [bonds_outstanding, bonds_traded], 
+  ignore_index=True
+)
+
+bonds_figure = (
+  ggplot(bonds_combined, 
+         aes(x="date", y="count", 
+             color="type", linetype="type")) +
+  geom_line() +
+  labs(
+    x="", y="", color="", linetype="",
+    title="Number of bonds outstanding and traded each quarter"
+  ) +
+  scale_x_datetime(breaks=date_breaks("1 year"), 
+                   labels=date_format("%Y")) +
+  scale_y_continuous(labels=comma_format())
+)
+bonds_figure.draw()
+```
+
+We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
+Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
+
+```{python}
+average_characteristics = (fisd
+  .assign(
+    maturity = lambda x: (x["maturity"] - x["offering_date"]).dt.days / 365,
+    offering_amt = lambda x: x["offering_amt"] / 10**3
+  )
+  .melt(value_vars=["maturity", "coupon", "offering_amt"], 
+        var_name="measure", 
+        value_name="value")
+  .dropna()
+  .groupby("measure")["value"]
+  .describe(percentiles=[.05, .50, .95])
+  .drop(columns="count")
+)
+average_characteristics.round(2)
+```
+
+We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons.
+
+Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
+
+```{python}
+average_trade_size = (trace_enhanced
+  .groupby("trd_exctn_dt", as_index=False)
+  .aggregate(
+    trade_size=("entrd_vol_qt", lambda x: (
+      sum(x*trace_enhanced.loc[x.index, "rptd_pr"]/100)/10**6)
+    ),
+    trade_number=("trd_exctn_dt", "size")
+  )
+  .melt(id_vars=["trd_exctn_dt"], 
+        value_vars=["trade_size", "trade_number"], 
+        var_name="measure", value_name="value")
+  .groupby("measure")["value"]
+  .describe(percentiles=[.05, .50, .95])
+  .drop(columns="count")
+)
+average_trade_size.round(2)
+```
+
+On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
+
+## Exercises
+
+1. Compute the amount outstanding across all bonds over time. Make sure to subtract all matured bonds. How would you describe the resulting plot?
+1. Compute the number of days each bond is traded (accounting for the bonds' maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
+1. WRDS provides more information from Mergent FISD such as ratings in the table `fisd_ratings`. Download the ratings table and plot the distribution of ratings for the different rating providers. How would you map the different providers to a common numeric rating scale? \index{Rating}
