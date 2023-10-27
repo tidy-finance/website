@@ -89,6 +89,8 @@ After we estimated the regression coefficients on an example, we scale the estim
 
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
+  
+    data = data.sort_values("month")
 
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
@@ -172,6 +174,11 @@ Next, we can apply the code snippet from the example above to compute rolling wi
 
 ```{python}
 def roll_capm_estimation_for_joblib(permno, group):
+  
+    if "date" in group.columns:
+      group = group.sort_values(by="date")
+    else:
+      group = group.sort_values(by="month")
 
     beta_values = (RollingOLS.from_formula(
         formula="ret_excess ~ mkt_excess",
@@ -188,8 +195,10 @@ def roll_capm_estimation_for_joblib(permno, group):
     result["month"] = group["month"].values
     result["permno"] = permno
     try:
-       result["date"] = group["date"].values
-       result = result[result.groupby("month")["date"].transform("max") == result["date"]]
+      result["date"] = group["date"].values
+      result = result[
+        (result.groupby("month")["date"]
+          .transform("max")) == result["date"]]
     except(KeyError):
       pass
     
