@@ -9,11 +9,6 @@ metadata:
 #| echo: false
 #| output: false
 import pre_render_script
-
-# Load wrds secrets from .env
-import os
-from dotenv import load_dotenv
-load_dotenv()
 ```
 
 ::: {.callout-note}
@@ -32,8 +27,9 @@ The current chapter relies on this set of Python packages.
 import pandas as pd
 import numpy as np
 import sqlite3
-from sqlalchemy import create_engine
 import httpimport
+
+from sqlalchemy import create_engine
 ```
 
 Compared to previous chapters, we load `httpimport` [@httpimport] to source code provided in the public [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) Note that you should be careful with loading anything from the web via this method, and it is highly discouraged to use any unsecure "HTTP" links.
@@ -43,6 +39,10 @@ Compared to previous chapters, we load `httpimport` [@httpimport] to source code
 Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
 
 ```{python}
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 connection_string = (
   "postgresql+psycopg2://" + 
   os.getenv("WRDS_USER") + ":" + 
@@ -67,46 +67,52 @@ The following chunk connects to the data and selects the bond sample to remove c
 
 ```{python}
 fisd_query = (
-  """SELECT complete_cusip, maturity,
-            offering_amt, offering_date,
-            dated_date, 
-            interest_frequency, coupon,
-            last_interest_date, 
-            issue_id, issuer_id
-        FROM fisd.fisd_mergedissue
-        WHERE security_level = 'SEN'
-              AND (slob = 'N' OR slob IS NULL)
-              AND security_pledge IS NULL
-              AND (asset_backed = 'N' OR asset_backed IS NULL)
-              AND (defeased = 'N' OR defeased IS NULL)
-              AND defeased_date IS NULL
-              AND bond_type IN ('CDEB', 'CMTN', 'CMTZ', 'CZ', 'USBN')
-              AND (pay_in_kind != 'Y' OR pay_in_kind IS NULL)
-              AND pay_in_kind_exp_date IS NULL
-              AND (yankee = 'N' OR yankee IS NULL)
-              AND (canadian = 'N' OR canadian IS NULL)
-              AND foreign_currency = 'N'
-              AND coupon_type IN ('F', 'Z') 
-              AND fix_frequency IS NULL
-              AND coupon_change_indicator = 'N'
-              AND interest_frequency IN ('0', '1', '2', '4', '12')
-              AND rule_144a = 'N'
-              AND (private_placement = 'N' OR private_placement IS NULL)
-              AND defaulted = 'N'
-              AND filing_date IS NULL
-              AND settlement IS NULL
-              AND convertible = 'N'
-              AND exchange IS NULL
-              AND (putable = 'N' OR putable IS NULL)
-              AND (unit_deal = 'N' OR unit_deal IS NULL)
-              AND (exchangeable = 'N' OR exchangeable IS NULL)
-              AND perpetual = 'N'
-              AND (preferred_security = 'N' OR preferred_security IS NULL)"""
+  "SELECT complete_cusip, maturity, offering_amt, "
+         "offering_date, dated_date, interest_frequency, "
+         "coupon, last_interest_date, issue_id, issuer_id "
+    "FROM fisd.fisd_mergedissue "
+    "WHERE security_level = 'SEN' "
+          "AND (slob = 'N' OR slob IS NULL) "
+          "AND security_pledge IS NULL "              
+          "AND (asset_backed = 'N' OR asset_backed IS NULL) "
+          "AND (defeased = 'N' OR defeased IS NULL) "
+          "AND defeased_date IS NULL "
+          "AND bond_type IN ('CDEB', 'CMTN', "
+                            "'CMTZ', 'CZ', 'USBN') "
+          "AND (pay_in_kind != 'Y' OR pay_in_kind IS NULL) "
+          "AND pay_in_kind_exp_date IS NULL "
+          "AND (yankee = 'N' OR yankee IS NULL) "
+          "AND (canadian = 'N' OR canadian IS NULL) "
+          "AND foreign_currency = 'N' "
+          "AND coupon_type IN ('F', 'Z') "
+          "AND fix_frequency IS NULL "
+          "AND coupon_change_indicator = 'N' "
+          "AND interest_frequency IN ('0', '1', '2', '4', '12') "
+          "AND rule_144a = 'N' "
+          "AND (private_placement = 'N' OR "
+               "private_placement IS NULL) "
+          "AND defaulted = 'N' "
+          "AND filing_date IS NULL "
+          "AND settlement IS NULL "
+          "AND convertible = 'N' "
+          "AND exchange IS NULL "
+          "AND (putable = 'N' OR putable IS NULL) "
+          "AND (unit_deal = 'N' OR unit_deal IS NULL) "
+          "AND (exchangeable = 'N' OR exchangeable IS NULL) "
+          "AND perpetual = 'N' "
+          "AND (preferred_security = 'N' OR "
+               "preferred_security IS NULL)"
 )
+
 
 fisd = (pd.read_sql_query(
     sql=fisd_query,
-    con=wrds)
+    con=wrds,
+    dtype={"complete_cusip": str, "interest_frequency": str, 
+           "issue_id": int, "issuer_id": int},
+    parse_dates={"maturity", "offering_date", 
+                 "dated_date", "last_interest_date"}
+  )
 )
 ```
 
@@ -114,13 +120,16 @@ We also pull issuer information from `fisd_mergedissuer` regarding the industry 
 
 ```{python}
 fisd_issuer_query = (
-  """SELECT issuer_id, sic_code, country_domicile
-        FROM fisd.fisd_mergedissuer"""
+  "SELECT issuer_id, sic_code, country_domicile "
+    "FROM fisd.fisd_mergedissuer"
 )
 
 fisd_issuer = (pd.read_sql_query(
     sql=fisd_issuer_query,
-    con=wrds)
+    con=wrds,
+    dtype={"issuer_id": int, "sic_code": str, 
+           "country_domicile": str}
+  )
 )
 
 fisd = (fisd
