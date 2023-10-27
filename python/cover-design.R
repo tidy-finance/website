@@ -201,7 +201,7 @@ data_plot <- industries |>
   group_by(year = floor_date(date, "year"), name) |>
   arrange(date) |> 
   summarize(
-    total = prod(1+value) - 1,
+    total = prod(1+value),
     vola = sd(value),
     .groups = "keep"
   ) |> 
@@ -229,7 +229,7 @@ colors <- wes_palette("Zissou1",
                       type = "continuous"
 )
 
-data_plot |> 
+cover_python <- data_plot |> 
   mutate(vola = factor(vola)) |>
   ggplot(aes(x = year, y = total, fill = vola)) +
   geom_col() +
@@ -240,5 +240,13 @@ data_plot |>
     panel.spacing = unit(-5, "lines")
   ) +
   cp +
-  facet_wrap(~name, nrow = 2, scales = "free_y") +
+  facet_wrap(~name, nrow = 3, scales = "free_y") +
   scale_fill_manual(values = colors)
+
+ggsave(
+  plot = cover_python,
+  width = 10,
+  height = 7,
+  filename = "images/cover-python-flowers.png",
+  bg = "white"
+)
