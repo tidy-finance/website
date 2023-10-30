@@ -26,7 +26,7 @@ library(tidyverse)
 library(RSQLite)
 ```
 
-Let us initialize you `tidy_finance.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
+Let us initialize a `tidy_finance.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -155,9 +155,7 @@ dbWriteTable(
 
 ### Dummy `compustat` table
 
-To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1 using the same trick as with the macro data tables. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. 
-
-We then use the `!!!` operator to unlist and execute a list of commands. This trick actually helps us to avoid typing the same function for each column individually. Finally, each table with dummy data is written to the new database with dummy data.
+To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. We then use the `!!!` operator to unlist and execute a list of commands. This trick actually helps us to avoid typing the same function for each column individually.
 
 ```{r}
 relevant_columns <- c(
@@ -237,14 +235,14 @@ dbWriteTable(
 
 Lastly, we move to the bond data that we use in our books. 
 
-### Dummy `mergent` data
+### Dummy `fisd` data
 
 To create dummy data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`. 
 
 ```{r}
 number_of_bonds <- 100
 
-mergent_dummy <- 1:number_of_bonds |> 
+fisd_dummy <- 1:number_of_bonds |> 
   map_df(
     function(x) {
       tibble(
@@ -272,22 +270,22 @@ mergent_dummy <- 1:number_of_bonds |>
   
 dbWriteTable(
   tidy_finance, 
-  "mergent", 
-  mergent_dummy, 
+  "fisd", 
+  fisd_dummy, 
   overwrite = TRUE
 )
 ```
 
 ### Dummy `trace_enhanced` data
 
-Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `mergent` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. 
+Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. 
 
 ```{r}
 start_date <- as.Date("2014-01-01")
 end_date <- as.Date("2016-11-30")
 
 bonds_panel <- expand_grid(
-  mergent_dummy |> 
+  fisd_dummy |> 
     select(cusip_id = complete_cusip),
   tibble(
     trd_exctn_dt = seq(start_date, end_date, "1 day")
