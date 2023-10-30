@@ -59,7 +59,6 @@ tidy_finance = sqlite3.connect(
 )
 ```
 
-
 ## Mergent FISD
 
 For research on US corporate bonds, the Mergent Fixed Income Securities Database (FISD) is the primary resource for bond characteristics.\index{Data!FISD} There is a [detailed manual](https://wrds-www.wharton.upenn.edu/documents/1364/FixedIncome_Securities_Master_Database_User_Guide_v4.pdf) on WRDS, so we only cover the necessary subjects here. FISD data comes in two main variants, namely, centered on issuers or issues. In either case, the most useful identifiers are [CUSIPs.](https://www.cusip.com/index.html) 9-digit CUSIPs identify securities issued by issuers. The issuers can be identified from the first six digits of a security CUSIP, which is also called 6-digit CUSIP. Both stocks and bonds have CUSIPs.\index{CUSIP} This connection would, in principle, allow matching them easily, but due to changing issuer details, this approach only yields small coverage.
@@ -90,7 +89,8 @@ fisd_query = (
           "AND coupon_type IN ('F', 'Z') "
           "AND fix_frequency IS NULL "
           "AND coupon_change_indicator = 'N' "
-          "AND interest_frequency IN ('0', '1', '2', '4', '12') "
+          "AND interest_frequency IN ('0', '1', '2', "
+                                          "'4', '12') "
           "AND rule_144a = 'N' "
           "AND (private_placement = 'N' OR "
                "private_placement IS NULL) "
@@ -106,7 +106,6 @@ fisd_query = (
           "AND (preferred_security = 'N' OR "
                "preferred_security IS NULL)"
 )
-
 
 fisd = (pd.read_sql_query(
     sql=fisd_query,
@@ -216,13 +215,6 @@ for j in range(1, batches + 1):
       )
     
   print(f"Chunk {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
-
-```
-
-# 
-
-```{python}
-
 ```
 
 ## Insights into Corporate Bonds
@@ -265,7 +257,7 @@ Next, we look at the bonds traded each quarter in the same period. Notice that w
 ```{python}
 trace_enhanced = (pd.read_sql_query(
     sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, " 
-                "entrd_vol_qt, yld_pt" 
+                "entrd_vol_qt, yld_pt " 
             "FROM trace_enhanced"),
     con=tidy_finance,
     parse_dates={"trd_exctn_dt"}
@@ -274,7 +266,10 @@ trace_enhanced = (pd.read_sql_query(
 
 bonds_traded = (trace_enhanced
   .assign(
-    date = lambda x: (x["trd_exctn_dt"] - pd.offsets.MonthBegin(1)).dt.to_period("Q").dt.start_time
+    date = lambda x: (
+      (x["trd_exctn_dt"] - pd.offsets.MonthBegin(1))
+        .dt.to_period("Q").dt.start_time
+    )
   )
   .groupby("date", as_index=False)
   .aggregate(count=("cusip_id", "nunique"))
@@ -317,7 +312,9 @@ Does this lack of liquidity mean that corporate bond markets are irrelevant in t
 ```{python}
 average_characteristics = (fisd
   .assign(
-    maturity = lambda x: (x["maturity"] - x["offering_date"]).dt.days / 365,
+    maturity = lambda x: (
+      (x["maturity"] - x["offering_date"]).dt.days / 365
+    ),
     offering_amt = lambda x: x["offering_amt"] / 10**3
   )
   .melt(value_vars=["maturity", "coupon", "offering_amt"], 
