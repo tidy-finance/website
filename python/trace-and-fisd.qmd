@@ -173,23 +173,24 @@ with httpimport.remote_repo(gist_url):
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1000 bonds, which we define below.\index{Paris (Climate) Agreement}
 
 ```{python}
-fisd_cusips = list(fisd["complete_cusip"].unique())
+cusips = list(fisd["complete_cusip"].unique())
 
 batch_size = 100
-batches = np.ceil(len(fisd_cusips) / batch_size).astype(int)
+batches = np.ceil(len(cusips) / batch_size).astype(int)
 ```
 
 Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
 
 ```{python}
 #| eval: false
+#| output: false
 for j in range(1, batches + 1):
   
-  cusip_chunk = fisd_cusips[
-    ((j - 1) * batch_size):(min(j * batch_size, len(fisd_cusips)))
+  cusip_batch = cusips[
+    ((j - 1) * batch_size):(min(j * batch_size, len(cusips)))
   ]
 
-  cusip_str = "('" + "', '".join(cusip_chunk) + "')"
+  cusip_str = "('" + "', '".join(cusip_batch) + "')"
   
   trace_enhanced_sub = clean_enhanced_trace(
     cusips=cusip_str,
@@ -199,22 +200,23 @@ for j in range(1, batches + 1):
   )
   
   if not trace_enhanced_sub.empty:
-    if j == 1:
-      trace_enhanced_sub.to_sql(
-        name="trace_enhanced", 
-        con=tidy_finance, 
-        if_exists="replace", 
-        index=False
-      )
-    else:
-      trace_enhanced_sub.to_sql(
-        name="trace_enhanced", 
-        con=tidy_finance,
-        if_exists="append", 
-        index=False
-      )
+      if j == 1:
+          trace_enhanced_sub.to_sql(
+            name="trace_enhanced", 
+            con=tidy_finance, 
+            if_exists="replace", 
+            index=False
+          )
+      else:
+          trace_enhanced_sub.to_sql(
+            name="trace_enhanced", 
+            con=tidy_finance,
+            if_exists="append", 
+            index=False
+        )
     
-  print(f"Chunk {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
+  print(f"Batch {j} out of {batches} done "
+        f"({(j / batches) * 100:.2f}%)\n")
 ```
 
 ## Insights into Corporate Bonds
@@ -225,27 +227,27 @@ We start by looking into the number of bonds outstanding over time and compare i
 
 ```{python}
 dates = pd.date_range(
-  start='2014-01-01', 
-  end='2016-11-30', 
-  freq='Q'
+  start="2014-01-01", 
+  end="2016-11-30", 
+  freq="Q"
 )
 
 bonds_outstanding = (pd.DataFrame({
-      'date': dates
+      "date": dates
   })
-  .merge(fisd[['complete_cusip']], how='cross')
-  .merge(fisd[['complete_cusip', 'offering_date', 'maturity']],
-         on='complete_cusip', how='left')
+  .merge(fisd[["complete_cusip"]], how="cross")
+  .merge(fisd[["complete_cusip", "offering_date", "maturity"]],
+         on="complete_cusip", how="left")
   .assign(
-    offering_date = lambda x: x["offering_date"].dt.floor('D'),
-    maturity = lambda x: x["maturity"].dt.floor('D')
+    offering_date = lambda x: x["offering_date"].dt.floor("D"),
+    maturity = lambda x: x["maturity"].dt.floor("D")
   )
   .query(
     "date >= offering_date & date <= maturity"
   )
-  .groupby('date')
+  .groupby("date")
   .size()
-  .reset_index(name='count')
+  .reset_index(name="count")
   .assign(
     type = "Outstanding"
   )

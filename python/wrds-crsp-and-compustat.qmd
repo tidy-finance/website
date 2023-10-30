@@ -409,68 +409,67 @@ factors_ff3_daily = pd.read_sql(
   parse_dates={"date"}
 )
   
-permnos = pd.read_sql(
-  "SELECT DISTINCT permno FROM crsp_monthly", 
-  tidy_finance,
-)
+permnos = list(crsp_monthly["permno"].unique().astype(str))
 
 batch_size = 100
 batches = np.ceil(len(permnos) / batch_size).astype(int)
   
 for j in range(1, batches + 1):  
     
-    permno_chunk = permnos[
-      ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
-    ]
-    
-    permno_str = "('" + "', '".join(permno_chunk["permno"].astype(str)) + "')"
+  permno_batch = permnos[
+    ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
+  ]
   
-    crsp_daily_sub_query = (
-      "SELECT permno, date, ret " + 
-        "FROM crsp.dsf " +
-        "WHERE permno IN " + permno_str + " " + 
-        "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
-    )
+  permno_str = "('" + "', '".join(permno_batch) + "')"
+  
+  crsp_daily_sub_query = (
+    "SELECT permno, date, ret " + 
+      "FROM crsp.dsf " +
+      "WHERE permno IN " + permno_str + " " + 
+      "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
+  )
     
-    crsp_daily_sub = (pd.read_sql_query(
-        sql=crsp_daily_sub_query,
-        con=wrds,
-        dtype={"permno": np.int64},
-        parse_dates={"date"}
-      )
-      .dropna()
+  crsp_daily_sub = (pd.read_sql_query(
+      sql=crsp_daily_sub_query,
+      con=wrds,
+      dtype={"permno": np.int64},
+      parse_dates={"date"}
     )
+    .dropna()
+   )
 
-    if not crsp_daily_sub.empty:
-        crsp_daily_sub = (crsp_daily_sub
-          .assign(
-            month = lambda x: x["date"].dt.to_period("M").dt.to_timestamp()
-          )
-          .merge(factors_ff3_daily[["date", "rf"]], 
-                 on="date", how="left")
-          .assign(
-            ret_excess = lambda x: 
-              ((x["ret"] - x["rf"]).clip(lower=-1))
-          )
-          .get(["permno", "date", "month", "ret_excess"])
+  if not crsp_daily_sub.empty:
+      crsp_daily_sub = (crsp_daily_sub
+        .assign(
+          month = lambda x: 
+            x["date"].dt.to_period("M").dt.to_timestamp()
         )
-          
-        if j == 1:
-            crsp_daily_sub.to_sql(
-              name="crsp_daily", 
-              con=tidy_finance, 
-              if_exists="replace", 
-              index=False
-            )
-        else:
-            crsp_daily_sub.to_sql(
-              name="crsp_daily", 
-              con=tidy_finance,
-              if_exists="append", 
-              index=False
-            )
+        .merge(factors_ff3_daily[["date", "rf"]], 
+               on="date", how="left")
+        .assign(
+          ret_excess = lambda x: 
+            ((x["ret"] - x["rf"]).clip(lower=-1))
+        )
+        .get(["permno", "date", "month", "ret_excess"])
+      )
+        
+      if j == 1:
+          crsp_daily_sub.to_sql(
+            name="crsp_daily", 
+            con=tidy_finance, 
+            if_exists="replace", 
+            index=False
+          )
+      else:
+          crsp_daily_sub.to_sql(
+            name="crsp_daily", 
+            con=tidy_finance,
+            if_exists="append", 
+            index=False
+          )
             
-        print(f"Chunk {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
+  print(f"Batch {j} out of {batches} done "
+        f"({(j / batches) * 100:.2f}%)\n")
 ```
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
