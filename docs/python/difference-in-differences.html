@@ -501,7 +501,7 @@ Note
 <p>In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discuss in <a href="../python/fixed-effects-and-clustered-standard-errors.html">Fixed Effects and Clustered Standard Errors</a>. We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.</p>
 <p>The approach we use here replicates the results of <span class="citation" data-cites="Seltzer2022">Seltzer, Starks, and Zhu (<a href="#ref-Seltzer2022" role="doc-biblioref">2022</a>)</span> partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on ESG effects in corporate bond markets is already large but continues to grow (for recent examples, see, e.g., <span class="citation" data-cites="Halling2021">Halling, Yu, and Zechner (<a href="#ref-Halling2021" role="doc-biblioref">2021</a>)</span>, <span class="citation" data-cites="Handler2022">Handler, Jankowitsch, and Pasler (<a href="#ref-Handler2022" role="doc-biblioref">2022</a>)</span>, <span class="citation" data-cites="Huynh2021">Huynh and Xia (<a href="#ref-Huynh2021" role="doc-biblioref">2021</a>)</span>, among many others).</p>
 <p>The current chapter relies on this set of Python packages.</p>
-<div id="5d827a40" class="cell" data-execution_count="2">
+<div id="0346ad2c" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -509,13 +509,14 @@ Note
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> norm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> norm</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> regtabletotext <span class="im">import</span> prettify_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Compared to previous chapters, we introduce the <code>scipy.stats</code> module from the <code>scipy</code> <span class="citation" data-cites="scipy">(<a href="#ref-scipy" role="doc-biblioref">Virtanen et al. 2020</a>)</span> for simple retrieval of quantiles of the standard normal distribution.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We use TRACE and Mergent FISD as data sources from our <code>SQLite</code>-database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/trace-and-fisd.html">TRACE and FISD</a>. </p>
-<div id="484d5b72" class="cell" data-execution_count="3">
+<div id="96bb4307" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -539,7 +540,7 @@ Note
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries <span class="citation" data-cites="Seltzer2022">(in line with <a href="#ref-Seltzer2022" role="doc-biblioref">Seltzer, Starks, and Zhu 2022</a>)</span>.</p>
-<div id="494a7d6c" class="cell" data-execution_count="4">
+<div id="c977f6e4" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>treatment_date <span class="op">=</span> pd.to_datetime(<span class="st">"2015-12-12"</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>polluting_industries <span class="op">=</span> [</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dv">49</span>, <span class="dv">13</span>, <span class="dv">45</span>, <span class="dv">29</span>, <span class="dv">28</span>, <span class="dv">33</span>, <span class="dv">40</span>, <span class="dv">20</span>,</span>
@@ -572,7 +573,7 @@ Note
 <span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond’s last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature <span class="citation" data-cites="Bessembinder2008">(see, e.g., <a href="#ref-Bessembinder2008" role="doc-biblioref">Bessembinder et al. 2008</a>)</span>. We weigh each transaction by volume to reflect a trade’s relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices <code>rptd_pr</code> larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions). </p>
-<div id="833623b4" class="cell" data-execution_count="5">
+<div id="608b564f" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="op">=</span> (trace_enhanced</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"rptd_pr &gt; 25"</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
@@ -621,14 +622,14 @@ Note
 <span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>By combining the bond-specific information from Mergent FISD for our bond sample with the aggregated TRACE data, we arrive at the main sample for our analysis.</p>
-<div id="1a3b33b0" class="cell" data-execution_count="6">
+<div id="1e72d948" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="op">=</span> (bonds</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .merge(trace_aggregated, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"cusip_id"</span>)</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Before we can run the first regression, we need to define the <code>treated</code> indicator, which is the product of the <code>post_period</code> (i.e., all months after the signing of the PA) and the <code>polluter</code> indicator defined above.</p>
-<div id="8c788b16" class="cell" data-execution_count="7">
+<div id="e2d1e8bc" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="op">=</span> (bonds_panel</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    post_period <span class="op">=</span> <span class="kw">lambda</span> x: (</span>
@@ -646,7 +647,7 @@ Note
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.</p>
-<div id="17334619" class="cell" data-execution_count="8">
+<div id="adf7a50c" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>bonds_panel_summary <span class="op">=</span> (bonds_panel</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .melt(</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    var_name<span class="op">=</span><span class="st">"measure"</span>,</span>
@@ -658,7 +659,7 @@ Note
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(bonds_panel_summary, <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
+<div class="cell-output cell-output-display" data-execution_count="8">
 <div>
 
 
@@ -736,7 +737,7 @@ Note
 <h2 class="anchored" data-anchor-id="panel-regressions">Panel Regressions</h2>
 <p>The PA is a legally binding international treaty on climate change. It was adopted by 196 Parties at COP 21 in Paris on 12 December 2015 and entered into force on 4 November 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an OLS regression without fixed effects where we include the <code>treated</code>, <code>post_period</code>, and <code>polluter</code> dummies, as well as the bond-specific characteristics <code>log_offering_amt</code> and <code>time_to_maturity</code>. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.</p>
 <p>The second model follows the typical DD regression approach by including individual (<code>cusip_id</code>) and time (<code>month</code>) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: <code>treated</code>.</p>
-<div id="f59fa7c1" class="cell" data-execution_count="9">
+<div id="14ea0b5e" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model_without_fe <span class="op">=</span> lm.PanelOLS.from_formula(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  formula<span class="op">=</span>(<span class="st">"avg_yield ~ treated + post_period + polluter "</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>           <span class="st">"+ log_offering_amt + time_to_maturity + 1"</span>),</span>
@@ -749,44 +750,24 @@ Note
 <span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  data<span class="op">=</span>bonds_panel.set_index([<span class="st">"cusip_id"</span>, <span class="st">"month"</span>]),</span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>).fit()</span>
 <span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>comparison <span class="op">=</span> lm.panel.results.compare(</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  [model_without_fe, model_with_fe]</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> table <span class="kw">in</span> comparison.summary.tables:</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="bu">print</span>(table)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>prettify_results([</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  model_without_fe, model_with_fe</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>                   Model Comparison                  
-=====================================================
-                               Model 0        Model 1
------------------------------------------------------
-Dep. Variable                avg_yield      avg_yield
-Estimator                     PanelOLS       PanelOLS
-No. Observations                125850         125850
-Cov. Est.                   Unadjusted     Unadjusted
-R-squared                       0.0303         0.0069
-R-Squared (Within)              0.0045         0.0117
-R-Squared (Between)             0.0003         0.0471
-R-Squared (Overall)             0.0303         0.0340
-F-statistic                     785.95         828.04
-P-value (F-stat)                0.0000         0.0000
-=====================     ============   ============
-Intercept                       10.565               
-                              (55.528)               
-treated                         0.4554         0.9658
-                              (9.0953)       (28.776)
-post_period                    -0.1741               
-                             (-5.8242)               
-polluter                        0.4733               
-                              (14.899)               
-log_offering_amt               -0.5359               
-                             (-37.482)               
-time_to_maturity                0.0560               
-                              (40.167)               
-======================= ============== ==============
-Effects                                        Entity
-                                                 Time
------------------------------------------------------</code></pre>
+<pre><code>Outcome              avg_yield       avg_yield
+
+Intercept         10.565 (55.53)
+treated             0.455 (9.1)    0.966 (28.78)
+post_period       -0.174 (-5.82)
+polluter           0.473 (14.9)
+log_offering_amt  -0.536 (-37.48)
+time_to_maturity   0.056 (40.17)
+
+Fixed effects                      Entity, Time
+VCOV type           Unadjusted      Unadjusted
+Observations          125,850         125,850
+R2 (incl. FE)          0.030           0.647
+Within R2              0.005           0.012</code></pre>
 </div>
 </div>
 <p>Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the <code>treated</code> coefficient varies considerably across models.</p>
@@ -834,7 +815,7 @@ Effects                                        Entity
 <span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>  scale_linetype_manual(values<span class="op">=</span>[<span class="st">"solid"</span>, <span class="st">"dashed"</span>])</span>
 <span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>polluters_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
+<div class="cell-output cell-output-display" data-execution_count="10">
 <div id="fig-1301" class="quarto-figure quarto-figure-center anchored" alt="Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016.">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1301-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
@@ -928,7 +909,7 @@ Figure&nbsp;1: The figure shows the coefficient estimates and 95 percent confide
 <span id="cb11-76"><a href="#cb11-76" aria-hidden="true" tabindex="-1"></a>       title<span class="op">=</span><span class="st">"Polluters' yield patterns around Paris Agreement signing"</span>)</span>
 <span id="cb11-77"><a href="#cb11-77" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb11-78"><a href="#cb11-78" aria-hidden="true" tabindex="-1"></a>polluter_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="14">
+<div class="cell-output cell-output-display" data-execution_count="11">
 <div id="fig-1402" class="quarto-figure quarto-figure-center anchored" alt="Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again.">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1402-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
