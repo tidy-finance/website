@@ -1,0 +1,284 @@
+---
+title: Clean Enhanced TRACE with Python
+metadata:
+  pagetitle: Clean Enhanced TRACE with Python
+  description-meta: Copy the code to clean enhanced TRACE bond transaction data using the programming language Python.
+---
+
+This appendix contains code to clean enhanced TRACE with Python. It is also available via the following Github [gist](https://gist.github.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b).\index{Github!Gist} Hence, you could also source the file with the following chunk.
+
+```{python}
+#| eval: false
+gist_url = "https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b/raw/084fccccb618375034dbd0afba65788d62a2affa/"
+
+with httpimport.remote_repo(gist_url):
+  from clean_enhanced_TRACE_python import clean_enhanced_trace
+```
+
+We need this function in Chapter [TRACE and FISD](trace-and-fisd.qmd) to download and clean enhanced TRACE trade messages following @Dick2009 and @Dick2014 for enhanced TRACE specifically. This code is based on the resources provided by the project [Open Source Bond Asset Pricing](https://openbondassetpricing.com/) and their related publication @Dickerson2023. We encourage that you acknowledge their effort. Related, WRDS provides SAS code to clean enhanced TRACE data.
+
+The function takes a vector of CUSIPs (in `cusips`), a connection to WRDS (`connection`) explained in Chapter 3, and a start and end date (`start_date` and `end_date`, respectively). Specifying too many CUSIPs will result in very slow downloads and a potential failure due to the size of the request to WRDS. The dates should be within the coverage of TRACE itself, i.e., starting after 2002, and the dates should be supplied as a string indicating MM/DD/YYYY. The output of the function contains all valid trade messages for the selected CUSIPs over the specified period.\index{CUSIP}\index{Dick-Nielsen cleaning} 
+
+```{python}
+#| eval: false
+def clean_enhanced_trace(
+  cusips,
+  connection, 
+  start_date="'01/01/2002'", 
+  end_date="'12/31/2023'"
+):
+  
+  import pandas as pd
+  import numpy as np
+  
+  # Load main file ------------------------------------------------#
+  trace_query = (
+    """SELECT cusip_id, bond_sym_id, trd_exctn_dt,
+              trd_exctn_tm, days_to_sttl_ct, lckd_in_ind,
+              wis_fl, sale_cndtn_cd, msg_seq_nb, 
+              trc_st, trd_rpt_dt, trd_rpt_tm, 
+              entrd_vol_qt, rptd_pr, yld_pt, 
+              asof_cd, orig_msg_seq_nb, rpt_side_cd, 
+              cntra_mp_id, stlmnt_dt, spcl_trd_fl """ +
+    "FROM trace.trace_enhanced " +
+    "WHERE cusip_id IN " + cusips + " " +
+    "AND trd_exctn_dt BETWEEN " + start_date + " AND " + end_date
+  )
+
+  trace_all = (pd.read_sql_query(
+      sql=trace_query,
+      con=wrds,
+      parse_dates={"trd_exctn_dt","trd_rpt_dt", "stlmnt_dt"}
+    )
+  )
+  
+  # Post 2012-06-02 -------------------------------------------------#
+  # Trades (trc_st = T) and correction (trc_st = R)
+  trace_post_TR = (trace_all
+    .query("trc_st in ['T', 'R']")
+    .query("trd_rpt_dt >= '2012-06-02'")
+  )
+  
+  # Cancellations (trc_st = X) and correction cancellations (trc_st = C) -----#
+  trace_post_XC = (trace_all
+    .query("trc_st in ['X', 'C']")
+    .query("trd_rpt_dt >= '2012-06-02'")
+    .get(["cusip_id", "msg_seq_nb", "entrd_vol_qt",
+          "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+          "trd_exctn_dt", "trd_exctn_tm"])
+    .assign(drop=True)
+  )
+  
+  # Cleaning corrected and cancelled trades
+  trace_post_TR = (trace_post_TR
+    .merge(trace_post_XC, how="left")
+    .query("drop != True")
+    .drop(columns="drop")
+  )
+  
+  # Reversals (trc_st = Y) -----#
+  trace_post_Y = (trace_all
+    .query("trc_st == 'Y'")
+    .query("trd_rpt_dt >= '2012-06-02'")
+    .get(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
+          "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+          "trd_exctn_dt", "trd_exctn_tm"])
+    .assign(drop=True)
+    .rename(columns={"orig_msg_seq_nb": "msg_seq_nb"})
+  )
+  
+  # Clean reversals
+  ## match the orig_msg_seq_nb of the Y-message to
+  ## the msg_seq_nb of the main message
+  trace_post = (trace_post_TR
+    .merge(trace_post_Y, how="left")
+    .query("drop != True")
+    .drop(columns="drop")
+  )
+  
+  # Pre 06-02-12 --------------------------------------------------#
+  # Trades (trc_st = T)
+  trace_pre_T = (trace_all
+    # .query("trc_st == 'T'")
+    .query("trd_rpt_dt < '2012-06-02'")
+  )
+    
+  # Cancelations (trc_st = C) -----#
+  trace_pre_C = (trace_all
+    .query("trc_st == 'C'")
+    .query("trd_rpt_dt < '2012-06-02'")
+    .get(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
+          "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+          "trd_exctn_dt", "trd_exctn_tm"])
+    .assign(drop=True)
+    .rename(columns={"orig_msg_seq_nb": "msg_seq_nb"})
+  )
+  
+  # Remove cancellations from trades
+  ## match the orig_msg_seq_nb of the C-message
+  ## to the msg_seq_nb of the main message
+  trace_pre_T = (trace_pre_T
+    .merge(trace_pre_C, how="left")
+    .query("drop != True")
+    .drop(columns="drop")
+  )
+  
+  # Corrections (trc_st = W) - can also correct a previous W -----#
+  trace_pre_W = (trace_all
+    .query("trc_st == 'W'")
+    .query("trd_rpt_dt < '2012-06-02'")
+  )
+  
+  # Implement corrections in a loop
+  ## Correction control
+  correction_control = len(trace_pre_W)
+  correction_control_last = len(trace_pre_W)
+
+  ## Correction loop
+  while (correction_control > 0):
+    # Create placeholder
+    ## Only identifying columns of trace_pre_T (for joins)
+    placeholder_trace_pre_T = (trace_pre_T
+      .get(["cusip_id", "trd_exctn_dt", "msg_seq_nb"])
+      .rename(columns={"msg_seq_nb": "orig_msg_seq_nb"})
+      .assign(matched_T=True)
+    )
+    
+    # Corrections that correct some msg
+    trace_pre_W_correcting = (trace_pre_W
+      .merge(placeholder_trace_pre_T, how="left")
+      .query("matched_T == True")
+      .drop(columns="matched_T")
+    )
+
+    # Corrections that do not correct some msg
+    trace_pre_W = (trace_pre_W
+      .merge(placeholder_trace_pre_T, how="left")
+      .query("matched_T != True")
+      .drop(columns="matched_T")
+    )
+    
+    # Create placeholder 
+    ## Only identifying columns of trace_pre_W_correcting (for anti-joins)
+    placeholder_trace_pre_W_correcting = (trace_pre_W_correcting
+      .get(["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"])
+      .rename(columns={"orig_msg_seq_nb": "msg_seq_nb"})
+      .assign(corrected=True)
+    )
+    
+    # Delete msgs that are corrected 
+    trace_pre_T = (trace_pre_T
+      .merge(placeholder_trace_pre_W_correcting, how="left")
+      .query("corrected != True")
+      .drop(columns="corrected")
+    )
+    
+    # Add correction msgs
+    trace_pre_T = pd.concat([trace_pre_T, trace_pre_W_correcting])
+
+    # Escape if no corrections remain or they cannot be matched
+    correction_control = len(trace_pre_W)
+    
+    if correction_control == correction_control_last: 
+      break
+    else:
+      correction_control_last = len(trace_pre_W)
+      continue
+  
+  # Reversals (asof_cd = R) -----#
+  ## Record reversals
+  trace_pre_R = (trace_pre_T
+    .query("asof_cd == 'R'")
+    .sort_values(["cusip_id", "trd_exctn_dt",
+                 "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm"])
+  )
+  
+  ## Prepare final data
+  trace_pre = (trace_pre_T
+    .query("asof_cd == None | asof_cd.isnull() | asof_cd not in ['R', 'X', 'D']")
+    .sort_values(["cusip_id", "trd_exctn_dt",
+                 "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm"])
+  )
+  
+  ## Add grouped row numbers
+  trace_pre_R["seq"] = (trace_pre_R
+    .groupby(["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+              "rptd_pr", "rpt_side_cd", "cntra_mp_id"])
+    .cumcount()
+  )
+
+  trace_pre["seq"] = (trace_pre
+    .groupby(["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+              "rptd_pr", "rpt_side_cd", "cntra_mp_id"])
+    .cumcount()
+  )
+  
+  ## Select columns for reversal cleaning
+  trace_pre_R = (trace_pre_R
+    .get(["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+         "rptd_pr", "rpt_side_cd", "cntra_mp_id", "seq"])
+    .assign(reversal=True)
+  )
+  
+  ## Remove reversals and the reversed trade
+  trace_pre = (trace_pre
+    .merge(trace_pre_R, how="left")
+    .query("reversal != True")
+    .drop(columns=["reversal", "seq"])
+  )
+  
+  # Agency trades -------------------------------------------------#
+  # Combine pre and post trades
+  trace_clean = pd.concat([trace_pre, trace_post])
+  
+  # Keep agency sells and unmatched agency buys
+  ## Agency sells
+  trace_agency_sells = (trace_clean 
+    .query("cntra_mp_id == 'D' & rpt_side_cd == 'S'")
+  )
+  
+  # Placeholder for trace_agency_sells with relevant columns
+  placeholder_trace_agency_sells = (trace_agency_sells
+    .get(["cusip_id", "trd_exctn_dt",
+          "entrd_vol_qt", "rptd_pr"])
+    .assign(matched=True)
+  )
+
+  # Agency buys that are unmatched
+  trace_agency_buys_filtered = (trace_clean  
+    .query("cntra_mp_id == 'D' & rpt_side_cd == 'B'")
+    .merge(placeholder_trace_agency_sells, how="left")
+    .query("matched != True")
+    .drop(columns="matched")
+  )
+  
+  # Non-agency
+  trace_nonagency = (trace_clean 
+    .query("cntra_mp_id == 'C'")
+  )
+  
+  # Agency cleaned
+  trace_clean = pd.concat([trace_nonagency,trace_agency_sells,trace_agency_buys_filtered])
+  
+  # Additional Filters --------------------------------------------#
+  trace_add_filters = (trace_clean
+    .assign(days_to_sttl_ct2 = lambda x: (x["stlmnt_dt"] - x["trd_exctn_dt"]).dt.days)
+    .assign(days_to_sttl_ct = lambda x: pd.to_numeric(x["days_to_sttl_ct"], errors='coerce'))
+    .query("days_to_sttl_ct.isnull() | days_to_sttl_ct <= 7")
+    .query("days_to_sttl_ct2.isnull() | days_to_sttl_ct2 <= 7")
+    .query("wis_fl == 'N'")
+    .query("spcl_trd_fl.isnull() | spcl_trd_fl == ''")
+    .query("asof_cd.isnull() | asof_cd == ''")
+  )
+  
+  # Output --------------------------------------------------------#
+  # Only keep necessary columns
+  trace_final = (trace_add_filters
+    .sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"])
+    .get(["cusip_id", "trd_exctn_dt", "trd_exctn_tm",
+        "rptd_pr", "entrd_vol_qt", "yld_pt", "rpt_side_cd", "cntra_mp_id"])
+  )
+  
+  # Return
+  return trace_final
+```

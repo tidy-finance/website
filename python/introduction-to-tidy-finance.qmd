@@ -47,7 +47,7 @@ prices = (yf.download(tickers="AAPL",
                      "Volume": "volume"
                     })
 )
-prices.head()
+prices.head().round(3)
 ```
 
 \index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance. The above code chunk returns a data frame with eight quite self-explanatory columns: `date`, the market prices at the `open`, `high`, `low`, and `close`, the `adjusted` price in USD, the daily `volume` (in the number of traded shares), and the `symbol`. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices but have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
@@ -82,7 +82,7 @@ returns = (prices
   .assign(ret = lambda x: x["adjusted"].pct_change())
   .get(["symbol", "date", "ret"])
 )
-returns.head()
+returns.head().round(3)
 ```
 
 The resulting data frame contains three columns, where the last contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NaN`) because there is no previous price.\index{Missing value} Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The function `sort_values()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `ascending=False`.
@@ -118,14 +118,18 @@ returns_figure.draw()
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest.
 
 ```{python}
-returns["ret"].describe()
+returns["ret"].describe().round(3)
 ```
 
 We see that the maximum *daily* return was `python round(returns["ret"].max() * 100, 3)` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
 You can also compute these summary statistics for each year individually by imposing `.groupby(returns["date"].dt.year)`, where the call `.dt.year` returns the year of a date variable. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the return distribution.
 
 ```{python}
-returns["ret"].groupby(returns["date"].dt.year).describe()
+(returns["ret"]
+  .groupby(returns["date"].dt.year)
+  .describe()[["mean", "std", "min", "max"]]
+  .round(3)
+)
 ```
 
 \index{Summary statistics}
@@ -208,7 +212,12 @@ all_returns = (index_prices
   .get(["symbol", "date", "ret"])
   .dropna(subset="ret")
 )
-all_returns.groupby("symbol")["ret"].describe()
+
+(all_returns
+  .groupby("symbol")["ret"]
+  .describe()
+  .round(3)
+)
 ```
 
 \index{Summary statistics}
@@ -304,7 +313,7 @@ mvp_return = (mu.T @ mvp_weights)
 mvp_volatility = np.sqrt(mvp_weights.T @ sigma @ mvp_weights)
 mvp_moments = pd.DataFrame([mvp_return, mvp_volatility],
                           index=["average_ret", "volatility"]).T
-mvp_moments
+mvp_moments.round(3)
 ```
 
 The command `np.linalg.inv()` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `np.linalg.inv(sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).\

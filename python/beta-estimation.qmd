@@ -44,8 +44,8 @@ tidy_finance = sqlite3.connect(
 )
 
 crsp_monthly = (pd.read_sql_query(
-  sql="""SELECT permno, month, industry, ret_excess 
-          FROM crsp_monthly""",
+  sql=("SELECT permno, month, industry, ret_excess " 
+       "FROM crsp_monthly"),
   con=tidy_finance,
   parse_dates={"month"})
   .dropna()
@@ -89,6 +89,8 @@ After we estimated the regression coefficients on an example, we scale the estim
 
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
+  
+    data = data.sort_values("month")
 
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
@@ -149,7 +151,7 @@ plot_beta = (
   scale_x_datetime(breaks=date_breaks("5 year"), 
                    labels=date_format("%Y")) + 
   labs(x="", y="", color="", linetype="",
-       title=("Monthly beta estimates for example stocks " +
+       title=("Monthly beta estimates for example stocks "
               "using 5 years of data"))
 )
 plot_beta.draw()
@@ -172,6 +174,11 @@ Next, we can apply the code snippet from the example above to compute rolling wi
 
 ```{python}
 def roll_capm_estimation_for_joblib(permno, group):
+  
+    if "date" in group.columns:
+      group = group.sort_values(by="date")
+    else:
+      group = group.sort_values(by="month")
 
     beta_values = (RollingOLS.from_formula(
         formula="ret_excess ~ mkt_excess",
@@ -188,8 +195,10 @@ def roll_capm_estimation_for_joblib(permno, group):
     result["month"] = group["month"].values
     result["permno"] = permno
     try:
-       result["date"] = group["date"].values
-       result = result[result.groupby("month")["date"].transform("max") == result["date"]]
+      result["date"] = group["date"].values
+      result = result[
+        (result.groupby("month")["date"]
+          .transform("max")) == result["date"]]
     except(KeyError):
       pass
     
@@ -223,8 +232,8 @@ Note that the sample is large compared to the monthly data, so make sure to have
 
 ```{python}
 crsp_daily = (pd.read_sql_query(
-    sql="""SELECT permno, month, date, ret_excess 
-            FROM crsp_daily""",
+    sql=("SELECT permno, month, date, ret_excess "
+         "FROM crsp_daily"),
     con=tidy_finance,
     parse_dates={"month", "date"})
   .dropna()
@@ -380,7 +389,7 @@ plot_beta_comparison = (
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x="", y="", color="",
-       title=("Comparison of beta estimates using monthly " +
+       title=("Comparison of beta estimates using monthly "
               "and daily data"))
 )
 plot_beta_comparison.draw()
@@ -430,7 +439,7 @@ plot_beta_long = (
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x=None, y=None, color=None, linetype=None,
-       title=("End-of-month share of securities with beta " +
+       title=("End-of-month share of securities with beta "
               "estimates"))
 )
 plot_beta_long.draw()
