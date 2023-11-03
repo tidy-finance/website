@@ -13,8 +13,13 @@ industries <- industries_raw$subsets$data[[1]] |>
   rename_with(str_to_lower) |> 
   filter(date >= "1927-01-01" & date <= "2022-12-31")
 
-data_plot <- industries |> 
-  pivot_longer(cols = -date) |> 
+industries_long <- industries |> 
+  pivot_longer(cols = -date) 
+
+industries_order <- sort(unique(industries_long$name))
+
+data_plot <-industries_long |> 
+  mutate(name = factor(name, levels = industries_order)) |> 
   group_by(year = floor_date(date, "year"), name) |>
   arrange(date) |> 
   summarize(
@@ -23,9 +28,7 @@ data_plot <- industries |>
     .groups = "keep"
   ) |> 
   ungroup() |> 
-  mutate(vola = ntile(vola, 48))
-
-distinct(data_plot, year)
+  mutate(vola = ntile(vola, 42))
 
 levels <- data_plot |>
   distinct(vola) |>
@@ -51,7 +54,8 @@ cover_python <- data_plot |>
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
-    panel.spacing = unit(-5, "lines")
+    panel.spacing = unit(-75, "points"),
+    plot.margin = unit(c(75, 0, 75, 0), "points") # top, right, bottom, left
   ) +
   cp +
   facet_wrap(~name, nrow = 2, scales = "free_y") +
@@ -62,7 +66,7 @@ cover_python
 ggsave(
   plot = cover_python,
   width = 10,
-  height = 4,
+  height = 6,
   filename = "images/cover-python.png",
   bg = "white"
 )
