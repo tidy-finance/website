@@ -74,8 +74,12 @@ bm <- book_equity |>
   select(permno, gvkey, sorting_date, comp_date, bm)
 
 data_for_sorts <- crsp_monthly |>
-  left_join(bm, by = c("permno", "gvkey", "month" = "sorting_date")) |>
-  left_join(me, by = c("permno", "month" = "sorting_date")) |>
+  left_join(
+    bm, by = c("permno", "gvkey", "month" = "sorting_date")
+  ) |>
+  left_join(
+    me, by = c("permno", "month" = "sorting_date")
+  ) |>
   select(
     permno, gvkey, month, ret_excess,
     mktcap_lag, me, bm, exchange, comp_date
@@ -157,13 +161,16 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 value_premium <- value_portfolios |>
   group_by(month, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
-  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] -
-                              ret[portfolio_bm == min(portfolio_bm)])
-
-mean(value_premium$value_premium * 100)
+  summarize(
+    value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+      ret[portfolio_bm == min(portfolio_bm)]
+  ) |> 
+  summarize(
+    value_premium = mean(value_premium)
+  )
 ```
 
-The resulting annualized value premium is 4.608 percent.
+The resulting monthly value premium is `{r} round(value_premium$value_premium*100, 2)` percent with an annualized return of `{r} round(((1+value_premium$value_premium)^12-1) * 100, 1)` percent.
 
 ## Dependent Sorts
 
@@ -197,13 +204,16 @@ value_portfolios <- data_for_sorts |>
 value_premium <- value_portfolios |>
   group_by(month, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
-  summarize(value_premium = ret[portfolio_bm == max(portfolio_bm)] -
-    ret[portfolio_bm == min(portfolio_bm)])
-
-mean(value_premium$value_premium * 100)
+  summarize(
+    value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+      ret[portfolio_bm == min(portfolio_bm)]
+  ) |> 
+  summarize(
+    value_premium = mean(value_premium)
+  )
 ```
 
-The value premium from dependent sorts is 3.948 percent per year.
+The monthly value premium from dependent sorts is `{r} round(value_premium$value_premium*100, 2)` percent, which translates to an annualized premium of `{r} round(((1+value_premium$value_premium)^12 - 1)*100, 1)` percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

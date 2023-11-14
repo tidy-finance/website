@@ -29,6 +29,8 @@ import sqlite3
 import datetime as dt
 import itertools
 import linearmodels as lm
+
+from regtabletotext import prettify_result, prettify_results
 ```
 
 Compared to previous chapters, we introduce `linearmodels` [@linearmodels], which provides tools for estimating various econometric models. 
@@ -49,9 +51,8 @@ crsp_monthly = pd.read_sql_query(
 )
 
 compustat = pd.read_sql_query(
-  sql="""SELECT datadate, gvkey, year, at, be, capx, oancf, 
-                txdb 
-          FROM compustat""",
+  sql=("SELECT datadate, gvkey, year, at, be, capx, oancf, "
+       "txdb FROM compustat"),
   con=tidy_finance,
   parse_dates={"datadate"}
 )
@@ -143,12 +144,12 @@ $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\t
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `PanelOLS()`-function to estimate the simple model so that the output has the same structure as the other regressions below. 
 
 ```{python}
-model_ols = lm.PanelOLS.from_formula(
-  formula="investment_lead ~ cash_flows + tobins_q + 1",
-  data=data_investment.set_index(["gvkey", "year"]),
-).fit()
-for table in model_ols.summary.tables:
-  print(table)
+model_ols = (lm.PanelOLS.from_formula(
+    formula="investment_lead ~ cash_flows + tobins_q + 1",
+    data=data_investment.set_index(["gvkey", "year"]),
+  ).fit()
+)
+prettify_result(model_ols)
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
@@ -159,13 +160,13 @@ where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean in
 
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 ```{python}
-model_fe_firm = lm.PanelOLS.from_formula(
-  formula="""investment_lead ~ cash_flows + tobins_q + 
-                               EntityEffects""",
-  data=data_investment.set_index(["gvkey", "year"]),
-).fit()
-for table in model_fe_firm.summary.tables:
-  print(table)
+model_fe_firm = (lm.PanelOLS.from_formula(
+    formula=("investment_lead ~ cash_flows + tobins_q " 
+             "+ EntityEffects"),
+    data=data_investment.set_index(["gvkey", "year"]),
+  ).fit()
+)
+prettify_result(model_fe_firm)
 ```
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
@@ -175,25 +176,24 @@ $$ \text{Investment}_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{i
 where $\alpha_t$ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows.
 
 ```{python}
-model_fe_firmyear = lm.PanelOLS.from_formula(
-  formula="""investment_lead ~ cash_flows + tobins_q + 
-                               EntityEffects + TimeEffects""",
-  data=data_investment.set_index(["gvkey", "year"]),
-).fit()
-for table in model_fe_firmyear.summary.tables:
-  print(table)
+model_fe_firmyear = (lm.PanelOLS.from_formula(
+    formula=("investment_lead ~ cash_flows + tobins_q " 
+             "+ EntityEffects + TimeEffects"),
+    data=data_investment.set_index(["gvkey", "year"]),
+  ).fit()
+)
+prettify_result(model_fe_firmyear)
 ```
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time. 
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin's q are colinear with the fixed effects, and the estimation becomes void. 
 
 Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the `results.compare()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.  
+
 ```{python}
-comparison = lm.panel.results.compare(
-  [model_ols, model_fe_firm, model_fe_firmyear]
-)
-for table in comparison.summary.tables:
-  print(table)
+prettify_results([
+  model_ols, model_fe_firm, model_fe_firmyear
+])
 ```
 
 ## Clustering Standard Errors
@@ -206,16 +206,16 @@ Instead of relying on the iid assumption, we can use the `cov_type="clustered"` 
 
 ```{python}
 model_cluster_firm = lm.PanelOLS.from_formula(
-  formula="""investment_lead ~ cash_flows + tobins_q + 
-                               EntityEffects + TimeEffects""",
+  formula=("investment_lead ~ cash_flows + tobins_q "
+           "+ EntityEffects + TimeEffects"),
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit(cov_type="clustered", 
       cluster_entity=True, 
       cluster_time=False)
 
 model_cluster_firmyear = lm.PanelOLS.from_formula(
-  formula="""investment_lead ~ cash_flows + tobins_q + 
-                               EntityEffects + TimeEffects""",
+  formula=("investment_lead ~ cash_flows + tobins_q "
+           "+ EntityEffects + TimeEffects"),
   data=data_investment.set_index(["gvkey", "year"]),
 ).fit(cov_type="clustered", 
       cluster_entity=True, 
@@ -226,13 +226,9 @@ model_cluster_firmyear = lm.PanelOLS.from_formula(
 The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin's q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin's q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$ statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 ```{python}
-comparison_clustered = lm.panel.results.compare(
-  [model_fe_firmyear, 
-   model_cluster_firm, 
-   model_cluster_firmyear]
-)
-for table in comparison_clustered.summary.tables:
-  print(table)
+prettify_results([
+  model_fe_firmyear, model_cluster_firm, model_cluster_firmyear
+])
 ```
 
 Inspired by @AbadieEtAl2017, we want to close this chapter by highlighting that choosing the right dimensions for clustering is a design problem. Even if the data is informative about whether clustering matters for standard errors, they do not tell you whether you should adjust the standard errors for clustering. Clustering at too aggregate levels can hence lead to unnecessarily inflated standard errors. 

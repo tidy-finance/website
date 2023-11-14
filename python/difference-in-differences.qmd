@@ -31,23 +31,25 @@ import statsmodels.formula.api as smf
 
 from plotnine import *
 from scipy.stats import norm
+from mizani.breaks import date_breaks
+from mizani.formatters import date_format
+from regtabletotext import prettify_results
 ```
 
 Compared to previous chapters, we introduce the `scipy.stats` module from the `scipy` [@scipy] for simple retrieval of quantiles of the standard normal distribution. 
 
 ## Data Preparation
 
-We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in Chapters 2-4. \index{Data!TRACE}\index{Data!FISD}
+We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{python}
 tidy_finance = sqlite3.connect(
   database="data/tidy_finance_python.sqlite"
 )
 
-mergent = (pd.read_sql_query(
-    sql="""SELECT complete_cusip, maturity, offering_amt, 
-                  sic_code 
-            FROM mergent""",
+fisd = (pd.read_sql_query(
+    sql=("SELECT complete_cusip, maturity, offering_amt, " 
+         "sic_code FROM fisd"),
     con=tidy_finance,
     parse_dates={"maturity"}
   )
@@ -55,9 +57,8 @@ mergent = (pd.read_sql_query(
 )
 
 trace_enhanced = (pd.read_sql_query(
-    sql="""SELECT cusip_id, trd_exctn_dt, rptd_pr, 
-                  entrd_vol_qt, yld_pt 
-            FROM trace_enhanced""",
+    sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, " 
+         "entrd_vol_qt, yld_pt FROM trace_enhanced"),
     con=tidy_finance,
     parse_dates={"trd_exctn_dt"}
   )
@@ -74,8 +75,8 @@ polluting_industries = [
   26, 42, 10, 53, 32, 99, 37
 ]
 
-bonds = (mergent
-  .query("offering_amt > 0")
+bonds = (fisd
+  .query("offering_amt > 0 & sic_code != 'None'")
   .assign(
     time_to_maturity = lambda x: (
       (x["maturity"]-treatment_date).dt.days / 365
@@ -141,13 +142,13 @@ trace_aggregated = (trace_enhanced
   )
 )
 
-idx = (trace_aggregated
+date_index = (trace_aggregated
   .groupby(["cusip_id", "month"])["trd_exctn_dt"]
   .idxmax()
 )
 
 trace_aggregated = (trace_aggregated
-  .loc[idx]
+  .loc[date_index]
   .get(["cusip_id", "month", "avg_yield"])
 )
 ```
@@ -216,12 +217,9 @@ model_with_fe = lm.PanelOLS.from_formula(
   data=bonds_panel.set_index(["cusip_id", "month"]),
 ).fit()
 
-comparison = lm.panel.results.compare(
-  [model_without_fe, model_with_fe]
-)
-
-for table in comparison.summary.tables:
-  print(table)
+prettify_results([
+  model_without_fe, model_with_fe
+])
 ```
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
@@ -270,7 +268,9 @@ polluters_plot = (
       x="", y="Yield", shape="Polluter?", color="Polluter?",
       title="Polluters respond stronger to Paris Agreement than green firms"
     ) +
-  scale_linetype_manual(values=["solid", "dashed"])
+  scale_linetype_manual(values=["solid", "dashed"]) +
+  scale_x_datetime(breaks=date_breaks("1 year"), 
+                   labels=date_format("%Y")) 
 )
 polluters_plot.draw()
 ```
@@ -356,7 +356,9 @@ polluter_plot = (
   geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5) +
   geom_point(aes(y="estimate")) +
   labs(x="", y="Yield",
-       title="Polluters' yield patterns around Paris Agreement signing")
+       title="Polluters' yield patterns around Paris Agreement signing") +
+  scale_x_datetime(breaks=date_breaks("1 year"), 
+                   labels=date_format("%Y")) 
 )
 polluter_plot.draw()
 ```

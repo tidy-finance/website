@@ -24,6 +24,7 @@ import numpy as np
 import sqlite3
 import statsmodels.formula.api as smf
 
+from regtabletotext import prettify_result
 from statsmodels.regression.rolling import RollingOLS
 from plotnine import *
 from mizani.breaks import date_breaks
@@ -43,8 +44,8 @@ tidy_finance = sqlite3.connect(
 )
 
 crsp_monthly = (pd.read_sql_query(
-  sql="""SELECT permno, month, industry, ret_excess 
-          FROM crsp_monthly""",
+  sql=("SELECT permno, month, industry, ret_excess " 
+       "FROM crsp_monthly"),
   con=tidy_finance,
   parse_dates={"month"})
   .dropna()
@@ -72,17 +73,15 @@ we regress stock excess returns `ret_excess` on excess returns of the market por
 Python provides a simple solution to estimate (linear) models with the function `smf.ols()`. `smf.ols()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `smf.ols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.
 
 ```{python}
-model_fit = (smf.ols(
+model_beta = (smf.ols(
     formula="ret_excess ~ mkt_excess",
     data=crsp_monthly.query("permno == 14593"))
   .fit()
 )
-
-model_fit_coefs = model_fit.summary(slim=True).tables[1]
-model_fit_coefs
+prettify_result(model_beta)
 ```
 
-`smf.ols()` returns an object of class `RegressionModel` which contains all information we usually care about with linear models. `summary()` returns an overview of the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$). 
+`smf.ols()` returns an object of class `RegressionModel` which contains all information we usually care about with linear models. `prettify_result()` returns an overview of the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$). 
 
 ## Rolling-Window Estimation
 
@@ -90,6 +89,8 @@ After we estimated the regression coefficients on an example, we scale the estim
 
 ```{python}
 def roll_capm_estimation(data, window_size, min_obs):
+  
+    data = data.sort_values("month")
 
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
@@ -150,7 +151,7 @@ plot_beta = (
   scale_x_datetime(breaks=date_breaks("5 year"), 
                    labels=date_format("%Y")) + 
   labs(x="", y="", color="", linetype="",
-       title=("Monthly beta estimates for example stocks " +
+       title=("Monthly beta estimates for example stocks "
               "using 5 years of data"))
 )
 plot_beta.draw()
@@ -173,6 +174,11 @@ Next, we can apply the code snippet from the example above to compute rolling wi
 
 ```{python}
 def roll_capm_estimation_for_joblib(permno, group):
+  
+    if "date" in group.columns:
+      group = group.sort_values(by="date")
+    else:
+      group = group.sort_values(by="month")
 
     beta_values = (RollingOLS.from_formula(
         formula="ret_excess ~ mkt_excess",
@@ -189,8 +195,10 @@ def roll_capm_estimation_for_joblib(permno, group):
     result["month"] = group["month"].values
     result["permno"] = permno
     try:
-       result["date"] = group["date"].values
-       result = result[result.groupby("month")["date"].transform("max") == result["date"]]
+      result["date"] = group["date"].values
+      result = result[
+        (result.groupby("month")["date"]
+          .transform("max")) == result["date"]]
     except(KeyError):
       pass
     
@@ -224,8 +232,8 @@ Note that the sample is large compared to the monthly data, so make sure to have
 
 ```{python}
 crsp_daily = (pd.read_sql_query(
-    sql="""SELECT permno, month, date, ret_excess 
-            FROM crsp_daily""",
+    sql=("SELECT permno, month, date, ret_excess "
+         "FROM crsp_daily"),
     con=tidy_finance,
     parse_dates={"month", "date"})
   .dropna()
@@ -381,7 +389,7 @@ plot_beta_comparison = (
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x="", y="", color="",
-       title=("Comparison of beta estimates using monthly " +
+       title=("Comparison of beta estimates using monthly "
               "and daily data"))
 )
 plot_beta_comparison.draw()
@@ -392,6 +400,7 @@ The estimates in @fig-604 look as expected. As you can see, it really depends on
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
 ```{python}
+#| output: false
 (beta
   .to_sql(
     name="beta", 
@@ -431,7 +440,7 @@ plot_beta_long = (
   scale_x_datetime(breaks=date_breaks("10 year"), 
                    labels=date_format("%Y")) +
   labs(x=None, y=None, color=None, linetype=None,
-       title=("End-of-month share of securities with beta " +
+       title=("End-of-month share of securities with beta "
               "estimates"))
 )
 plot_beta_long.draw()

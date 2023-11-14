@@ -2,8 +2,6 @@
 title: TRACE and FISD
 aliases:
   - ../trace-and-fisd.html
-execute:
-  cache: true
 pre-render:
   - pre_render_script.R
 metadata:
@@ -57,13 +55,12 @@ For research on US corporate bonds, the Mergent Fixed Income Securities Database
 We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria [@bessembinder2006]. The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. 
 Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures. 
 
-The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly [see, e.g., @Dick2012; @Ohara2021, among many others].
+The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used [see, e.g., @Dick2012; @Ohara2021, among many others].
 
 ```{r}
-mergent <- tbl(
-  wrds,
-  in_schema("fisd", "fisd_mergedissue")
-) |>
+fisd_mergedissue_db <- tbl(wrds, in_schema("fisd", "fisd_mergedissue"))
+
+fisd <- fisd_mergedissue_db |>
   filter(
     security_level == "SEN", # senior bonds
     slob == "N" | is.na(slob), # secured lease obligation
@@ -123,12 +120,14 @@ mergent <- tbl(
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
-mergent_issuer <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) |>
+fisd_mergedissuer_db <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) 
+
+fisd_issuer <- fisd_mergedissuer_db |>
   select(issuer_id, sic_code, country_domicile) |>
   collect()
 
-mergent <- mergent |>
-  inner_join(mergent_issuer, by = "issuer_id") |>
+fisd <- fisd |>
+  inner_join(fisd_issuer, by = "issuer_id") |>
   filter(country_domicile == "USA") |>
   select(-country_domicile)
 ```
@@ -138,8 +137,8 @@ Finally, we save the bond characteristics to our local database. This selection 
 ```{r}
 dbWriteTable(
   conn = tidy_finance,
-  name = "mergent",
-  value = mergent,
+  name = "fisd",
+  value = fisd,
   overwrite = TRUE
 )
 ```
@@ -161,13 +160,13 @@ source_gist("3a05b3ab281563b2e94858451c2eb3a4")
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
 ```{r}
-mergent_cusips <- mergent |>
+fisd_cusips <- fisd |>
   pull(complete_cusip)
 
-mergent_parts <- split(
-  mergent_cusips,
+fisd_parts <- split(
+  fisd_cusips,
   rep(1:10, 
-      length.out = length(mergent_cusips))
+      length.out = length(fisd_cusips))
 )
 ```
 
@@ -175,9 +174,11 @@ Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-
 
 ```{r}
 #| eval: false
-for (j in 1:length(mergent_parts)) {
+batches <- length(fisd_parts)
+
+for (j in 1:batches) {
   trace_enhanced <- clean_enhanced_trace(
-    cusips = mergent_parts[[j]],
+    cusips = fisd_parts[[j]],
     connection = wrds,
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
@@ -190,7 +191,9 @@ for (j in 1:length(mergent_parts)) {
     overwrite = ifelse(j == 1, TRUE, FALSE),
     append = ifelse(j != 1, TRUE, FALSE)
   )
-
+  
+  cat("Batch", j, "out of", batches, "done (", 
+      round(j / batches, 2) * 100, "%)\n")
 }
 ```
 
@@ -204,8 +207,8 @@ We start by looking into the number of bonds outstanding over time and compare i
 bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
                                               ymd("2016-11-30"), 
                                               by = "quarter"), 
-                                 "complete_cusip" = mergent$complete_cusip) |> 
-  left_join(mergent |> select(complete_cusip, 
+                                 "complete_cusip" = fisd$complete_cusip) |> 
+  left_join(fisd |> select(complete_cusip, 
                               offering_date,
                               maturity), 
             by = "complete_cusip") |> 
@@ -255,7 +258,7 @@ We see that the number of bonds outstanding increases steadily between 2014 and 
 Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
 
 ```{r}
-mergent |>
+fisd |>
   mutate(maturity = as.numeric(maturity - offering_date) / 365,
          offering_amt = offering_amt / 10^3) |> 
   pivot_longer(cols = c(maturity, coupon, offering_amt),

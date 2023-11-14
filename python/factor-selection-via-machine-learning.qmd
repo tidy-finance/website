@@ -86,7 +86,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import (
-  ElasticNet, Lasso, lasso_path, enet_path
+  ElasticNet, Lasso, Ridge
 )
 ```
 
@@ -174,8 +174,8 @@ data = (industries_ff_monthly
 )
 ```
 
-Our data contains `python len(data.columns)-2` columns of regressors with the `python len(macro_predictors.columns) - 1` macro variables and `python len(factors_ff_monthly.columns) + len(factors_q_monthly.columns)-2` factor returns for each month. 
-@fig-1401 provides summary statistics for the `python len(industries_ff_monthly["industry"].value_counts())` monthly industry excess returns in percent.\index{Graph!Box plot}
+Our data contains `{python} len(data.columns)-2` columns of regressors with the `{python} len(macro_predictors.columns) - 1` macro variables and `{python} len(factors_ff3_monthly.columns) + len(factors_q_monthly.columns)-2` factor returns for each month. 
+@fig-1401 provides summary statistics for the `{python} len(industries_ff_monthly["industry"].value_counts())` monthly industry excess returns in percent.\index{Graph!Box plot}
 
 ```{python}
 #| label: fig-1401
@@ -231,36 +231,35 @@ new_columns = pd.DataFrame(
 
 data = pd.concat([data, new_columns], axis=1)
 
-pre_processor = ColumnTransformer(
+preprocessor = ColumnTransformer(
     transformers=[
         ("scale", StandardScaler(), 
          [col for col in data.columns 
           if col not in ["ret_excess", "month", "industry"]])
         ],
     remainder="drop",
-    verbose_feature_names_out = False
+    verbose_feature_names_out=False
 )
 ```
 
 ### Build a model
 
-\index{Regression}
-Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
+\index{Regression} Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
 
 $$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ 
 
-We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with basically the same code. For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
+We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and - later - Neural networks or Random forests with similar code. For now, we start with the linear regression model with a given value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
 ```{python}
 lm_model = ElasticNet(
-  alpha=0.0001, 
+  alpha=0.007,
   l1_ratio=1, 
   max_iter=5000, 
   fit_intercept=False
 )  
 
 lm_pipeline = Pipeline([
-  ("pre_processor", pre_processor),
+  ("preprocessor", preprocessor),
   ("regressor", lm_model)
 ])
 ```
@@ -269,18 +268,10 @@ That's it - we are done! The object `lm_model_pipeline` contains the definition 
 
 ### Fit a model
 
-With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. 
-The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
+With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
 
 ```{python}
 data_manufacturing = data.query("industry == 'manuf'")
-
-pd.DataFrame(
-  lm_pipeline[:1].fit_transform(
-    data_manufacturing
-    ), 
-  columns = lm_pipeline[:-1].get_feature_names_out()
-)
              
 lm_fit = lm_pipeline.fit(
   data_manufacturing, 
@@ -312,11 +303,8 @@ predicted_values_plot = (
              color="Variable", linetype="Variable")) +
   geom_line() +
   labs(
-    x="",
-    y="",
-    color="",
-    linetype="",
-    title=("Monthly realized and fitted manufacturing" +
+    x="", y="", color="", linetype="",
+    title=("Monthly realized and fitted manufacturing "
            "industry risk premia")
   ) +
   scale_x_datetime(
@@ -326,29 +314,35 @@ predicted_values_plot = (
       expand=(0, 0)
   ) +
   scale_y_continuous(labels=percent_format()))
-  
 predicted_values_plot.draw()
 ```
 
 What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. 
 
 ```{python}
-x = pre_processor.fit_transform(data_manufacturing)
+#| warning: false
+x = preprocessor.fit_transform(data_manufacturing)
 y = data_manufacturing["ret_excess"]
 
-alphas_lasso, coefs_lasso, _ = enet_path(x, y, l1_ratio=1)
+alphas = np.logspace(-5, 5, 100)
 
-alphas_ridge, coefs_ridge, _ = enet_path(x, y, l1_ratio=0.01)
-
-lasso_coefficients = (pd.DataFrame(coefs_lasso)
-  .transpose()
-  .assign(alpha = alphas_lasso, model = "Lasso")
+coefficients_lasso = []
+for a in alphas:
+    lasso = Lasso(alpha=a, fit_intercept=False)
+    coefficients_lasso.append(lasso.fit(x, y).coef_)
+    
+coefficients_lasso = (pd.DataFrame(coefficients_lasso)
+  .assign(alpha = alphas, model = "Lasso")
   .melt(id_vars=["alpha", "model"])
 )
+    
+coefficients_ridge = []
+for a in alphas:
+    ridge = Ridge(alpha=a, fit_intercept=False)
+    coefficients_ridge.append(ridge.fit(x, y).coef_)
 
-ridge_coefficients = (pd.DataFrame(coefs_ridge)
-  .transpose()
-  .assign(alpha = alphas_ridge, model = "Ridge")
+coefficients_ridge = (pd.DataFrame(coefficients_ridge)
+  .assign(alpha = alphas, model = "Ridge")
   .melt(id_vars=["alpha", "model"])
 )
 ```
@@ -360,18 +354,17 @@ The data frames `lasso_coefficients` and `ridge_coefficients` contain an entire 
 #| fig-cap: "The penalty parameters are chosen iteratively to resemble the path from no penalization to a model that excludes all variables."
 #| fig-alt: "Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, and Lasso exhibits non-linear behavior."
 coefficients_plot = (
-  ggplot(pd.concat([lasso_coefficients, ridge_coefficients]), 
+  ggplot(pd.concat([coefficients_lasso, coefficients_ridge]), 
          aes(x = "alpha", y = "value", color = "variable")) + 
   geom_line()  +
   scale_x_log10() +
-  facet_wrap("model", scales = "free_x") +
+  facet_wrap("model") +
   labs(
     x = "Penalty factor (lambda)", y = "",
-    title = ("Estimated coefficient paths for different" +
+    title = ("Estimated coefficient paths for different "
              "penalty factors")
   ) +
   theme(legend_position="none"))
-
 coefficients_plot.draw()
 ```
 
@@ -404,6 +397,7 @@ initial_years = 5
 assessment_months = 48
 n_splits = len(data_manufacturing) // assessment_months
 length_of_year = 12
+alphas = np.logspace(-6, 2, 100)
 
 data_folds = TimeSeriesSplit(
   n_splits=n_splits, 
@@ -412,12 +406,8 @@ data_folds = TimeSeriesSplit(
 )
 
 params = {
-  "regressor__alpha":np.linspace(
-    start = 0, 
-    stop = 1, 
-    num = 20
-  ),
-  "regressor__l1_ratio":(0.0, 0.5, 1)
+  "regressor__alpha": alphas,
+  "regressor__l1_ratio": (0.0, 0.5, 1)
 }
 
 finder = GridSearchCV(
@@ -443,7 +433,7 @@ validation = (pd.DataFrame(finder.cv_results_)
   .assign(
     mspe = lambda x: -x["mean_test_score"],
     param_regressor__alpha = lambda x: pd.to_numeric(
-      x['param_regressor__alpha'], errors='coerce'
+      x["param_regressor__alpha"], errors="coerce"
     )
   )
 )
@@ -459,13 +449,13 @@ validation_plot = (ggplot(validation,
        title = "Root MSPE for different penalty factors",
        color = "Proportion of Lasso Penalty") +
   geom_line() +
-  guides(linetype = "none")
+  guides(linetype = "none") +
+  scale_x_log10()
 )
-
 validation_plot.draw()
 ```
 
-@fig-1404 shows that ...
+@fig-1404 shows that the MSPE drops faster for Lasso and Elastic net compared to Ridge regressions as penality factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes.
 
 ### Full workflow
 
@@ -478,15 +468,11 @@ First, we define the Lasso model with one tuning parameter.
 lm_model = Lasso(fit_intercept=False, max_iter=5000)  
 
 params = {
-  "regressor__alpha":np.linspace(
-    start=0.001, 
-    stop=1, 
-    num=20
-  ),
+  "regressor__alpha": alphas
 }
 
 lm_pipeline = Pipeline([
-  ("pre_processor", pre_processor),
+  ("preprocessor", preprocessor),
   ("regressor", lm_model)
 ])
 ```
@@ -494,6 +480,8 @@ lm_pipeline = Pipeline([
 The following task can be easily parallelized to reduce computing time, but we use a simple loop for ease of exposition.
 
 ```{python}
+#| warning: false
+#| output: false
 all_industries = data["industry"].drop_duplicates()
 
 results = []
@@ -526,6 +514,7 @@ selected_factors = (
   )
   .assign(**dict(zip(all_industries, results)))
   .melt(id_vars="variable", var_name ="industry")
+  .query("value==True")
 )
 ```
 
@@ -536,37 +525,20 @@ What has just happened? In principle, exactly the same as before but instead of 
 #| fig-height: 6
 #| fig-cap: "Grey areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero."
 #| fig-alt: "Title: Selected variables for different industries. The figure shows which factors and macroeconomic predictors the Lasso model selected for the different industries. In general, there are not many selected variables. The market excess return is selected across all industries except for utilities."
-selected_factors = (selected_factors
-  .assign(
-    n = lambda x: x.groupby("variable")["value"].transform("sum"),
-    variable = lambda x: pd.Categorical(x["variable"],
-    categories = x.groupby("variable")["n"].mean().sort_values().index),
-    term_temp = lambda x: pd.cut(
-      x["n"],
-      bins=[-0, 2, float("inf")], 
-      include_lowest = True, 
-      labels=["Other", "Unique"])
-    )
-  .query("term_temp=='Unique'")
-  .drop(columns="term_temp")
-)
-
 selected_factors_plot = (
   ggplot(selected_factors, 
-         aes(x="variable", y="industry", fill="value")) +
+         aes(x="variable", y="industry")) +
   geom_tile() +
-  scale_fill_manual(values=["white", "grey"]) +
-  theme(axis_text_x=element_text(rotation=70, hjust=1), 
-        legend_position = "None") +
+  theme(axis_text_x=element_text(rotation=70, hjust=1)) +
   labs(x="", y="", 
        title="Selected variables for different industries") +
-  coord_flip()
+  coord_flip() +
+  scale_x_discrete(limits=reversed)
 )
-
 selected_factors_plot.draw()
 ```
 
-The heat map in @fig-1405 conveys ...
+The heat map in @fig-1405 conveys two main insights: first, we see that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only `factor_ff_mkt_excess` and its interaction with `macro_bm` a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While barely any variable is selected by Lasso for Utilities, many factors are selected for, e.g., Durable and Manufacturing, but the selected factors do not necessarily coincide. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide a factor that consistently provides pricing abilities across industries.
 
 ## Exercises 
 

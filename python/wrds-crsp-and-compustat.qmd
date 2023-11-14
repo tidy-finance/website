@@ -17,6 +17,8 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the `sqlite`-database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
 
+If you don't have access to WRDS, but still want to run the code in this book, we refer to the Appendix [WRDS Dummy Data](wrds-dummy-data.qmd), where show how to create a dummy database that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this dummy database.
+
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
 ```{python}
@@ -67,22 +69,22 @@ We use the three remote tables to fetch the data we want to put into our local d
 
 ```{python}
 crsp_monthly_query = (
-  """SELECT msf.permno, msf.date, 
-            date_trunc('month', msf.date)::date as month,
-            msf.ret, msf.shrout, msf.altprc, 
-            msenames.exchcd, msenames.siccd,
-            msedelist.dlret, msedelist.dlstcd
-        FROM crsp.msf AS msf
-        LEFT JOIN crsp.msenames as msenames
-               ON msf.permno = msenames.permno AND 
-                  msenames.namedt <= msf.date AND
-                  msf.date <= msenames.nameendt
-        LEFT JOIN crsp.msedelist as msedelist
-               ON msf.permno = msedelist.permno AND
-                  date_trunc('month', msf.date)::date = 
-                  date_trunc('month', msedelist.dlstdt)::date
-        WHERE msf.date BETWEEN '01/01/1960' AND '12/31/2022'
-              AND msenames.shrcd IN (10, 11)"""
+  "SELECT msf.permno, msf.date, "
+          "date_trunc('month', msf.date)::date as month, "
+          "msf.ret, msf.shrout, msf.altprc, "
+          "msenames.exchcd, msenames.siccd, "
+          "msedelist.dlret, msedelist.dlstcd "
+    "FROM crsp.msf AS msf "
+    "LEFT JOIN crsp.msenames as msenames "
+    "ON msf.permno = msenames.permno AND "
+       "msenames.namedt <= msf.date AND "
+       "msf.date <= msenames.nameendt "
+    "LEFT JOIN crsp.msedelist as msedelist "
+    "ON msf.permno = msedelist.permno AND "
+       "date_trunc('month', msf.date)::date = "
+       "date_trunc('month', msedelist.dlstdt)::date "
+    "WHERE msf.date BETWEEN '01/01/1960' AND '12/31/2022' "
+          "AND msenames.shrcd IN (10, 11)"
 )
 
 crsp_monthly = (pd.read_sql_query(
@@ -407,68 +409,67 @@ factors_ff3_daily = pd.read_sql(
   parse_dates={"date"}
 )
   
-permnos = pd.read_sql(
-  "SELECT DISTINCT permno FROM crsp_monthly", 
-  tidy_finance,
-)
+permnos = list(crsp_monthly["permno"].unique().astype(str))
 
 batch_size = 100
 batches = np.ceil(len(permnos) / batch_size).astype(int)
   
 for j in range(1, batches + 1):  
     
-    permno_chunk = permnos[
-      ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
-    ]
-    
-    permno_str = "('" + "', '".join(permno_chunk["permno"].astype(str)) + "')"
+  permno_batch = permnos[
+    ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
+  ]
   
-    crsp_daily_sub_query = (
-      "SELECT permno, date, ret " + 
-        "FROM crsp.dsf " +
-        "WHERE permno IN " + permno_str + " " + 
-        "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
-    )
+  permno_str = "('" + "', '".join(permno_batch) + "')"
+  
+  crsp_daily_sub_query = (
+    "SELECT permno, date, ret " + 
+      "FROM crsp.dsf " +
+      "WHERE permno IN " + permno_str + " " + 
+      "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
+  )
     
-    crsp_daily_sub = (pd.read_sql_query(
-        sql=crsp_daily_sub_query,
-        con=wrds,
-        dtype={"permno": np.int64},
-        parse_dates={"date"}
-      )
-      .dropna()
+  crsp_daily_sub = (pd.read_sql_query(
+      sql=crsp_daily_sub_query,
+      con=wrds,
+      dtype={"permno": np.int64},
+      parse_dates={"date"}
     )
+    .dropna()
+   )
 
-    if not crsp_daily_sub.empty:
-        crsp_daily_sub = (crsp_daily_sub
-          .assign(
-            month = lambda x: x["date"].dt.to_period("M").dt.to_timestamp()
-          )
-          .merge(factors_ff3_daily[["date", "rf"]], 
-                 on="date", how="left")
-          .assign(
-            ret_excess = lambda x: 
-              ((x["ret"] - x["rf"]).clip(lower=-1))
-          )
-          .get(["permno", "date", "month", "ret_excess"])
+  if not crsp_daily_sub.empty:
+      crsp_daily_sub = (crsp_daily_sub
+        .assign(
+          month = lambda x: 
+            x["date"].dt.to_period("M").dt.to_timestamp()
         )
-          
-        if j == 1:
-            crsp_daily_sub.to_sql(
-              name="crsp_daily", 
-              con=tidy_finance, 
-              if_exists="replace", 
-              index=False
-            )
-        else:
-            crsp_daily_sub.to_sql(
-              name="crsp_daily", 
-              con=tidy_finance,
-              if_exists="append", 
-              index=False
-            )
+        .merge(factors_ff3_daily[["date", "rf"]], 
+               on="date", how="left")
+        .assign(
+          ret_excess = lambda x: 
+            ((x["ret"] - x["rf"]).clip(lower=-1))
+        )
+        .get(["permno", "date", "month", "ret_excess"])
+      )
+        
+      if j == 1:
+          crsp_daily_sub.to_sql(
+            name="crsp_daily", 
+            con=tidy_finance, 
+            if_exists="replace", 
+            index=False
+          )
+      else:
+          crsp_daily_sub.to_sql(
+            name="crsp_daily", 
+            con=tidy_finance,
+            if_exists="append", 
+            index=False
+          )
             
-        print(f"Chunk {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
+  print(f"Batch {j} out of {batches} done "
+        f"({(j / batches) * 100:.2f}%)\n")
 ```
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
@@ -483,15 +484,14 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 
 ```{python}
 compustat_query = (
-  """SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, 
-            itcb,  pstkrv, pstkl, pstk, capx, oancf, sale, 
-            cogs, xint, xsga
-        FROM comp.funda
-        WHERE indfmt = 'INDL' 
-              AND datafmt = 'STD'  
-              AND consol = 'C' 
-              AND datadate BETWEEN 
-                  '01/01/1960' AND '12/31/2022'"""
+  "SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, "
+         "itcb,  pstkrv, pstkl, pstk, capx, oancf, sale, "
+         "cogs, xint, xsga "
+    "FROM comp.funda "
+    "WHERE indfmt = 'INDL' "
+          "AND datafmt = 'STD' "
+          "AND consol = 'C' "
+          "AND datadate BETWEEN '01/01/1960' AND '12/31/2022'"
 )
 
 compustat = (pd.read_sql_query(
@@ -579,12 +579,12 @@ Unfortunately, CRSP and Compustat use different keys to identify stocks and firm
 
 ```{python}
 ccmxpf_linktable_query = (
-  """SELECT lpermno AS permno, gvkey, linkdt, 
-            COALESCE(linkenddt, CURRENT_DATE) AS linkenddt
-        FROM crsp.ccmxpf_linktable
-        WHERE linktype IN ('LU', 'LC') AND
-              linkprim IN ('P', 'C') AND
-              usedflag = 1"""
+  "SELECT lpermno AS permno, gvkey, linkdt, "
+         "COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "
+    "FROM crsp.ccmxpf_linktable "
+    "WHERE linktype IN ('LU', 'LC') "
+          "AND linkprim IN ('P', 'C') "
+          "AND usedflag = 1"
 )
 
 ccmxpf_linktable = (pd.read_sql_query(
