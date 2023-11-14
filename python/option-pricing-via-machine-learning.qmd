@@ -96,7 +96,7 @@ To that end, we start with simulated data. We compute option prices for call opt
 In order to keep the analysis reproducible, we use `np.random.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 ```{python}
-random_state = 420
+random_state = 42
 np.random.seed(random_state)
 
 S = np.arange(40, 61)
@@ -154,8 +154,9 @@ Next, we show how to fit a neural network to the data. The function `MLPRegresso
 
 ```{python}
 max_iter = 1000
+
 nnet_model = MLPRegressor(
-  hidden_layer_sizes=(10, ), 
+  hidden_layer_sizes=10, 
   max_iter=max_iter, 
   random_state=random_state
 )
@@ -175,9 +176,7 @@ nnet_fit = nnet_pipeline.fit(
 )
 ```
 
-Once you are familiar with the `scikit-learn` workflow, it is a piece of cake to fit other models. 
-For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node.
-The random forests are trained using the function `RandomForestRegressor()`. 
+Once you are familiar with the `scikit-learn` workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node. The random forests are trained using the function `RandomForestRegressor()`. 
 
 ```{python}
 rf_model = RandomForestRegressor(
@@ -203,7 +202,7 @@ rf_fit = rf_pipeline.fit(
 
 ### Deep neural networks
 
-A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used [for applications of deep neural networks in finance, see, for instance, @Jiang2022; @Jensen2022].
+A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used [for applications of deep neural networks in finance, see, for instance, @Jiang2022; @Jensen2022]. The following code chunk implemenets a deep neural network with 3 hidden layers of size 10 each and logistic activation functions. 
 
 ```{python}
 deepnnet_model = MLPRegressor(
@@ -253,12 +252,12 @@ test_X = test_data.get(["S", "K", "r", "T", "sigma"])
 test_y = test_data.get("observed_price")
 
 predictive_performance = (pd.concat(
-  [test_data.reset_index(drop = True), 
-   pd.DataFrame({"Random forest": rf_fit.predict(test_X),
-                 "Single layer": nnet_fit.predict(test_X),
-                 "Deep NN": deepnnet_fit.predict(test_X),
-                 "Lasso": lm_fit.predict(test_X)})
-  ], axis = 1)
+    [test_data.reset_index(drop = True), 
+     pd.DataFrame({"Random forest": rf_fit.predict(test_X),
+                   "Single layer": nnet_fit.predict(test_X),
+                   "Deep NN": deepnnet_fit.predict(test_X),
+                   "Lasso": lm_fit.predict(test_X)})
+    ], axis = 1)
   .melt(
     id_vars=["S", "K", "r", "T", "sigma", "black_scholes", "observed_price"],
     var_name="Model",
@@ -271,7 +270,7 @@ predictive_performance = (pd.concat(
 )
 ```
 
-In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model.  We show the results graphically in @fig-151 .\index{Graph!Prediction error}
+In the lines above, we use each of the fitted models to generate predictions for the entire test data set of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model. We show the results graphically in @fig-151 .\index{Graph!Prediction error}
 
 ```{python}
 #| label: fig-151
@@ -280,14 +279,14 @@ In the lines above, we use each of the fitted models to generate predictions for
 predictive_performance_plot = (
   ggplot(predictive_performance, 
          aes(x="moneyness", y="pricing_error", 
-             color="Model", linetype="Model")) +
+             color="Model")) +
   geom_point(alpha=0.05) +
-  geom_smooth(se=False) +
+  facet_wrap("Model") + 
   labs(
     x="Moneyness (S - K)", y="Absolut prediction error (USD)",
-    color=None, linetype=None,
     title="Prediction errors of call option prices for different models",
-  )
+  ) +
+  theme(legend_position="")
 )
 predictive_performance_plot.draw()
 ```
@@ -295,9 +294,9 @@ predictive_performance_plot.draw()
 The results can be summarized as follows:
 
 1. All ML methods seem to be able to price call options after observing the training test set.
-1. The average prediction errors increase for far in-the-money options. 
 1. Random forest and the Lasso seem to perform consistently worse in prediction option prices than the neural networks.
-1. The complexity of the deep neural network relative to the single-layer neural network does not result in better out-of-sample predictions.
+1. For random forest and Lasso, the average prediction errors increase for far in-the-money options. 
+1. The increased complexity of the deep neural network relative to the single-layer neural network results in lower prediction errors.
 
 ## Exercises
 
