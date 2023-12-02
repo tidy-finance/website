@@ -353,6 +353,11 @@ permnos <- tbl(tidy_finance, "crsp_monthly") |>
   distinct(permno) |>
   pull()
 
+msedelist <- msedelist_db |> 
+  select(permno, dlstdt, dlret) |> 
+  collect() |> 
+  filter(permno %in% permnos) 
+
 batch_size <- 500
 batches <- ceiling(length(permnos) / batch_size)
 
@@ -370,6 +375,20 @@ for (j in 1:batches) {
     drop_na()
 
   if (nrow(crsp_daily_sub) > 0) {
+    
+    crsp_daily_sub <- crsp_daily_sub |> 
+      left_join(msedelist, by = c("permno", "date"="dlstdt")) |> 
+      bind_rows(msedelist |> 
+                  anti_join(crsp_daily_sub, 
+                            by = c("permno", "dlstdt" = "date"))) |> 
+      mutate(ret = if_else(!is.na(dlret), dlret, ret),
+             date = if_else(!is.na(dlstdt), dlstdt, date)) |> 
+      select(-c(dlret, dlstdt)) |> 
+      left_join(msedelist |> 
+                  select(permno, dlstdt), by = "permno") |> 
+      filter(date <= dlstdt) |> 
+      select(-dlstdt)
+    
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
       left_join(factors_ff3_daily |>
@@ -388,8 +407,7 @@ for (j in 1:batches) {
     )
   }
 
-  cat("Batch", j, "out of", batches, "done (", 
-      percent(j / batches), ")\n")
+  cat("Batch", j, "out of", batches, "done (", percent(j / batches), ")\n")
 }
 ```
 
