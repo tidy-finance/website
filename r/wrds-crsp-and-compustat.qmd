@@ -342,6 +342,12 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `cat()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
+Also notice that we adjust the returns for delistings in a different manner than for monthly returns: 
+
+1. If a return is recorded in CRSP daily for a delisting date `dlstdt`, then we replace it with the delisting return `dlret`. 
+2. If no return is recorded in CRSP daily for an existing delisting date, then we add a new row with the delisting return. 
+3. We ensure that no returns after the delisting date `dlstdt` remain in the final table. 
+
 ```{r}
 #| eval: false
 dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
@@ -352,11 +358,6 @@ factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
 permnos <- tbl(tidy_finance, "crsp_monthly") |>
   distinct(permno) |>
   pull()
-
-msedelist <- msedelist_db |> 
-  select(permno, dlstdt, dlret) |> 
-  collect() |> 
-  filter(permno %in% permnos) 
 
 batch_size <- 500
 batches <- ceiling(length(permnos) / batch_size)
@@ -369,15 +370,18 @@ for (j in 1:batches) {
 
   crsp_daily_sub <- dsf_db |>
     filter(permno %in% permno_batch &
-      date >= start_date & date <= end_date) |>
+             date >= start_date & date <= end_date) |>
     select(permno, date, ret) |>
     collect() |>
     drop_na()
 
   if (nrow(crsp_daily_sub) > 0) {
     
-    msedelist_sub <- msedelist |> 
-      filter(permno %in% unique(crsp_daily_sub$permno))
+    msedelist_sub <- msedelist_db |> 
+    filter(permno %in% permno_batch) |> 
+    select(permno, dlstdt, dlret) |> 
+    collect() |>
+    drop_na()
     
     crsp_daily_sub <- crsp_daily_sub |> 
       left_join(msedelist_sub, by = c("permno", "date"="dlstdt")) |> 
@@ -415,8 +419,6 @@ for (j in 1:batches) {
 ```
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
-
-To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.
 
 ## Preparing Compustat data
 
