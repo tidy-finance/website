@@ -400,6 +400,12 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 20 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `print()`. Notice that we also use the function `to_sql()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
+Also notice that we adjust the returns for delistings in a different manner than for monthly returns: 
+
+1. If a return is recorded in CRSP daily for a delisting date `dlstdt`, then we replace it with the delisting return `dlret`. 
+2. If no return is recorded in CRSP daily for an existing delisting date, then we add a new row with the delisting return. 
+3. We ensure that no returns after the delisting date `dlstdt` remain in the final table. 
+
 ```{python}
 #| eval: false
 #| output: false
@@ -411,7 +417,7 @@ factors_ff3_daily = pd.read_sql(
   
 permnos = list(crsp_monthly["permno"].unique().astype(str))
 
-batch_size = 100
+batch_size = 500
 batches = np.ceil(len(permnos) / batch_size).astype(int)
   
 for j in range(1, batches + 1):  
@@ -420,13 +426,16 @@ for j in range(1, batches + 1):
     ((j - 1) * batch_size):(min(j * batch_size, len(permnos)))
   ]
   
-  permno_str = "('" + "', '".join(permno_batch) + "')"
+  permno_batch_formatted = (
+    ", ".join(f"'{permno}'" for permno in permno_batch)
+  )
+  permno_string = f"({permno_batch_formatted})"
   
   crsp_daily_sub_query = (
-    "SELECT permno, date, ret " + 
-      "FROM crsp.dsf " +
-      "WHERE permno IN " + permno_str + " " + 
-      "AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
+    "SELECT permno, date, ret "
+      "FROM crsp.dsf "
+     f"WHERE permno IN {permno_string} " 
+           f"AND date BETWEEN '01/01/1960' AND '12/31/2022'" 
   )
     
   crsp_daily_sub = (pd.read_sql_query(
@@ -439,6 +448,54 @@ for j in range(1, batches + 1):
    )
 
   if not crsp_daily_sub.empty:
+      
+      msedelist_sub_query = (
+        "SELECT permno, dlstdt, dlret "
+          "FROM crsp.msedelist as msedelist "
+         f"WHERE permno IN {permno_string} "
+      )
+      
+      msedelist_sub = (pd.read_sql_query(
+          sql=msedelist_sub_query,
+          con=wrds,
+          dtype={"permno": np.int64},
+          parse_dates={"dlstdt"}
+        )
+        .dropna()
+      )
+      
+      crsp_daily_sub = (crsp_daily_sub
+        .merge(msedelist_sub[["permno", "dlstdt"]], 
+               how="left",
+               left_on=["permno", "date"], right_on=["permno", "dlstdt"])
+      )
+      
+      missing_dlret = (msedelist_sub
+        .merge(crsp_daily_sub, 
+               how="outer", indicator=True,
+               left_on=["permno", "dlstdt"], right_on=["permno", "date"])
+        .query("_merge=='left_only'")
+        .drop(columns=["_merge", "dlstdt_x", "dlstdt_y"])
+      )
+      
+      crsp_daily_sub = pd.concat([crsp_daily_sub, missing_dlret])
+      
+      crsp_daily_sub = (crsp_daily_sub
+        .assign(
+          ret=lambda x: x["dlret"].where(x["dlret"].notna(), x["ret"]),
+          date=lambda x: x["dlstdt"].where(x["dlstdt"].notna(), x["date"])
+        )
+        .drop(columns=["dlret", "dlstdt"])
+      )
+      
+      crsp_daily_sub = (crsp_daily_sub
+        .merge(msedelist_sub[["permno", "dlstdt"]],
+               on="permno", how="left")
+        .assign(dlstdt=lambda x: x["dlstdt"].fillna("2022-12-31"))
+        .query("date <= dlstdt")
+        .drop(columns=["dlstdt"])
+      )
+    
       crsp_daily_sub = (crsp_daily_sub
         .assign(
           month = lambda x: 
@@ -468,13 +525,10 @@ for j in range(1, batches + 1):
             index=False
           )
             
-  print(f"Batch {j} out of {batches} done "
-        f"({(j / batches) * 100:.2f}%)\n")
+  print(f"Batch {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
 ```
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data we actually use and that we can load the full daily data into our memory later. 
-
-To the best of our knowledge, the daily CRSP data does not require any adjustments like the monthly data. The adjustment of the monthly data comes from the fact that CRSP aggregates daily data into monthly observations and has to decide which prices and returns to record if a stock gets delisted. In the daily data, there is simply no price or return after delisting, so there is also no aggregation problem.
 
 ## Preparing Compustat data
 
