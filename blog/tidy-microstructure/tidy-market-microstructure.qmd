@@ -51,10 +51,8 @@ kable(variable_table,
 Our focus is on the *practice* of empirical market microstructure. As such, we often motivate the coding choices with economic concepts. Other than that, however, readers interested in the economics underlying each metric are referred to introductory texts such as Campbell, Lo and MacKinlay (1997)[^4], Foucault, Pagano & Röell (2013)[^5] and Hasbrouck (2007)[^6]. 
 
 **Programming.**
-The coding here is in R, and the full code from the code chunks below is available in an R script, [here](https://www.dropbox.com/scl/fi/1lu8um14c569j841kmtyu/tidy-market-microstructure.R?rlkey=e3oy4wp7ngxv5fcq23bz8c24f&dl=1).
+The coding here is in R.
 
-<!-- TODO Update script once blog post is published -->
-  
 The choice of language is of course a matter of taste. When deciding on the tools to use, what is important to consider is that the data files in this field are often huge. How can we process them without crashing our laptops? The example data used in this guide are tiny, but we wrote the code to be efficient when the number of observations per day go from thousands to millions.^[A previous guide to microstructure programming (in SAS) is provided by Boehmer, Broussard and Kallunki (2002): Boehmer, E., Broussard, J. P., & Kallunki, J. P. (2002). *Using SAS in financial research*. SAS Publishing.]
 
 Even within the world of R, there are of course different packages available to pursue the same goal. We primarily rely on `data.table`, which is a very fast package for working with the high dimensional data that characterizes microstructure. The speed benefits show when reading and sorting data, and really shine when applying functions to several groups.^[Part of the `data.table` speed advantage is that it uses parallel processing by default. Consequently, one has to be cautious to use it in parallelization, as improper specification may lead to [over-parallelization](https://towardsdatascience.com/parallelization-caveats-in-r-1-the-basics-multiprocessing-and-multithreading-performance-eb584b7e850e) and undermine the performance benefits.] 
@@ -154,7 +152,7 @@ setnames(quotes, raw_quote_variables, new_quote_variables)
 tv_quotes <- tv_quotes|> 
   transmute(ticker = `#RIC`,
             domain = Domain,
-            date_time = as.Date(`Date-Time`),
+            date_time = `Date-Time`,
             gmt_offset = `GMT Offset`,
             type = Type,
             bid_price = `Bid Price`, 
@@ -175,9 +173,7 @@ The other two categorical variables, `domain` and `type`, are indeed constants. 
 ## data.table
 ```{r}
 # Output a table of sample tickers and values of `domain` and `type`
-table(quotes$ticker, quotes$domain)
-
-table(quotes$ticker, quotes$type)
+table(quotes$ticker, quotes$type, quotes$domain)
 
 # Delete variables
 quotes[, c("domain", "type") := NULL]
@@ -213,7 +209,10 @@ table(quotes$ticker, quotes$date)
 tv_quotes <- tv_quotes |> 
   mutate(date = as.Date(date_time))
 
-as_tibble(tv_quotes) |> count(ticker, date) |> pivot_wider(names_from = ticker, values_from = n)
+as_tibble(tv_quotes) |> 
+  count(ticker, date) |> 
+  pivot_wider(names_from = ticker, 
+              values_from = n)
 ```
 :::
 
@@ -255,15 +254,19 @@ quotes[, c("date_time", "exchange_time", "gmt_offset") := NULL]
 
 ## tidyverse (using dtplyr)
 ```{r}
-tv_quotes <- tv_quotes |>
-  mutate(time = hms::as_hms(exchange_time),
-         time = hms::as_hms(time + dhours(gmt_offset)))
+tv_quotes <- tv_quotes |> 
+  separate(exchange_time, 
+           into = c("hour", "minute", "second"), 
+           sep=":", 
+           convert = TRUE) |> 
+  mutate(time = hour * 3600 + minute * 60 + second + gmt_offset * 3600)
 ```
 
 Having made sure that dates and times are in the desired format, we can save space by dropping the raw time and date variables. 
 
 ```{r}
-tv_quotes <- tv_quotes |> select(-date_time, -exchange_time, -gmt_offset)
+tv_quotes <- tv_quotes|> 
+  select(-c("date_time", "gmt_offset","hour","minute","second"))
 ```
 :::
 
@@ -302,17 +305,18 @@ tv_quotes <- tv_quotes |>
 
 When measuring market quality in continuous trading, it is common to filter out periods that may be influenced by call auctions. The LSE opens for trading with a call auction at 08:00 am, local time, and closes with another call at 4:30 pm. There is also an intraday call auction at noon, 12:00 pm. To avoid the impact of the auctions, we exclude quotes before 8:01 am and after 4:29 pm. We do *not* exclude quotes recorded around the intraday call auction, but set them as missing (`NA`).  If they were instead deleted, it would give the false impression that the last observation before the excluded quotes was still valid.
 
+First, we exclude quotes around the opening and closing of continuous trading.
+Next, we set quotes around the intraday auction to missing. 
+
 ::: {.panel-tabset group="language"}
 ## data.table
 
-First, we exclude quotes around the opening and closing of continuous trading.
 ```{r Opening hours}
 open_time <- 8 * 3600
 close_time <- 16.5 * 3600
 quotes <- quotes[time > (open_time + 60) & time < (close_time - 60)]
 ```
 
-Next, we set quotes around the intraday auction to missing. 
 ```{r}
 intraday_auction_time <- 12 * 3600
 quotes[time > (intraday_auction_time - 60) & time < (intraday_auction_time + 3 * 60), 
@@ -321,8 +325,6 @@ quotes[time > (intraday_auction_time - 60) & time < (intraday_auction_time + 3 *
 
 ## tidyverse (using dtplyr)
 
-First, we exclude quotes around the opening and closing of continuous trading.
-Then, we set quotes around the intraday auction to missing. 
 ```{r}
 tv_quotes <- tv_quotes |>
   filter(time > hms::as_hms("08:01:00"), 
@@ -342,9 +344,10 @@ In the output below, note that the x-axis is in units of pence (0.01 British Pou
 
 Also, it is clear from the histogram that the tick size, the minimum price increment that is allowed when quoting prices, is 0.5 pence (that is, GBP 0.005). Most spreads are quoted at one or two ticks.
 
+We use the package ´ggplot2´ to plot an histogram of the nominal quoted bid-ask spreads.
+
 ::: {.panel-tabset group="language"}
 ## data.table
-We use the package ´ggplot2´ to plot an histogram of the nominal quoted bid-ask spreads.
 ```{r}
 library(ggplot2)
 ggplot(quotes, 
@@ -385,12 +388,12 @@ ggplot(quotes[is.na(ask_price - bid_price)],
 ```{r}
 ggplot(tv_quotes |> 
          filter(is.na(ask_price) | is.na(bid_price)) |>
+         mutate(time = hms::hms(time)) |>
          as_tibble(), 
        aes(x = time, fill = ticker)) +
   geom_histogram(bins = 100) + 
   labs(title = "Histogram of missing spreads",
        x = "Time of Day")
-
 ```
 :::
 
@@ -398,7 +401,6 @@ ggplot(tv_quotes |>
 
 With all the data preparation done, we are ready for the actual liquidity measurement. For comparisons across stocks, it is useful to relate the nominal spread to the fundamental value of the security. This is done by the *relative* quoted bid-ask spread, defined as $quoted\_spread^{rel} = (P^A - P^B)/M$, where $M$ is the midpoint (also known as the midprice; defined as the average of the best bid and the best ask prices). One can argue that the midpoint is not always representative of the fundamental value, but it has the strong advantage that it is continuously available in the quote data. 
 
-<!-- TODO: Define M Done-->
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Fundamental value}
@@ -407,14 +409,16 @@ quotes[, midpoint := (bid_price + ask_price) / 2]
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_quotes <- tv_quotes |> 
+  mutate(midpoint = (bid_price + ask_price) / 2)
 ```
 :::
 
 The quoted spread can also be measured relative to the tick size. In an open market, the spread can never be below one tick. A tick refers to the tick size of a security. It is the minimum price increment a security can be quoted and traded. The tick size in the example data is half a cent at both exchanges. We refer to the average number of ticks in the bid-ask spread as the *tick* spread, $quoted\_spread^{tic} = (P^A - P^B) / tick\_size$. 
 
-<!-- TODO: could be useful to define tick_size here. Done Check for Bjorn. Björn: The tick size is defined earlier. -->
-<!-- TODO: I suppose the tick size is half a cent at BOTH venues? Done Check for Bjorn. Yes, it is always the same across EU venues. -->
+```{r}
+tick_size <- 0.5
+```
 
 Another dimension of quoted liquidity is the market depth. We measure the average depth quoted at the best bid and ask prices. It is defined as $quoted\_depth = (Q^A + Q^B)/2$, where $Q^A$ and $Q^B$ are the depths available at the bid and ask prices. 
 
@@ -428,13 +432,12 @@ The output shows that the liquidity is higher at the LSE than at the TQE. Both i
 # Measure the average quote-based liquidity
 # This step calculates the mean of each of the market quality variables, for each 
 # ticker-day (as indicated in `by = c("ticker", "date")`)
-tick_size <- 0.5
 
 quotes_liquidity <- quotes[, {
 	quoted_spread = ask_price - bid_price
 	list(quoted_spread_nom = mean(quoted_spread, na.rm = TRUE),
-	     quoted_spread_rel = mean(quoted_spread / midpoint, na.rm = TRUE),
-	     quoted_spread_tic = mean(quoted_spread / tick_size, na.rm = TRUE),
+	     quoted_spread_relative = mean(quoted_spread / midpoint, na.rm = TRUE),
+	     quoted_spread_tick = mean(quoted_spread / tick_size, na.rm = TRUE),
 	     quoted_depth = mean(bid_depth * bid_price + ask_depth * ask_price, 
 	                         na.rm = TRUE) / 2)},
 	by = c("ticker", "date")]
@@ -442,24 +445,37 @@ quotes_liquidity <- quotes[, {
 # Output the liquidity measures, averaged across the five trading days for each ticker. 
 quotes_liquidity[, 
 	list(quoted_spread_nom = round(mean(quoted_spread_nom), digits = 2),
-	     quoted_spread_rel = round(mean(quoted_spread_rel) * 1e4, digits = 2),
-	     quoted_spread_tic = round(mean(quoted_spread_tic), digits = 2),
-	     quoted_depth = round(mean(quoted_depth) * 1e-5), digits = 2), 
+	     quoted_spread_relative = round(mean(quoted_spread_relative) * 1e4, digits = 2),
+	     quoted_spread_tick = round(mean(quoted_spread_tick), digits = 2),
+	     quoted_depth = round(mean(quoted_depth) * 1e-5, digits = 2)), 
 	by = "ticker"]
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_liquidity <- tv_quotes |>
+  mutate(quoted_spread = ask_price - bid_price) |>
+  group_by(ticker, date) |> 
+  summarise(quoted_spread_nom = mean(quoted_spread, na.rm = TRUE),
+            quoted_spread_relative = mean(quoted_spread / midpoint, na.rm = TRUE) * 1e4,
+            quoted_spread_tick = mean(quoted_spread / tick_size, na.rm = TRUE),
+            quoted_depth = mean(bid_depth * bid_price + ask_depth * ask_price, 
+                                        na.rm = TRUE) / 2 * 1e-5)
 
+tv_quotes_liquidity |> 
+  group_by(ticker) |>
+  summarise(across(contains("quoted"), 
+                   ~round(mean(.), digits = 2))) |>
+  pivot_longer(-ticker) |>
+  as_tibble() |>
+  pivot_wider(names_from = name, values_from = value)
 ```
 :::
-<!-- TODO: I suggest to scale by 1e4 and 1e-5 in the first step and to round all columns at once in the second step Done -->
 
 **Duration-weighted liquidity.**
 The output above are straight averages, implying an assumption that all quote observations are equally important. But whereas some quotes remain valid for several minutes, many don't last longer than a split-second. For this reason, it is common to either sample the quote data in fixed time intervals (such as at the end of each second), or to weight the observations by their duration. The duration is the time that a quote observation is in force. That is, the time elapsed until the next quote update arrives. We show the duration-weighted approach in the code below (for guidance on how to get the quotes at the end of each second, see Section 3.1).
 
 Note that the `duration` variable is obtained separately for each ticker and date. Even if we are interested in the average liquidity across dates, it is important to partition by each ticker and date to avoid that duration is calculated overnight (resulting in a huge weight with negative sign, because it will be roughly the opening time minus the closing time). Except for replacing the `mean` function with the `weighted.mean`, the code below is very similar to that above.
 
-<!-- TODO: confused about the "negative sign". Bjorn -- done -->
 In the output, we note that the differences between the duration-weighted and the equal-weighted liquidity averages are small. Nevertheless, we consider the duration-weighted average more appropriate because it is not sensitive to shortlived price and depth fluctuations.
 
 ::: {.panel-tabset group="language"}
@@ -492,6 +508,22 @@ quotes_liquidity_dw[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_liquidity <- tv_quotes |>
+  group_by(ticker, date) |>
+  mutate(duration = c(diff(time), 0), 
+         quoted_spread = ask_price - bid_price) |>
+  summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
+            quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
+            quoted_spread_tick = weighted.mean(quoted_spread / tick_size, w = duration, na.rm = TRUE),
+            quoted_depth = weighted.mean(bid_depth * bid_price + ask_depth * ask_price, w = duration, na.rm = TRUE) / 2 * 1e-5)
+
+tv_quotes_liquidity |> 
+  group_by(ticker) |>
+  summarise(across(contains("quoted"), 
+                   ~round(mean(.), digits = 2))) |>
+  pivot_longer(-ticker) |>
+  as_tibble() |>
+  pivot_wider(names_from = name, values_from = value)
 
 ```
 :::
@@ -516,14 +548,17 @@ quotes <- quotes[!duplicated(quotes, fromLast = TRUE, by = c("ticker", "date", "
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_quotes <- tv_quotes |> 
+  group_by(ticker, date, time) |>
+  slice(n()) |> 
+  ungroup() |>
+  lazy_dt()
 ```
 :::
 
 **Merging quotes from different venues.**
 We are now ready to match the quotes from the two exchanges. First, we create separate quote data sets for the two exchanges. Second, we merge the two by matching on date and time. Third, we forward-fill quotes from both venues, such that for each LSE quote we know the prevailing TQE quote, and vice versa. The validity of this is ensured by the option `sort = TRUE` in the `merge` function, which returns a data.table that is sorted on the matching variables.
 
-<!-- TODO: Just in case you ever used this for teaching: I wonder if there is a simple illustration of this process. -->
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Merging LSE and TQE}
@@ -541,16 +576,31 @@ quotes_ebbo <- merge(quotes_lse, quotes_tqe,
                      by = c("date", "time"), 
                      suffixes = venues, 
                      all = TRUE, sort = TRUE)
+```
 
-# Forward-fill the quoted prices and depth for each exchange 
+Next, we forward-fill the quoted prices and depth for each exchange. 
+```{r}
 local_lob_variables <- paste0(lob_variables, rep(venues, each = 4))
 
 quotes_ebbo[, (local_lob_variables) := lapply(.SD, nafill, type = "locf"), 
   .SDcols = (local_lob_variables),
 	by = "date"]
 ```
+
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_ebbo <- tv_quotes |> 
+  select(-midpoint) |>
+  mutate(ticker = case_when(ticker == "PRUl.TQ" ~ "tqe",
+                            ticker == "PRU.L" ~ "lse")) |>
+  pivot_wider(names_from = ticker, 
+              values_from = matches("bid|ask")) |>
+  arrange(date, time)
+
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  group_by(date) |>
+  fill(matches("bid|ask")) |> 
+  ungroup()
 
 ```
 :::
@@ -565,20 +615,37 @@ We obtain the depth at the best prices by summing the depth of the individual ve
 ## data.table
 ```{r EBBO}
 # Obtain the EBBO prices and depths
-quotes_ebbo[, best_bid_price := pmax(bid_price_lse, bid_price_tqe)]
-quotes_ebbo[, best_ask_price := pmin(ask_price_lse, ask_price_tqe)]
+quotes_ebbo[, best_bid_price := pmax(bid_price_lse, bid_price_tqe, na.rm = TRUE)]
+quotes_ebbo[, best_ask_price := pmin(ask_price_lse, ask_price_tqe, na.rm = TRUE)]
 quotes_ebbo[, best_bid_depth := bid_depth_lse * (bid_price_lse == best_bid_price) + 
               bid_depth_tqe * (bid_price_tqe == best_bid_price)]
 quotes_ebbo[, best_ask_depth := ask_depth_lse * (ask_price_lse == best_ask_price) +
               ask_depth_tqe * (ask_price_tqe == best_ask_price)]
+```
 
-# Drop local exchange variables and objects
+Finally, we drop local exchange variables and objects
+```{r}
 quotes_ebbo[, (local_lob_variables) := NULL]
 rm(quotes_lse, quotes_tqe, quotes, local_lob_variables)
 ```
+
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  mutate(best_bid_price = pmax(bid_price_lse, bid_price_tqe, na.rm = TRUE),
+         best_ask_price = pmin(ask_price_lse, ask_price_tqe, na.rm = TRUE),
+         best_bid_depth = bid_depth_lse * (bid_price_lse == best_bid_price) + 
+           bid_depth_tqe * (bid_price_tqe == best_bid_price),
+         best_ask_depth = ask_depth_lse * (ask_price_lse == best_ask_price) + 
+           ask_depth_tqe * (ask_price_tqe == best_ask_price)
+  )
 
+```
+
+Finally, we drop local exchange variables and objects
+```{r}
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  select(date, time, contains("best"))
 ```
 :::
 
@@ -593,7 +660,8 @@ quotes_ebbo[, midpoint := (best_bid_price + best_ask_price) / 2]
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_quotes_ebbo <- tv_quotes_ebbo |> 
+  mutate(midpoint = (best_bid_price + best_ask_price) / 2)
 ```
 :::
 
@@ -602,14 +670,23 @@ As above, we check that the EBBO quotes are economically meaningful by tabulatin
 
 It is also notable from the table that the maximum consolidated spread is 2.5, as compared to the spreads of up to 11 recorded in the single-venue analysis. By definition, the EBBO quoted spread is never wider than at the single venues. 
 
+::: {.panel-tabset group="language"}
+## data.table
+
 ```{r EBBO quoted spread}
 # Output an overview of the EBBO nominal quoted bid-ask spread 
 table(quotes_ebbo$best_ask_price - quotes_ebbo$best_bid_price)
 ```
+## tidyverse (using dtplyr)
+```{r}
+tv_quotes_ebbo |> 
+  transmute(ebbo_nominal_spread = best_ask_price - best_bid_price) |>
+  as_tibble() |>
+  count(ebbo_nominal_spread)
+```
+:::
 
 Observations with locked or crossed quotes are usually excluded when measuring market quality. It is also common to exclude bid-ask spread observations that are unrealistically high. We have no such cases in this sample, but, for illustration, we include a filter that would capture spreads that relative to the share price are wider than 5%.
-
-<!-- TODO: I guess you mean relative spreads wider than 500 basis points? Bjorn - Done -->
 
 In the procedure below, we flag the problematic quotes, but we do not exclude them. If they were deleted, it would imply that the last observation before the excluded spread was still in force, which may mislead subsequent analysis. 
 
@@ -639,10 +716,21 @@ quotes_ebbo_filters[,
 
 ## tidyverse (using dtplyr)
 ```{r}
+threshold <- 0.05
+
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  mutate(quoted_spread = best_ask_price - best_bid_price,
+         crossed = quoted_spread < 0,
+         locked = quoted_spread == 0,
+         large = quoted_spread / midpoint > threshold) |>
+  lazy_dt()
+
+tv_quotes_ebbo |>
+  summarise(across(c(crossed, locked, large), 
+                   ~round(100 * mean(.),2)))
 
 ```
 :::
-<!-- TODO: consider multiplying by 100 for interpretation in percent Done -->
 
 **Consolidated liquidity measures.**
 We obtain duration-weighted measures of consolidated liquidity in the same way as above. The only difference here is that we subset the quotes to filter out crossed and locked markets. 
@@ -663,9 +751,9 @@ quotes_liquidity_ebbo_dw <- quotes_ebbo[!crossed & !locked & !large, {
 	
 	list(quoted_spread_nom = weighted.mean(quoted_spread, 
 	                                       w = duration, na.rm = TRUE),
-	     quoted_spread_rel = weighted.mean(quoted_spread / midpoint, 
+	     quoted_spread_relative = weighted.mean(quoted_spread / midpoint, 
 	                                       w = duration, na.rm = TRUE),
-	     quoted_spread_tic = weighted.mean(quoted_spread / tick_size,
+	     quoted_spread_tick = weighted.mean(quoted_spread / tick_size,
 	                                       w = duration, na.rm = TRUE),
 	     quoted_depth = weighted.mean(best_bid_depth * best_bid_price + 
 	                                  best_ask_depth * best_ask_price, 
@@ -675,13 +763,25 @@ quotes_liquidity_ebbo_dw <- quotes_ebbo[!crossed & !locked & !large, {
 # Output the liquidity measures, averaged across the five trading days 
 quotes_liquidity_ebbo_dw[, 
 	list(quoted_spread_nom = round(mean(quoted_spread_nom), digits = 2),
-	     quoted_spread_rel = round(mean(quoted_spread_rel * 1e4), digits = 2),
-	     quoted_spread_tic = round(mean(quoted_spread_tic), digits = 2),
+	     quoted_spread_relative = round(mean(quoted_spread_relative * 1e4), digits = 2),
+	     quoted_spread_tick = round(mean(quoted_spread_tick), digits = 2),
 	     quoted_depth = round(mean(quoted_depth * 1e-6), digits = 2))]
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_liquidity_ebbo_dw <- tv_quotes_ebbo |>
+  group_by(date) |>
+  mutate(duration = c(diff(time), 0), 
+         quoted_spread = best_ask_price - best_bid_price) |>
+  filter(!crossed, !locked, !large) |>
+  summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
+            quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
+            quoted_spread_tick = weighted.mean(quoted_spread / tick_size, w = duration, na.rm = TRUE),
+            quoted_depth = weighted.mean(best_bid_depth * best_bid_price + best_ask_depth * best_ask_price, w = duration, na.rm = TRUE) / 2 * 1e-5)
 
+tv_quotes_liquidity_ebbo_dw |>
+  summarise(across(contains("quoted"), 
+                   ~round(mean(.), digits = 2))) 
 ```
 :::
 ## Data export
@@ -690,11 +790,15 @@ As we will reuse the consolidated quotes in the applications below, we save the 
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r EBBO data export}
+#| eval: FALSE
+
 # Export the consolidated quotes
 fwrite(quotes_ebbo, file = "quotes_ebbo.csv.gz")
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+#| eval: FALSE
+write_csv(tv_quotes_ebbo, file = "quotes_ebbo.csv.gz")
 
 ```
 :::
@@ -715,7 +819,7 @@ There are three more variables: `Price`, `Volume`, and `MMT Classification`. As 
 ## data.table
 ```{r Load trade data}
 # Load the trade data
-trades_url <- "http://tinyurl.com/3f4wfj9c"
+trades_url <- "http://tinyurl.com/prutrades"
 trades <- fread(trades_url)
 
 # View the trade data
@@ -732,11 +836,31 @@ setnames(trades,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+trades_url <- "http://tinyurl.com/prutrades"
+tv_trades <- vroom::vroom(trades_url, 
+                       col_types = list(`Exch Time` = col_character()))
 
+tv_trades <- lazy_dt(tv_trades)
 ```
+
+The raw data looks as follows.
+```{r}
+tv_trades
+```
+We rename the variables.
+```{r}
+tv_trades <- tv_trades |>
+  transmute(ticker = `#RIC`,
+            date_time = `Date-Time`,
+            gmt_offset = `GMT Offset`,
+            price = Price, 
+            size = Volume, 
+            exchange_time = `Exch Time`,
+            mmt = `MMT Classification`
+  )
+```
+
 :::
-<!-- TODO: I advice to put this part to the beginning as well.  Decided against it-->
-<!-- TODO: Also here I would clean the column names as a first thing while quickly explaining what they mean. Drop the ones you do not need.  Decided against it-->
 
 **Dates and timestamps.**
 As above, we filter out the first and last minute of continuous trading, as well as the minutes surrounding the intraday auction. Note here that filtered trades are excluded, not just set as missing. This is OK, because we won't do any forward-filling for the trade data.
@@ -767,6 +891,26 @@ trades <- trades[time > (open_time + 60) & time < (close_time - 60) &
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_trades <- tv_trades |> 
+  separate(exchange_time, 
+           into = c("hour", "minute", "second"), 
+           sep=":", 
+           convert = TRUE) |> 
+  mutate(date = as.Date(date_time),
+         time = hour * 3600 + minute * 60 + second + gmt_offset * 3600)
+```
+
+Having made sure that dates and times are in the desired format, we can save space by dropping the raw time and date variables. Further, we only retain trades from the continuous trading sessions. 
+
+```{r}
+tv_trades <- tv_trades|> 
+  select(-c("date_time", "gmt_offset","hour","minute","second"))
+
+tv_trades <- tv_trades |>
+  filter(time > hms::as_hms("08:01:00"), 
+         time < hms::as_hms("16:29:00"),
+         time < hms::as_hms("11:59:00") | time > hms::as_hms("12:03:00")) |>
+  lazy_dt()
 
 ```
 :::
@@ -776,25 +920,24 @@ A line plot offers a good overview of price data. In the figure below, we see th
 
 ::: {.panel-tabset group="language"}
 ## data.table
-<!--Niklas: Bjorn, we can think of adding the facet_warp command to be accurate on not showing both price series as one. 
-Björn: Good idea, but I decided to use it for dates instead :). As we find out below that the problem comes from the LSE trades, there is also no need to show that here. --> 
 ```{r Trade price plot}
 # Plot the trade prices
 ggplot(trades, 
        aes(time, price)) + 
        geom_line() + 
-       facet_wrap(.~date) + 
+       facet_wrap(.~date, ncol= 1) + 
        labs(title = "Trade prices",  y = "Price", x = "Time (seconds past midnight)")
 ```
 
 ## tidyverse (using dtplyr)
 ```{r}
-
+ggplot(tv_trades |>as_tibble(), 
+       aes(hms::hms(time), price)) + 
+       geom_line() + 
+       facet_wrap(.~date, ncol= 1) + 
+       labs(title = "Trade prices",  y = "Price", x = "Time")
 ```
 :::
-
-<!-- Niklas: Bjorn maybe we write a part here to explain that the outliers are predominately caused by dark trades on LSE.
-Björn: I think the text below explains that.-->
 
 There are various ways to handle outliers, but the best way is to understand them. In trade data sets, there is often information provided about the trade circumstances (for quote observations, such information is often sparse). In the current data set, the best piece of supporting information is the MMT code. MMT, short for Market Model Typology, is a rich set of flags reported for trades in Europe in recent years. For details, see the website of the [Fix Trading Community](https://www.fixtrading.org/mmt/).
 
@@ -804,18 +947,11 @@ An overview of the populated values shows in the first column that the LOB marke
 
 The low-priced trades are captured in the second column. All those trades are off-book, as indicated by the first digit being "4". The second digit holds information about how the off-book trades are reported ("5" is for on-exchange, "6" is for off-exchange, and "7" indicates systematic internalisers).  
 
-::: {.panel-tabset group="language"}
-## data.table
 ```{r MMT overview}
 # Output an overview of the MMT codes
 # The function `substr` is used here to extract the first two characters of the MMT code
 table(substr(trades[, mmt], start = 1, stop = 2), trades[, price] < 100)
 ```
-## tidyverse (using dtplyr)
-```{r}
-
-```
-:::
 
 In this analysis we are focusing on liquidity at the exchanges. Accordingly, we use the MMT codes to filter out trades from other trading venues. Restricting the trades to continuous trading at the exchanges, we obtain price plots that are free from outliers.
 
@@ -829,30 +965,28 @@ LOB_continuous_trades <- substr(trades[, mmt], start = 1, stop = 2) == "12"
 ggplot(trades[LOB_continuous_trades], 
        aes(time, price)) + 
   geom_line() + 
-  facet_wrap(.~date) + 
+  facet_wrap(.~date, ncol = 1) + 
   labs(title = "Trade prices", y = "Price", x = "Time (seconds past midnight)")
 ```
 
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_trades |>
+  filter(str_extract(mmt, "^.{2}") == "12") |>
+  as_tibble() |>
+ggplot(aes(hms::hms(time), price)) + 
+  geom_line() + 
+  facet_wrap(.~date, ncol = 1) + 
+  labs(title = "Trade prices", y = "Price", x = "Time")
 ```
 :::
 
 Further detective work reveals that the trade price outliers are not erroneous, they are just stated in pounds rather than in pence. This is clear because the outliers are priced 100 times lower than the other trades. Apparently, some off-exchange trades follow a different price reporting convention. 
 
-::: {.panel-tabset group="language"}
-## data.table
 ```{r Trade price outliers}
 # View trades with low prices
 trades[price < 100]
 ```
-
-## tidyverse (using dtplyr)
-```{r}
-
-```
-:::
 
 Quirks in the data are not unusual, and if they go unnoticed they can have strong impact on the market quality measures. The take-away from the outlier analysis is that there is often an explanation for why their prices are off. It is not always as straightforward as here, but it is worthwhile to try to find out what the cause of the deviations is. Other potential explanations are that the time stamps are off (possibly due to delayed reporting) or that the pricing is not done at the market (but in accordance to some derivative contract). 
 
@@ -866,7 +1000,8 @@ trades <- trades[LOB_continuous_trades]
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_trades <- tv_trades |>
+  filter(str_extract(mmt, "^.{2}") == "12")
 ```
 :::
 
@@ -880,15 +1015,18 @@ For US data, the most common approach is to match trades to the last quotes avai
 In lack of specific guidance for stocks traded in the UK, we match trades to quotes prevailing just before the trade. Based on the assumption that the combined liquidity from LSE and TQE offers the best fundamental value approximation, we match trades from all venues to the EBBO.
 
 The merge function in `data.table` can be called as above by `merge(dt1, dt2)` (for two data.tables named `dt1` and `dt2`), or simply `dt1[dt2]`. We use the latter approach here because it allows us to specify what to do when the timestamps do not match exactly. The option `roll = TRUE` specifies that each observation in `trades` should be matched to the `quotes_ebbo` observation with the latest timestamp that is equal or earlier than the trade timestamp. However, we don't want *equal* matches, because the quote observation should always be *before* the trade. To avoid matching to contemporaneous quotes, which may be updated to reflect the impact of the trade itself, we add one microsecond to the quote timestamps before running the merge function.
-<!-- Niklas: I included the blog post of R bloggers on it -->
 For further understanding and illustration of the rolling join, we refer to the blog post by [R-Bloggers](https://www.r-bloggers.com/2016/06/understanding-data-table-rolling-joins/).
 
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Matching trades to prevailing quotes}
+#| eval: FALSE
+
 # Load the EBBO quote data
 quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
+``` 
 
+```{r}
 # Adjust quote time stamps by one microsecond
 setnames(quotes_ebbo, old = "time", new = "quote_time")
 quotes_ebbo[, time := quote_time + 0.000001]
@@ -906,7 +1044,18 @@ trades <- quotes_ebbo[trades, roll = TRUE, mult = "last"]
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  mutate(quote_time = time + 0.000001) |>
+  select(-time) |>
+  arrange(date, quote_time) |> 
+  as_tibble()
 
+tv_trades <- tv_trades |>
+  arrange(date, time) |> 
+  as_tibble()
+
+tv_trades <- tv_trades |>
+  left_join(tv_quotes_ebbo, join_by(date, closest(time >= quote_time))) 
 ```
 :::
 
@@ -1035,8 +1184,6 @@ In line with Hagströmer (2021), we find that the weighted midpoint version of t
 
 The reason for that the choice of effective spread measure matters for PRU is that its trading is constrained by the tick size (the quoted spread is almost always one or two ticks). Stocks that are not tick-constrained tend to show smaller differences between the effective spread measures.   
 
-<!-- TODO: I suggest you stick to either TQE or Turquoise through the entire document after defining it once. Done-->
-
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Depth-weighted effective spread vw}
@@ -1140,8 +1287,6 @@ For each of these measures, rather than the tick data that we worked with above,
 ## Equispaced returns
 To get started, we again rely on the consolidated quote data. For the applications below, we drop all LOB variables except the midpoint and the filtering flags.
 
-<!-- Niklas: Bjorn We are often reading the ebbo because we are overwriting it, I changed that. 
-Björn: I changed it back. Sorry, didn't like it. Is it not better to just retain the true time stamp? Here for the efficiency measures, I think we should simply reload it. -->
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Load EBBO data}
