@@ -798,7 +798,7 @@ fwrite(quotes_ebbo, file = "quotes_ebbo.csv.gz")
 ## tidyverse (using dtplyr)
 ```{r}
 #| eval: FALSE
-write_csv(tv_quotes_ebbo, file = "quotes_ebbo.csv.gz")
+write_csv(as_tibble(tv_quotes_ebbo), file = "quotes_ebbo.csv.gz")
 
 ```
 :::
@@ -834,6 +834,13 @@ setnames(trades,
          old = raw_trade_variables, 
          new = new_trade_variables)
 ```
+
+Finally, we remove the columns ´Domain´ and ´Type´.
+
+```{r}
+trades[, c("Domain", "Type") := NULL]
+```
+
 ## tidyverse (using dtplyr)
 ```{r}
 trades_url <- "http://tinyurl.com/prutrades"
@@ -1023,7 +1030,7 @@ For further understanding and illustration of the rolling join, we refer to the 
 #| eval: FALSE
 
 # Load the EBBO quote data
-quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
+#quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
 ``` 
 
 ```{r}
@@ -1090,6 +1097,26 @@ trades_filters[,
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_trades <- tv_trades |>
+  mutate(include = !crossed & !locked & !large & !is.na(size) & size > 0 &
+           !is.na(price) & price > 0 & !is.na(midpoint) & midpoint > 0)
+
+trades_filters <- tv_trades |>
+  group_by(ticker) |>
+  summarise(
+    crossed = mean(crossed, na.rm = TRUE),
+    locked = mean(locked, na.rm = TRUE),
+    large = mean(large, na.rm = TRUE),
+    no_price = mean(is.na(price) | price == 0),
+    no_size = mean(is.na(size) | size == 0),
+    no_quotes = mean(is.na(midpoint) | midpoint <= 0),
+    included = mean(include)
+  )
+
+# Round percentages and display
+trades_filters |>
+  mutate(across(crossed:included, ~round(. * 100, digits = 2))) |>
+  select(ticker, crossed, locked, large, no_price, no_size, no_quotes, included)
 
 ```
 :::
@@ -1138,6 +1165,35 @@ table(trades$ticker, trades$dir)
 
 ## tidyverse (using dtplyr)
 ```{r}
+# Quote rule (the trade price is compared to the midpoint at the time of the trade)
+tv_trades <- tv_trades %>%
+  mutate(quote_diff = sign(price - midpoint))
+
+# Tick rule (each trade is matched to the closest preceding trade price change)
+price_tick <- tv_trades %>%
+  transmute(date, time, price_change = c(NA, sign(diff(price)))) %>%
+  filter(price_change != 0)
+
+# Merge trades and trade price changes
+tv_trades <- tv_trades %>%
+  left_join(price_tick, by = c("date", "time")) %>%
+  arrange(date, time) %>%
+  fill(price_change, .direction = "up")
+
+# Apply the Lee-Ready (1991) algorithm
+trades <- trades %>%
+  group_by(date) %>%
+  mutate(
+    dir = case_when(
+      !is.na(quote_diff) & quote_diff != 0 ~ quote_diff,
+      TRUE ~ price_change
+    )
+  ) %>%
+  ungroup()
+
+# Display table of ticker and dir
+table_result <- table(trades$ticker, trades$dir)
+print(table_result)
 
 ```
 :::
