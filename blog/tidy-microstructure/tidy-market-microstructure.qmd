@@ -14,8 +14,9 @@ description: A beginner's guide to market quality measurement in high-frequency 
 image: thumbnail.png
 image-alt: Cartoon of robots and humans trying to make sense of green stock price charts on black background. Created with DALL-E 3.
 categories: 
-  - Microstructure
+  - Market microstructure
   - R
+  - data.table
 ---
 
 Anyone active in market microstructure research *knows* that the devil is in the details. When clocks tick in microseconds and prices move in cents, a brief delay or a small fee discount can make a huge difference for traders. In fact, they can even be the business model of an exchange. But as much as such institutional detail is fascinating, the empirical implementation of even the most conventional microstructure concepts can be frustrating. Referring to the *interest of brevity*, many journal articles often defer the implementation details to an appendix, and even there they tend to be vague or incomplete. With the additional challenge of vast data sets, new entrants into this field face a steep challenge. 
@@ -46,8 +47,6 @@ kable(variable_table,
       longtable = FALSE)
 ```
 
-<!-- TODO Provide direct links to sections in the table -->
-
 Our focus is on the *practice* of empirical market microstructure. As such, we often motivate the coding choices with economic concepts. Other than that, however, readers interested in the economics underlying each metric are referred to introductory texts such as Campbell, Lo and MacKinlay (1997)[^4], Foucault, Pagano & Röell (2013)[^5] and Hasbrouck (2007)[^6]. 
 
 **Programming.**
@@ -76,6 +75,12 @@ Quotes are expressions of interests to buy or sell securities, observable before
 ## Quote data inspection and preparation
 Let's dive into it. After loading the required packages, the following code shows how to import and preview the data. We get an overview of the data by simply typing the name of the data frame in the console. It automatically abbreviates the content to show only a subset of the data. 
 
+The data can be downloaded directly from within `R`.
+
+```{r}
+quotes_url <- "http://tinyurl.com/pruquotes"
+```
+
 ::: {.panel-tabset group="language"}
 ## data.table
 
@@ -85,8 +90,8 @@ To load the data we use the function 'fread' which is similar to `read.csv`, but
 
 # Install and load the `data.table` package
 # install.packages("data.table")
+# install.packages('R.utils')
 library(data.table)
-quotes_url <- "http://tinyurl.com/pruquotes"
 
 # Load the view the quote data
 quotes <- fread(quotes_url)
@@ -114,7 +119,6 @@ library(tidyverse)
 We read the data as a ´tibble´ using the (very fast) function ´vroom´. The call ´lazy_dt´ converts the tibble to a lazy ´data.table´ object. Lazy means that all following commands are not executed immediately but translated to ´data.table´ syntax first and then executed at a final stage. As a result, there should be almost no difference in execution time of the code in ´tidyverse´ syntax versus the ´data.table´ implementation. 
 ```{r}
 #| cache=TRUE
-quotes_url <- "http://tinyurl.com/pruquotes"
 
 tv_quotes <- vroom::vroom(quotes_url, 
                        col_types = list(`Exch Time` = col_character()))
@@ -150,7 +154,7 @@ setnames(quotes, raw_quote_variables, new_quote_variables)
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes <- tv_quotes|> 
-  transmute(ticker = `#RIC`,
+  rename(ticker = `#RIC`,
             domain = Domain,
             date_time = `Date-Time`,
             gmt_offset = `GMT Offset`,
@@ -160,8 +164,8 @@ tv_quotes <- tv_quotes|>
             ask_price = `Ask Price`,
             ask_depth = `Ask Size`,
             exchange_time = `Exch Time`
-  )
-
+  ) |>
+  lazy_dt()
 ```
 :::
 
@@ -182,7 +186,8 @@ quotes[, c("domain", "type") := NULL]
 
 ## tidyverse (using dtplyr)
 ```{r}
-as_tibble(tv_quotes) |> count(ticker, type, domain)
+tv_quotes |> 
+  count(ticker, type, domain)
 tv_quotes <- tv_quotes |>
   select(-type, -domain)
 ```
@@ -207,9 +212,10 @@ table(quotes$ticker, quotes$date)
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes <- tv_quotes |> 
-  mutate(date = as.Date(date_time))
+  mutate(date = as.Date(date_time)) |>
+  lazy_dt()
 
-as_tibble(tv_quotes) |> 
+tv_quotes |> 
   count(ticker, date) |> 
   pivot_wider(names_from = ticker, 
               values_from = n)
@@ -305,6 +311,12 @@ tv_quotes <- tv_quotes |>
 
 When measuring market quality in continuous trading, it is common to filter out periods that may be influenced by call auctions. The LSE opens for trading with a call auction at 08:00 am, local time, and closes with another call at 4:30 pm. There is also an intraday call auction at noon, 12:00 pm. To avoid the impact of the auctions, we exclude quotes before 8:01 am and after 4:29 pm. We do *not* exclude quotes recorded around the intraday call auction, but set them as missing (`NA`).  If they were instead deleted, it would give the false impression that the last observation before the excluded quotes was still valid.
 
+```{r}
+open_time <- 8 * 3600
+close_time <- 16.5 * 3600
+intraday_auction_time <- 12 * 3600
+```
+
 First, we exclude quotes around the opening and closing of continuous trading.
 Next, we set quotes around the intraday auction to missing. 
 
@@ -312,13 +324,10 @@ Next, we set quotes around the intraday auction to missing.
 ## data.table
 
 ```{r Opening hours}
-open_time <- 8 * 3600
-close_time <- 16.5 * 3600
 quotes <- quotes[time > (open_time + 60) & time < (close_time - 60)]
 ```
 
 ```{r}
-intraday_auction_time <- 12 * 3600
 quotes[time > (intraday_auction_time - 60) & time < (intraday_auction_time + 3 * 60), 
   (lob_variables)] <-  NA
 ```
@@ -333,7 +342,8 @@ tv_quotes <- tv_quotes |>
 tv_quotes <- tv_quotes |>
   mutate(across(matches("bid|ask"), 
                 ~if_else(time > hms::as_hms("11:59:00") & 
-                         time < hms::as_hms("12:03:00"), NA_real_, .)))
+                         time < hms::as_hms("12:03:00"), NA_real_, .))) |>
+  lazy_dt()
 ```
 ::: 
 
@@ -386,11 +396,11 @@ ggplot(quotes[is.na(ask_price - bid_price)],
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-ggplot(tv_quotes |> 
+tv_quotes |> 
          filter(is.na(ask_price) | is.na(bid_price)) |>
          mutate(time = hms::hms(time)) |>
-         as_tibble(), 
-       aes(x = time, fill = ticker)) +
+         as_tibble() |>
+ggplot(aes(x = time, fill = ticker)) +
   geom_histogram(bins = 100) + 
   labs(title = "Histogram of missing spreads",
        x = "Time of Day")
@@ -508,10 +518,14 @@ quotes_liquidity_dw[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-tv_quotes_liquidity <- tv_quotes |>
+tv_quotes <- tv_quotes |>
   group_by(ticker, date) |>
-  mutate(duration = c(diff(time), 0), 
-         quoted_spread = ask_price - bid_price) |>
+  mutate(duration = c(diff(time), 0)) |>
+  ungroup()
+
+tv_quotes_liquidity <- tv_quotes |>
+  mutate(quoted_spread = ask_price - bid_price) |>
+  group_by(ticker, date) |>
   summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
             quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
             quoted_spread_tick = weighted.mean(quoted_spread / tick_size, w = duration, na.rm = TRUE),
@@ -590,7 +604,7 @@ quotes_ebbo[, (local_lob_variables) := lapply(.SD, nafill, type = "locf"),
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes_ebbo <- tv_quotes |> 
-  select(-midpoint) |>
+  select(-midpoint, -duration) |>
   mutate(ticker = case_when(ticker == "PRUl.TQ" ~ "tqe",
                             ticker == "PRU.L" ~ "lse")) |>
   pivot_wider(names_from = ticker, 
@@ -645,7 +659,8 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
 Finally, we drop local exchange variables and objects
 ```{r}
 tv_quotes_ebbo <- tv_quotes_ebbo |>
-  select(date, time, contains("best"))
+  select(date, time, contains("best")) |>
+  lazy_dt()
 ```
 :::
 
@@ -688,6 +703,10 @@ tv_quotes_ebbo |>
 
 Observations with locked or crossed quotes are usually excluded when measuring market quality. It is also common to exclude bid-ask spread observations that are unrealistically high. We have no such cases in this sample, but, for illustration, we include a filter that would capture spreads that relative to the share price are wider than 5%.
 
+```{r}
+threshold <- 0.05
+```
+
 In the procedure below, we flag the problematic quotes, but we do not exclude them. If they were deleted, it would imply that the last observation before the excluded spread was still in force, which may mislead subsequent analysis. 
 
 The output shows that 2.90% of the quote observations are locked, while 0.06% are crossed. 
@@ -696,11 +715,9 @@ The output shows that 2.90% of the quote observations are locked, while 0.06% ar
 ## data.table
 ```{r EBBO quote filters}
 # Flag problematic consolidated quotes
-threshold <- 0.05
 
 quotes_ebbo[, c("crossed", "locked", "large") := {
 	quoted_spread = (best_ask_price - best_bid_price)
-	
     list(quoted_spread < 0, quoted_spread == 0, quoted_spread / midpoint > threshold)}]
 
 # Count the incidence of the consolidated quote flags
@@ -716,8 +733,6 @@ quotes_ebbo_filters[,
 
 ## tidyverse (using dtplyr)
 ```{r}
-threshold <- 0.05
-
 tv_quotes_ebbo <- tv_quotes_ebbo |>
   mutate(quoted_spread = best_ask_price - best_bid_price,
          crossed = quoted_spread < 0,
@@ -769,10 +784,14 @@ quotes_liquidity_ebbo_dw[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  group_by(date)|>
+  mutate(duration = c(diff(time), 0)) |>
+  ungroup()
+
 tv_quotes_liquidity_ebbo_dw <- tv_quotes_ebbo |>
   group_by(date) |>
-  mutate(duration = c(diff(time), 0), 
-         quoted_spread = best_ask_price - best_bid_price) |>
+  mutate(quoted_spread = best_ask_price - best_bid_price) |>
   filter(!crossed, !locked, !large) |>
   summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
             quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
@@ -790,16 +809,15 @@ As we will reuse the consolidated quotes in the applications below, we save the 
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r EBBO data export}
-#| eval: FALSE
+#| eval: false
 
 # Export the consolidated quotes
 fwrite(quotes_ebbo, file = "quotes_ebbo.csv.gz")
 ```
 ## tidyverse (using dtplyr)
 ```{r}
-#| eval: FALSE
-write_csv(as_tibble(tv_quotes_ebbo), file = "quotes_ebbo.csv.gz")
-
+#| eval: false
+write_csv(as_tibble(tv_quotes_ebbo), file = "tv_quotes_ebbo.csv.gz")
 ```
 :::
 
@@ -813,13 +831,16 @@ For the market makers, who makes a living from the bid-ask spread, price impact 
 ## Trade data inspection and preparation
 We load the trade data and view the data structure. The ticker, date, and time variables follow the same structure as in quotes data, so we can proceed with the same date and time transformations as above.
 
+```{r}
+trades_url <- "http://tinyurl.com/prutrades"
+```
+
 There are three more variables: `Price`, `Volume`, and `MMT Classification`. As discussed above, we refer to the number of shares executed in a trade as "size" (we reserve the term "volume" to the sum of trade sizes in a given interval). We rename the `Volume` variable accordingly, and also alter the other variable names to make them easier to work with in R.
 
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Load trade data}
 # Load the trade data
-trades_url <- "http://tinyurl.com/prutrades"
 trades <- fread(trades_url)
 
 # View the trade data
@@ -843,7 +864,6 @@ trades[, c("Domain", "Type") := NULL]
 
 ## tidyverse (using dtplyr)
 ```{r}
-trades_url <- "http://tinyurl.com/prutrades"
 tv_trades <- vroom::vroom(trades_url, 
                        col_types = list(`Exch Time` = col_character()))
 
@@ -857,14 +877,16 @@ tv_trades
 We rename the variables.
 ```{r}
 tv_trades <- tv_trades |>
-  transmute(ticker = `#RIC`,
+  rename(ticker = `#RIC`,
             date_time = `Date-Time`,
             gmt_offset = `GMT Offset`,
             price = Price, 
             size = Volume, 
             exchange_time = `Exch Time`,
             mmt = `MMT Classification`
-  )
+  ) |>
+  select(-c("Domain", "Type")) |>
+  lazy_dt()
 ```
 
 :::
@@ -1027,10 +1049,10 @@ For further understanding and illustration of the rolling join, we refer to the 
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Matching trades to prevailing quotes}
-#| eval: FALSE
+#| eval: false
 
 # Load the EBBO quote data
-#quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
+quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
 ``` 
 
 ```{r}
@@ -1062,7 +1084,8 @@ tv_trades <- tv_trades |>
   as_tibble()
 
 tv_trades <- tv_trades |>
-  left_join(tv_quotes_ebbo, join_by(date, closest(time >= quote_time))) 
+  left_join(tv_quotes_ebbo, join_by(date, closest(time >= quote_time))) |>
+  lazy_dt()
 ```
 :::
 
@@ -1164,37 +1187,46 @@ table(trades$ticker, trades$dir)
 ```
 
 ## tidyverse (using dtplyr)
+First, we compute the sign of the price change based on the quote rule (the trade price is compared to the midpoint at the time of the trade).
 ```{r}
-# Quote rule (the trade price is compared to the midpoint at the time of the trade)
-tv_trades <- tv_trades %>%
+tv_trades <- tv_trades |>
   mutate(quote_diff = sign(price - midpoint))
+```
 
-# Tick rule (each trade is matched to the closest preceding trade price change)
-price_tick <- tv_trades %>%
-  transmute(date, time, price_change = c(NA, sign(diff(price)))) %>%
-  filter(price_change != 0)
+Second, each trade is matched to the closest preceding trade price change.
+```{r}
+price_tick <- tv_trades |>
+  transmute(date, time, price_change = c(NA, sign(diff(price)))) |>
+  filter(price_change != 0) |> 
+  group_by(date,time)|> 
+  slice(n()) |> 
+  ungroup() |>
+  as_tibble()
+```
 
-# Merge trades and trade price changes
-tv_trades <- tv_trades %>%
-  left_join(price_tick, by = c("date", "time")) %>%
-  arrange(date, time) %>%
-  fill(price_change, .direction = "up")
+We merge the `price_tick` and the `trades` objects, such that each trade is associated with the latest previous price change.
+```{r}
+tv_trades <- tv_trades |>
+  as_tibble() |>
+  left_join(price_tick, join_by(date, closest(time>=time))) |>
+  rename(time=time.x) |>
+  fill(price_change, .direction = "up") |>
+  lazy_dt()
+```
 
-# Apply the Lee-Ready (1991) algorithm
-trades <- trades %>%
-  group_by(date) %>%
-  mutate(
-    dir = case_when(
-      !is.na(quote_diff) & quote_diff != 0 ~ quote_diff,
-      TRUE ~ price_change
-    )
-  ) %>%
-  ungroup()
+Finally, we apply the Lee-Ready (1991) algorithm
+```{r}
+tv_trades <- tv_trades |>
+  group_by(date) |>
+  mutate(dir = case_when(!is.na(quote_diff) & quote_diff != 0 ~ quote_diff,
+                         TRUE ~ price_change)
+  ) |>
+  ungroup() |>
+  lazy_dt()
 
-# Display table of ticker and dir
-table_result <- table(trades$ticker, trades$dir)
-print(table_result)
-
+tv_trades |> 
+  as_tibble() |> 
+  count(ticker,dir)
 ```
 :::
 
@@ -1230,6 +1262,24 @@ trades_liquidity[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_trades <- tv_trades |>
+  arrange(ticker, date, time)
+
+tv_trades_liquidity <- tv_trades |>
+  filter(include == TRUE) |>
+  group_by(ticker, date) |>
+  summarise(
+    effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, w = size),
+    volume = sum(price * size)
+  )
+
+# Output liquidity measures, averaged across the five trading days for each ticker
+tv_trades_liquidity |>
+  group_by(ticker) |>
+  summarise(
+    effective_spread = round(mean(effective_spread * 1e4), digits = 2),
+    volume = round(mean(volume * 1e-8), digits = 2)
+  )
 
 ```
 :::
@@ -1263,6 +1313,22 @@ trades_liquidity[,
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_trades_liquidity <- tv_trades |>
+  filter(include == TRUE) |>
+  group_by(ticker, date) |>
+  summarise(
+    midpoint_w = weighted.mean((best_bid_price * best_ask_depth + best_ask_price * best_bid_depth) /
+                                (best_ask_depth + best_bid_depth), w = size),
+    effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, w = size),
+    effective_spread_w = weighted.mean(2 * dir * (price - midpoint_w) / midpoint_w, w = size)
+  )
+
+tv_trades_liquidity |>
+  group_by(ticker) |>
+  summarise(
+    effective_spread = round(mean(effective_spread * 1e4), digits = 2),
+    effective_spread_w = round(mean(effective_spread_w * 1e4), digits = 2)
+  )
 
 ```
 :::
@@ -1297,6 +1363,24 @@ trades[, include_1min := !crossed_1min & !locked_1min & !large_1min]
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_ebbo <- tv_quotes_ebbo |>
+  mutate(time = quote_time - 60)
+
+# Rename variables to indicate that they correspond to quotes 1 minute after the trade
+# The function `paste0` adds the suffix "_1min" to each variable
+tv_quotes_ebbo <- tv_quotes_ebbo |> 
+  rename_with(~str_c(., "_1min"), c(midpoint, crossed, locked, large))
+
+# Merge trades and quotes
+tv_trades <- tv_quotes_ebbo |>
+  left_join(tv_trades, join_by(date, closest(time>=time))) |>
+  arrange(ticker, date, time.x) |>
+  group_by(ticker, date) |>
+  fill(midpoint_1min, crossed_1min, locked_1min, large_1min, .direction = "down")
+
+# Flag valid future quotes
+tv_trades <- tv_trades |>
+  mutate(include_1min = !crossed_1min & !locked_1min & !large_1min)
 
 ```
 :::
@@ -1346,8 +1430,11 @@ To get started, we again rely on the consolidated quote data. For the applicatio
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Load EBBO data}
+#| eval: false
 quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
+```
 
+```{r}
 # Delete variables
 quotes_ebbo[, c("best_bid_price", "best_bid_depth", "best_ask_price", 
                 "best_ask_depth", "duration") := NULL]
@@ -1355,7 +1442,8 @@ quotes_ebbo[, c("best_bid_price", "best_bid_depth", "best_ask_price",
 
 ## tidyverse (using dtplyr)
 ```{r}
-
+tv_quotes_ebbo |> 
+  select(date, time, midpoint, crossed, locked, large)
 ```
 :::
 
@@ -1386,6 +1474,14 @@ quotes_1sec
 
 ## tidyverse (using dtplyr)
 ```{r}
+sampling_freq  <- 1
+open_time <- 8 * 3600
+close_time <- 16.5 * 3600
+
+time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
+
+tv_quotes_1sec <- expand_grid(date = tv_quotes_ebbo|>pull(date)|>unique(), 
+            time = time_grid)
 
 ```
 :::
@@ -1416,6 +1512,13 @@ quotes_1sec[, return := 1e4 * c(NA, diff(log(midpoint))), by = "date"]
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_1sec <- tv_quotes_1sec |> 
+  left_join(tv_quotes_ebbo, join_by(date, closest(time>=time))) |>
+  mutate(midpoint_1min = na_if(midpoint_1min, locked_1min|crossed_1min|large_1min))
+
+tv_quotes_1sec |> 
+  group_by(date) |>
+  mutate(return = 1e4 * c(NA, diff(log(midpoint))))
 
 ```
 :::
@@ -1509,7 +1612,7 @@ A key point throughout this guide is to try to monitor and understand the data. 
 The format necessarily imposes limitations. We don't cover all market quality measures and not all variations in methodology, but aim to convey what we consider to be good practice when calculating the most common measures. If you disagree, find bugs, or have other feedback, don't hesitate to send us an email at [bjh@sbs.su.se](mailto:bjh@sbs.su.se) and [niklas.landsberg@kuleuven.be](mailto:niklas.landsberg@kuleuven.be). 
 
 To cite our work, please use the following reference information:
-Hagströmer, B. and Landsberg, N. (2023). Tidy Market Microstructure. URL: ...
+Hagströmer, B. and Landsberg, N. (2023). Tidy Market Microstructure. URL: [www.tidy-finance.org/blog/tidy-microstructure](www.tidy-finance.org/blog/tidy-microstructure)
 
 [^1]: Menkveld, A. J. et al. (2023). Non-standard errors, *Journal of Finance (forthcoming)*. http://dx.doi.org/10.2139/ssrn.3961574
 [^2]: Amihud, Y. (2002). Illiquidity and stock returns: Cross-section and time-series effects. *Journal of Financial Markets*, 5(1), 31-56. https://doi.org/10.1016/S1386-4181(01)00024-6
@@ -1519,9 +1622,3 @@ Hagströmer, B. and Landsberg, N. (2023). Tidy Market Microstructure. URL: ...
 [^6]: Hasbrouck, J. (2007). *Empirical market microstructure: The institutions, economics, and econometrics of securities trading*. Oxford University Press.
 [^7]: Scheuch, C., Voigt, S., & Weiss P. (2023). *Tidy finance with {R}*. Chapman and Hall/CRC. https://doi.org/10.1201/b23237
 }
-
-```{r Convert to RScript, include= FALSE, eval= FALSE}
-# Convert to one R Script
-infile <- "tidy-market-microstructure.qmd"
-knitr::purl(infile)
-```
