@@ -808,13 +808,12 @@ As we will reuse the consolidated quotes in the applications below, we save the 
 
 ::: {.panel-tabset group="language"}
 ## data.table
+We export the consolidated quotes using ´fwrite´. 
 ```{r EBBO data export}
-#| eval: false
-
-# Export the consolidated quotes
 fwrite(quotes_ebbo, file = "quotes_ebbo.csv.gz")
 ```
 ## tidyverse (using dtplyr)
+We export the consolidated quotes using ´write_csv´. 
 ```{r}
 #| eval: false
 write_csv(as_tibble(tv_quotes_ebbo), file = "tv_quotes_ebbo.csv.gz")
@@ -885,8 +884,7 @@ tv_trades <- tv_trades |>
             exchange_time = `Exch Time`,
             mmt = `MMT Classification`
   ) |>
-  select(-c("Domain", "Type")) |>
-  lazy_dt()
+  select(-c("Domain", "Type")) 
 ```
 
 :::
@@ -1048,35 +1046,38 @@ For further understanding and illustration of the rolling join, we refer to the 
 
 ::: {.panel-tabset group="language"}
 ## data.table
+For the sake of completeness, you can load the EBBO quote data which we stored at an intermediate step above as follows.
 ```{r Matching trades to prevailing quotes}
 #| eval: false
-
-# Load the EBBO quote data
 quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
 ``` 
 
 ```{r}
 # Adjust quote time stamps by one microsecond
-setnames(quotes_ebbo, old = "time", new = "quote_time")
-quotes_ebbo[, time := quote_time + 0.000001]
+quotes_ebbo[, matching_time := time + 0.00001]
 
 # Sort trades and quotes (this specifies the matching criteria for the merge function)
 setkeyv(trades, cols = c("date", "time"))
-setkeyv(quotes_ebbo, cols = c("date", "time"))
+setkeyv(quotes_ebbo, cols = c("date", "matching_time"))
 
 # Match trades to quotes prevailing at the time of trade 
 # The rolling is done only for the last of the matching variables, in this case "time"
 # `mult = "last"` specifies that if there are multiple matches with identical timestamps, 
 # the last match is retained
-trades <- quotes_ebbo[trades, roll = TRUE, mult = "last"]
+trades <- quotes_ebbo[trades, on = c("date", matching_time = "time"), roll = TRUE, mult = "last"]
 ```
 
 ## tidyverse (using dtplyr)
+For the sake of completeness, you can load the EBBO quote data which we stored at an intermediate step above as follows.
+```{r}
+#| eval: false
+tv_quotes_ebbo <- read_csv("tv_quotes_ebbo.csv.gz")
+```
+
 ```{r}
 tv_quotes_ebbo <- tv_quotes_ebbo |>
-  mutate(quote_time = time + 0.000001) |>
-  select(-time) |>
-  arrange(date, quote_time) |> 
+  mutate(matching_time = time + 0.000001) |>
+  arrange(date, matching_time) |> 
   as_tibble()
 
 tv_trades <- tv_trades |>
@@ -1084,7 +1085,7 @@ tv_trades <- tv_trades |>
   as_tibble()
 
 tv_trades <- tv_trades |>
-  left_join(tv_quotes_ebbo, join_by(date, closest(time >= quote_time))) |>
+  left_join(tv_quotes_ebbo |> select(-time), join_by(date, closest(time >= matching_time))) |>
   lazy_dt()
 ```
 :::
@@ -1316,9 +1317,9 @@ trades_liquidity[,
 tv_trades_liquidity <- tv_trades |>
   filter(include == TRUE) |>
   group_by(ticker, date) |>
+  mutate(    midpoint_w = (best_bid_price * best_ask_depth + best_ask_price * best_bid_depth) /
+                                (best_ask_depth + best_bid_depth)) |>
   summarise(
-    midpoint_w = weighted.mean((best_bid_price * best_ask_depth + best_ask_price * best_bid_depth) /
-                                (best_ask_depth + best_bid_depth), w = size),
     effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, w = size),
     effective_spread_w = weighted.mean(2 * dir * (price - midpoint_w) / midpoint_w, w = size)
   )
@@ -1344,7 +1345,7 @@ The code below prepares the variables needed to calculate the realized spread an
 ## data.table
 ```{r Preparation for the effective spread decomposition}
 # Adjust quote time stamps by 60 seconds
-quotes_ebbo <- quotes_ebbo[, time := quote_time - 60]
+quotes_ebbo <- quotes_ebbo[, shifted_time := matching_time - 60]
 
 # Rename variables to indicate that they correspond to quotes 1 minute after the trade
 # The function `paste0` adds the suffix "_1min" to each variable
@@ -1353,7 +1354,7 @@ setnames(quotes_ebbo,
          new = paste0(c("midpoint", "crossed", "locked", "large"), "_1min"))
 
 # Merge trades and quotes
-setkeyv(quotes_ebbo, cols = c("date", "time"))
+setkeyv(quotes_ebbo, cols = c("date", "shifted_time"))
 setkeyv(trades, cols = c("date", "time"))
 trades <- quotes_ebbo[trades, roll = TRUE, mult = "last"]
 
@@ -1364,23 +1365,28 @@ trades[, include_1min := !crossed_1min & !locked_1min & !large_1min]
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes_ebbo <- tv_quotes_ebbo |>
-  mutate(time = quote_time - 60)
+  mutate(shifted_time = matching_time - 60)
 
 # Rename variables to indicate that they correspond to quotes 1 minute after the trade
 # The function `paste0` adds the suffix "_1min" to each variable
 tv_quotes_ebbo <- tv_quotes_ebbo |> 
-  rename_with(~str_c(., "_1min"), c(midpoint, crossed, locked, large))
+  mutate(across(c(midpoint, crossed, locked, large), 
+                ~., 
+                .names="{col}_1min"))
 
 # Merge trades and quotes
-tv_trades <- tv_quotes_ebbo |>
-  left_join(tv_trades, join_by(date, closest(time>=time))) |>
-  arrange(ticker, date, time.x) |>
+tv_trades <- tv_trades |>
+  as_tibble() |>
+  left_join(tv_quotes_ebbo |> select(date, shifted_time, contains("_1min")), 
+            join_by(date, closest(time>=shifted_time))) |>
+  arrange(ticker, date, shifted_time) |>
   group_by(ticker, date) |>
   fill(midpoint_1min, crossed_1min, locked_1min, large_1min, .direction = "down")
 
 # Flag valid future quotes
 tv_trades <- tv_trades |>
-  mutate(include_1min = !crossed_1min & !locked_1min & !large_1min)
+  mutate(include_1min = !crossed_1min & !locked_1min & !large_1min) |>
+  lazy_dt()
 
 ```
 :::
@@ -1410,6 +1416,23 @@ effective_spread_decomposition[,
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_effective_spread_decomposition <- tv_trades |>
+  filter(include == TRUE,
+         include_1min == TRUE) |>
+  group_by(ticker, date) |>
+  summarise(effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, 
+								  w = size),
+	     price_impact = weighted.mean(2 * dir * (midpoint_1min - midpoint) / midpoint, 
+  		 						 w = size),
+  		 realized_spread = weighted.mean(2 * dir * (price - midpoint_1min) / midpoint, 
+  		 						 w = size))
+
+tv_effective_spread_decomposition |>
+  group_by(ticker) |>
+  summarise(
+    effective_spread = round(mean(effective_spread * 1e4), digits = 2),
+    price_impact = round(mean(price_impact * 1e4), digits = 2),
+    realized_spread = round(mean(realized_spread * 1e4), digits = 2))
 
 ```
 :::
@@ -1420,8 +1443,6 @@ The accuracy of the effective spread decomposition may be improved by replacing 
 
 In efficient markets, future price moves are unpredictable, but it is well-known that frictions can cause deviations from that view. This insight is the starting point for measurement of the degree of market efficiency. We consider two measures, the autocorrelation of returns and the variance ratio. We also include the *realized volatility*, the mean squared returns, which is a common control variable in microstructure research. 
 
-<!-- TODO: I know realized volatility as the sum of squared returns?  -->
-
 For each of these measures, rather than the tick data that we worked with above, we need *equispaced returns*. That is, we want to calculate price changes between fixed points in time, such as second by second. As this does not correspond to the LOB updates, we need to transform the data to the desired frequency.
 
 ## Equispaced returns
@@ -1430,7 +1451,6 @@ To get started, we again rely on the consolidated quote data. For the applicatio
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Load EBBO data}
-#| eval: false
 quotes_ebbo <- fread(file = "quotes_ebbo.csv.gz")
 ```
 
@@ -1442,24 +1462,29 @@ quotes_ebbo[, c("best_bid_price", "best_bid_depth", "best_ask_price",
 
 ## tidyverse (using dtplyr)
 ```{r}
-tv_quotes_ebbo |> 
-  select(date, time, midpoint, crossed, locked, large)
+tv_quotes_ebbo <- tv_quotes_ebbo |> 
+  select(date, time, midpoint, crossed, locked , large) |>
+  lazy_dt()
 ```
 :::
 
 To obtain equispaced observations, we create a time grid with one observation per second. As above, we exclude the first and last minute when setting the opening and closing times. We use the `expand.grid` function to create a grid of second-by-second observations for each sample date, and then convert it to a `data.table`.  
 
+First we create an equispaced time grid.
+```{r}
+sampling_freq  <- 1
+open_time <- 8 * 3600
+close_time <- 16.5 * 3600
+```
+
+The function `seq` creates a sequence of discrete numbers the `by` option defines the increment of the sequence, which is here 1 second
+```{r}
+time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
+```
+
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Equispaced quote data, 1 sec}
-# Create an equispaced time grid
-sampling_freq  <- 1 # 1 second grid
-open_time <- 8 * 3600
-close_time <- 16.5 * 3600
-
-# The function `seq` creates a sequence of discrete numbers
-# the `by` option defines the increment of the sequence, which is here 1 second
-time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
 
 # Repeat the time grid for each date and sort it by date and time
 dates <- unique(quotes_ebbo$date)
@@ -1474,13 +1499,7 @@ quotes_1sec
 
 ## tidyverse (using dtplyr)
 ```{r}
-sampling_freq  <- 1
-open_time <- 8 * 3600
-close_time <- 16.5 * 3600
-
-time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
-
-tv_quotes_1sec <- expand_grid(date = tv_quotes_ebbo|>pull(date)|>unique(), 
+tv_quotes_1sec <- expand_grid(date = tv_quotes_ebbo |> pull(date) |> unique(), 
             time = time_grid)
 
 ```
@@ -1513,12 +1532,11 @@ quotes_1sec[, return := 1e4 * c(NA, diff(log(midpoint))), by = "date"]
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes_1sec <- tv_quotes_1sec |> 
-  left_join(tv_quotes_ebbo, join_by(date, closest(time>=time))) |>
-  mutate(midpoint_1min = na_if(midpoint_1min, locked_1min|crossed_1min|large_1min))
-
-tv_quotes_1sec |> 
+  left_join(tv_quotes_ebbo |> as_tibble(), join_by(date, closest(time>=time))) |>
+  mutate(midpoint = na_if(midpoint, locked|crossed|large)) |>
   group_by(date) |>
-  mutate(return = 1e4 * c(NA, diff(log(midpoint))))
+  mutate(return = 1e4 * c(NA, diff(log(midpoint)))) |>
+  lazy_dt()
 
 ```
 :::
@@ -1548,6 +1566,16 @@ efficiency_1sec[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_efficiency_1sec <- tv_quotes_1sec |>
+  arrange(date, time.x) |>
+  group_by(date) |>
+  summarise(return_corr_1sec = cor(return, lag(return), use = "complete.obs"),
+            vol_1sec = mean(return^2, na.rm = TRUE),
+            return_var_1sec = var(return, na.rm = TRUE))
+
+tv_efficiency_1sec |>
+  summarise(across(everything(), 
+                   ~round(mean(.), digits = 2)))
 
 ```
 :::
@@ -1557,12 +1585,15 @@ The variance ratio is defined as $var\_ratio_{\tau_{1}, \tau_{2}} = (Var(R_{\tau
 
 We measure the variance ratio for 1-second and 10-second returns. To get the 10-second return variance, the first step is to obtain the 10-second price grid. To do so, we simply take a subset of the grid obtained for the 1-second frequency. We then proceed with the calculation of returns and the return variance in the same way as above.
 
+```{r}
+sampling_freq <- 10 # 10 second grid
+time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
+```
+
 ::: {.panel-tabset group="language"}
 ## data.table
 ```{r Equispaced quote data, 10 sec}
 # Subset the 1-second price grid to get the 10-second price grid 
-sampling_freq <- 10 # 10 second grid
-time_grid <- seq(from = open_time + 60, to = close_time - 60, by = sampling_freq)
 quotes_10sec <- quotes_1sec[time %in% time_grid,]
 
 # Calculate returns at the 10-second frequency, expressed in basis points
@@ -1575,7 +1606,15 @@ efficiency_10sec <- quotes_10sec[,
 ```
 ## tidyverse (using dtplyr)
 ```{r}
+tv_quotes_10sec <- tv_quotes_1sec |>
+  rename(time = time.x) |>
+  inner_join(tibble(time = time_grid)) |>
+  group_by(date) |>
+  mutate(return = 1e4 * c(NA, diff(log(midpoint))))
 
+tv_efficiency_10sec <- tv_quotes_10sec |>
+  group_by(date) |>
+  summarise(return_var_10sec = var(return, na.rm = TRUE))
 ```
 :::
 
@@ -1599,7 +1638,13 @@ efficiency[,
 
 ## tidyverse (using dtplyr)
 ```{r}
+tv_efficiency <- tv_efficiency_1sec |>
+  inner_join(tv_efficiency_10sec) |>
+  mutate(var_ratio = return_var_10sec / (10 * return_var_1sec)) |>
+  lazy_dt()
 
+tv_efficiency |>
+  summarise(across(c(return_var_1sec, return_var_10sec, var_ratio), ~round(mean(.), digits = 3)))
 ```
 :::
 
