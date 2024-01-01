@@ -533,7 +533,7 @@ Note
 <p>In the second step, the time-series average <span class="math inline">\(\frac{1}{T}\sum_{t=1}^T \hat\lambda^{f}_t\)</span> of the estimates <span class="math inline">\(\hat\lambda^{f}_t\)</span> can then be interpreted as the risk premium for the specific risk factor <span class="math inline">\(f\)</span>. We follow <span class="citation" data-cites="Zaffaroni2022">Zaffaroni and Zhou (<a href="#ref-Zaffaroni2022" role="doc-biblioref">2022</a>)</span> and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time <span class="math inline">\(t+1\)</span> variables, then the regression approach captures risk attributes rather than risk premiums.</p>
 <p>Before we move to the implementation, we want to highlight that the characteristics, e.g., <span class="math inline">\(\hat\beta^{f}_{i}\)</span>, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a <em>step 0</em>. You might thus worry that the errors of <span class="math inline">\(\hat\beta^{f}_{i}\)</span> impact the risk premiums’ standard errors. Measurement error in <span class="math inline">\(\hat\beta^{f}_{i}\)</span> indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias <span class="citation" data-cites="Shanken1992 Kim1995 Chen2015">(see, e.g., <a href="#ref-Shanken1992" role="doc-biblioref">Shanken 1992</a>; <a href="#ref-Kim1995" role="doc-biblioref">Kim 1995</a>; <a href="#ref-Chen2015" role="doc-biblioref">Chen, Lee, and Lee 2015</a>, among others)</span> but also shows that the bias goes to zero as <span class="math inline">\(T \to \infty\)</span>. We refer to <span class="citation" data-cites="Gagliardini2016">Gagliardini, Ossola, and Scaillet (<a href="#ref-Gagliardini2016" role="doc-biblioref">2016</a>)</span> for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: <span class="citation" data-cites="Hou2020">Hou, Xue, and Zhang (<a href="#ref-Hou2020" role="doc-biblioref">2020</a>)</span> advocates using weighed-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.</p>
 <p>The current chapter relies on this set of Python packages.</p>
-<div id="e3478574" class="cell" data-execution_count="2">
+<div id="1b386fb9" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -544,7 +544,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We illustrate <span class="citation" data-cites="Fama1973">Fama and MacBeth (<a href="#ref-Fama1973" role="doc-biblioref">1973</a>)</span> with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>.</p>
-<div id="8c9ea0d2" class="cell" data-execution_count="3">
+<div id="b537ce1d" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -569,7 +569,7 @@ Note
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization. Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.</p>
-<div id="f54c5e6c" class="cell" data-execution_count="4">
+<div id="f7ab2307" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>characteristics <span class="op">=</span> (compustat</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    month <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"datadate"</span>].dt.to_period(<span class="st">"M"</span>)</span>
@@ -624,7 +624,7 @@ Note
 <section id="cross-sectional-regression" class="level2">
 <h2 class="anchored" data-anchor-id="cross-sectional-regression">Cross-sectional Regression</h2>
 <p>Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums <span class="math inline">\(\hat\lambda^{f}_t\)</span> for each point in time. </p>
-<div id="aad04afa" class="cell" data-execution_count="5">
+<div id="63dbe35a" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>risk_premiums <span class="op">=</span> (data_fama_macbeth</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: smf.ols(</span>
@@ -637,7 +637,7 @@ Note
 <section id="time-series-aggregation" class="level2">
 <h2 class="anchored" data-anchor-id="time-series-aggregation">Time-Series Aggregation</h2>
 <p>Now that we have the risk premiums’ estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the <span class="math inline">\(t\)</span>-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests.</p>
-<div id="933f11e3" class="cell" data-execution_count="6">
+<div id="bff3556b" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>price_of_risk <span class="op">=</span> (risk_premiums</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars<span class="op">=</span><span class="st">"month"</span>, </span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        var_name<span class="op">=</span><span class="st">"factor"</span>, </span>
@@ -654,7 +654,7 @@ Note
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in <a href="../python/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>, the typical procedure for this is computing <span class="citation" data-cites="Newey1987">Newey and West (<a href="#ref-Newey1987" role="doc-biblioref">1987</a>)</span> standard errors.</p>
-<div id="3b731db5" class="cell" data-execution_count="7">
+<div id="3e80b9ac" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>price_of_risk_newey_west <span class="op">=</span> (risk_premiums</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars<span class="op">=</span><span class="st">"month"</span>, </span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        var_name<span class="op">=</span><span class="st">"factor"</span>, </span>
@@ -728,7 +728,6 @@ Note
 <ol type="1">
 <li>Download a sample of test assets from Kenneth French’s homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.</li>
 <li>Use individual stocks with weighted-least squares based on a firm’s size as suggested by <span class="citation" data-cites="Hou2020">Hou, Xue, and Zhang (<a href="#ref-Hou2020" role="doc-biblioref">2020</a>)</span>. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches.</li>
-<li>Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.</li>
 </ol>
 
 
