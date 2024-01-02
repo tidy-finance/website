@@ -6,16 +6,21 @@ author:
     affiliations:
       - name: wikifolio Financial Technologies AG
 date: "2023-09-26"
-description: R code to generate dummy data that can be used to run the code chunks in Tidy Finance with R or Python
+description: R code to generate dummy data that can be used to run the code chunks in Tidy Finance with R
 image: thumbnail.png
-image-alt: An image of a stylized company building on a screen in the middle of a room. The room has a futuristic setting, with a backdrop of a digital, grid-like landscape symbolizing the internet. The color palette should be a combination of cool blues and warm yellow. Created with DALL-E 2.
+image-alt: A 3D computer-rendered  image of a stylized company building on a screen in the middle of a room. Created with DALL-E 2.
 categories: 
   - Data
+  - R
 ---
 
 Since we published our book [Tidy Finance with R](../../r/index.qmd), we have received feedback from readers who don't have access to WRDS that they cannot run the code we provide. To alleviate their constraints, we decided to create a dummy database that contains the WRDS tables and corresponding columns such that all code chunks in our book can be executed with this dummy database. The resulting database can be found through [this link](https://github.com/tidy-finance/website/tree/main/blog/tidy-finance-dummy-data/data) (around 50 MB). Just download the database and put it into your `data` folder (I already renamed it to `tidy_finance.sqlite`). Note that we do not create dummy data for macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](../../r/accessing-and-managing-financial-data.qmd).
 
 We deliberately use the *dummy* label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does *not* contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books. 
+
+::: {.callout-note}
+If you want to see the Python code to generate the dummy data, check out the chapter in the appendix of our book: [WRDS Dummy Data](../../python/wrds-dummy-data.qmd).
+:::
 
 To generate the dummy database, we use the following packages:
 
@@ -25,7 +30,7 @@ library(tidyverse)
 library(RSQLite)
 ```
 
-Let us initialize you `tidy_finance.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
+Let us initialize a `tidy_finance.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -154,9 +159,7 @@ dbWriteTable(
 
 ### Dummy `compustat` table
 
-To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1 using the same trick as with the macro data tables. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. 
-
-We then use the `!!!` operator to unlist and execute a list of commands. This trick actually helps us to avoid typing the same function for each column individually. Finally, each table with dummy data is written to the new database with dummy data.
+To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. We then use the `!!!` operator to unlist and execute a list of commands. This trick actually helps us to avoid typing the same function for each column individually.
 
 ```{r}
 relevant_columns <- c(
@@ -236,14 +239,14 @@ dbWriteTable(
 
 Lastly, we move to the bond data that we use in our books. 
 
-### Dummy `mergent` data
+### Dummy `fisd` data
 
 To create dummy data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`. 
 
 ```{r}
 number_of_bonds <- 100
 
-mergent_dummy <- 1:number_of_bonds |> 
+fisd_dummy <- 1:number_of_bonds |> 
   map_df(
     function(x) {
       tibble(
@@ -271,22 +274,22 @@ mergent_dummy <- 1:number_of_bonds |>
   
 dbWriteTable(
   tidy_finance, 
-  "mergent", 
-  mergent_dummy, 
+  "fisd", 
+  fisd_dummy, 
   overwrite = TRUE
 )
 ```
 
 ### Dummy `trace_enhanced` data
 
-Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `mergent` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. 
+Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. 
 
 ```{r}
 start_date <- as.Date("2014-01-01")
 end_date <- as.Date("2016-11-30")
 
 bonds_panel <- expand_grid(
-  mergent_dummy |> 
+  fisd_dummy |> 
     select(cusip_id = complete_cusip),
   tibble(
     trd_exctn_dt = seq(start_date, end_date, "1 day")

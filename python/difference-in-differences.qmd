@@ -1,5 +1,8 @@
 ---
 title: Difference in Differences
+metadata:
+  pagetitle: Difference in Differences with Python
+  description-meta: Perform difference-in-difference estimation and analyze parallel trends using the programming language Python. 
 ---
 
 ```{python}
@@ -13,43 +16,51 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 
 In this chapter, we illustrate the concept of *difference in differences* (DD) estimators by evaluating the effects of climate change regulation on the pricing of bonds across firms. DD estimators are typically used to recover the treatment effects of natural or quasi-natural experiments that trigger sharp changes in the environment of a specific group. Instead of looking at differences in just one group (e.g., the effect in the treated group), DD investigates the treatment effects by looking at the difference between differences in two groups. Such experiments are usually exploited to address endogeneity concerns [e.g., @RobertsWhited2013]. The identifying assumption is that the outcome variable would change equally in both groups without the treatment. This assumption is also often referred to as the assumption of parallel trends. Moreover, we would ideally also want a random assignment to the treatment and control groups. Due to lobbying or other activities, this randomness is often violated in (financial) economics.\index{Difference in differences}
 
-In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discuss in the Chapter 12. We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.\index{Paris (Climate) Agreement}
+In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discuss in [Fixed Effects and Clustered Standard Errors](fixed-effects-and-clustered-standard-errors.qmd). We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.\index{Paris (Climate) Agreement}
 
 The approach we use here replicates the results of @Seltzer2022 partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on ESG effects in corporate bond markets is already large but continues to grow (for recent examples, see, e.g., @Halling2021, @Handler2022, @Huynh2021, among many others).
 
-The current chapter relies on this set of packages. 
+The current chapter relies on this set of Python packages. 
 
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import linearmodels as lm
 import statsmodels.formula.api as smf
-from scipy.stats import norm
 
 from plotnine import *
+from scipy.stats import norm
+from mizani.breaks import date_breaks
+from mizani.formatters import date_format
+from regtabletotext import prettify_results
 ```
+
+Compared to previous chapters, we introduce the `scipy.stats` module from the `scipy` [@scipy] for simple retrieval of quantiles of the standard normal distribution. 
 
 ## Data Preparation
 
-We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in Chapters 2-4. \index{Data!TRACE}\index{Data!FISD}
+We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
-mergent = (pd.read_sql_query(
-  sql="SELECT complete_cusip, maturity, offering_amt, sic_code FROM mergent",
-  con=tidy_finance,
-  parse_dates={"maturity": {"unit": "D", "origin": "unix"}}
+fisd = (pd.read_sql_query(
+    sql=("SELECT complete_cusip, maturity, offering_amt, " 
+         "sic_code FROM fisd"),
+    con=tidy_finance,
+    parse_dates={"maturity"}
   )
   .dropna()
 )
 
 trace_enhanced = (pd.read_sql_query(
-  sql="SELECT cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt FROM trace_enhanced",
-  con=tidy_finance,
-  parse_dates={"trd_exctn_dt": {"unit": "D", "origin": "unix"}}
+    sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, " 
+         "entrd_vol_qt, yld_pt FROM trace_enhanced"),
+    con=tidy_finance,
+    parse_dates={"trd_exctn_dt"}
   )
   .dropna()
 )
@@ -64,48 +75,80 @@ polluting_industries = [
   26, 42, 10, 53, 32, 99, 37
 ]
 
-bonds = (mergent
-  .query("offering_amt > 0")
+bonds = (fisd
+  .query("offering_amt > 0 & sic_code != 'None'")
   .assign(
-    time_to_maturity = lambda x: (x["maturity"]-treatment_date).dt.days / 365,
-    sic_code = lambda x: x["sic_code"].astype(str).str[:2].astype(int),
-    log_offering_amt = lambda x: np.log(x["offering_amt"])
+    time_to_maturity = lambda x: (
+      (x["maturity"]-treatment_date).dt.days / 365
+    ),
+    sic_code = lambda x: (
+      x["sic_code"].astype(str).str[:2].astype(int)
+    ),
+    log_offering_amt = lambda x: (
+      np.log(x["offering_amt"])
+    )
   )
   .query("time_to_maturity >= 1")
   .rename(columns={"complete_cusip": "cusip_id"})
-  .get(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
+  .get(["cusip_id", "time_to_maturity", 
+        "log_offering_amt", "sic_code"])
   .assign(
-    polluter = lambda x: x["sic_code"].isin(polluting_industries)
+    polluter = lambda x: (
+      x["sic_code"].isin(polluting_industries)
+    )
   )
   .reset_index(drop=True)
 )
 ```
 
-Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
+Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields.
+We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
 
 ```{python}
-trace_aggregated = (trace_enhanced
+trace_enhanced = (trace_enhanced
   .query("rptd_pr > 25")
+  .assign(
+    weight = lambda x: x["entrd_vol_qt"] * x["rptd_pr"],
+  )
+  .assign(
+     weighted_yield = lambda x: x["weight"] * x["yld_pt"]
+  )
+)
+
+trace_aggregated = (trace_enhanced
   .groupby(["cusip_id", "trd_exctn_dt"])
   .aggregate(
-    avg_yield = ("yld_pt", lambda x: np.average(x, weights=trace_enhanced
-                                     .loc[x.index, "entrd_vol_qt"]
-                                     * trace_enhanced
-                                     .loc[x.index, "rptd_pr"])),
+    weighted_yield_sum = ("weighted_yield", "sum"),
+    weight_sum = ("weight", "sum"),
     trades = ("rptd_pr", "count")
   )
   .reset_index()
+  .assign(
+    avg_yield = lambda x: (
+      x["weighted_yield_sum"] / x["weight_sum"]
+    )
+  )
   .dropna(subset=["avg_yield"])
   .query("trades >= 5")
   .assign(
-    trd_exctn_dt = lambda x: pd.to_datetime(x["trd_exctn_dt"])
+    trd_exctn_dt = lambda x: (
+      pd.to_datetime(x["trd_exctn_dt"])
+    )
   )
   .assign(
-    month = lambda x: x["trd_exctn_dt"] - pd.tseries.offsets.MonthBegin()
+    month = lambda x: (
+      x["trd_exctn_dt"] - pd.tseries.offsets.MonthBegin()
+    )
   )
-  .groupby(["cusip_id", "month"])
-  .apply(lambda x: x[x["trd_exctn_dt"] == x["trd_exctn_dt"].max()])
-  .reset_index(drop=True)
+)
+
+date_index = (trace_aggregated
+  .groupby(["cusip_id", "month"])["trd_exctn_dt"]
+  .idxmax()
+)
+
+trace_aggregated = (trace_aggregated
+  .loc[date_index]
   .get(["cusip_id", "month", "avg_yield"])
 )
 ```
@@ -123,9 +166,19 @@ Before we can run the first regression, we need to define the `treated` indicato
 
 ```{python}
 bonds_panel = (bonds_panel
-  .assign(post_period = lambda x:x["month"] >= (treatment_date- pd.tseries.offsets.MonthBegin()))
-  .assign(treated = lambda x: x["polluter"] & x["post_period"])
-  .assign(month_cat = lambda x: pd.Categorical(x["month"], ordered=True))
+  .assign(
+    post_period = lambda x: (
+      x["month"] >= (treatment_date - 
+                      pd.tseries.offsets.MonthBegin())
+    )
+  )
+  .assign(
+    treated = lambda x: x["polluter"] & x["post_period"]
+  )
+  .assign(
+    month_cat = lambda x: pd.Categorical(x["month"], 
+                                         ordered=True)
+  )
 )
 ```
 
@@ -133,13 +186,16 @@ As usual, we tabulate summary statistics of the variables that enter the regress
 
 ```{python}
 bonds_panel_summary = (bonds_panel
-  .melt(var_name="measure",
-        value_vars=["avg_yield", "time_to_maturity", "log_offering_amt"]
+  .melt(
+    var_name="measure",
+    value_vars=["avg_yield", "time_to_maturity", 
+                "log_offering_amt"]
   )
   .groupby("measure")
   .describe(percentiles=[0.05, 0.5, 0.95])
 )
-bonds_panel_summary                
+
+np.round(bonds_panel_summary, 2)
 ```
 
 ## Panel Regressions
@@ -150,18 +206,20 @@ The second model follows the typical DD regression approach by including individ
 
 ```{python}
 model_without_fe = lm.PanelOLS.from_formula(
-    formula=("avg_yield ~ treated + post_period + polluter "
-             "+ log_offering_amt + time_to_maturity + 1"),
-    data=bonds_panel.set_index(["cusip_id", "month"]),
+  formula=("avg_yield ~ treated + post_period + polluter "
+           "+ log_offering_amt + time_to_maturity + 1"),
+  data=bonds_panel.set_index(["cusip_id", "month"]),
 ).fit()
 
 model_with_fe = lm.PanelOLS.from_formula(
-    formula="avg_yield ~ treated + EntityEffects + TimeEffects",
-    data=bonds_panel.set_index(["cusip_id", "month"]),
+  formula=("avg_yield ~ treated + "
+           "EntityEffects + TimeEffects"),
+  data=bonds_panel.set_index(["cusip_id", "month"]),
 ).fit()
 
-comparison = lm.panel.results.compare([model_without_fe, model_with_fe])
-comparison
+prettify_results([
+  model_without_fe, model_with_fe
+])
 ```
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
@@ -199,18 +257,20 @@ model_without_fe_coefs = (
 
 polluters_plot = (
   ggplot(model_without_fe_coefs, aes(x="month", y="estimate",
-         color="treatment", linetype="treatment", shape="treatment"))
-  + geom_vline(xintercept=pd.to_datetime(treatment_date) -
-               pd.tseries.offsets.MonthBegin(), linetype="dashed")
-  + geom_hline(yintercept=0, linetype="dashed")
-  + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
-  + geom_point()
-  + guides(linetype=None)
-  + labs(
+         color="treatment", linetype="treatment", shape="treatment")) +
+  geom_vline(xintercept=pd.to_datetime(treatment_date) -
+             pd.tseries.offsets.MonthBegin(), linetype="dashed") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5) +
+  geom_point() +
+  guides(linetype=None) + 
+  labs(
       x="", y="Yield", shape="Polluter?", color="Polluter?",
       title="Polluters respond stronger to Paris Agreement than green firms"
-    )
-  + scale_linetype_manual(values=["solid", "dashed"])
+    ) +
+  scale_linetype_manual(values=["solid", "dashed"]) +
+  scale_x_datetime(breaks=date_breaks("1 year"), 
+                   labels=date_format("%Y")) 
 )
 polluters_plot.draw()
 ```
@@ -289,14 +349,16 @@ model_with_fe_time_coefs = pd.concat(
     [model_with_fe_time_coefs, lag0_row], ignore_index=True)
 
 polluter_plot = (
-  ggplot(model_with_fe_time_coefs, aes(x="month", y="estimate"))
-  + geom_vline(aes(xintercept=treatment_date - pd.tseries.offsets.MonthBegin()), 
-                   linetype="dashed")
-  + geom_hline(aes(yintercept=0), linetype="dashed")
-  + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
-  + geom_point(aes(y="estimate"))
-  + labs(x="", y="Yield",
-         title="Polluters' yield patterns around Paris Agreement signing")
+  ggplot(model_with_fe_time_coefs, aes(x="month", y="estimate")) +
+  geom_vline(aes(xintercept=treatment_date - pd.tseries.offsets.MonthBegin()), 
+                 linetype="dashed") +
+  geom_hline(aes(yintercept=0), linetype="dashed") +
+  geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5) +
+  geom_point(aes(y="estimate")) +
+  labs(x="", y="Yield",
+       title="Polluters' yield patterns around Paris Agreement signing") +
+  scale_x_datetime(breaks=date_breaks("1 year"), 
+                   labels=date_format("%Y")) 
 )
 polluter_plot.draw()
 ```
@@ -309,4 +371,4 @@ Notice that during the year after the PA was signed, the 45th President of the U
 ## Exercises
 
 1. The 46th President of the US rejoined the Paris Agreement in February 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
-2. Based on the exercise on ratings in Chapter 4, include ratings as a control variable in the analysis above. Do the results change?
+2. Based on the exercise on ratings in [TRACE and FISD](trace-and-fisd.qmd), include ratings as a control variable in the analysis above. Do the results change?

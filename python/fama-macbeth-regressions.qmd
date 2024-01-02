@@ -1,5 +1,8 @@
 ---
 title: Fama-MacBeth Regressions
+metadata:
+  pagetitle: Fama-MacBeth Regressions with Python
+  description-meta: Estimate risk premiums via Fama-MacBeth regressions using the programming language Python.
 ---
 
 ```{python}
@@ -28,39 +31,43 @@ In the second step, the time-series average $\frac{1}{T}\sum_{t=1}^T \hat\lambda
 
 Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
-The current chapter relies on this set of packages. 
+The current chapter relies on this set of Python packages. 
+
 ```{python}
 import pandas as pd
 import numpy as np
-from pandas.tseries.offsets import DateOffset
+import sqlite3
 import statsmodels.formula.api as smf
+
+from pandas.tseries.offsets import DateOffset
 ```
 
 ## Data Preparation
 
-We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
+We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
 
 ```{python}
-import sqlite3
-
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = pd.read_sql_query(
-  sql="SELECT permno, gvkey, month, ret_excess, mktcap from crsp_monthly",
+  sql=("SELECT permno, gvkey, month, ret_excess, mktcap "
+       "FROM crsp_monthly"),
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  parse_dates={"month"}
 )
 
 compustat = pd.read_sql_query(
   sql="SELECT datadate, gvkey, be FROM compustat",
   con=tidy_finance,
-  parse_dates={"datadate": {"unit": "D", "origin": "unix"}}
+  parse_dates={"datadate"}
 )
 
 beta = pd.read_sql_query(
-  sql="SELECT month, permno, beta_monthly from beta",
+  sql="SELECT month, permno, beta_monthly FROM beta",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}}
+  parse_dates={"month"}
 )
 ```
 
@@ -69,20 +76,28 @@ Furthermore, we also use the CAPM betas based on monthly returns we computed in 
 
 ```{python}
 characteristics = (compustat
-  .assign(month = lambda x: x["datadate"].dt.to_period("M").dt.to_timestamp())
+  .assign(
+    month = lambda x: (x["datadate"].dt.to_period("M")
+                        .dt.to_timestamp())
+  )
   .merge(crsp_monthly, how="left", on=["gvkey", "month"], )
   .merge(beta, how="left", on=["permno", "month"])
-  .assign(bm = lambda x: x["be"] / x["mktcap"],
-          log_mktcap = lambda x: np.log(x["mktcap"]),
-          sorting_date = lambda x: x["month"] + DateOffset(months = 6))
-  .get(["gvkey", "bm", "log_mktcap", "beta_monthly", "sorting_date"])
+  .assign(
+    bm = lambda x: x["be"] / x["mktcap"],
+    log_mktcap = lambda x: np.log(x["mktcap"]),
+    sorting_date = lambda x: (x["month"] + 
+                                DateOffset(months = 6))
+  )
+  .get(["gvkey", "bm", "log_mktcap", 
+        "beta_monthly", "sorting_date"])
   .rename(columns={"beta_monthly": "beta"})
 )
 
 data_fama_macbeth = (crsp_monthly
   .merge(characteristics, 
          how="left",
-         left_on=["gvkey", "month"], right_on=["gvkey", "sorting_date"])
+         left_on=["gvkey", "month"], 
+         right_on=["gvkey", "sorting_date"])
   .sort_values(["month", "permno"])
   .groupby("permno")
   .apply(lambda x: x.assign(
@@ -94,14 +109,19 @@ data_fama_macbeth = (crsp_monthly
 )
 
 data_fama_macbeth_lagged = (data_fama_macbeth
-  .assign(month = lambda x: x["month"] - DateOffset(months=1))
+  .assign(
+    month = lambda x: x["month"] - DateOffset(months=1)
+  )
   .get(["permno", "month", "ret_excess"])
   .rename(columns={"ret_excess": "ret_excess_lead"})
 )
 
 data_fama_macbeth = (data_fama_macbeth
-  .merge(data_fama_macbeth_lagged, how="left", on=["permno", "month"])
-  .get(["permno", "month", "ret_excess_lead", "beta", "log_mktcap", "bm"])
+  .merge(data_fama_macbeth_lagged, 
+         how="left",
+         on=["permno", "month"])
+  .get(["permno", "month", "ret_excess_lead", 
+        "beta", "log_mktcap", "bm"])
   .dropna()
 )
 ```
@@ -113,8 +133,10 @@ Next, we run the cross-sectional regressions with the characteristics as explana
 ```{python}
 risk_premiums = (data_fama_macbeth
   .groupby("month", as_index=False)
-  .apply(lambda x: smf.ols("ret_excess_lead ~ beta + log_mktcap + bm", x)
-                    .fit().params)
+  .apply(lambda x: smf.ols(
+    "ret_excess_lead ~ beta + log_mktcap + bm", x
+    ).fit().params
+  )
 )
 ```
 
@@ -124,22 +146,28 @@ Now that we have the risk premiums' estimates for each period, we can average ac
 
 ```{python}
 price_of_risk = (risk_premiums
-  .melt(id_vars="month", var_name="factor", value_name="estimate")
+  .melt(id_vars="month", 
+        var_name="factor", 
+        value_name="estimate")
   .groupby("factor")["estimate"]
   .apply(lambda x: pd.Series(
     {"risk_premium": 100 * x.mean(),
      "t_statistic": x.mean() / x.std() * np.sqrt(len(x))}))
   .reset_index()
-  .pivot(index="factor", columns="level_1", values="estimate")
+  .pivot(index="factor",
+         columns="level_1",
+         values="estimate")
   .reset_index()
 )
 ```
 
-It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in Chapter 7, the typical procedure for this is computing @Newey1987 standard errors.\index{Standard errors!Newey-West}
+It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), the typical procedure for this is computing @Newey1987 standard errors.\index{Standard errors!Newey-West}
 
 ```{python}
 price_of_risk_newey_west = (risk_premiums
-  .melt(id_vars="month", var_name="factor", value_name="estimate")
+  .melt(id_vars="month", 
+        var_name="factor", 
+        value_name="estimate")
   .groupby("factor")
   .apply(lambda x: x["estimate"].mean() /
          smf.ols("estimate ~ 1", x)
@@ -161,4 +189,3 @@ Finally, let us interpret the results. Stocks with higher book-to-market ratios 
 
 1. Download a sample of test assets from Kenneth French's homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.
 1. Use individual stocks with weighted-least squares based on a firm's size as suggested by @Hou2020. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches. 
-1. Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.

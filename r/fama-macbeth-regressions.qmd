@@ -2,6 +2,11 @@
 title: Fama-MacBeth Regressions
 aliases:
   - ../fama-macbeth-regressions.html
+pre-render:
+  - pre_render_script.R
+metadata:
+  pagetitle: Fama-MacBeth Regressions with R
+  description-meta: Estimate risk premiums via Fama-MacBeth regressions using the programming language R.
 ---
 
 In this chapter, we present a simple implementation of @Fama1973, a regression approach commonly called Fama-MacBeth regressions. Fama-MacBeth regressions are widely used in empirical asset pricing studies. We use individual stocks as test assets to estimate the risk premium associated with the three factors included in @Fama1993.
@@ -21,8 +26,10 @@ In the second step, the time-series average $\frac{1}{T}\sum_{t=1}^T \hat\lambda
 
 Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums' standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias [see, e.g., @Shanken1992; @Kim1995; @Chen2015, among others] but also shows that the bias goes to zero as $T \to \infty$. We refer to @Gagliardini2016 for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: @Hou2020 advocates using weighed-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
-The current chapter relies on this set of packages. 
-```{r, eval = TRUE, message = FALSE}
+The current chapter relies on this set of R packages. 
+
+```{r}
+#| message: false
 library(tidyverse)
 library(RSQLite)
 library(sandwich)
@@ -31,12 +38,12 @@ library(broom)
 
 ## Data Preparation
 
-We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
+We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
 
 ```{r}
 tidy_finance <- dbConnect(
   SQLite(),
-  "data/tidy_finance.sqlite",
+  "data/tidy_finance_r.sqlite",
   extended_types = TRUE
 )
 
@@ -110,7 +117,7 @@ price_of_risk <- risk_premiums |>
   )
 ```
 
-It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in Chapter 7, the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`.\index{Standard errors!Newey-West}
+It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`.\index{Standard errors!Newey-West}
 
 ```{r}
 regressions_for_newey_west <- risk_premiums |>
@@ -143,4 +150,3 @@ Finally, let us interpret the results. Stocks with higher book-to-market ratios 
 
 1. Download a sample of test assets from Kenneth French's homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.
 1. Use individual stocks with weighted-least squares based on a firm's size as suggested by @Hou2020. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches. 
-1. Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.

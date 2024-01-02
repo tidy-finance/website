@@ -1,5 +1,8 @@
 ---
 title: Parametric Portfolio Policies
+metadata:
+  pagetitle: Parametric Portfolio Policies with Python
+  description-meta: Evaluate portfolio allocation strategies based on Brandt, Santa-Clara, and Valkanov (2009) using the programming language Python.
 ---
 
 ```{python}
@@ -15,28 +18,34 @@ In this chapter, we apply different portfolio performance measures to evaluate a
 For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of @Brandt2009 proposes to parametrize the optimal portfolio weights as a function of stock characteristics instead of estimating the stock's expected return, variance, and covariances with other stocks in a prior step. 
 We choose weights as a function of the characteristics, which maximize the expected utility of the investor. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by @Brandt2009. See the review paper @Brandt2010 for an excellent treatment of related portfolio choice methods.  
 
-The current chapter relies on the following set of packages:
+The current chapter relies on the following set of Python packages:
+
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import statsmodels.api as sm
-from scipy.optimize import minimize
+
 from itertools import product, starmap
+from scipy.optimize import minimize
 ```
+
+Compared to previous chapters, we introduce the `scipy.optimize` module from the `scipy` [@scipy] for solving optimization problems.  
 
 ## Data Preparation
 
-To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in Chapters 2-4.\index{Data!CRSP}
+To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 crsp_monthly = (pd.read_sql_query(
-  sql="SELECT permno, month, ret_excess, mktcap, mktcap_lag FROM crsp_monthly",
+  sql=("SELECT permno, month, ret_excess, mktcap, mktcap_lag " 
+       "FROM crsp_monthly"),
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  parse_dates={"month"})
   .dropna()
 )
 ```
@@ -46,17 +55,19 @@ To evaluate the performance of portfolios, we further use monthly market returns
 factors_ff_monthly = (pd.read_sql_query(
   sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month": {"unit": "D", "origin": "unix"}})
+  parse_dates={"month"})
   .dropna()
 )
 ```
 
 Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t-13$ and $t-2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
-To construct the correct lagged values, we use the approach introduced in Chapter 3.\index{Data!CRSP}
+To construct the correct lagged values, we use the approach introduced in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
 
 ```{python}
 crsp_monthly_lags = (crsp_monthly
-  .assign(month=lambda x: x["month"] + pd.DateOffset(months=13))
+  .assign(
+    month=lambda x: x["month"] + pd.DateOffset(months=13)
+  )
   .get(["permno", "month", "mktcap"])
 )
 
@@ -96,13 +107,13 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 data_portfolios = (data_portfolios
   .groupby("month", group_keys=True)
   .apply(lambda x: x.assign(
-    relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
+    relative_mktcap=x["mktcap_lag"] / x["mktcap_lag"].sum()
     )
   )
   .set_index("month")
   .groupby(level="month")
   .transform(lambda x: (x - x.mean()) / x.std()
-            if x.name.endswith("lag") else x)
+                       if x.name.endswith("lag") else x)
   .reset_index()
   .drop(["mktcap_lag"], axis=1)
 )
@@ -119,7 +130,9 @@ The allocation strategy is straightforward because the number of parameters to e
 To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta_0$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values.
 
 ```{python}
-lag_columns = [i for i in data_portfolios.columns if "lag" in i]
+lag_columns = [
+  i for i in data_portfolios.columns if "lag" in i
+]
 n_parameters = len(lag_columns)
 theta = pd.DataFrame(
   {"theta": [1.5] * n_parameters}, 
@@ -146,10 +159,13 @@ def compute_portfolio_weights(theta, data,
 
     data = (data
         .groupby("month", group_keys=True)
-        .apply(lambda x: x.assign(characteristic_tilt=x[theta.index]@theta
-                                  / x.shape[0]))
+        .apply(lambda x: x.assign(
+          characteristic_tilt=x[theta.index]@theta/x.shape[0]
+          )
+        )
         .reset_index(drop=True)
-        .assign(weight_benchmark=lambda x: x["relative_mktcap"]
+        .assign(
+          weight_benchmark=lambda x: x["relative_mktcap"]
                 if value_weighting else 1 / x.shape[0],
                 weight_tilt=lambda x: x["weight_benchmark"]
                 + x["characteristic_tilt"]
@@ -158,7 +174,10 @@ def compute_portfolio_weights(theta, data,
 
     if not allow_short_selling:
         data = (data
-            .assign(weight_tilt=lambda x: np.maximum(0, x["weight_tilt"])))
+          .assign(
+            weight_tilt=lambda x: np.maximum(0, x["weight_tilt"])
+          )
+        )
 
     # Normalize
     data = (data
@@ -248,13 +267,15 @@ def evaluate_portfolio(weights_data,
                   value_name="weight",
                   var_name="model")
              .groupby(["model", "month"])["weight"]
-             .aggregate([("Mean Absolute weight", lambda x: np.mean(abs(x))),
-                         ("Max. weight", lambda x: max(x)),
-                         ("Min. weight", lambda x: min(x)),
-                         ("Avg. sum of negative weights",
-                          lambda x: -np.sum(x[x < 0])),
-                         ("Avg. fraction of negative weights",
-                          lambda x: np.mean(x < 0))])
+             .aggregate(
+               [("Mean Absolute weight", lambda x: np.mean(abs(x))),
+               ("Max. weight", lambda x: max(x)),
+               ("Min. weight", lambda x: min(x)),
+               ("Avg. sum of negative weights",
+               lambda x: -np.sum(x[x < 0])),
+               ("Avg. fraction of negative weights",
+               lambda x: np.mean(x < 0))]
+              )
              .reset_index()
              .drop(columns=["month"])
              .groupby(["model"])
@@ -266,12 +287,12 @@ def evaluate_portfolio(weights_data,
         evaluation_stats = (evaluation_stats
           .merge(evaluation_weights, how="left", on="model")
           .set_index("model")
-          )
+        )
         
     evaluation_stats = (evaluation_stats            
-        .transpose()
-        .rename_axis(columns=None)
-        )
+      .transpose()
+      .rename_axis(columns=None)
+    )
 
     return evaluation_stats
 ```
@@ -280,7 +301,7 @@ def evaluate_portfolio(weights_data,
 Let us take a look at the different portfolio strategies and evaluation measures.
 
 ```{python}
-evaluate_portfolio(weights_crsp)
+evaluate_portfolio(weights_crsp).round(3)
 ```
 
 The value-weighted portfolio delivers an annualized return of more than 6 percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically 1 for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
@@ -300,7 +321,10 @@ def objective_function(theta,
         theta, data, value_weighting, allow_short_selling)
 
     objective_function = evaluate_portfolio(
-        processed_data, capm_evaluation=False, full_evaluation=False)
+      processed_data, 
+      capm_evaluation=False, 
+      full_evaluation=False
+    )
 
     objective_function = -objective_function.loc[objective_measure, "tilt"]
 
@@ -322,7 +346,7 @@ optimal_theta = minimize(
 (pd.DataFrame(
   optimal_theta.x,
   columns=["Optimal Theta"],
-  index=["momentum_lag", "size_lag"]).T.round(2)
+  index=["momentum_lag", "size_lag"]).T.round(3)
 )
 ```
 
@@ -341,13 +365,15 @@ def evaluate_optimal_performance(data,
     optimal_theta = minimize(
         fun=objective_function,
         x0=[1.5]*n_parameters,
-        args=(data, objective_measure, value_weighting, allow_short_selling),
+        args=(data, objective_measure, 
+              value_weighting, allow_short_selling),
         method="Nelder-Mead",
         tol=10e-2
         ).x
 
     processed_data = compute_portfolio_weights(
-      optimal_theta, data, value_weighting, allow_short_selling
+      optimal_theta, data, 
+      value_weighting, allow_short_selling
     )
 
     portfolio_evaluation = evaluate_portfolio(processed_data)
@@ -355,11 +381,16 @@ def evaluate_optimal_performance(data,
     weight_text = "VW" if value_weighting else "EW"
     short_text = "" if allow_short_selling else " (no s.)"
 
-    strategy_name_dict = {"benchmark": weight_text,
-                          "tilt": f"{weight_text} Optimal{short_text}"}
+    strategy_name_dict = {
+      "benchmark": weight_text,
+      "tilt": f"{weight_text} Optimal{short_text}"
+    }
 
-    portfolio_evaluation.columns = [strategy_name_dict[i]
-                                    for i in portfolio_evaluation.columns]
+    portfolio_evaluation.columns = [
+      strategy_name_dict[i]
+      for i in portfolio_evaluation.columns
+    ]
+    
     return(portfolio_evaluation)
 ```
 
@@ -376,8 +407,13 @@ permutations = product(
   value_weighting, allow_short_selling
 )
                        
-results = list(starmap(evaluate_optimal_performance, permutations))
-performance_table = pd.concat(results, axis=1).T.drop_duplicates().T.round(2)
+results = list(starmap(
+  evaluate_optimal_performance, 
+  permutations
+))
+performance_table = (pd.concat(results, axis=1)
+  .T.drop_duplicates().T.round(3)
+)
 column_names = sorted(performance_table.columns, key=len)
 performance_table[column_names]
 ``` 

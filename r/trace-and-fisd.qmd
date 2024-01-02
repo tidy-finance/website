@@ -2,14 +2,21 @@
 title: TRACE and FISD
 aliases:
   - ../trace-and-fisd.html
+pre-render:
+  - pre_render_script.R
+metadata:
+  pagetitle: TRACE and FISD with R
+  description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language R. 
 ---
 
 In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly 10 trillion USD outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R. 
 
 Many researchers study liquidity in the US corporate bond market [see, e.g., @bessembinder2006, @Edwards2007, and @Ohara2021, among many others]. We do not cover bond returns here, but you can compute them from TRACE data. Instead, we refer to studies on the topic such as @Bessembinder2008, @bai2019, and @kelly2020 and a survey by @Huang2021. Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.\index{Corporate bonds}
 
-The current chapter relies on this set of packages. 
-```{r, message=FALSE}
+The current chapter relies on this set of R packages. 
+
+```{r}
+#| message: false
 library(tidyverse)
 library(dbplyr)
 library(RSQLite)
@@ -21,7 +28,7 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 
 ## Bond Data from WRDS 
 
-Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in the previous chapter. Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
 
 ```{r}
 wrds <- dbConnect(
@@ -30,13 +37,13 @@ wrds <- dbConnect(
   dbname = "wrds",
   port = 9737,
   sslmode = "require",
-  user = Sys.getenv("user"),
-  password = Sys.getenv("password")
+  user = Sys.getenv("WRDS_USER"),
+  password = Sys.getenv("WRDS_PASSWORD")
 )
 
 tidy_finance <- dbConnect(
   SQLite(),
-  "data/tidy_finance.sqlite",
+  "data/tidy_finance_r.sqlite",
   extended_types = TRUE
 )
 ```
@@ -48,13 +55,12 @@ For research on US corporate bonds, the Mergent Fixed Income Securities Database
 We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria [@bessembinder2006]. The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. 
 Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures. 
 
-The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly [see, e.g., @Dick2012; @Ohara2021, among many others].
+The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used [see, e.g., @Dick2012; @Ohara2021, among many others].
 
 ```{r}
-mergent <- tbl(
-  wrds,
-  in_schema("fisd", "fisd_mergedissue")
-) |>
+fisd_mergedissue_db <- tbl(wrds, in_schema("fisd", "fisd_mergedissue"))
+
+fisd <- fisd_mergedissue_db |>
   filter(
     security_level == "SEN", # senior bonds
     slob == "N" | is.na(slob), # secured lease obligation
@@ -114,12 +120,14 @@ mergent <- tbl(
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
-mergent_issuer <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) |>
+fisd_mergedissuer_db <- tbl(wrds, in_schema("fisd", "fisd_mergedissuer")) 
+
+fisd_issuer <- fisd_mergedissuer_db |>
   select(issuer_id, sic_code, country_domicile) |>
   collect()
 
-mergent <- mergent |>
-  inner_join(mergent_issuer, by = "issuer_id") |>
+fisd <- fisd |>
+  inner_join(fisd_issuer, by = "issuer_id") |>
   filter(country_domicile == "USA") |>
   select(-country_domicile)
 ```
@@ -127,12 +135,12 @@ mergent <- mergent |>
 Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
-  dbWriteTable(
-    conn = tidy_finance,
-    name = "mergent",
-    value = mergent,
-    overwrite = TRUE
-  )
+dbWriteTable(
+  conn = tidy_finance,
+  name = "fisd",
+  value = fisd,
+  overwrite = TRUE
+)
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -143,7 +151,7 @@ The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting
 
 Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-We store code for cleaning enhanced TRACE with R on the following Github [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{Github!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in Chapter 3, and a start and end date, respectively.
+We store code for cleaning enhanced TRACE with R on the following Github [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{Github!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
 
 ```{r, message=FALSE}
 source_gist("3a05b3ab281563b2e94858451c2eb3a4")
@@ -152,37 +160,41 @@ source_gist("3a05b3ab281563b2e94858451c2eb3a4")
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
 ```{r}
-mergent_cusips <- mergent |>
+fisd_cusips <- fisd |>
   pull(complete_cusip)
 
-mergent_parts <- split(
-  mergent_cusips,
+fisd_parts <- split(
+  fisd_cusips,
   rep(1:10, 
-      length.out = length(mergent_cusips))
+      length.out = length(fisd_cusips))
 )
 ```
 
-Finally, we run a loop in the same style as in Chapter 3 where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
 
-```{r, eval = FALSE}
-for (j in 1:length(mergent_parts)) {
+```{r}
+#| eval: false
+batches <- length(fisd_parts)
+
+for (j in 1:batches) {
   trace_enhanced <- clean_enhanced_trace(
-    cusips = mergent_parts[[j]],
+    cusips = fisd_parts[[j]],
     connection = wrds,
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
   )
 
   dbWriteTable(
-      conn = tidy_finance,
-      name = "trace_enhanced",
-      value = trace_enhanced,
-      overwrite = ifelse(j == 1, TRUE, FALSE),
-      append = ifelse(j != 1, TRUE, FALSE)
-    )
-
+    conn = tidy_finance,
+    name = "trace_enhanced",
+    value = trace_enhanced,
+    overwrite = ifelse(j == 1, TRUE, FALSE),
+    append = ifelse(j != 1, TRUE, FALSE)
+  )
+  
+  cat("Batch", j, "out of", batches, "done (", 
+      round(j / batches, 2) * 100, "%)\n")
 }
-
 ```
 
 ## Insights into Corporate Bonds
@@ -195,8 +207,8 @@ We start by looking into the number of bonds outstanding over time and compare i
 bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
                                               ymd("2016-11-30"), 
                                               by = "quarter"), 
-                                 "complete_cusip" = mergent$complete_cusip) |> 
-  left_join(mergent |> select(complete_cusip, 
+                                 "complete_cusip" = fisd$complete_cusip) |> 
+  left_join(fisd |> select(complete_cusip, 
                               offering_date,
                               maturity), 
             by = "complete_cusip") |> 
@@ -246,7 +258,7 @@ We see that the number of bonds outstanding increases steadily between 2014 and 
 Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
 
 ```{r}
-mergent |>
+fisd |>
   mutate(maturity = as.numeric(maturity - offering_date) / 365,
          offering_amt = offering_amt / 10^3) |> 
   pivot_longer(cols = c(maturity, coupon, offering_amt),
@@ -292,7 +304,6 @@ On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 
 
 ## Exercises
 
-1. Summarize the amount outstanding of all bonds over time and describe the resulting graph. 
+1. Compute the amount outstanding across all bonds over time. Make sure to subtract all matured bonds. How would you describe the resulting plot?
 1. Compute the number of days each bond is traded (accounting for the bonds' maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
-1. WRDS provides more information from Mergent FISD. In particular, they also provide rating information in `fisd_ratings`. Download the ratings for the bond sample. Then, plot the distribution of ratings in a histogram.\index{Rating}
-1. Download the TRACE data until the end of September 2021. Hint: you want to download the data completely new, rather than adding the new information. Can you find a reason why?
+1. WRDS provides more information from Mergent FISD such as ratings in the table `fisd_ratings`. Download the ratings table and plot the distribution of ratings for the different rating providers. How would you map the different providers to a common numeric rating scale? \index{Rating}

@@ -1,5 +1,8 @@
 ---
 title: Constrained Optimization and Backtesting
+metadata:
+  pagetitle: Constrained Optimization and Backtesting with Python
+  description-meta: Conduct portfolio backtesting with transaction costs and no-shortselling constraints using the programming language Python. 
 ---
 
 ```{python}
@@ -14,7 +17,7 @@ You are reading the work-in-progress edition of **Tidy Finance with Python**. Co
 \index{Backtesting} In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. \index{Short-selling}
 We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R.\index{Efficient portfolio} We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter. 
 
-Throughout this chapter, we use the following packages:
+Throughout this chapter, we use the following Python packages:
 
 ```{python}
 import pandas as pd
@@ -23,23 +26,24 @@ import sqlite3
 
 from plotnine import *
 from mizani.formatters import percent_format
-
-from scipy.stats import expon
 from itertools import product
+from scipy.stats import expon
 from scipy.optimize import minimize
 ```
 
 ## Data Preparation
 
-We start by loading the required data from our `SQLite`-database introduced in Chapters 2-4. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
+We start by loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
 industry_returns  = (pd.read_sql_query(
     sql="SELECT * FROM industries_ff_monthly",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D","origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
   .drop(columns=["month"])
 )
@@ -155,17 +159,17 @@ If transaction costs would be absent, the investor would simply implement the me
 #| label: fig-1701
 #| fig-cap: "The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark."
 #| fig-alt: "Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."
-plot_rebalancing = (
+rebalancing_plot = (
     ggplot(transaction_costs, 
            aes(x="beta", y="concentration",
-               color="factor(gamma)", linetype="factor(gamma)"))
-    + geom_line()
-    + guides(linetype=None)
-    + labs(x="Transaction cost parameter", y="Distance from MVP",
-           color="Risk aversion",
-           title="Portfolio weights for different risk aversion and transaction cost")
+               color="factor(gamma)", linetype="factor(gamma)")) +
+    geom_line() +
+    guides(linetype=None) +
+    labs(x="Transaction cost parameter", y="Distance from MVP",
+         color="Risk aversion",
+         title="Portfolio weights for different risk aversion and transaction cost")
 )
-plot_rebalancing.draw()
+rebalancing_plot.draw()
 ```
 
 @fig-1701 shows rebalancing from the initial portfolio (which we always set to the minimum variance portfolio weights in this example). The higher the transaction costs parameter $\beta$, the smaller is the rebalancing from the initial portfolio. In addition, if risk aversion $\gamma$ increases, the efficient portfolio is closer to the minimum variance portfolio weights such that the investor desires less rebalancing from the initial holdings. 
@@ -314,16 +318,16 @@ weights = (pd.DataFrame({
         value_name = "weights")
 )
 
-weights_plot = (ggplot(weights, 
-  aes(x="Industry", y="weights", fill="Strategy"))
-  + geom_bar(stat="identity", position="dodge", width=0.7)
-  + coord_flip()
-  + labs(y="Allocation weight",
-         fill=None,
-         title="Optimal allocations for different strategies")
-  + scale_y_continuous(labels=percent_format())
+weights_plot = (
+  ggplot(weights,
+         aes(x="Industry", y="weights", fill="Strategy")) +
+  geom_bar(stat="identity", position="dodge", width=0.7) +
+  coord_flip() +
+  labs(y="Allocation weight",
+       fill=None,
+       title="Optimal allocations for different strategies") +
+  scale_y_continuous(labels=percent_format())
 )
-
 weights_plot.draw()
 ```
 

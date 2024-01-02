@@ -2,19 +2,25 @@
 title: Univariate Portfolio Sorts
 aliases:
   - ../univariate-portfolio-sorts.html
+pre-render:
+  - pre_render_script.R
+metadata:
+  pagetitle: Univariate Portfolio Sorts with R
+  description-meta: Perform univariate portfolio sorts to test for return predictability using the programming language R. 
 ---
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing [e.g., @BaliEngleMurray2016]. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. 
-We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in Chapter 9. 
+We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). 
 
 A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$.\index{Portfolio sorts!Univariate}
 Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$.  
 The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. 
 To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
-The current chapter relies on the following set of packages.
+The current chapter relies on the following set of R packages.
 
-```{r, eval = TRUE, message = FALSE}
+```{r}
+#| message: false
 library(tidyverse)
 library(RSQLite)
 library(scales)
@@ -27,14 +33,14 @@ Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for
 
 ## Data Preparation
 
-We start with loading the required data from our `SQLite`-database introduced in Chapters 2-4. In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
+We start with loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
 Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors}
 `beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
 
 ```{r}
 tidy_finance <- dbConnect(
   SQLite(),
-  "data/tidy_finance.sqlite",
+  "data/tidy_finance_r.sqlite",
   extended_types = TRUE
 )
 
@@ -42,7 +48,7 @@ crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   select(permno, month, ret_excess, mktcap_lag) |>
   collect()
 
-factors_ff_monthly <- tbl(tidy_finance, "factors_ff_monthly") |>
+factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   select(month, mkt_excess) |>
   collect()
 
@@ -159,7 +165,7 @@ beta_portfolios <- data_for_sorts |>
     ret_excess = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )|>
-  left_join(factors_ff_monthly, by = "month")
+  left_join(factors_ff3_monthly, by = "month")
 ```
 
 ## More Performance Evaluation
@@ -224,7 +230,7 @@ beta_portfolios_summary |>
   geom_point() +
   geom_abline(
     intercept = 0,
-    slope = mean(factors_ff_monthly$mkt_excess),
+    slope = mean(factors_ff3_monthly$mkt_excess),
     linetype = "solid"
   ) +
   geom_abline(
@@ -234,7 +240,7 @@ beta_portfolios_summary |>
   ) +
   scale_y_continuous(
     labels = percent,
-    limit = c(0, mean(factors_ff_monthly$mkt_excess) * 2)
+    limit = c(0, mean(factors_ff3_monthly$mkt_excess) * 2)
   ) +
   scale_x_continuous(limits = c(0, 2)) +
   labs(
@@ -256,7 +262,7 @@ beta_longshort <- beta_portfolios |>
               names_from = portfolio, 
               values_from = ret_excess) |>
   mutate(long_short = high - low) |>
-  left_join(factors_ff_monthly, by = "month")
+  left_join(factors_ff3_monthly, by = "month")
 ```
 
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 

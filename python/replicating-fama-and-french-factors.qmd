@@ -1,5 +1,8 @@
 ---
 title: Replicating Fama and French Factors
+metadata:
+  pagetitle: Replicating Fama and French Factors with Python
+  description-meta: Use the programming language Python to replicate the famous Fama-French three and five factor asset pricing models.
 ---
 
 ```{python}
@@ -11,89 +14,115 @@ import pre_render_script
 You are reading the work-in-progress edition of **Tidy Finance with Python**. Code chunks and text might change over the next couple of months. We are always looking for feedback via [contact\@tidy-finance.org](mailto:contact@tidy-finance.org). Meanwhile, you can find the complete R version [here](../r/index.qmd).
 :::
 
-In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French three-factor model [see @Fama1993] is a cornerstone of asset pricing. On top of the market factor represented by the traditional CAPM beta, the model includes the size and value factors to explain the cross section of returns. We introduce both factors in Chapter 9, and their definition remains the same. Size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
+In this chapter, we provide a replication of the famous Fama and French factor portfolios. The Fama and French factor models are a cornerstone of empirical asset pricing [see @Fama1992 and @FamaFrench2015]. On top of the market factor represented by the traditional CAPM beta, the three factor model includes the size and value factors to explain the cross section of returns. Its successor, the five factor model, additionally includes profitability and investment as explanatory factors. 
 
-The current chapter relies on this set of packages. 
+We start with the three factor model. We already introduced the size and value factors in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd), and their definition remains the same: size is the SMB factor (small-minus-big) that is long small firms and short large firms. The value factor is HML (high-minus-low) and is long in high book-to-market firms and short in low book-to-market counterparts. 
+
+After the replication of the three factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates. 
+
+The current chapter relies on this set of Python packages. 
+
 ```{python}
 import pandas as pd
 import numpy as np
 import sqlite3
-
 import statsmodels.formula.api as smf
+
+from regtabletotext import prettify_result
 ```
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in Chapters 2-4.\index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below and we only load data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
-tidy_finance = sqlite3.connect("data/tidy_finance.sqlite")
+tidy_finance = sqlite3.connect(
+  database="data/tidy_finance_python.sqlite"
+)
 
-data_ff = (pd.read_sql_query(
-    sql="SELECT permno, gvkey, month, ret_excess, mktcap, mktcap_lag, exchange FROM crsp_monthly",
+crsp_monthly = (pd.read_sql_query(
+    sql=("SELECT permno, gvkey, month, ret_excess, mktcap, "
+         "mktcap_lag, exchange FROM crsp_monthly"),
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
   .dropna()
 )
 
-book_equity = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be FROM compustat",
+compustat = (pd.read_sql_query(
+    sql="SELECT gvkey, datadate, be, op, inv FROM compustat",
     con=tidy_finance,
-    parse_dates={"datadate": {"unit": "D", "origin": "unix"}})
+    parse_dates={"datadate"})
   .dropna()
 )
 
-factors_ff_monthly = (pd.read_sql_query(
-    sql="SELECT month, smb, hml FROM factors_ff_monthly",
+factors_ff3_monthly = (pd.read_sql_query(
+    sql="SELECT month, smb, hml FROM factors_ff3_monthly",
     con=tidy_finance,
-    parse_dates={"month": {"unit": "D", "origin": "unix"}})
+    parse_dates={"month"})
+  .dropna()
+)
+
+factors_ff5_monthly = (pd.read_sql_query(
+    sql=("SELECT month, smb, hml, rmw, cma "
+         "FROM factors_ff5_monthly"),
+    con=tidy_finance,
+    parse_dates={"month"})
   .dropna()
 )
 ```
 
-Yet when we start merging our data set for computing the premiums, there are a few differences to Chapter 9. First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
+Yet when we start merging our data set for computing the premiums, there are a few differences to [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
 
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `drop_duplicates()` at the end of the chunk below.
 
 ```{python}
-me_ff = (data_ff
+size = (crsp_monthly
   .query("month.dt.month == 6")
-  .assign(sorting_date = lambda x: x["month"] + pd.DateOffset(months=1))
-  .get(["permno", "sorting_date", "mktcap"])
-  .rename(columns={"mktcap": "me_ff"})
-)
-
-me_ff_dec = (data_ff
-  .query("month.dt.month == 12")
-  .assign(sorting_date = lambda x: x["month"] + pd.DateOffset(months=7))
-  .get(["permno", "gvkey", "sorting_date", "mktcap"])
-  .rename(columns={"mktcap": "bm_me"})
-)
-
-bm_ff = (book_equity
   .assign(
-    sorting_date = lambda x: pd.to_datetime((x["datadate"].dt.year + 1).astype(str) + "0701", format="%Y%m%d")
-    )
-  .rename(columns={"be": "bm_be"})
-  .merge(me_ff_dec, 
-         how="inner", 
-         on=["gvkey", "sorting_date"])
-  .assign(bm_ff = lambda x: x["bm_be"] / x["bm_me"])
-  .get(["permno", "sorting_date", "bm_ff"])
+    sorting_date = lambda x: (x["month"] + 
+                                pd.DateOffset(months=1))
+  )
+  .get(["permno", "exchange", "sorting_date", "mktcap"])
+  .rename(columns={"mktcap": "size"})
 )
 
-variables_ff = (me_ff
-  .merge(bm_ff, 
+market_equity = (crsp_monthly
+  .query("month.dt.month == 12")
+  .assign(
+    sorting_date = lambda x: (x["month"] + 
+                                pd.DateOffset(months=7))
+  )
+  .get(["permno", "gvkey", "sorting_date", "mktcap"])
+  .rename(columns={"mktcap": "me"})
+)
+
+book_to_market = (compustat
+  .assign(
+    sorting_date = lambda x: (pd.to_datetime(
+      (x["datadate"].dt.year + 1).astype(str) + 
+        "0701", format="%Y%m%d"))
+  )
+  .merge(market_equity,
+         how="inner",
+         on=["gvkey", "sorting_date"])
+  .assign(bm = lambda x: x["be"] / x["me"])
+  .get(["permno", "sorting_date", "me", "bm"])
+)
+
+sorting_variables = (size
+  .merge(book_to_market, 
          how="inner", 
          on=["permno", "sorting_date"])
+  .dropna()
+  .drop_duplicates(subset=["permno", "sorting_date"])
  )
 ```
 
 ## Portfolio Sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in Chapter 9 because the `seq()` we would produce does not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints, they form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30%- and 70%-percentiles, and they use independent sorts. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which take the breakpoint-sequence as an object specified in the function's call. Specifically, we give `percentiles = [0, 0.3, 0.7, 1]` to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ```{python}
 def assign_portfolio(data, sorting_variable, percentiles):
@@ -104,90 +133,321 @@ def assign_portfolio(data, sorting_variable, percentiles):
         )
     breakpoints.iloc[0] = -np.Inf
     breakpoints.iloc[breakpoints.size-1] = np.Inf
-    assigned_portfolios = pd.cut(data[sorting_variable],
-                                 bins=breakpoints,
-                                 labels=pd.Series(range(1, breakpoints.size)),
-                                 include_lowest=True)
+    assigned_portfolios = pd.cut(
+      data[sorting_variable],
+      bins=breakpoints,
+      labels=pd.Series(range(1, breakpoints.size)),
+      include_lowest=True
+    )
     return assigned_portfolios
 
-portfolios_ff = (variables_ff
-  .merge(data_ff,
-         how="inner",
-         left_on=["permno", "sorting_date"], right_on=["permno", "month"])
+portfolios = (sorting_variables
   .groupby("sorting_date", group_keys=False)
   .apply(lambda x: x
-         .assign(portfolio_me = assign_portfolio(x, 'me_ff', [0, 0.5, 1]),
-                 portfolio_bm = assign_portfolio(x, 'bm_ff', [0, 0.3, 0.7, 1])))
+         .assign(portfolio_size = assign_portfolio(
+                    x, "size", [0, 0.5, 1]
+                  ),
+                 portfolio_bm = assign_portfolio(
+                    x, "bm", [0, 0.3, 0.7, 1]))
+  )
   .reset_index(drop=True)
-  .get(["permno", "sorting_date", "portfolio_me", "portfolio_bm"])
+  .get(["permno", "sorting_date", 
+        "portfolio_size", "portfolio_bm"])
 )
 ```
 
 Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 ```{python}
-portfolios_ff = (data_ff
-  .assign(sorting_date = lambda x: pd.to_datetime(
-            x["month"].apply(lambda x: str(x.year - 1) + "0701" if x.month <= 6 else str(x.year) + "0701")))
-  .merge(portfolios_ff, how="inner", on=["permno", "sorting_date"])
+portfolios = (crsp_monthly
+  .assign(
+    sorting_date = lambda x: (pd.to_datetime(
+      x["month"].apply(lambda x: str(x.year - 1) +
+        "0701" if x.month <= 6 else str(x.year) + "0701")))
+  )
+  .merge(portfolios,
+         how="inner", 
+         on=["permno", "sorting_date"])
 )
 ```
 
-## Fama and French Factor Returns
+## Fama and French Three Factor Model
 
-Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Size!Size factor}\index{Value factor}
+Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama and French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally.\index{Factor!Size}\index{Factor!Value}
 
 ```{python}
-factors_ff_monthly_replicated = (portfolios_ff
-  .groupby(["portfolio_me", "portfolio_bm", "month"])
-  .apply(lambda x: pd.Series({"ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])}))
+factors_replicated = (portfolios
+  .groupby(["portfolio_size", "portfolio_bm", "month"])
+  .apply(lambda x: pd.Series(
+    {"ret": np.average(x["ret_excess"], 
+                       weights=x["mktcap_lag"])})
+   )
   .reset_index()
   .groupby("month")
   .apply(lambda x: pd.Series({
-    "smb_replicated": x["ret"][x["portfolio_me"] == 1].mean() - x["ret"][x["portfolio_me"] == 2].mean(),
-    "hml_replicated": x["ret"][x["portfolio_bm"] == 3].mean() - x["ret"][x["portfolio_bm"] == 1].mean()
+    "smb_replicated": (
+      x["ret"][x["portfolio_size"] == 1].mean() - 
+        x["ret"][x["portfolio_size"] == 2].mean()),
+    "hml_replicated": (
+      x["ret"][x["portfolio_bm"] == 3].mean() -
+        x["ret"][x["portfolio_bm"] == 1].mean())
     }))
-  .round(decimals=4)
 )
 ```
 
 ## Replication Evaluation
 
-In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium} However, we did not follow their procedure strictly. The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `smf.ols()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
+In the previous section, we replicated the size and value premiums following the procedure outlined by Fama and French.\index{Size!Size premium}\index{Value premium} The final question is then: how close did we get? We answer this question by looking at the two time-series estimates in a regression analysis using `smf.ols()`. If we did a good job, then we should see a non-significant intercept (rejecting the notion of systematic error), a coefficient close to 1 (indicating a high correlation), and an adjusted R-squared close to 1 (indicating a high proportion of explained variance).
 
 ```{python}
-test = (factors_ff_monthly
-  .merge(factors_ff_monthly_replicated, 
+test = (factors_ff3_monthly
+  .merge(factors_replicated, 
          how="inner", 
          on="month")
+  .round(decimals=4)
 )
 ```
 
-The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient and R-squared are at 99%. 
+To test the success of the SMB factor, we hence run the following regression:
 
 ```{python}
-model_smb = (smf.ols(formula="smb ~ smb_replicated", data=test)
+model_smb = (smf.ols(
+    formula="smb ~ smb_replicated", 
+    data=test
+  )
   .fit()
-  .summary(slim=True)
 )
-for table in model_smb.tables:
-  print(table)
+prettify_result(model_smb)
 ```
 
-The replication of the HML factor is also a success, although at a slightly lower level with coefficient and R-squared around 96%. 
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and R-squared are at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)`%. 
 
 ```{python}
-model_hml = (smf.ols(formula="hml ~ hml_replicated", data=test)
+model_hml = (smf.ols(
+    formula="hml ~ hml_replicated", 
+    data=test
+  )
   .fit()
-  .summary(slim=True)
 )
-for table in model_hml.tables:
-  print(table)
+prettify_result(model_hml)
 ```
 
-The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French premiums, although we cannot see their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data. 
+The replication of the HML factor is also a success, although at a slightly lower level with coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and R-squared around `{python} int(np.round(model_hml.rsquared_adj, 2) * 100)`%. 
+
+The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French size and value premiums, although we do not know their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.
+
+## Fama and French Five Factor Model
+
+Now, let us move to the replication of the five factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `dropna()` statement yields different sample sizes as some firms with `be` values might not have `op` or `inv` values. 
+
+```{python}
+other_sorting_variables = (compustat
+  .assign(
+    sorting_date = lambda x: (pd.to_datetime(
+      (x["datadate"].dt.year + 1).astype(str) + 
+        "0701", format="%Y%m%d"))
+  )
+  .merge(market_equity,
+         how="inner",
+         on=["gvkey", "sorting_date"])
+  .assign(bm = lambda x: x["be"] / x["me"])
+  .get(["permno", "sorting_date", "me", "bm", "op", "inv"])
+)
+
+sorting_variables = (size
+  .merge(other_sorting_variables, 
+         how="inner", 
+         on=["permno", "sorting_date"])
+  .dropna()
+  .drop_duplicates(subset=["permno", "sorting_date"])
+ )
+```
+
+In each month, we independently sort all stocks into the two size portfolios. The value, profitability, and investment portfolios, on the other hand, are the results of dependent sorts based on the size portfolios. We then merge the portfolios to the return data for the rest of the year just as above. 
+
+```{python}
+portfolios = (sorting_variables
+  .groupby("sorting_date", as_index=False)
+  .apply(lambda x: x
+         .assign(portfolio_size = assign_portfolio(
+                    x, "size", [0, 0.5, 1]))
+  )
+  .groupby(["sorting_date", "portfolio_size"], 
+           as_index=False)
+  .apply(lambda x: x
+         .assign(portfolio_bm = assign_portfolio(
+                    x, "bm", [0, 0.3, 0.7, 1]),
+                 portfolio_op = assign_portfolio(
+                    x, "op", [0, 0.3, 0.7, 1]),
+                 portfolio_inv = assign_portfolio(
+                    x, "inv", [0, 0.3, 0.7, 1]))
+  )
+  .get(["permno", "sorting_date",
+        "portfolio_size", "portfolio_bm",
+        "portfolio_op", "portfolio_inv"])
+)
+
+portfolios = (crsp_monthly
+  .assign(
+    sorting_date = lambda x: (pd.to_datetime(
+      x["month"].apply(lambda x: str(x.year - 1) +
+        "0701" if x.month <= 6 else str(x.year) + "0701")))
+  )
+  .merge(portfolios,
+         how="inner", 
+         on=["permno", "sorting_date"])
+)
+```
+
+Now, we want to construct each of the factors, but this time the size factor actually comes last because it is the result of averaging across all other factor portfolios. This dependency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor, HML, as above by going long the two portfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.
+
+```{python}
+portfolios_value = (portfolios
+  .groupby(["portfolio_size", "portfolio_bm", "month"], 
+           as_index=False)
+  .apply(lambda x: pd.Series({
+      "ret": np.average(x["ret_excess"], 
+                        weights=x["mktcap_lag"])})
+  )
+)
+
+factors_value = (portfolios_value
+  .groupby("month", as_index=False)
+  .apply(lambda x: pd.Series({
+    "hml_replicated": (
+      x["ret"][x["portfolio_bm"] == 3].mean() - 
+        x["ret"][x["portfolio_bm"] == 1].mean())})
+  )
+)
+```
+
+For the profitability factor, RMW, we take a long position in the two high profitability portfolios and a short position in the two low profitability portfolios.\index{Factor!Profitability}
+
+```{python}
+portfolios_profitability = (portfolios
+  .groupby(["portfolio_size", "portfolio_op", "month"], 
+           as_index=False)
+  .apply(lambda x: pd.Series({
+      "ret": np.average(x["ret_excess"], 
+                        weights=x["mktcap_lag"])})
+  )
+)
+
+factors_profitability = (portfolios_profitability
+  .groupby("month", as_index=False)
+  .apply(lambda x: pd.Series({
+    "rmw_replicated": (
+      x["ret"][x["portfolio_op"] == 3].mean() - 
+        x["ret"][x["portfolio_op"] == 1].mean())})
+  )
+)
+```
+
+For the investment factor, CMA, we go long the two low investment portfolios and short the two high investment portfolios.\index{Factor!Investment}
+
+```{python}
+portfolios_investment = (portfolios
+  .groupby(["portfolio_size", "portfolio_inv", "month"], 
+           as_index=False)
+  .apply(lambda x: pd.Series({
+      "ret": np.average(x["ret_excess"], 
+                       weights=x["mktcap_lag"])})
+  )
+)
+
+factors_investment = (portfolios_investment
+  .groupby("month", as_index=False)
+  .apply(lambda x: pd.Series({
+    "cma_replicated": (
+      x["ret"][x["portfolio_inv"] == 1].mean() - 
+        x["ret"][x["portfolio_inv"] == 3].mean())})
+  )
+)
+```
+
+Finally, the size factor, SMB, is constructed by going long the six small portfolios and short the six large portfolios. 
+
+```{python}
+factors_size = (
+  pd.concat([portfolios_value, portfolios_profitability, 
+             portfolios_investment], ignore_index=True)
+  .groupby("month", as_index=False)
+  .apply(lambda x: pd.Series({
+    "smb_replicated": (
+      x["ret"][x["portfolio_size"] == 1].mean() - 
+        x["ret"][x["portfolio_size"] == 2].mean())})
+  )
+)
+```
+
+We then join all factors together into one data frame and construct again a suitable table to run tests for evaluating our replication.
+
+```{python}
+factors_replicated = (factors_size
+  .merge(factors_value, how="outer", on="month")
+  .merge(factors_profitability, how="outer", on="month")
+  .merge(factors_investment, how="outer", on="month")
+)
+
+test = (factors_ff5_monthly
+  .merge(factors_replicated, how="inner", on="month")
+  .round(decimals=4)
+)
+```
+
+Let us start the replication evaluation again with the size factor:
+
+```{python}
+model_smb = (smf.ols(
+    formula="smb ~ smb_replicated", 
+    data=test
+  )
+  .fit()
+)
+prettify_result(model_smb)
+```
+
+The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)`%. 
+
+```{python}
+model_hml = (smf.ols(
+    formula="hml ~ hml_replicated", 
+    data=test
+  )
+  .fit()
+)
+prettify_result(model_hml)
+```
+
+The replication of the HML factor is also a success, although at a slightly higher coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `{python} int(np.round(model_hml.rsquared_adj, 2) * 100)`%. 
+
+```{python}
+model_rmw = (smf.ols(
+    formula="rmw ~ rmw_replicated", 
+    data=test
+  )
+  .fit()
+)
+prettify_result(model_rmw)
+```
+
+We are also able to replicate the RMW factor quite well with a coefficient of `{python} np.round(model_rmw.params["rmw_replicated"], 2)` and an R-squared around `{python} int(np.round(model_rmw.rsquared_adj, 2) * 100)`%.
+
+```{python}
+model_cma = (smf.ols(
+    formula="cma ~ cma_replicated", 
+    data=test
+  )
+  .fit()
+)
+prettify_result(model_cma)
+```
+
+Finally, the CMA factor also replicates well with a coefficient of `{python} np.round(model_cma.params["cma_replicated"], 2)` and an R-squared around `{python} int(np.round(model_cma.rsquared_adj, 2) * 100)`%.
+
+Overall, our approach seems to replicate the Fama-French three and five factor models just as well as the three factors. 
 
 ## Exercises
 
 1. @Fama1993 claim that their sample excludes firms until they have appeared in Compustat for two years. Implement this additional filter and compare the improvements of your replication effort. 
-2. On his homepage, [Kenneth French](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) provides instructions on how to construct the most common variables used for portfolio sorts. Pick one of them, e.g. `OP` (operating profitability) and try to replicate the portfolio sort return time series provided on his homepage.  
+2. On his homepage, [Kenneth French](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) provides instructions on how to construct the most common variables used for portfolio sorts. Try to replicate the univariate portfolio sort return time series for `E/P` (earnings / price) provided on his homepage and evaluate your replication effort using regressions.

@@ -1,5 +1,8 @@
 ---
 title: Introduction to Tidy Finance
+metadata:
+  pagetitle: Introduction to Tidy Finance with Python
+  description-meta: Learn how to use the programming language Python for downloading and analyzing stock market data.
 ---
 
 ```{python}
@@ -11,12 +14,12 @@ import pre_render_script
 You are reading the work-in-progress edition of **Tidy Finance with Python**. Code chunks and text might change over the next couple of months. We are always looking for feedback via [contact\@tidy-finance.org](mailto:contact@tidy-finance.org). Meanwhile, you can find the complete R version [here](../r/index.qmd).
 :::
 
-The main aim of this chapter is to familiarize yourself with `pandas` and `numpy`, the main workhorses for data analysis in Python. 
+The main aim of this chapter is to familiarize yourself with `pandas` [@reback2020pandas, @reback2020pandas] and `numpy` [@harris2020array], the main workhorses for data analysis in Python. 
 We start by downloading and visualizing stock data from Yahoo!Finance. Then, we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with Stock Market Data
 
-At the start of each session, we load the required packages. Throughout the entire book, we always use `pandas` and `numpy` to perform a number of data manipulations. In this chapter, we also load the convenient `yfinance` package to download price data. 
+At the start of each session, we load the required Python packages. Throughout the entire book, we always use `pandas` and `numpy` to perform a number of data manipulations. In this chapter, we also load the convenient `yfinance` [@yfinance] package to download price data. 
 
 ```{python}
 import pandas as pd
@@ -32,7 +35,7 @@ We first download daily prices for one stock symbol, e.g., the Apple stock, *AAP
 #| warning: false
 prices = (yf.download(tickers="AAPL", 
                       start="2000-01-01", 
-                      end="2021-12-31")
+                      end="2022-12-31")
   .reset_index()
   .assign(symbol = "AAPL")
   .rename(columns = {"Date": "date", 
@@ -44,24 +47,29 @@ prices = (yf.download(tickers="AAPL",
                      "Volume": "volume"
                     })
 )
-prices.head()
+prices.head().round(3)
 ```
 
 \index{Data!YahooFinance} `yf.download()` downloads stock market data from Yahoo!Finance. The above code chunk returns a data frame with eight quite self-explanatory columns: `date`, the market prices at the `open`, `high`, `low`, and `close`, the `adjusted` price in USD, the daily `volume` (in the number of traded shares), and the `symbol`. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices but have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
-Next, we use the `plotnine` package to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
+Next, we use the `plotnine` [@plotnine] package to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
 ```{python}
 #| label: fig-100 
 #| fig-cap: "Prices are in USD, adjusted for dividend payments and stock splits."
-#| fig-alt: "Title: Apple stock prices between the beginning of 2000 and the end of 2021. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD."
+#| fig-alt: "Title: Apple stock prices between the beginning of 2000 and the end of 2022. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD."
 from plotnine import *
+from mizani.breaks import date_breaks
+from mizani.formatters import date_format
 
-prices_figure = (ggplot(prices, aes(y="adjusted", 
-                                    x="date"))
- + geom_line()
- + labs(x="", y="",
-        title="Apple stock prices between beginning of 2000 and end of 2021")
+prices_figure = (
+  ggplot(prices, 
+         aes(y="adjusted", x="date")) +
+ geom_line() +
+ labs(x="", y="",
+      title="Apple stock prices between beginning of 2000 and end of 2022") +
+ scale_x_datetime(breaks=date_breaks("5 years"), 
+                  labels=date_format("%Y"))
 )
 prices_figure.draw()
 ```
@@ -74,7 +82,7 @@ returns = (prices
   .assign(ret = lambda x: x["adjusted"].pct_change())
   .get(["symbol", "date", "ret"])
 )
-returns.head()
+returns.head().round(3)
 ```
 
 The resulting data frame contains three columns, where the last contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NaN`) because there is no previous price.\index{Missing value} Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The function `sort_values()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `ascending=False`.
@@ -85,7 +93,7 @@ For the upcoming examples, we remove missing values as these would require separ
 returns = returns.dropna() 
 ```
 
-Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we add a dashed line that indicates the 5 percent quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at most 5 percent. The 5 percent quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to stylized facts of returns.\index{Returns}
+Next, we visualize the distribution of daily returns in a histogram in @fig-101 where we also introduce the `mizani` [@mizani] package for formatting functions. \index{Graph!Histogram} Additionally, we add a dashed line that indicates the 5 percent quantile of the daily returns to the histogram, which is a (crude) proxy for the worst return of the stock with a probability of at most 5 percent. The 5 percent quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to stylized facts of returns.\index{Returns}
 
 ```{python}
 #| label: fig-101 
@@ -95,12 +103,14 @@ from mizani.formatters import percent_format
 
 quantile_05 = returns["ret"].quantile(0.05)
 
-returns_figure = (ggplot(returns, aes(x="ret"))
- + geom_histogram(bins=100)
- + geom_vline(aes(xintercept=quantile_05), linetype="dashed")
- + labs(x=None, y=None,
-        title="Distribution of daily Apple stock returns")
- + scale_x_continuous(labels=percent_format())
+returns_figure = (
+  ggplot(returns, aes(x="ret")) +
+  geom_histogram(bins=100) +
+  geom_vline(aes(xintercept=quantile_05), 
+                 linetype="dashed") +
+  labs(x="", y="",
+       title="Distribution of daily Apple stock returns") +
+  scale_x_continuous(labels=percent_format())
 )
 returns_figure.draw()
 ```
@@ -108,14 +118,18 @@ returns_figure.draw()
 Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest.
 
 ```{python}
-returns["ret"].describe()
+returns["ret"].describe().round(3)
 ```
 
 We see that the maximum *daily* return was `python round(returns["ret"].max() * 100, 3)` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
 You can also compute these summary statistics for each year individually by imposing `.groupby(returns["date"].dt.year)`, where the call `.dt.year` returns the year of a date variable. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the return distribution.
 
 ```{python}
-returns["ret"].groupby(returns["date"].dt.year).describe()
+(returns["ret"]
+  .groupby(returns["date"].dt.year)
+  .describe()[["mean", "std", "min", "max"]]
+  .round(3)
+)
 ```
 
 \index{Summary statistics}
@@ -145,7 +159,7 @@ Next, we can use `yf.download()` to download prices for all stock symbols in the
 #| warning: false
 index_prices = (yf.download(tickers=symbols, 
                             start="2000-01-01",
-                            end="2021-12-31",
+                            end="2022-12-31",
                             progress=False)
   .melt(ignore_index=False, 
         var_name=["variable", "symbol"])
@@ -171,15 +185,16 @@ The resulting data frame contains `python len(index_prices)` daily observations 
 #| label: fig-103
 #| fig-cap: "Prices in USD, adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index."
-index_prices_figure = (ggplot(index_prices, 
-                              aes(y="adjusted", 
-                                  x="date", 
-                                  color="symbol"))
- + geom_line()
- + labs(x="", y="", color="",
-        title="Stock prices of DOW index constituents")
- + theme(legend_position="none")
- )
+index_prices_figure = (
+  ggplot(index_prices, 
+         aes(y="adjusted", x="date", color="symbol")) +
+ geom_line() +
+ labs(x="", y="", color="",
+      title="Stock prices of DOW index constituents") +
+ theme(legend_position="none") +
+ scale_x_datetime(breaks=date_breaks("5 years"), 
+                  labels=date_format("%Y")) 
+)
 index_prices_figure.draw()
 ```
 
@@ -194,7 +209,11 @@ all_returns = (index_prices
   .dropna(subset="ret")
 )
 
-all_returns.groupby("symbol")["ret"].describe()
+(all_returns
+  .groupby("symbol")["ret"]
+  .describe()
+  .round(3)
+)
 ```
 
 \index{Summary statistics}
@@ -206,7 +225,7 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 ```{python}
 #| label: fig-104
 #| fig-cap: "Total daily trading volume in billion USD."
-#| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100."
+#| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2022, with a maximum of more than 100."
 trading_volume = (index_prices
   .assign(trading_volume = lambda x: (x["volume"] * x["adjusted"]) / 1e9)
   .groupby("date")["trading_volume"]
@@ -215,14 +234,14 @@ trading_volume = (index_prices
   .assign(trading_volume_lag = lambda x: x["trading_volume"].shift())
 )
 
-trading_volume_figure = (ggplot(trading_volume, 
-                                aes(x="date", 
-                                    y="trading_volume"))
- + geom_line()
- + labs(x="", 
-        y="",
-        title="Aggregate daily trading volume of "
-              "DOW index constituents in billion USD")
+trading_volume_figure = (
+  ggplot(trading_volume, 
+          aes(x="date", y="trading_volume")) +
+  geom_line() +
+  labs(x="", y="",
+       title="Aggregate daily trading volume of DOW index constituents in billion USD") +
+  scale_x_datetime(breaks=date_breaks("5 years"), 
+                  labels=date_format("%Y"))
 )
 trading_volume_figure.draw()
 ```
@@ -234,16 +253,14 @@ trading_volume_figure.draw()
 #| label: fig-105
 #| fig-cap: "Total daily trading volume in billion USD."
 #| fig-alt: "Title: Persistence in daily trading volume of DOW index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45-degree line."
-trading_volume_figure = (ggplot(trading_volume, 
-                                aes(x="trading_volume_lag", 
-                                    y="trading_volume"))
- + geom_point()
- + geom_abline(aes(intercept=0, slope=1), 
-               linetype="dashed")
- + labs(x="Previous day aggregate trading volume",
-        y="Aggregate trading volume",
-        title="Persistence in daily trading volume of DOW constituents "
-              "in billion USD")
+trading_volume_figure = (
+  ggplot(trading_volume, 
+         aes(x="trading_volume_lag", y="trading_volume")) +
+  geom_point() +
+  geom_abline(aes(intercept=0, slope=1), linetype="dashed") +
+  labs(x="Previous day aggregate trading volume",
+       y="Aggregate trading volume",
+       title="Persistence in daily trading volume of DOW constituents in billion USD")
 )
 trading_volume_figure.draw()
 ```
@@ -292,7 +309,7 @@ mvp_return = (mu.T @ mvp_weights)
 mvp_volatility = np.sqrt(mvp_weights.T @ sigma @ mvp_weights)
 mvp_moments = pd.DataFrame([mvp_return, mvp_volatility],
                           index=["average_ret", "volatility"]).T
-mvp_moments
+mvp_moments.round(3)
 ```
 
 The command `np.linalg.inv()` returns the solution of a system of equations $Ax = b$. If `b` is not provided, as in the example above, it defaults to the identity matrix such that `np.linalg.inv(sigma)` delivers $\Sigma^{-1}$ (if a unique solution exists).\
@@ -342,19 +359,23 @@ mvp_volatility = np.sqrt(mvp_weights.T @ sigma @ mvp_weights) * np.sqrt(length_y
 efp_return = mu_bar * length_year
 efp_volatility = np.sqrt(efp_weights.T @ sigma @ efp_weights) * np.sqrt(length_year)
 
-res_figure = (ggplot(res, aes(x="sd", 
-                              y="mu"))
- + geom_point()
- + geom_point(pd.DataFrame({"mu": [mvp_return, efp_return],
-                            "sd": [mvp_volatility, efp_volatility]}),
-              size=4)
- + geom_point(pd.DataFrame({"mu": mu * length_year, 
-                            "sd": np.sqrt(np.diag(sigma)) * np.sqrt(length_year)}))
- + labs(x="Annualized standard deviation",
-        y="Annualized expected return",
-        title="Efficient frontier for DOW index constituents")
- + scale_x_continuous(labels=percent_format())
- + scale_y_continuous(labels=percent_format())
+res_figure = (
+  ggplot(res, aes(x="sd", y="mu")) +
+  geom_point() +
+  geom_point(
+    pd.DataFrame({"mu": [mvp_return, efp_return],
+                  "sd": [mvp_volatility, efp_volatility]}),
+    size=4
+  ) +
+  geom_point(
+    pd.DataFrame({"mu": mu * length_year,
+                  "sd": np.sqrt(np.diag(sigma)) * np.sqrt(length_year)})
+  ) +
+  labs(x="Annualized standard deviation",
+       y="Annualized expected return",
+       title="Efficient frontier for DOW index constituents") +
+  scale_x_continuous(labels=percent_format()) +
+  scale_y_continuous(labels=percent_format())
 )
 res_figure.draw()
 ```
@@ -363,10 +384,10 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1.  Download daily prices for another stock market symbols of your choice from Yahoo!Finance with `yf.download()` from the `yfinance` package. Plot two time series of the symbol's un-adjusted and adjusted closing prices. Explain the differences.
-2.  Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
-3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- ["AAPL", "MMM", "BA"]`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
-4.  Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
-5.  Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
-6.  In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
-7.  The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk, i.e., standard deviation. Identify the portfolio with the highest expected return per standard deviation. Hint: the ratio of expected return to standard deviation is an important concept in Finance.
+1. Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `yf.download()` from the `yfinance` package. Plot two time series of the ticker’s un-adjusted and adjusted closing prices. Explain the differences.
+1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
+1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker = ["AAPL", "MMM", "BA"]`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the ticker `AAPL`.
+1.Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
+1. In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
+1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk. Identify the portfolio with the highest expected return per standard deviation. Which famous performance measure is close to the ratio of average returns to the standard deviation of returns?

@@ -2,18 +2,24 @@
 title: Introduction to Tidy Finance
 aliases:
   - ../introduction-to-tidy-finance.html
+pre-render:
+  - pre_render_script.R
+metadata:
+  pagetitle: Introduction to Tidy Finance with R
+  description-meta: Learn how to use the programming language R for downloading and analyzing stock market data.
 ---
 
 The main aim of this chapter is to familiarize yourself with the tidyverse. We start by downloading and visualizing stock data from Yahoo!Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with Stock Market Data
 
-At the start of each session, we load the required packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the convenient `tidyquant` package [@tidyquant] to download price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse`.\index{tidyverse}
+At the start of each session, we load the required R packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the convenient `tidyquant` package [@tidyquant] to download price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse`.\index{tidyverse}
 Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
 
 You typically have to install a package once before you can load it. In case you have not done this yet, call `install.packages("tidyquant")`. \index{tidyquant} If you have trouble using `tidyquant`, check out the corresponding [documentation.](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ00-introduction-to-tidyquant.html)
 
-```{r, eval = TRUE, message=FALSE}
+```{r}
+#| message: false
 library(tidyverse)
 library(tidyquant)
 library(scales)
@@ -21,12 +27,12 @@ library(scales)
 
 We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
 
-```{r, eval = TRUE}
+```{r}
 #| cache: true
 prices <- tq_get("AAPL",
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2021-12-31"
+  to = "2022-12-31"
 )
 prices
 ```
@@ -38,20 +44,20 @@ Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of ad
 ```{r}
 #| label: fig-100 
 #| fig-cap: "Prices are in USD, adjusted for dividend payments and stock splits."
-#| fig-alt: "Title: Apple stock prices between the beginning of 2000 and the end of 2021. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD."
+#| fig-alt: "Title: Apple stock prices between the beginning of 2000 and the end of 2022. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD."
 prices |>
   ggplot(aes(x = date, y = adjusted)) +
   geom_line() +
   labs(
     x = NULL,
     y = NULL,
-    title = "Apple stock prices between beginning of 2000 and end of 2021"
+    title = "Apple stock prices between beginning of 2000 and end of 2022"
   )
 ```
 
 \index{Returns} Instead of analyzing prices, we compute daily net returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted day $t$ price. In that context, the function `lag()` is helpful, which returns the previous value in a vector.
 
-```{r, eval = TRUE}
+```{r}
 returns <- prices |>
   arrange(date) |>
   mutate(ret = adjusted / lag(adjusted) - 1) |>
@@ -63,7 +69,7 @@ The resulting tibble contains three columns, where the last contains the daily r
 
 For the upcoming examples, we remove missing values as these would require separate treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
 
-```{r, eval = TRUE}
+```{r}
 returns <- returns |>
   drop_na(ret)
 ```
@@ -133,7 +139,8 @@ As a next step, we generalize the code from before such that all the computation
 
 This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of symbols, e.g., `symbol <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
 
-```{r, eval = TRUE, message = FALSE}
+```{r}
+#| message: false
 symbols <- tq_index("DOW") |> 
   filter(company != "US DOLLAR")
 symbols
@@ -141,12 +148,12 @@ symbols
 
 Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on the NASDAQ exchange). \index{Exchange!NASDAQ}
 
-```{r, eval = TRUE}
+```{r}
 #| cache: true
 index_prices <- tq_get(symbols,
   get = "stock.prices",
   from = "2000-01-01",
-  to = "2021-12-31"
+  to = "2022-12-31"
 )
 ```
 
@@ -209,7 +216,7 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 ```{r}
 #| label: fig-104
 #| fig-cap: "Total daily trading volume in billion USD."
-#| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2021, with a maximum of more than 100."
+#| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2022, with a maximum of more than 100."
 trading_volume <- index_prices |>
   group_by(date) |>
   summarize(trading_volume = sum(volume * adjusted))
@@ -370,10 +377,10 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1.  Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the symbol's un-adjusted and adjusted closing prices. Explain the differences.
-2.  Compute daily net returns for the asset and visualize the distribution of daily returns in a histogram. Also, use `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns within the histogram. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns
-3.  Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
-4.  Consider the research question: Are days with high aggregate trading volume often also days with large absolute price changes? Find an appropriate visualization to analyze the question.
-5.  Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
-6.  In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
-7.  The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk, i.e., standard deviation. Identify the portfolio with the highest expected return per standard deviation. Hint: the ratio of expected return to standard deviation is an important concept in Finance.
+1. Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the ticker’s un-adjusted and adjusted closing prices. Explain the differences.
+1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
+1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the ticker `AAPL`.
+1.Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
+1. In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
+1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk. Identify the portfolio with the highest expected return per standard deviation. Which famous performance measure is close to the ratio of average returns to the standard deviation of returns?
