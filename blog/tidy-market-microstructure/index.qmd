@@ -132,7 +132,7 @@ tv_quotes
 Note that we use the suffix `tv_` for every object generated using `tidyverse` syntax. This way you can execute the entire code of this blog post without overwriting `data.table` objects with the `dtplyr` equivalent and vice versa. 
 
 The data contain four variables that describe the state of the order book (`Bid Price`, `Bid Size`, `Ask Price`, and `Ask Size`). The LOB holds orders at numerous different prices, but we only see the best price level on each side. This is sufficient for most quote-based market quality measures. 
-We also get three variables conveying time stamps and time zone information (`Date-Time`, `GMT Offset`, and `Exch time`; discussed in detail below), and three categorical variables (`#RIC`, `Domain`, and `Type`). 
+We also get three variables conveying time stamps and time zone information (`Date-Time`, `GMT Offset`, and `Exch time`; discussed in detail below), and three character variables (`#RIC`, `Domain`, and `Type`). 
 
 Before processing the data, we rename the variables. Names containing spaces, hashes, and dashes may make sense for data vendors, but they are impractical to work with in R. Furthermore, for the order book variables, we prefer to use the term *depth* to refer to the number of shares quoted, reserving the term *size* to the number of shares changing hands in a trade. 
 
@@ -168,9 +168,10 @@ tv_quotes <- tv_quotes|>
 ```
 :::
 
-From the output above, the categorical variables look like constants, with the same value in every line. If so, they occupy way more memory than necessary. The `table` function is great to gauge the variation in categorical variables. In this case, it shows us that there is variation in the `ticker` variable. The two tickers are for the same stock, `PRU`, traded at two different exchange, LSE and TQE. The former is more active, with 165,261 quote updates. 
+From the output above, the character columns might look like they are the same for all rows, hence occupying more memory than necessary.
+The `data.table::table()` or `dtplyr::count()` functions are great to gauge the variation in categorical variables. In this case, it shows us that there is variation in the `ticker` variable. The two tickers are for the same stock, `PRU`, traded at two different exchange, LSE and TQE. The former is more active, with 165,261 quote updates. 
 
-The other two categorical variables, `domain` and `type`, are indeed constants. We delete them to save memory.
+The other two character variables, `domain` and `type`, are indeed constants. We delete them to save memory.
 
 ::: {.panel-tabset group="language"}
 ## data.table
@@ -190,7 +191,6 @@ tv_quotes |>
 tv_quotes <- tv_quotes |>
   select(-type, -domain)
 ```
-We can see that `type` and `Domain` only have unique values (`Quote` and `Market Price`). Going forward, we delete these variables.
 :::
 
 **Dates.**
@@ -278,7 +278,7 @@ tv_quotes <- tv_quotes|>
 **Prices and depths.**
 An important feature of LOB quotes is that they remain valid until cancelled, executed or modified. Whenever there is a change to the prevailing quotes, a new quote observation is added to the data. It is irrelevant if the latest quote is from the previous millisecond or from the previous minute -- it remains valid until updated. It is thus economically meaningful to forward-fill quotes that prevailed in the previous period. Trades, in contrast, are agreed upon at a fixed point in time and do not convey any information about future prices or sizes. They should not be forward-filled, see [Hagströmer and Menkveld (2023)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4356262)^[Hagströmer, B., & Menkveld, A. J. (2023). Trades, quotes, and information shares. Working paper.].
 
-When forward-filling quote data, it is important to restrict the procedure to the same date, stock and trading venue. For example, quotes should never be forward-filled from one day to the next, and not from one venue to another. This is ensured with the `by` argument (in `data.table`) or the `groupby` argument (in `tidyverse`), which specifies that the operation is to be done *within* each combination of tickers and dates. 
+When forward-filling quote data, it is important to restrict the procedure to the same date, stock and trading venue. For example, quotes should never be forward-filled from one day to the next, and not from one venue to another. This is ensured with the `by` argument (in `data.table`) or the `group_by` function (in `tidyverse`), which specifies that the operation is to be done *within* each combination of tickers and dates. 
 
 ::: {.panel-tabset group="language"}
 ## data.table
@@ -363,7 +363,8 @@ ggplot(quotes,
        aes(x = ask_price - bid_price, fill = ticker)) +
   geom_histogram(bins = 100) +
   labs(title = "Histogram of nominal bid-ask spread",
-       x = "Nominal bid-ask spread (pence)") +
+       x = "Nominal bid-ask spread (pence)",
+       y = "Count") +
   scale_x_continuous(breaks = 1:12)
 ```
 ## dtplyr
@@ -374,7 +375,8 @@ tv_quotes |>
   ggplot(aes(x = ask_price - bid_price, fill = ticker)) +
   geom_histogram(bins = 100) +
   labs(title = "Histogram of nominal bid-ask spread",
-       x = "Nominal bid-ask spread (pence)") +
+       x = "Nominal bid-ask spread (pence)",
+       y = "Count") +
   scale_x_continuous(breaks = 1:12)
 ```
 :::
