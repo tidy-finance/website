@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.506">
+<meta name="generator" content="quarto-1.4.533">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -119,6 +119,7 @@ div.csl-indent {
     "search-more-match-text": "more match in this document",
     "search-more-matches-text": "more matches in this document",
     "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
     "search-detached-cancel-button-title": "Cancel",
     "search-submit-button-title": "Submit",
     "search-label": "Search"
@@ -158,6 +159,33 @@ cookieconsent.run({
 
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
 
 <link rel="stylesheet" href="../styling/styles.css">
 <meta property="og:title" content="Fama-MacBeth Regressions with Python">
@@ -262,7 +290,7 @@ cookieconsent.run({
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../python/index.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Preface</span></a>
+ <span class="menu-text">Tidy Finance with Python</span></a>
   </div>
 </li>
       </ul>
@@ -505,7 +533,7 @@ Note
 <p>In the second step, the time-series average <span class="math inline">\(\frac{1}{T}\sum_{t=1}^T \hat\lambda^{f}_t\)</span> of the estimates <span class="math inline">\(\hat\lambda^{f}_t\)</span> can then be interpreted as the risk premium for the specific risk factor <span class="math inline">\(f\)</span>. We follow <span class="citation" data-cites="Zaffaroni2022">Zaffaroni and Zhou (<a href="#ref-Zaffaroni2022" role="doc-biblioref">2022</a>)</span> and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time <span class="math inline">\(t+1\)</span> variables, then the regression approach captures risk attributes rather than risk premiums.</p>
 <p>Before we move to the implementation, we want to highlight that the characteristics, e.g., <span class="math inline">\(\hat\beta^{f}_{i}\)</span>, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a <em>step 0</em>. You might thus worry that the errors of <span class="math inline">\(\hat\beta^{f}_{i}\)</span> impact the risk premiums’ standard errors. Measurement error in <span class="math inline">\(\hat\beta^{f}_{i}\)</span> indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias <span class="citation" data-cites="Shanken1992 Kim1995 Chen2015">(see, e.g., <a href="#ref-Shanken1992" role="doc-biblioref">Shanken 1992</a>; <a href="#ref-Kim1995" role="doc-biblioref">Kim 1995</a>; <a href="#ref-Chen2015" role="doc-biblioref">Chen, Lee, and Lee 2015</a>, among others)</span> but also shows that the bias goes to zero as <span class="math inline">\(T \to \infty\)</span>. We refer to <span class="citation" data-cites="Gagliardini2016">Gagliardini, Ossola, and Scaillet (<a href="#ref-Gagliardini2016" role="doc-biblioref">2016</a>)</span> for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks: <span class="citation" data-cites="Hou2020">Hou, Xue, and Zhang (<a href="#ref-Hou2020" role="doc-biblioref">2020</a>)</span> advocates using weighed-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.</p>
 <p>The current chapter relies on this set of Python packages.</p>
-<div id="00eee446" class="cell" data-execution_count="2">
+<div id="1b386fb9" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -516,7 +544,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We illustrate <span class="citation" data-cites="Fama1973">Fama and MacBeth (<a href="#ref-Fama1973" role="doc-biblioref">1973</a>)</span> with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>.</p>
-<div id="45f1f24d" class="cell" data-execution_count="3">
+<div id="b537ce1d" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -541,7 +569,7 @@ Note
 <span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization. Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.</p>
-<div id="6dba7547" class="cell" data-execution_count="4">
+<div id="f7ab2307" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>characteristics <span class="op">=</span> (compustat</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    month <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"datadate"</span>].dt.to_period(<span class="st">"M"</span>)</span>
@@ -596,7 +624,7 @@ Note
 <section id="cross-sectional-regression" class="level2">
 <h2 class="anchored" data-anchor-id="cross-sectional-regression">Cross-sectional Regression</h2>
 <p>Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums <span class="math inline">\(\hat\lambda^{f}_t\)</span> for each point in time. </p>
-<div id="b4c8ef0b" class="cell" data-execution_count="5">
+<div id="63dbe35a" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>risk_premiums <span class="op">=</span> (data_fama_macbeth</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: smf.ols(</span>
@@ -609,7 +637,7 @@ Note
 <section id="time-series-aggregation" class="level2">
 <h2 class="anchored" data-anchor-id="time-series-aggregation">Time-Series Aggregation</h2>
 <p>Now that we have the risk premiums’ estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the <span class="math inline">\(t\)</span>-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests.</p>
-<div id="bb8b2a85" class="cell" data-execution_count="6">
+<div id="bff3556b" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>price_of_risk <span class="op">=</span> (risk_premiums</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars<span class="op">=</span><span class="st">"month"</span>, </span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        var_name<span class="op">=</span><span class="st">"factor"</span>, </span>
@@ -626,7 +654,7 @@ Note
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in <a href="../python/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>, the typical procedure for this is computing <span class="citation" data-cites="Newey1987">Newey and West (<a href="#ref-Newey1987" role="doc-biblioref">1987</a>)</span> standard errors.</p>
-<div id="e42a0937" class="cell" data-execution_count="7">
+<div id="3e80b9ac" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>price_of_risk_newey_west <span class="op">=</span> (risk_premiums</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars<span class="op">=</span><span class="st">"month"</span>, </span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        var_name<span class="op">=</span><span class="st">"factor"</span>, </span>
@@ -662,30 +690,30 @@ Note
 <tr class="odd">
 <td data-quarto-table-cell-role="th">0</td>
 <td>Intercept</td>
-<td>1.163</td>
-<td>4.700</td>
-<td>3.993</td>
+<td>1.240</td>
+<td>4.784</td>
+<td>4.142</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">1</td>
 <td>beta</td>
-<td>0.035</td>
-<td>0.332</td>
-<td>0.325</td>
+<td>0.007</td>
+<td>0.063</td>
+<td>0.058</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">2</td>
 <td>bm</td>
-<td>0.175</td>
-<td>3.592</td>
-<td>3.209</td>
+<td>0.163</td>
+<td>3.087</td>
+<td>2.882</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">3</td>
 <td>log_mktcap</td>
-<td>-0.112</td>
-<td>-3.166</td>
-<td>-3.129</td>
+<td>-0.108</td>
+<td>-3.010</td>
+<td>-2.830</td>
 </tr>
 </tbody>
 </table>
@@ -700,14 +728,13 @@ Note
 <ol type="1">
 <li>Download a sample of test assets from Kenneth French’s homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.</li>
 <li>Use individual stocks with weighted-least squares based on a firm’s size as suggested by <span class="citation" data-cites="Hou2020">Hou, Xue, and Zhang (<a href="#ref-Hou2020" role="doc-biblioref">2020</a>)</span>. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches.</li>
-<li>Implement a rolling-window regression for the time-series estimation of the factor exposure. Skip one month after each rolling period before including the exposures in the cross-sectional regression to avoid a look-ahead bias. Then, adapt the cross-sectional regression and compute the average risk premiums.</li>
 </ol>
 
 
 
 </section>
 
-<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
+<div id="quarto-appendix" class="default"><section class="quarto-appendix-contents" role="doc-bibliography" id="quarto-bibliography"><h2 class="anchored quarto-appendix-heading">References</h2><div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list">
 <div id="ref-Campbell1998" class="csl-entry" role="listitem">
 Campbell, John Y., Andrew W. Lo, A. Craig MacKinlay, and Robert F. Whitelaw. 1998. <span>“The Econometrics of Financial Markets.”</span> <em>Macroeconomic Dynamics</em> 2 (4): 559–62. <a href="https://doi.org/10.1017/S1365100598009092">https://doi.org/10.1017/S1365100598009092</a>.
 </div>
@@ -885,27 +912,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       }
     }
     stripColumnClz(note)
-    const typesetMath = (el) => {
-      if (window.MathJax) {
-        // MathJax Typeset
-        window.MathJax.typeset([el]);
-      } else if (window.katex) {
-        // KaTeX Render
-        var mathElements = el.getElementsByClassName("math");
-        var macros = [];
-        for (var i = 0; i < mathElements.length; i++) {
-          var texText = mathElements[i].firstChild;
-          if (mathElements[i].tagName == "SPAN") {
-            window.katex.render(texText.data, mathElements[i], {
-              displayMode: mathElements[i].classList.contains('display'),
-              throwOnError: false,
-              macros: macros,
-              fleqn: false
-            });
-          }
-        }
-      }
-    }
     if (id === null || id.startsWith('sec-')) {
       // Special case sections, only their first couple elements
       const container = document.createElement("div");
@@ -920,10 +926,14 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             break;
           }
         }
-        typesetMath(container);
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
         return container.innerHTML
       } else {
-        typesetMath(note);
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
         return note.innerHTML;
       }
     } else {
@@ -932,7 +942,9 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (anchorLink) {
         anchorLink.remove();
       }
-      typesetMath(note);
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
       return note.innerHTML;
     }
   }
@@ -1178,7 +1190,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
  © Christoph Frey, Chistoph Scheuch, Stefan Voigt &amp; Patrick Weiss
   </li>  
 </ul>
-    <div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/tidy-finance/website/edit/main/python/fama-macbeth-regressions.qmd" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/tidy-finance/website/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li></ul></div><div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
     <div class="nav-footer-right">
       &nbsp;
     </div>
