@@ -119,8 +119,7 @@ We read the data as a ´tibble´ using the (very fast) function ´vroom´. The c
 ```{r}
 #| cache=TRUE
 
-tv_quotes <- vroom::vroom(quotes_url, 
-                       col_types = list(`Exch Time` = col_character()))
+tv_quotes <- vroom::vroom(quotes_url, col_types = list(`Exch Time` = col_character()))
 
 tv_quotes <- lazy_dt(tv_quotes)
 ```
@@ -154,15 +153,15 @@ setnames(quotes, raw_quote_variables, new_quote_variables)
 ```{r}
 tv_quotes <- tv_quotes|> 
   rename(ticker = `#RIC`,
-            domain = Domain,
-            date_time = `Date-Time`,
-            gmt_offset = `GMT Offset`,
-            type = Type,
-            bid_price = `Bid Price`, 
-            bid_depth = `Bid Size`, 
-            ask_price = `Ask Price`,
-            ask_depth = `Ask Size`,
-            exchange_time = `Exch Time`
+         domain = Domain,
+         date_time = `Date-Time`,
+         gmt_offset = `GMT Offset`,
+         type = Type,
+         bid_price = `Bid Price`, 
+         bid_depth = `Bid Size`, 
+         ask_price = `Ask Price`,
+         ask_depth = `Ask Size`,
+         exchange_time = `Exch Time`
   ) |>
   lazy_dt()
 ```
@@ -364,7 +363,7 @@ ggplot(quotes,
   geom_histogram(bins = 100) +
   labs(title = "Histogram of nominal bid-ask spread",
        x = "Nominal bid-ask spread (pence)") +
-  scale_x_continuous(breaks=1:12)
+  scale_x_continuous(breaks = 1:12)
 ```
 ## tidyverse (using dtplyr)
 
@@ -375,11 +374,11 @@ tv_quotes |>
   geom_histogram(bins = 100) +
   labs(title = "Histogram of nominal bid-ask spread",
        x = "Nominal bid-ask spread (pence)") +
-  scale_x_continuous(breaks=1:12)
+  scale_x_continuous(breaks = 1:12)
 ```
 :::
 
-R produces a warning when plotting the nominal bid-ask spread. It mentions 1,576 rows containing "non-finite values". The non-finite values refer either `NA`, `Inf` (inifinite) or `-Inf` (negative inifinite). In the timestamp section, we imposed `NA` for LOB variables during midday auction. To see if those are the cause of the warning, let's create a histogram of the time stamps of the missing values. 
+R produces a warning when plotting the nominal bid-ask spread. It mentions 1,576 rows containing "non-finite values". The non-finite values refer either `NA`, `Inf` (infinite) or `-Inf` (negative infinite). In the timestamp section, we imposed `NA` for LOB variables during midday auction. To see if those are the cause of the warning, let's create a histogram of the time stamps of the missing values. 
 
 Indeed, all missing values are around ~43,150 and ~43,350 seconds of the trading day which is the time of the midday auction (noon is $12\times3,600=43,200$ seconds past midnight). Accounting for missing spreads by plotting the histogram without `NA` removes the warning. 
 
@@ -396,10 +395,10 @@ ggplot(quotes[is.na(ask_price - bid_price)],
 ## tidyverse (using dtplyr)
 ```{r}
 tv_quotes |> 
-         filter(is.na(ask_price) | is.na(bid_price)) |>
-         mutate(time = hms::hms(time)) |>
-         as_tibble() |>
-ggplot(aes(x = time, fill = ticker)) +
+  filter(is.na(ask_price) | is.na(bid_price)) |>
+  mutate(time = hms::hms(time)) |>
+  as_tibble() |>
+  ggplot(aes(x = time, fill = ticker)) +
   geom_histogram(bins = 100) + 
   labs(title = "Histogram of missing spreads",
        x = "Time of Day")
@@ -464,19 +463,20 @@ quotes_liquidity[,
 tv_quotes_liquidity <- tv_quotes |>
   mutate(quoted_spread = ask_price - bid_price) |>
   group_by(ticker, date) |> 
-  summarise(quoted_spread_nom = mean(quoted_spread, na.rm = TRUE),
+  summarize(quoted_spread_nom = mean(quoted_spread, na.rm = TRUE),
             quoted_spread_relative = mean(quoted_spread / midpoint, na.rm = TRUE) * 1e4,
             quoted_spread_tick = mean(quoted_spread / tick_size, na.rm = TRUE),
             quoted_depth = mean(bid_depth * bid_price + ask_depth * ask_price, 
-                                        na.rm = TRUE) / 2 * 1e-5)
+                                na.rm = TRUE) / 2 * 1e-5,
+            .groups = "drop")
 
 tv_quotes_liquidity |> 
   group_by(ticker) |>
-  summarise(across(contains("quoted"), 
+  summarize(across(contains("quoted"), 
                    ~round(mean(.), digits = 2))) |>
   pivot_longer(-ticker) |>
-  as_tibble() |>
-  pivot_wider(names_from = name, values_from = value)
+  pivot_wider(names_from = name, values_from = value) |> 
+  as_tibble()
 ```
 :::
 
@@ -485,7 +485,7 @@ The output above are straight averages, implying an assumption that all quote ob
 
 Note that the `duration` variable is obtained separately for each ticker and date. Even if we are interested in the average liquidity across dates, it is important to partition by each ticker and date to avoid that duration is calculated overnight (resulting in a huge weight with negative sign, because it will be roughly the opening time minus the closing time). Except for replacing the `mean` function with the `weighted.mean`, the code below is very similar to that above.
 
-In the output, we note that the differences between the duration-weighted and the equal-weighted liquidity averages are small. Nevertheless, we consider the duration-weighted average more appropriate because it is not sensitive to shortlived price and depth fluctuations.
+In the output, we note that the differences between the duration-weighted and the equal-weighted liquidity averages are small. Nevertheless, we consider the duration-weighted average more appropriate because it is not sensitive to short-lived price and depth fluctuations.
 
 ::: {.panel-tabset group="language"}
 ## data.table
@@ -525,19 +525,19 @@ tv_quotes <- tv_quotes |>
 tv_quotes_liquidity <- tv_quotes |>
   mutate(quoted_spread = ask_price - bid_price) |>
   group_by(ticker, date) |>
-  summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
+  summarize(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
             quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
             quoted_spread_tick = weighted.mean(quoted_spread / tick_size, w = duration, na.rm = TRUE),
-            quoted_depth = weighted.mean(bid_depth * bid_price + ask_depth * ask_price, w = duration, na.rm = TRUE) / 2 * 1e-5)
+            quoted_depth = weighted.mean(bid_depth * bid_price + ask_depth * ask_price, w = duration, na.rm = TRUE) / 2 * 1e-5,
+            .groups = "drop")
 
 tv_quotes_liquidity |> 
   group_by(ticker) |>
-  summarise(across(contains("quoted"), 
+  summarize(across(contains("quoted"), 
                    ~round(mean(.), digits = 2))) |>
   pivot_longer(-ticker) |>
-  as_tibble() |>
-  pivot_wider(names_from = name, values_from = value)
-
+  pivot_wider(names_from = name, values_from = value) |> 
+  as_tibble()
 ```
 :::
 
@@ -614,7 +614,6 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
   group_by(date) |>
   fill(matches("bid|ask")) |> 
   ungroup()
-
 ```
 :::
 
@@ -648,11 +647,10 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
   mutate(best_bid_price = pmax(bid_price_lse, bid_price_tqe, na.rm = TRUE),
          best_ask_price = pmin(ask_price_lse, ask_price_tqe, na.rm = TRUE),
          best_bid_depth = bid_depth_lse * (bid_price_lse == best_bid_price) + 
-           bid_depth_tqe * (bid_price_tqe == best_bid_price),
+         bid_depth_tqe * (bid_price_tqe == best_bid_price),
          best_ask_depth = ask_depth_lse * (ask_price_lse == best_ask_price) + 
-           ask_depth_tqe * (ask_price_tqe == best_ask_price)
+         ask_depth_tqe * (ask_price_tqe == best_ask_price)
   )
-
 ```
 
 Finally, we drop local exchange variables and objects
@@ -695,8 +693,8 @@ table(quotes_ebbo$best_ask_price - quotes_ebbo$best_bid_price)
 ```{r}
 tv_quotes_ebbo |> 
   transmute(ebbo_nominal_spread = best_ask_price - best_bid_price) |>
-  as_tibble() |>
-  count(ebbo_nominal_spread)
+  count(ebbo_nominal_spread) |> 
+  as_tibble()
 ```
 :::
 
@@ -714,7 +712,6 @@ The output shows that 2.90% of the quote observations are locked, while 0.06% ar
 ## data.table
 ```{r EBBO quote filters}
 # Flag problematic consolidated quotes
-
 quotes_ebbo[, c("crossed", "locked", "large") := {
 	quoted_spread = (best_ask_price - best_bid_price)
     list(quoted_spread < 0, quoted_spread == 0, quoted_spread / midpoint > threshold)}]
@@ -740,7 +737,7 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
   lazy_dt()
 
 tv_quotes_ebbo |>
-  summarise(across(c(crossed, locked, large), 
+  summarize(across(c(crossed, locked, large), 
                    ~round(100 * mean(.),2)))
 
 ```
@@ -792,13 +789,13 @@ tv_quotes_liquidity_ebbo_dw <- tv_quotes_ebbo |>
   group_by(date) |>
   mutate(quoted_spread = best_ask_price - best_bid_price) |>
   filter(!crossed, !locked, !large) |>
-  summarise(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
+  summarize(quoted_spread_nom = weighted.mean(quoted_spread, w = duration, na.rm = TRUE),
             quoted_spread_relative = weighted.mean(quoted_spread / midpoint, w = duration, na.rm = TRUE) * 1e4,
             quoted_spread_tick = weighted.mean(quoted_spread / tick_size, w = duration, na.rm = TRUE),
             quoted_depth = weighted.mean(best_bid_depth * best_bid_price + best_ask_depth * best_ask_price, w = duration, na.rm = TRUE) / 2 * 1e-5)
 
 tv_quotes_liquidity_ebbo_dw |>
-  summarise(across(contains("quoted"), 
+  summarize(across(contains("quoted"), 
                    ~round(mean(.), digits = 2))) 
 ```
 :::
@@ -867,8 +864,7 @@ trades[, c("Domain", "Type") := NULL]
 
 ## tidyverse (using dtplyr)
 ```{r}
-tv_trades <- vroom::vroom(trades_url, 
-                       col_types = list(`Exch Time` = col_character()))
+tv_trades <- vroom::vroom(trades_url, col_types = list(`Exch Time` = col_character()))
 
 tv_trades <- lazy_dt(tv_trades)
 ```
@@ -881,12 +877,12 @@ We rename the variables.
 ```{r}
 tv_trades <- tv_trades |>
   rename(ticker = `#RIC`,
-            date_time = `Date-Time`,
-            gmt_offset = `GMT Offset`,
-            price = Price, 
-            size = Volume, 
-            exchange_time = `Exch Time`,
-            mmt = `MMT Classification`
+         date_time = `Date-Time`,
+         gmt_offset = `GMT Offset`,
+         price = Price, 
+         size = Volume, 
+         exchange_time = `Exch Time`,
+         mmt = `MMT Classification`
   ) |>
   select(-c("Domain", "Type")) 
 ```
@@ -941,7 +937,6 @@ tv_trades <- tv_trades |>
          time < hms::as_hms("16:29:00"),
          time < hms::as_hms("11:59:00") | time > hms::as_hms("12:03:00")) |>
   lazy_dt()
-
 ```
 :::
 
@@ -952,20 +947,21 @@ A line plot offers a good overview of price data. In the figure below, we see th
 ## data.table
 ```{r Trade price plot}
 # Plot the trade prices
-ggplot(trades, 
-       aes(time, price)) + 
-       geom_line() + 
-       facet_wrap(.~date, ncol= 1) + 
-       labs(title = "Trade prices",  y = "Price", x = "Time (seconds past midnight)")
+trades |> 
+  ggplot(aes(x = time, y = price)) + 
+  geom_line() + 
+  facet_wrap(~date, ncol= 1) + 
+  labs(title = "Trade prices",  y = "Price", x = "Time (seconds past midnight)")
 ```
 
 ## tidyverse (using dtplyr)
 ```{r}
-ggplot(tv_trades |>as_tibble(), 
-       aes(hms::hms(time), price)) + 
-       geom_line() + 
-       facet_wrap(.~date, ncol= 1) + 
-       labs(title = "Trade prices",  y = "Price", x = "Time")
+tv_trades |>
+  as_tibble() |> 
+  ggplot(aes(x = hms::hms(time), y = price)) + 
+  geom_line() + 
+  facet_wrap(~date, ncol= 1) + 
+  labs(title = "Trade prices",  y = "Price", x = "Time (seconds past midnight)")
 ```
 :::
 
@@ -993,9 +989,9 @@ LOB_continuous_trades <- substr(trades[, mmt], start = 1, stop = 2) == "12"
 
 # Plot the prices of continuous trades
 ggplot(trades[LOB_continuous_trades], 
-       aes(time, price)) + 
+       aes(x = time, y = price)) + 
   geom_line() + 
-  facet_wrap(.~date, ncol = 1) + 
+  facet_wrap(~date, ncol = 1) + 
   labs(title = "Trade prices", y = "Price", x = "Time (seconds past midnight)")
 ```
 
@@ -1004,10 +1000,10 @@ ggplot(trades[LOB_continuous_trades],
 tv_trades |>
   filter(str_extract(mmt, "^.{2}") == "12") |>
   as_tibble() |>
-ggplot(aes(hms::hms(time), price)) + 
+  ggplot(aes(x = hms::hms(time), y = price)) + 
   geom_line() + 
-  facet_wrap(.~date, ncol = 1) + 
-  labs(title = "Trade prices", y = "Price", x = "Time")
+  facet_wrap(~date, ncol = 1) + 
+  labs(title = "Trade prices", y = "Price", x = "Time (seconds past midnight)")
 ```
 :::
 
@@ -1073,10 +1069,9 @@ trades <- quotes_ebbo[trades, roll = TRUE, mult = "last"]
 ## tidyverse (using dtplyr)
 For the sake of completeness, you can load the EBBO quote data which we stored at an intermediate step above as follows.
 ```{r}
+#| message: false
 tv_quotes_ebbo <- read_csv("tv_quotes_ebbo.csv")
-```
 
-```{r}
 tv_quotes_ebbo <- tv_quotes_ebbo |>
   mutate(time = time + 0.000001) |>
   arrange(date, time) |> 
@@ -1129,7 +1124,7 @@ tv_trades <- tv_trades |>
 
 trades_filters <- tv_trades |>
   group_by(ticker) |>
-  summarise(
+  summarize(
     crossed = mean(crossed, na.rm = TRUE),
     locked = mean(locked, na.rm = TRUE),
     large = mean(large, na.rm = TRUE),
@@ -1142,7 +1137,8 @@ trades_filters <- tv_trades |>
 # Round percentages and display
 trades_filters |>
   mutate(across(crossed:included, ~round(. * 100, digits = 2))) |>
-  select(ticker, crossed, locked, large, no_price, no_size, no_quotes, included)
+  select(ticker, crossed, locked, large, no_price, no_size, no_quotes, included) |> 
+  as_tibble()
 ```
 :::
 
@@ -1226,8 +1222,8 @@ tv_trades <- tv_trades |>
   lazy_dt()
 
 tv_trades |> 
-  as_tibble() |> 
-  count(ticker,dir)
+  count(ticker, dir) |> 
+  as_tibble()
 ```
 :::
 
@@ -1269,19 +1265,20 @@ tv_trades <- tv_trades |>
 tv_trades_liquidity <- tv_trades |>
   filter(include == TRUE) |>
   group_by(ticker, date) |>
-  summarise(
+  summarize(
     effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, w = size),
-    volume = sum(price * size)
+    volume = sum(price * size),
+    .groups = "drop"
   )
 
 # Output liquidity measures, averaged across the five trading days for each ticker
 tv_trades_liquidity |>
   group_by(ticker) |>
-  summarise(
+  summarize(
     effective_spread = round(mean(effective_spread * 1e4), digits = 2),
     volume = round(mean(volume * 1e-8), digits = 2)
-  )
-
+  ) |> 
+  as_tibble()
 ```
 :::
 
@@ -1317,20 +1314,21 @@ trades_liquidity[,
 tv_trades_liquidity <- tv_trades |>
   filter(include == TRUE) |>
   group_by(ticker, date) |>
-  mutate(    midpoint_w = (best_bid_price * best_ask_depth + best_ask_price * best_bid_depth) /
-                                (best_ask_depth + best_bid_depth)) |>
-  summarise(
+  mutate(midpoint_w = (best_bid_price * best_ask_depth + best_ask_price * best_bid_depth) /
+           (best_ask_depth + best_bid_depth)) |>
+  summarize(
     effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, w = size),
-    effective_spread_w = weighted.mean(2 * dir * (price - midpoint_w) / midpoint_w, w = size)
+    effective_spread_w = weighted.mean(2 * dir * (price - midpoint_w) / midpoint_w, w = size),
+    .groups = "drop"
   )
 
 tv_trades_liquidity |>
   group_by(ticker) |>
-  summarise(
+  summarize(
     effective_spread = round(mean(effective_spread * 1e4), digits = 2),
     effective_spread_w = round(mean(effective_spread_w * 1e4), digits = 2)
-  )
-
+  ) |> 
+  as_tibble()
 ```
 :::
 
@@ -1387,7 +1385,6 @@ tv_trades <- tv_trades |>
 tv_trades <- tv_trades |>
   mutate(include_1min = !crossed_1min & !locked_1min & !large_1min) |>
   lazy_dt()
-
 ```
 :::
 
@@ -1417,23 +1414,24 @@ effective_spread_decomposition[,
 ## tidyverse (using dtplyr)
 ```{r}
 tv_effective_spread_decomposition <- tv_trades |>
-  filter(include == TRUE,
-         include_1min == TRUE) |>
+  filter(include == TRUE & include_1min == TRUE) |>
   group_by(ticker, date) |>
-  summarise(effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, 
-								  w = size),
-	     price_impact = weighted.mean(2 * dir * (midpoint_1min - midpoint) / midpoint, 
-  		 						 w = size),
-  		 realized_spread = weighted.mean(2 * dir * (price - midpoint_1min) / midpoint, 
-  		 						 w = size))
+  summarize(effective_spread = weighted.mean(2 * dir * (price - midpoint) / midpoint, 
+                                             w = size),
+	          price_impact = weighted.mean(2 * dir * (midpoint_1min - midpoint) / midpoint, 
+	                                       w = size),
+  		      realized_spread = weighted.mean(2 * dir * (price - midpoint_1min) / midpoint, 
+  		                                      w = size),
+  		      .groups = "drop")
 
 tv_effective_spread_decomposition |>
   group_by(ticker) |>
-  summarise(
+  summarize(
     effective_spread = round(mean(effective_spread * 1e4), digits = 2),
     price_impact = round(mean(price_impact * 1e4), digits = 2),
-    realized_spread = round(mean(realized_spread * 1e4), digits = 2))
-
+    realized_spread = round(mean(realized_spread * 1e4), digits = 2)
+  ) |> 
+  as_tibble()
 ```
 :::
 
@@ -1462,6 +1460,7 @@ quotes_ebbo[, c("best_bid_price", "best_bid_depth", "best_ask_price",
 
 ## tidyverse (using dtplyr)
 ```{r}
+#| message: false
 tv_quotes_ebbo <- read_csv("tv_quotes_ebbo.csv") |> 
   select(date, time, midpoint, crossed, locked , large) |>
   lazy_dt()
@@ -1499,8 +1498,10 @@ quotes_1sec
 
 ## tidyverse (using dtplyr)
 ```{r}
-tv_quotes_1sec <- expand_grid(date = tv_quotes_ebbo |> pull(date) |> unique(), 
-            time = time_grid)
+tv_quotes_1sec <- expand_grid(
+  date = tv_quotes_ebbo |> pull(date) |>  unique(), 
+  time = time_grid
+)
 ```
 :::
 
@@ -1540,6 +1541,7 @@ tv_quotes_1sec <- tv_quotes_1sec |>
 :::
 
 ## Efficiency and volatility measures
+
 **Return autocorrelation and realized volatility.**
 We obtain the return autocorrelation by applying the `cor` function to returns and lagged returns. The latter are generated using the `shift` function with one lag. We account for missing values by specifying the option `use = "complete.obs"`. The return autocorrelation comes out at 0.02, a very low number. This is not surprising, as the sample stock is a large firm with high trading activity -- two characteristics associated with high market efficiency.
 
@@ -1567,14 +1569,13 @@ efficiency_1sec[,
 tv_efficiency_1sec <- tv_quotes_1sec |>
   arrange(date, time) |>
   group_by(date) |>
-  summarise(return_corr_1sec = cor(return, lag(return), use = "complete.obs"),
+  summarize(return_corr_1sec = cor(return, lag(return), use = "complete.obs"),
             vol_1sec = mean(return^2, na.rm = TRUE),
             return_var_1sec = var(return, na.rm = TRUE))
 
 tv_efficiency_1sec |>
-  summarise(across(everything(), 
+  summarize(across(everything(), 
                    ~round(mean(.), digits = 2)))
-
 ```
 :::
 
@@ -1611,7 +1612,7 @@ tv_quotes_10sec <- tv_quotes_1sec |>
 
 tv_efficiency_10sec <- tv_quotes_10sec |>
   group_by(date) |>
-  summarise(return_var_10sec = var(return, na.rm = TRUE))
+  summarize(return_var_10sec = var(return, na.rm = TRUE))
 ```
 :::
 
@@ -1641,7 +1642,7 @@ tv_efficiency <- tv_efficiency_1sec |>
   lazy_dt()
 
 tv_efficiency |>
-  summarise(across(c(return_var_1sec, return_var_10sec, var_ratio), ~round(mean(.), digits = 3)))
+  summarize(across(c(return_var_1sec, return_var_10sec, var_ratio), ~round(mean(.), digits = 3)))
 ```
 :::
 
