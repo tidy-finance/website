@@ -48,7 +48,7 @@ kable(variable_table,
 
 Our focus is on the *practice* of empirical market microstructure. As such, we often motivate the coding choices with economic concepts. Other than that, however, readers interested in the economics underlying each metric are referred to introductory texts such as Campbell, Lo and MacKinlay (1997)^[Campbell, J. Y., Lo, A. W., & MacKinlay, A. C. (1998). *The Econometrics of Financial Markets*. Princeton University Press.], Foucault, Pagano & Röell (2013)^[Foucault, T., Pagano, M., & Röell, A. (2013). *Market liquidity: Theory, evidence, and policy*. Oxford University Press, USA.] and Hasbrouck (2007)^[Hasbrouck, J. (2007). *Empirical market microstructure: The institutions, economics, and econometrics of securities trading*. Oxford University Press.]. 
 
-**Programming.**
+### Programming
 The coding here is in R.
 
 The choice of language is of course a matter of taste. When deciding on the tools to use, what is important to consider is that the data files in this field are often huge. How can we process them without crashing our laptops? The example data used in this guide are tiny, but we wrote the code to be efficient when the number of observations per day go from thousands to millions.^[A previous guide to microstructure programming (in SAS) is provided by Boehmer, Broussard and Kallunki (2002): Boehmer, E., Broussard, J. P., & Kallunki, J. P. (2002). *Using SAS in financial research*. SAS Publishing.]
@@ -59,7 +59,7 @@ The basic `data.table` syntax takes the form `DT[i, j, by]`, where `i` and `j` c
 
 For readers following the Tidy Finance project of [Scheuch et al. (2023)](https://tidy-finance.org/)^[Scheuch, C., Voigt, S., & Weiss P. (2023). *Tidy finance with {R}*. Chapman and Hall/CRC. https://doi.org/10.1201/b23237.], the `data.table` syntax can become a friction. For this reason, this guide comes in two flavors. As an alternative to `data.table`, we also show how to achieve essentially the same virtues in speed, but using the `tidyverse` syntax. The latter is based on `dtplyr`, which provides a `data.table` backend for the familiar `dplyr` package. Since the example data in this post is fairly small with around 250k rows, there are hardly any performance benefits of data.table over other packages. In practice, however, one works with billions of rows and the benefits of data.table manifest quickly.
 
-**Data.**
+### Data
 We use one week of quote and trade data for one stock (PRU, [*Prudential Financial Inc.*](https://en.wikipedia.org/wiki/Prudential_plc)). There is nothing special about that stock -- it is chosen to be representative of large-cap stocks in general. As is typical these days, PRU is traded at several exchanges as well as off-exchange. In addition to the listing venue (London Stock Exchange, LSE), the data includes trades and quotes from the competing venue Turquoise (TQE), as well as some dark pool trades. 
 
 The data is loaded automatically in the scripts provided. It can also be downloaded manually [here](http://tinyurl.com/tidymicrostructure).
@@ -193,7 +193,7 @@ tv_quotes <- tv_quotes |>
 ```
 :::
 
-**Dates.**
+###  Dates
 In the raw data, dates and times are embedded in the same variable, `date_time`, but for us it is useful to have them in separate variables. Accordingly, we now define the variable `date`.
 
 ::: {.panel-tabset group="language"}
@@ -223,7 +223,7 @@ tv_quotes |>
 
 The table output shows that there are five trading days in the sample. The number of quote observations per stock-date varies between roughly 16,000 and 40,000. The tendency that LSE has more quotes than TQE is consistent across trading days.
 
-**Timestamps.**
+###  Timestamps
 The accuracy of timestamps is important in microstructure data. Timestamps are often matched between quote and trade data (that are not necessarily generated in the same systems), or between data from exchanges in different locations. It is thus essential to be aware of latencies that may arise due to geography or hardware, for example. 
 
 We have two timestamps for each observation. The `exchange_time` variable is assigned by the exchange at the time an event is recorded in the exchange matching engine. The `date_time` variable is the timestamp assigned on receipt at the data vendor, which is by definition later than the `exchange_time`. Exchanges that are located at different distances from the vendor are likely to have different reporting delays. It is then up to the researcher to determine which timestamp to rely on, and the choice may depend on the research question. In our setting, as we measure liquidity across venues, it is important that the time stamps across venues are comparable. Based on that each exchanges has strong incentives to assign accurate time stamps (to cater for low-latency participants), we choose to work with the `exchange_time` variable.  
@@ -275,7 +275,7 @@ tv_quotes <- tv_quotes|>
 ```
 :::
 
-**Prices and depths.**
+### Prices and depths
 An important feature of LOB quotes is that they remain valid until cancelled, executed or modified. Whenever there is a change to the prevailing quotes, a new quote observation is added to the data. It is irrelevant if the latest quote is from the previous millisecond or from the previous minute -- it remains valid until updated. It is thus economically meaningful to forward-fill quotes that prevailed in the previous period. Trades, in contrast, are agreed upon at a fixed point in time and do not convey any information about future prices or sizes. They should not be forward-filled, see [Hagströmer and Menkveld (2023)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4356262)^[Hagströmer, B., & Menkveld, A. J. (2023). Trades, quotes, and information shares. Working paper.].
 
 When forward-filling quote data, it is important to restrict the procedure to the same date, stock and trading venue. For example, quotes should never be forward-filled from one day to the next, and not from one venue to another. This is ensured with the `by` argument (in `data.table`) or the `group_by` function (in `tidyverse`), which specifies that the operation is to be done *within* each combination of tickers and dates. 
@@ -346,8 +346,8 @@ tv_quotes <- tv_quotes |>
 ```
 ::: 
 
-**Screening.**
-Before turning to the market quality measurement, it is a good habit to check that the quote observations make economic sense. One way to do that is to study the variation in the bid-ask spread. The *nominal* bid-ask spread is defined as the difference between the ask price, $P^A$, and the bid price, $P^B$, $quoted\_spread^{nom}= P^A - P^B$. A histogram offers a quick overview of the variation (a line plot of the prices is also useful, see Section 2.1).
+### Screening
+Before turning to the market quality measurement, it is a good habit to check that the quote observations make economic sense. One way to do that is to study the variation in the bid-ask spread. The *nominal* bid-ask spread is defined as the difference between the ask price, $P^A$, and the bid price, $P^B$, $\text{quoted}\_\text{spread}^{nom}= P^A - P^B$. A histogram offers a quick overview of the variation (a line plot of the prices is also useful, see Section 2.1).
 
 In the output below, note that the x-axis is in units of pence (0.01 British Pounds, GBP). All quoted prices in this example data follow that convention. Note also that the bid-ask spread is strictly positive, as it should be whenever the market is open. The TQE occasionally has wider spreads than the LSE, but there are no extraordinarily large spreads. The maximum spread, GBP 0.11, corresponds to around 0.7% of the stock price. 
 
@@ -414,7 +414,7 @@ tv_quotes |>
 
 ## Liquidity measures
 
-With all the data preparation done, we are ready for the actual liquidity measurement. For comparisons across stocks, it is useful to relate the nominal spread to the fundamental value of the security. This is done by the *relative* quoted bid-ask spread, defined as $quoted\_spread^{rel} = (P^A - P^B)/M$, where $M$ is the midpoint (also known as the midprice; defined as the average of the best bid and the best ask prices). One can argue that the midpoint is not always representative of the fundamental value, but it has the strong advantage that it is continuously available in the quote data. 
+With all the data preparation done, we are ready for the actual liquidity measurement. For comparisons across stocks, it is useful to relate the nominal spread to the fundamental value of the security. This is done by the *relative* quoted bid-ask spread, defined as $\text{quoted}\_\text{spread}^{rel} = (P^A - P^B)/M$, where $M$ is the midpoint (also known as the midprice; defined as the average of the best bid and the best ask prices). One can argue that the midpoint is not always representative of the fundamental value, but it has the strong advantage that it is continuously available in the quote data. 
 
 ::: {.panel-tabset group="language"}
 ## data.table
@@ -435,7 +435,7 @@ The quoted spread can also be measured relative to the tick size. In an open mar
 tick_size <- 0.5
 ```
 
-Another dimension of quoted liquidity is the market depth. We measure the average depth quoted at the best bid and ask prices. It is defined as $quoted\_depth = (Q^A + Q^B)/2$, where $Q^A$ and $Q^B$ are the depths available at the bid and ask prices. 
+Another dimension of quoted liquidity is the market depth. We measure the average depth quoted at the best bid and ask prices. It is defined as $\text{quoted}\_\text{depth} = (Q^A + Q^B)/2$, where $Q^A$ and $Q^B$ are the depths available at the bid and ask prices. 
 
 In the code below, we store the liquidity measures in a new `data.table` named `quotes_liquidity`. This is because the new variables are averages, observed on a ticker-date frequency, as opposed to the tick-by-tick frequency of the `quotes` object. We multiply the quoted spread by 10,000 to express it in basis points, and divide the quoted depth by 100,000 to express it in thousand GBP.
 
@@ -487,7 +487,7 @@ tv_quotes_liquidity |>
 ```
 :::
 
-**Duration-weighted liquidity.**
+### Duration-weighted liquidity
 The output above are straight averages, implying an assumption that all quote observations are equally important. But whereas some quotes remain valid for several minutes, many don't last longer than a split-second. For this reason, it is common to either sample the quote data in fixed time intervals (such as at the end of each second), or to weight the observations by their duration. The duration is the time that a quote observation is in force. That is, the time elapsed until the next quote update arrives. We show the duration-weighted approach in the code below (for guidance on how to get the quotes at the end of each second, see Section 3.1).
 
 Note that the `duration` variable is obtained separately for each ticker and date. Even if we are interested in the average liquidity across dates, it is important to partition by each ticker and date to avoid that duration is calculated overnight (resulting in a huge weight with negative sign, because it will be roughly the opening time minus the closing time). Except for replacing the `mean` function with the `weighted.mean`, the code below is very similar to that above.
@@ -553,7 +553,7 @@ With the competition between exchanges, liquidity is dispersed across venues. Fo
 
 In Europe, the consolidated liquidity is sometimes referred to as the European Best Bid and Offer (EBBO). The terminology follows in the footsteps of the US market, where the *National* Best Bid and Offer (NBBO) is transmitted to the market on continuous basis. To obtain the EBBO, one needs to merge the LOB data from each relevant venue, and then determine the EBBO prices and depths. In the code below, we show step-by-step how to do that.
 
-**Retaining only the last quote update in each interval.**
+### Retaining only the last quote update in each interval
 Quote updates tend to cluster and it is common that several observations have identical timestamps. Multiple observations at one timestamp can be due to several investors responding to the same events, or that one market order leads to several LOB updates as it is executed against multiple limit orders. When matching quotes across venues, we need to restrict the number of observations per unit of time to one. There is no sensible way to distinguish observations with identical timestamps. In lack of a better approach, we retain the last observation in each interval. 
 
 ::: {.panel-tabset group="language"}
@@ -576,7 +576,7 @@ tv_quotes <- tv_quotes |>
 ```
 :::
 
-**Merging quotes from different venues.**
+### Merging quotes from different venues
 We are now ready to match the quotes from the two exchanges. First, we create separate quote data sets for the two exchanges. Second, we merge the two by matching on date and time. Third, we forward-fill quotes from both venues, such that for each LSE quote we know the prevailing TQE quote, and vice versa. The validity of this is ensured by the option `sort = TRUE` in the `merge` function, which returns a data.table that is sorted on the matching variables.
 
 ::: {.panel-tabset group="language"}
@@ -668,7 +668,7 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
 ```
 :::
 
-**Fundamental value.**
+### Fundamental value
 We can now obtain EBBO midpoints, as a proxy of fundamental value that factors in liquidity posted at multiple exchanges.
 
 ::: {.panel-tabset group="language"}
@@ -684,7 +684,7 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
 ```
 :::
 
-**Screening.**
+### Screening
 As above, we check that the EBBO quotes are economically meaningful by tabulating the counts of nominal spread levels. This exercise shows us that the consolidated spread is not strictly positive. There are numerous cases of zeroes, known as *locked* quotes, and also many negatives, referred to *crossed* quotes. This is possible because orders at the LSE and the TQE are never executed against each other -- it takes arbitrageurs to step in and act on crossed markets. Locked and crossed spreads are not uncommon in consolidated data. For an analysis of the incidence in US markets, see [Shkilko, van Ness & van Ness, 2008](https://www.sciencedirect.com/science/article/pii/S1386418107000031?casa_token=GIqJQiPKyisAAAAA:ZVbaf4SPC0IzxFFLWqgI2papSw2MrEf_lPXCL9OlT_ZnKgA6-pGTl4EYisKuIUaFdx8JY1p3d7o)^[Shkilko, A. V., Van Ness, B. F., & Van Ness, R. A. (2008). Locked and crossed markets on NASDAQ and the NYSE. *Journal of Financial Markets*, *11*(3), 308-337.].
 
 It is also notable from the table that the maximum consolidated spread is 2.5, as compared to the spreads of up to 11 recorded in the single-venue analysis. By definition, the EBBO quoted spread is never wider than at the single venues. 
@@ -745,12 +745,13 @@ tv_quotes_ebbo <- tv_quotes_ebbo |>
 
 tv_quotes_ebbo |>
   summarize(across(c(crossed, locked, large), 
-                   ~round(100 * mean(.),2)))
+                   ~round(100 * mean(.),2))) |>
+  as_tibble()
 
 ```
 :::
 
-**Consolidated liquidity measures.**
+### Consolidated liquidity measures
 We obtain duration-weighted measures of consolidated liquidity in the same way as above. The only difference here is that we subset the quotes to filter out crossed and locked markets. 
 
 The consolidated relative quoted bid-ask spread is 5.59 basis points, as compared to 5.70 and 6.69 basis points at LSE and TQE locally. The consolidated depth, 3.14 million GBP, is somewhat lower than the sum of the local depths seen above. This is to be expected, as some of the local depth is posted at price levels that are inferior to the EBBO.
@@ -896,7 +897,7 @@ tv_trades <- tv_trades |>
 ```
 :::
 
-**Dates and timestamps.**
+### Dates and timestamps
 As above, we filter out the first and last minute of continuous trading, as well as the minutes surrounding the intraday auction. Note here that filtered trades are excluded, not just set as missing. This is OK, because we won't do any forward-filling for the trade data.
 
 ::: {.panel-tabset group="language"}
@@ -948,7 +949,7 @@ tv_trades <- tv_trades |>
 ```
 :::
 
-**Trade variables.**
+### Trade variables
 A line plot offers a good overview of price data. In the figure below, we see that the trade prices are plagued by outliers that seem to be close to zero. The out-of-sequence prices are recorded on all trading dates and at virtually all times of the day. These outliers need to be addressed before we can proceed with the analysis.
 
 ::: {.panel-tabset group="language"}
@@ -1051,7 +1052,7 @@ tv_trades <- tv_trades |>
 ```
 :::
 
-**Matching trades to quotes.**
+### Matching trades to quotes
 To evaluate the cost of trading, we want to compare the trade price to the fundamental value at the time of trade, as implied by the bid-ask quotes.
 
 The objective of matching trades and quotes is to obtain the quotes that prevailed just before the trade. This is straightforward in settings where the trades and quotes are recorded at the same point, such that they are correctly sequenced. In other settings, the timestamps may need to be adjusted due to reporting latencies, or the trade size needs to be matched to changes in quoted depth ([Jurkatis, 2021](https://doi.org/10.1016/j.finmar.2021.100635))^[Jurkatis, S. (2022). Inferring trade directions in fast markets. *Journal of Financial Markets*, *58*, 100635.]. 
@@ -1107,7 +1108,7 @@ tv_trades <- tv_trades |>
 ```
 :::
 
-**Further screening.**
+### Further screening
 As some trades may be matched to crossed or locked quotes, another round of data screening is required. Because such quotes are not considered reliable, we do not include those trades in the liquidity measurement. Furthermore, if there are trades that could not be matched to any quotes, or that lack information on price or size, they should be excluded too. 
 
 The output shows that 88.5% of the trades at LSE are eligible for the liquidity analysis, and 96.8% of the trades at TQE. The criterion that drives virtually all exclusions in the sample is the locked quotes.
@@ -1162,7 +1163,7 @@ trades_filters |>
 ```
 :::
 
-**Direction of trade.**
+### Direction of trade
 In empirical market microstructure, we often need to determine the direction of trade. If a trade happens following a buy market order, it is said to be buyer-initiated, and vice versa. 
 
 The most common tool to determine the direction of trade is the algorithm prescribed by [Lee and Ready (1991)](https://onlinelibrary.wiley.com/doi/full/10.1111/j.1540-6261.1991.tb02683.x)^[Lee, C. M., & Ready, M. J. (1991). Inferring trade direction from intraday data. *Journal of Finance*, 46(2), 733-746.]. They primarily recommend the *quote rule*, saying that a trade is buyer-initiated if the trade price is above the prevailing midpoint, and seller-initiated if it is below. When the price equals the midpoint, Lee and Ready propose the *tick rule*. It specifies that a trade is buyer-initiated (seller-initiated) if the price is higher (lower) than the closest previous trade with a different price.
@@ -1249,10 +1250,10 @@ tv_trades |>
 
 ## Liquidity measures
 
-**Effective spread.**
-The relative effective spread is defined as $effective\_spread^{rel} = 2 D(P - M)/M$, where $P$ is the trade price and $D$ is the direction of trade. The multiplication by two is to make the effective spread comparable to the quoted spread. As is common in the literature, we use trade size weights when calculating the average effective spread. We multiply the effective spread by 10,000 to express it in basis points.
+### Effective spread
+The relative effective spread is defined as $\text{effective}\_\text{spread}^{rel} = 2 D(P - M)/M$, where $P$ is the trade price and $D$ is the direction of trade. The multiplication by two is to make the effective spread comparable to the quoted spread. As is common in the literature, we use trade size weights when calculating the average effective spread. We multiply the effective spread by 10,000 to express it in basis points.
 
-We also calculate the dollar volume, which is simply $dollar\_volume = P \times size$, with $size$ denoting the trade size. The trading volume is commonly referred to as liquidity in popular press, but in academic papers it rarely used as a liquidity measure. One reason for that is that spikes in volume are usually due to news rather than liquidity shocks. We still include trading volume here, because it often included as a control variable in microstructure event studies. To express the dollar volume in million GBP, we multiply it by $10^{-8}$.
+We also calculate the dollar volume, which is simply $\text{dollar}\_\text{volume} = P \times \text{size}$, with $\text{size}$ denoting the trade size. The trading volume is commonly referred to as liquidity in popular press, but in academic papers it rarely used as a liquidity measure. One reason for that is that spikes in volume are usually due to news rather than liquidity shocks. We still include trading volume here, because it often included as a control variable in microstructure event studies. To express the dollar volume in million GBP, we multiply it by $10^{-8}$.
 
 Consistent with the quote-based measures, the effective spread indicates that PRU is more liquid at LSE than at TQE. The LSE effective spread is 4.18 bps, more than 25% lower than the LSE quoted spread at 5.70 bps. The large difference may be due to trades executed at prices better than visible in the LOB, the effective spreads benchmarked to the consolidated midpoint rather than the respective venue midpoint, or the calculation of the effective spread at times of trade rather than continuously throughout the day. If investors time their trades to reduce trading costs, it makes sense that the effective spread is on average lower than the quoted spread. The interested reader can find out which of these differences drive the wedge between the two measures, by altering the way the average quoted spread is obtained.
 
@@ -1352,10 +1353,10 @@ tv_trades_liquidity |>
 ```
 :::
 
-**Price impact and realized spreads.**
-The price impact is defined as $price\_impact^{rel} = 2 D(M_{t+\Delta}-M)/M$, where $M_{t+\Delta}$ is the midpoint holding $\Delta$ seconds after the trade. It thus captures the signed price change following a trade. 
+### Price impact and realized spreads
+The price impact is defined as $\text{price}\_\text{impact}^{rel} = 2 D(M_{t+\Delta}-M)/M$, where $M_{t+\Delta}$ is the midpoint holding $\Delta$ seconds after the trade. It thus captures the signed price change following a trade. 
 
-The realized spread is defined as $realized\_spread^{rel} = 2 D(P - M_{t+\Delta})/M$. Note that the price impact and the realized spread may be viewed as two components of the effective spread, as $effective\_spread^{rel}=price\_impact^{rel}+realized\_spread^{rel}$.
+The realized spread is defined as $\text{realized}\_\text{spread}^{rel} = 2 D(P - M_{t+\Delta})/M$. Note that the price impact and the realized spread may be viewed as two components of the effective spread, as $\text{effective}\_\text{spread}^{rel}=\text{price}\_\text{impact}^{rel}+\text{realized}\_\text{spread}^{rel}$.
 
 The code below prepares the variables needed to calculate the realized spread and the price impact at a 60 second horizon (setting $\Delta=60$). It loads the consolidated quotes, subtracts 60 seconds to their timestamps, and merges them with the trades. In this way, we have trades that are matched to quotes prevailing just before the trade (from the previous matching) as well as to future quotes.
 
@@ -1562,7 +1563,7 @@ tv_quotes_1sec <- tv_quotes_1sec |>
 
 ## Efficiency and volatility measures
 
-**Return autocorrelation and realized volatility.**
+### Return autocorrelation and realized volatility
 We obtain the return autocorrelation by applying the `cor` function to returns and lagged returns. The latter are generated using the `shift` function with one lag. We account for missing values by specifying the option `use = "complete.obs"`. The return autocorrelation comes out at 0.02, a very low number. This is not surprising, as the sample stock is a large firm with high trading activity -- two characteristics associated with high market efficiency.
 
 Realized volatility is defined as the mean of squared returns. We also obtain the return variance to be able to calculate the variance ratio below. Although their definitions differ, the realized volatility and the return variance are almost identical in this data set, 0.32. This is because the mean return is close to zero.
@@ -1599,7 +1600,7 @@ tv_efficiency_1sec |>
 ```
 :::
 
-**Variance ratios.**
+### Variance ratios
 The variance ratio is defined as $var\_ratio_{\tau_{1}, \tau_{2}} = (Var(R_{\tau_{1}}) \tau_2) / (Var(R_{\tau_{2}})  \tau_1)$, where $\tau_{1}$ and $\tau_{2}$ are two return sampling frequencies, and $Var(R_{\tau_{i}})$  is the variance of returns sampled at frequency $\tau_{i}$. Under market efficiency, the variance ratio should be equal to one. Negative and positive deviations from unity are due to frictions. It is usually the absolute deviation from unity that is used as an efficiency measure.
 
 We measure the variance ratio for 1-second and 10-second returns. To get the 10-second return variance, the first step is to obtain the 10-second price grid. To do so, we simply take a subset of the grid obtained for the 1-second frequency. We then proceed with the calculation of returns and the return variance in the same way as above.
