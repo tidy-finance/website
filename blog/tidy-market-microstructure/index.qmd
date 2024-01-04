@@ -9,7 +9,7 @@ author:
     url: https://www.kuleuven.be/wieiswie/en/person/00167120
     affiliations:
       - name: KU Leuven 
-date: "2024-01-02"
+date: "2024-01-04"
 description: A beginner's guide to market quality measurement in high-frequency data using R.
 image: thumbnail.png
 image-alt: Cartoon of robots and humans trying to make sense of green stock price charts on black background. Created with DALL-E 3.
@@ -129,7 +129,7 @@ tv_quotes
 ```
 :::
 
-Note that we use the suffix `tv_` for every object generated using `tidyverse` syntax. This way you can execute the entire code of this blog post without overwriting `data.table` objects with the `dtplyr` equivalent and vice versa. 
+Note that we use the suffix `tv_` for every object generated using `tidyverse` syntax. This way you can execute the entire code of this guide without overwriting `data.table` objects with the `dtplyr` equivalent and vice versa. 
 
 The data contain four variables that describe the state of the order book (`Bid Price`, `Bid Size`, `Ask Price`, and `Ask Size`). The LOB holds orders at numerous different prices, but we only see the best price level on each side. This is sufficient for most quote-based market quality measures. 
 We also get three variables conveying time stamps and time zone information (`Date-Time`, `GMT Offset`, and `Exch time`; discussed in detail below), and three character variables (`#RIC`, `Domain`, and `Type`). 
@@ -169,7 +169,7 @@ tv_quotes <- tv_quotes|>
 :::
 
 From the output above, the character columns might look like they are the same for all rows, hence occupying more memory than necessary.
-The `data.table::table()` or `dtplyr::count()` functions are great to gauge the variation in categorical variables. In this case, it shows us that there is variation in the `ticker` variable. The two tickers are for the same stock, `PRU`, traded at two different exchange, LSE and TQE. The former is more active, with 165,261 quote updates. 
+The `data.table::table()` or `dtplyr::count()` functions are great to gauge the variation in categorical variables. In this case, it shows us that there is variation in the `ticker` variable. The two tickers are for the same stock, `PRU`, traded at two different exchanges, LSE and TQE. The former is more active, with 165,261 quote updates. 
 
 The other two character variables, `domain` and `type`, are indeed constants. We delete them to save memory.
 
@@ -309,6 +309,8 @@ tv_quotes <- tv_quotes |>
 :::
 
 When measuring market quality in continuous trading, it is common to filter out periods that may be influenced by call auctions. The LSE opens for trading with a call auction at 08:00 am, local time, and closes with another call at 4:30 pm. There is also an intraday call auction at noon, 12:00 pm. To avoid the impact of the auctions, we exclude quotes before 8:01 am and after 4:29 pm. We do *not* exclude quotes recorded around the intraday call auction, but set them as missing (`NA`).  If they were instead deleted, it would give the false impression that the last observation before the excluded quotes was still valid.
+
+When entering the opening hours, remember to state them for the same time zone as recorded in the data. In our case, the `gmt_offset` adjustment above makes sure that the data is stated in local (London) time.
 
 ```{r}
 open_time <- 8 * 3600
@@ -1358,6 +1360,8 @@ The price impact is defined as $\text{price}\_\text{impact}^{rel} = 2 D(M_{t+\De
 
 The realized spread is defined as $\text{realized}\_\text{spread}^{rel} = 2 D(P - M_{t+\Delta})/M$. Note that the price impact and the realized spread may be viewed as two components of the effective spread, as $\text{effective}\_\text{spread}^{rel}=\text{price}\_\text{impact}^{rel}+\text{realized}\_\text{spread}^{rel}$.
 
+The choice of horizon ($\Delta$) for the price impact and realized spread is arbitrary but can be important. The most common choice has traditionally been five minutes, but in modern markets that may even exceed the holding period of short-term investors. For a detailed discussion of this parameter, see Conrad & Wahal (2020).^[Conrad, J., & Wahal, S. (2020). The term structure of liquidity provision. *Journal of Financial Economics*, 136(1), 239-259. [https://doi.org/10.1016/j.jfineco.2019.09.008](https://doi.org/10.1016/j.jfineco.2019.09.008)]
+
 The code below prepares the variables needed to calculate the realized spread and the price impact at a 60 second horizon (setting $\Delta=60$). It loads the consolidated quotes, subtracts 60 seconds to their timestamps, and merges them with the trades. In this way, we have trades that are matched to quotes prevailing just before the trade (from the previous matching) as well as to future quotes.
 
 ::: {.panel-tabset group="language"}
@@ -1676,12 +1680,15 @@ unlink(blog_path)
 ```
 
 # Conclusion
-This blog post offers a glimpse into the world of empirical market microstructure. A world characterized by intriguing questions, vast data and implementation details that matter greatly -- both for real-world outcomes of market structure reforms and for market quality measures.
-If the blog post lowers the threshold and triggers your interest to enter this fascinating world, its aim is fulfilled.
+This guide offers a glimpse into the world of empirical market microstructure. A world characterized by intriguing questions, vast data and implementation details that matter greatly -- both for real-world outcomes of market structure reforms and for market quality measures.
+If the guide lowers the threshold and triggers your interest to enter this fascinating world, its aim is fulfilled.
 
-A key point throughout this guide is to try to monitor and understand the data. It is a good habit to inspect, plot, and summarize the data for each step of the processing. Outliers can often be understood with the aid of flags in the data in combination with institutional knowledge. If we know why they appear, we can make an informed decision about how to handle them. 
+A key point throughout this guide is to try to monitor and understand the data. It is a good habit to inspect, plot, and summarize the data for each step of the processing. Extreme observations can often be understood with the aid of flags in the data in combination with institutional knowledge. The latter is case-specific, so make sure to study the nitty gritty details of order types, priority rules, and block trade reporting. Once we understand the market, we can understand the data points, and make informed decisions about outliers.
 
 The format necessarily imposes limitations. We don't cover all market quality measures and not all variations in methodology, but aim to convey what we consider to be good practice when calculating the most common measures. If you disagree, find bugs, or have other feedback, don't hesitate to send us an email at [bjh@sbs.su.se](mailto:bjh@sbs.su.se) and [niklas.landsberg@kuleuven.be](mailto:niklas.landsberg@kuleuven.be). 
 
 To cite our work, please use the following reference information:
-Hagströmer, B. and Landsberg, N. (2023). Tidy Market Microstructure. URL: [www.tidy-finance.org/blog/tidy-market-microstructure](www.tidy-finance.org/blog/tidy-market-microstructure)
+Hagströmer, B. and Landsberg, N. (2024). Tidy Market Microstructure. URL: [www.tidy-finance.org/blog/tidy-market-microstructure](www.tidy-finance.org/blog/tidy-market-microstructure)
+
+### Acknowledgements
+We thank Christoph Scheuch, Stefan Voigt, and Darya Yuferova for helpful comments. This project received financial support from the Jan Wallander and Tom Hedelius Foundation.
