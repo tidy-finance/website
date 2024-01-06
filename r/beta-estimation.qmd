@@ -44,7 +44,7 @@ factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
-  left_join(factors_ff3_monthly, by = "month")
+  left_join(factors_ff3_monthly, join_by(month))
 ```
 
 To estimate the CAPM regression coefficients  
@@ -132,7 +132,7 @@ It is actually quite simple to perform the rolling-window estimation for an arbi
 #| fig-cap: "The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library."
 #| fig-alt: "Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock."
 beta_examples <- crsp_monthly |>
-  inner_join(examples, by = "permno") |>
+  inner_join(examples, join_by(permno)) |>
   group_by(permno) |>
   mutate(roll_capm_estimation(pick(everything()), months = 60, min_obs = 48)) |>
   ungroup() |>
@@ -178,7 +178,7 @@ Next, we want to apply the `roll_capm_estimation()` function to each stock. This
 
 ```{r}
 crsp_monthly_nested |>
-  inner_join(examples, by = "permno") |>
+  inner_join(examples, join_by(permno)) |>
   mutate(beta = map(
     data,
     ~ roll_capm_estimation(., months = 60, min_obs = 48)
@@ -234,7 +234,7 @@ However, note that your machine might not have enough memory to read the whole d
 
 ```{r}
 crsp_daily <- crsp_daily |>
-  inner_join(factors_ff3_daily, by = "date") |>
+  inner_join(factors_ff3_daily, join_by(date)) |>
   select(permno, month, ret_excess, mkt_excess)
 ```
 
@@ -251,7 +251,7 @@ These restrictions help us to retrieve somewhat smooth coefficient estimates.
 
 ```{r}
 crsp_daily_nested |>
-  inner_join(examples, by = "permno") |>
+  inner_join(examples, join_by(permno)) |>
   mutate(beta_daily = map(
     data,
     ~ roll_capm_estimation(., months = 3, min_obs = 50)
@@ -288,7 +288,7 @@ What is a typical value for stock betas? To get some feeling, we illustrate the 
 #| fig-cap: "The box plots show the average firm-specific beta estimates by industry."
 #| fig.alt: "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
 crsp_monthly |>
-  left_join(beta_monthly, by = c("permno", "month")) |>
+  left_join(beta_monthly, join_by(permno, month)) |>
   drop_na(beta_monthly) |>
   group_by(industry, permno) |>
   summarize(beta = mean(beta_monthly), 
@@ -335,11 +335,11 @@ To compare the difference between daily and monthly data, we combine beta estima
 #| fig-cap: "CAPM betas are computed using 5 years of monthly or 3 months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks."
 #| fig-alt: "Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency."
 beta <- beta_monthly |>
-  full_join(beta_daily, by = c("permno", "month")) |>
+  full_join(beta_daily, join_by(permno, month)) |>
   arrange(permno, month)
 
 beta |>
-  inner_join(examples, by = "permno") |>
+  inner_join(examples, join_by(permno)) |>
   pivot_longer(cols = c(beta_monthly, beta_daily)) |>
   drop_na() |>
   ggplot(aes(
@@ -378,7 +378,7 @@ In this case, we would have to go back and check all previous steps to find out 
 #| fig-cap: "The two lines show the share of securities with beta estimates using 5 years of monthly or 3 months of daily data."
 #| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or 3 months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta."
 beta_long <- crsp_monthly |>
-  left_join(beta, by = c("permno", "month")) |>
+  left_join(beta, join_by(permno, month)) |>
   pivot_longer(cols = c(beta_monthly, beta_daily))
 
 beta_long |>

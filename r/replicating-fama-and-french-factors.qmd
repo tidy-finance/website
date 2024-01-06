@@ -74,13 +74,13 @@ market_equity <- crsp_monthly |>
 book_to_market <- compustat |>
   mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
   select(gvkey, sorting_date, be) |>
-  inner_join(market_equity, by = c("gvkey", "sorting_date")) |>
+  inner_join(market_equity, join_by(gvkey, sorting_date)) |>
   mutate(bm = be / me) |>
   select(permno, sorting_date, me, bm)
 
 sorting_variables <- size |>
   inner_join(
-    book_to_market, by = c("permno", "sorting_date")
+    book_to_market, join_by(permno, sorting_date)
     ) |>
   drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
@@ -142,7 +142,7 @@ portfolios <- crsp_monthly |>
     month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
     month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
   )) |>
-  inner_join(portfolios, by = c("permno", "sorting_date"))
+  inner_join(portfolios, join_by(permno, sorting_date))
 ```
 
 ## Fama and French Three Factor Model
@@ -170,7 +170,7 @@ In the previous section, we replicated the size and value premiums following the
 
 ```{r}
 test <- factors_ff3_monthly |>
-  inner_join(factors_replicated, by = "month") |>
+  inner_join(factors_replicated, join_by(month)) |>
   mutate(
     across(c(smb_replicated, hml_replicated), ~round(., 4))
   )
@@ -202,13 +202,15 @@ Now, let us move to the replication of the five factor model. We extend the `oth
 other_sorting_variables <- compustat |>
   mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
   select(gvkey, sorting_date, be, op, inv) |>
-  inner_join(market_equity, by = c("gvkey", "sorting_date")) |>
+  inner_join(market_equity, 
+             join_by(gvkey, sorting_date)) |>
   mutate(bm = be / me) |>
   select(permno, sorting_date, me, be, bm, op, inv)
 
 sorting_variables <- size |>
   inner_join(
-    other_sorting_variables, by = c("permno", "sorting_date")
+    other_sorting_variables, 
+    join_by(permno, sorting_date)
     ) |>
   drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
@@ -244,7 +246,7 @@ portfolios <- crsp_monthly |>
     month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
     month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
   )) |>
-  inner_join(portfolios, by = c("permno", "sorting_date"))
+  inner_join(portfolios, join_by(permno, sorting_date))
 ```
 
 Now, we want to construct each of the factors, but this time the size factor actually comes last because it is the result of averaging across all other factor portfolios. This dependency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor, HML, as above by going long the two portfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.
@@ -321,17 +323,17 @@ We then join all factors together into one data frame and construct again a suit
 ```{r}
 factors_replicated <- factors_size |>
   full_join(
-    factors_value, by = "month"
+    factors_value, join_by(month)
   ) |>
   full_join(
-    factors_profitability, by = "month"
+    factors_profitability, join_by(month)
   ) |>
   full_join(
-    factors_investment, by = "month"
+    factors_investment, join_by(month)
   )
 
 test <- factors_ff5_monthly |>
-  inner_join(factors_replicated, by = "month") |>
+  inner_join(factors_replicated, join_by(month)) |>
   mutate(
     across(c(smb_replicated, hml_replicated, 
              rmw_replicated, cma_replicated), ~round(., 4))
