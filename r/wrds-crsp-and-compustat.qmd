@@ -84,7 +84,7 @@ crsp_monthly <- msf_db |>
     msenames_db |>
       filter(shrcd %in% c(10, 11)) |>
       select(permno, exchcd, siccd, namedt, nameendt),
-    by = c("permno")
+    join_by(permno)
   ) |>
   filter(date >= namedt & date <= nameendt) |>
   mutate(month = floor_date(date, "month")) |>
@@ -92,7 +92,7 @@ crsp_monthly <- msf_db |>
     msedelist_db |>
       select(permno, dlstdt, dlret, dlstcd) |>
       mutate(month = floor_date(dlstdt, "month")),
-    by = c("permno", "month")
+    join_by(permno, month)
   ) |>
   select(
     permno, # Security identifier
@@ -133,7 +133,7 @@ mktcap_lag <- crsp_monthly |>
   select(permno, month, mktcap_lag = mktcap)
 
 crsp_monthly <- crsp_monthly |>
-  left_join(mktcap_lag, by = c("permno", "month"))
+  left_join(mktcap_lag, join_by(permno, month))
 ```
 
 If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |> group_by(permno) |> mutate(mktcap_lag = lag(mktcap))`, take a look at the exercises.
@@ -200,7 +200,7 @@ factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
 
 crsp_monthly <- crsp_monthly |>
   left_join(factors_ff3_monthly,
-    by = "month"
+    join_by(month)
   ) |>
   mutate(
     ret_excess = ret_adj - rf,
@@ -255,7 +255,7 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 #| fig-cap: "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2022."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2022. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2022, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."
 tbl(tidy_finance, "crsp_monthly") |>
-  left_join(tbl(tidy_finance, "cpi_monthly"), by = "month") |>
+  left_join(tbl(tidy_finance, "cpi_monthly"), join_by(month)) |>
   group_by(month, exchange) |>
   summarize(
     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
@@ -290,7 +290,7 @@ Next, we look at the same descriptive statistics by industry. @fig-213 plots the
 #| fig-cap: "Number of stocks in the CRSP sample associated with different industries."
 #| fig-alt: "Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2022 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2022, the segment of firms within public administration is the largest in terms of the number of listed stocks."
 crsp_monthly_industry <- crsp_monthly |>
-  left_join(cpi_monthly, by = "month") |>
+  left_join(cpi_monthly, join_by(month)) |>
   group_by(month, industry) |>
   summarize(
     securities = n_distinct(permno),
@@ -384,15 +384,15 @@ for (j in 1:batches) {
     drop_na()
     
     crsp_daily_sub <- crsp_daily_sub |> 
-      left_join(msedelist_sub, by = c("permno", "date"="dlstdt")) |> 
+      left_join(msedelist_sub, join_by(permno, date == dlstdt)) |> 
       bind_rows(msedelist_sub |> 
                   anti_join(crsp_daily_sub, 
-                            by = c("permno", "dlstdt" = "date"))) |> 
+                            join_by(permno, dlstdt == date))) |> 
       mutate(ret = if_else(!is.na(dlret), dlret, ret),
              date = if_else(!is.na(dlstdt), dlstdt, date)) |> 
       select(-c(dlret, dlstdt)) |> 
       left_join(msedelist_sub |> 
-                  select(permno, dlstdt), by = "permno") |> 
+                  select(permno, dlstdt), join_by(permno)) |> 
       mutate(dlstdt = replace_na(dlstdt, end_date)) |> 
       filter(date <= dlstdt) |> 
       select(-dlstdt)
@@ -400,7 +400,7 @@ for (j in 1:batches) {
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
       left_join(factors_ff3_daily |>
-        select(date, rf), by = "date") |>
+        select(date, rf), join_by(date)) |>
       mutate(
         ret_excess = ret - rf,
         ret_excess = pmax(ret_excess, -1)
@@ -472,7 +472,7 @@ compustat <- compustat |>
     be = coalesce(seq, ceq + pstk, at - lt) +
       coalesce(txditc, txdb + itcb, 0) -
       coalesce(pstkrv, pstkl, pstk, 0),
-    be = if_else(be <= 0, as.numeric(NA), be),
+    be = if_else(be <= 0, NA, be),
     op = (sale - coalesce(cogs, 0) - 
             coalesce(xsga, 0) - coalesce(xint, 0)) / be,
   )
@@ -495,11 +495,12 @@ compustat <- compustat |>
   left_join(
     compustat |> 
       select(gvkey, year, at_lag = at) |> 
-      mutate(year = year + 1), by = c("gvkey", "year")
+      mutate(year = year + 1), 
+    join_by(gvkey, year)
   ) |> 
   mutate(
     inv = at / at_lag - 1,
-    inv = if_else(at_lag <= 0, as.numeric(NA), inv)
+    inv = if_else(at_lag <= 0, NA, inv)
   )
 ```
 
@@ -541,13 +542,13 @@ We use these links to create a new table with a mapping between stock identifier
 ```{r}
 ccm_links <- crsp_monthly |>
   inner_join(ccmxpf_linktable, 
-             by = "permno", relationship = "many-to-many") |>
+             join_by(permno), relationship = "many-to-many") |>
   filter(!is.na(gvkey) & 
            (date >= linkdt & date <= linkenddt)) |>
   select(permno, gvkey, date)
 
 crsp_monthly <- crsp_monthly |>
-  left_join(ccm_links, by = c("permno", "date"))
+  left_join(ccm_links, join_by(permno, date))
 ```
 
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local database.
@@ -570,7 +571,7 @@ crsp_monthly |>
   group_by(permno, year = year(month)) |>
   filter(date == max(date)) |>
   ungroup() |>
-  left_join(compustat, by = c("gvkey", "year")) |>
+  left_join(compustat, join_by(gvkey, year)) |>
   group_by(exchange, year) |>
   summarize(
     share = n_distinct(permno[!is.na(be)]) / n_distinct(permno),

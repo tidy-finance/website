@@ -53,7 +53,7 @@ crsp_monthly_lags <- crsp_monthly |>
 
 crsp_monthly <- crsp_monthly |>
   inner_join(crsp_monthly_lags,
-    by = c("permno", "month" = "month_13"),
+    join_by(permno, month == month_13),
     suffix = c("", "_13")
   )
 
@@ -202,7 +202,8 @@ evaluate_portfolio <- function(weights_crsp,
   
   evaluation_stats <- evaluation |>
     group_by(model) |>
-    left_join(factors_ff3_monthly, by = "month") |>
+    left_join(factors_ff3_monthly, 
+              join_by(month)) |>
     summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(length_year * portfolio_return),
@@ -214,7 +215,8 @@ evaluate_portfolio <- function(weights_crsp,
   
   if (capm_evaluation) {
     evaluation_capm <- evaluation |> 
-      left_join(factors_ff3_monthly, by = "month") |>
+      left_join(factors_ff3_monthly, 
+                join_by(month)) |>
       group_by(model) |>
       summarize(
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
@@ -222,7 +224,7 @@ evaluate_portfolio <- function(weights_crsp,
       )
     
     evaluation_stats <- evaluation_stats |> 
-      left_join(evaluation_capm, by = "model")
+      left_join(evaluation_capm, join_by(model))
   }
 
   if (full_evaluation) {
@@ -243,7 +245,7 @@ evaluate_portfolio <- function(weights_crsp,
       mutate(model = str_remove(model, "weight_")) 
     
     evaluation_stats <- evaluation_stats |> 
-      left_join(evaluation_weights, by = "model")
+      left_join(evaluation_weights, join_by(model))
   }
   
   evaluation_output <- evaluation_stats |> 
