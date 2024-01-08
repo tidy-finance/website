@@ -573,7 +573,7 @@ window.Quarto = {
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(crsp_monthly_lags,</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"permno"</span>, <span class="st">"month"</span> <span class="ot">=</span> <span class="st">"month_13"</span>),</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">join_by</span>(permno, month <span class="sc">==</span> month_13),</span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">""</span>, <span class="st">"_13"</span>)</span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
@@ -696,56 +696,58 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>  evaluation_stats <span class="ot">&lt;-</span> evaluation <span class="sc">|&gt;</span></span>
 <span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(model) <span class="sc">|&gt;</span></span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">left_join</span>(factors_ff3_monthly, <span class="at">by =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="fu">tibble</span>(</span>
-<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Expected utility"</span> <span class="ot">=</span> <span class="fu">mean</span>(<span class="fu">power_utility</span>(portfolio_return)),</span>
-<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Average return"</span> <span class="ot">=</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">mean</span>(length_year <span class="sc">*</span> portfolio_return),</span>
-<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>      <span class="st">"SD return"</span> <span class="ot">=</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">sqrt</span>(length_year) <span class="sc">*</span> <span class="fu">sd</span>(portfolio_return),</span>
-<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Sharpe ratio"</span> <span class="ot">=</span> <span class="fu">sqrt</span>(length_year) <span class="sc">*</span> <span class="fu">mean</span>(portfolio_return) <span class="sc">/</span> <span class="fu">sd</span>(portfolio_return),</span>
-<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">|&gt;</span></span>
-<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">model =</span> <span class="fu">str_remove</span>(model, <span class="st">"return_"</span>)) </span>
-<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (capm_evaluation) {</span>
-<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>    evaluation_capm <span class="ot">&lt;-</span> evaluation <span class="sc">|&gt;</span> </span>
-<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(factors_ff3_monthly, <span class="at">by =</span> <span class="st">"month"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model) <span class="sc">|&gt;</span></span>
-<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(</span>
-<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CAPM alpha"</span> <span class="ot">=</span> <span class="fu">coefficients</span>(<span class="fu">lm</span>(portfolio_return <span class="sc">~</span> mkt_excess))[<span class="dv">1</span>],</span>
-<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Market beta"</span> <span class="ot">=</span> <span class="fu">coefficients</span>(<span class="fu">lm</span>(portfolio_return <span class="sc">~</span> mkt_excess))[<span class="dv">2</span>]</span>
-<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>      )</span>
-<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
-<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(evaluation_capm, <span class="at">by =</span> <span class="st">"model"</span>)</span>
-<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (full_evaluation) {</span>
-<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>    evaluation_weights <span class="ot">&lt;-</span> weights_crsp <span class="sc">|&gt;</span></span>
-<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(month, <span class="fu">contains</span>(<span class="st">"weight"</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>      <span class="fu">pivot_longer</span>(<span class="sc">-</span>month, <span class="at">values_to =</span> <span class="st">"weight"</span>, <span class="at">names_to =</span> <span class="st">"model"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model, month) <span class="sc">|&gt;</span></span>
-<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(</span>
-<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Absolute weight"</span> <span class="ot">=</span> <span class="fu">abs</span>(weight),</span>
-<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Max. weight"</span> <span class="ot">=</span> <span class="fu">max</span>(weight),</span>
-<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Min. weight"</span> <span class="ot">=</span> <span class="fu">min</span>(weight),</span>
-<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Avg. sum of negative weights"</span> <span class="ot">=</span> <span class="sc">-</span><span class="fu">sum</span>(weight[weight <span class="sc">&lt;</span> <span class="dv">0</span>]),</span>
-<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Avg. fraction of negative weights"</span> <span class="ot">=</span> <span class="fu">sum</span>(weight <span class="sc">&lt;</span> <span class="dv">0</span>) <span class="sc">/</span> <span class="fu">n</span>(),</span>
-<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>        <span class="at">.keep =</span> <span class="st">"none"</span></span>
-<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">|&gt;</span></span>
-<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model) <span class="sc">|&gt;</span></span>
-<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(<span class="fu">across</span>(<span class="sc">-</span>month, <span class="sc">~</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">mean</span>(.))) <span class="sc">|&gt;</span></span>
-<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">model =</span> <span class="fu">str_remove</span>(model, <span class="st">"weight_"</span>)) </span>
-<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
-<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(evaluation_weights, <span class="at">by =</span> <span class="st">"model"</span>)</span>
-<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>  evaluation_output <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
-<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="sc">-</span>model, <span class="at">names_to =</span> <span class="st">"measure"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> model)</span>
-<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(evaluation_output)</span>
-<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">left_join</span>(factors_ff3_monthly, </span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>              <span class="fu">join_by</span>(month)) <span class="sc">|&gt;</span></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="fu">tibble</span>(</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Expected utility"</span> <span class="ot">=</span> <span class="fu">mean</span>(<span class="fu">power_utility</span>(portfolio_return)),</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Average return"</span> <span class="ot">=</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">mean</span>(length_year <span class="sc">*</span> portfolio_return),</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>      <span class="st">"SD return"</span> <span class="ot">=</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">sqrt</span>(length_year) <span class="sc">*</span> <span class="fu">sd</span>(portfolio_return),</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Sharpe ratio"</span> <span class="ot">=</span> <span class="fu">sqrt</span>(length_year) <span class="sc">*</span> <span class="fu">mean</span>(portfolio_return) <span class="sc">/</span> <span class="fu">sd</span>(portfolio_return),</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>    )) <span class="sc">|&gt;</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">model =</span> <span class="fu">str_remove</span>(model, <span class="st">"return_"</span>)) </span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (capm_evaluation) {</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>    evaluation_capm <span class="ot">&lt;-</span> evaluation <span class="sc">|&gt;</span> </span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(factors_ff3_monthly, </span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>                <span class="fu">join_by</span>(month)) <span class="sc">|&gt;</span></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model) <span class="sc">|&gt;</span></span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CAPM alpha"</span> <span class="ot">=</span> <span class="fu">coefficients</span>(<span class="fu">lm</span>(portfolio_return <span class="sc">~</span> mkt_excess))[<span class="dv">1</span>],</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Market beta"</span> <span class="ot">=</span> <span class="fu">coefficients</span>(<span class="fu">lm</span>(portfolio_return <span class="sc">~</span> mkt_excess))[<span class="dv">2</span>]</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(evaluation_capm, <span class="fu">join_by</span>(model))</span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (full_evaluation) {</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>    evaluation_weights <span class="ot">&lt;-</span> weights_crsp <span class="sc">|&gt;</span></span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(month, <span class="fu">contains</span>(<span class="st">"weight"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>      <span class="fu">pivot_longer</span>(<span class="sc">-</span>month, <span class="at">values_to =</span> <span class="st">"weight"</span>, <span class="at">names_to =</span> <span class="st">"model"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model, month) <span class="sc">|&gt;</span></span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Absolute weight"</span> <span class="ot">=</span> <span class="fu">abs</span>(weight),</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Max. weight"</span> <span class="ot">=</span> <span class="fu">max</span>(weight),</span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Min. weight"</span> <span class="ot">=</span> <span class="fu">min</span>(weight),</span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Avg. sum of negative weights"</span> <span class="ot">=</span> <span class="sc">-</span><span class="fu">sum</span>(weight[weight <span class="sc">&lt;</span> <span class="dv">0</span>]),</span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>        <span class="st">"Avg. fraction of negative weights"</span> <span class="ot">=</span> <span class="fu">sum</span>(weight <span class="sc">&lt;</span> <span class="dv">0</span>) <span class="sc">/</span> <span class="fu">n</span>(),</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>        <span class="at">.keep =</span> <span class="st">"none"</span></span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>      ) <span class="sc">|&gt;</span></span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(model) <span class="sc">|&gt;</span></span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(<span class="fu">across</span>(<span class="sc">-</span>month, <span class="sc">~</span> <span class="dv">100</span> <span class="sc">*</span> <span class="fu">mean</span>(.))) <span class="sc">|&gt;</span></span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">model =</span> <span class="fu">str_remove</span>(model, <span class="st">"weight_"</span>)) </span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(evaluation_weights, <span class="fu">join_by</span>(model))</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>  evaluation_output <span class="ot">&lt;-</span> evaluation_stats <span class="sc">|&gt;</span> </span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="sc">-</span>model, <span class="at">names_to =</span> <span class="st">"measure"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> model)</span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(evaluation_output)</span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p> Let us take a look at the different portfolio strategies and evaluation measures.</p>
 <div class="cell">
