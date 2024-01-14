@@ -1,0 +1,105 @@
+---
+title: Cover Image
+---
+
+```{python} 
+#| echo: false
+exec(open("./render-settings.py").read())
+```
+
+The cover of the book is inspired by the fast growing generative art community in R.\index{Generative art} Generative art refers to art that in whole or in part has been created with the use of an autonomous system. Instead of creating random dynamics we rely on what is core to the book: The evolution of financial markets. Each circle corresponds to one of the twelve Fama-French industry portfolios, whereas each bar represents the average annual return between 1927 and 2022. The bar color is determined by the standard deviation of returns for each industry. The few lines of code below replicate the entire figure. 
+
+```{python}
+#| eval: false
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas_datareader as pdr
+
+from datetime import datetime
+from matplotlib.colors import LinearSegmentedColormap
+
+main_colors = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00"]
+colormap = LinearSegmentedColormap.from_list("custom_colormap", main_colors)
+
+industries_ff_daily_raw = pdr.DataReader(
+  name="12_Industry_Portfolios_daily",
+  data_source="famafrench", 
+  start="1927-01-01", 
+  end="2022-12-31")[0]
+
+industries_ff_daily = (industries_ff_daily_raw
+  .divide(100)
+  .reset_index(names="date")
+  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
+  .rename(str.lower, axis="columns")
+)
+
+industries_long = (industries_ff_daily
+  .melt(id_vars="date", var_name="name", value_name="value")
+)
+                          
+industries_order = sorted(industries_long["name"].unique())
+
+data_plot = (industries_long
+  .assign(year=industries_long["date"].dt.to_period("Y"))
+  .groupby(["year", "name"])
+  .aggregate(total=("value", "mean"),
+             vola=("value", "std"))
+  .reset_index()
+  .assign(
+    vola_ntile=lambda x: pd.qcut(x["vola"], 42, labels=False)
+  )
+)
+
+dpi = 300
+width = 2400/dpi
+height = 1800/dpi
+num_cols = 4
+num_rows = int(len(industries_order)/num_cols)
+fig, axs = plt.subplots(
+  num_rows, num_cols,
+  constrained_layout=True,
+  subplot_kw={"projection": "polar"},
+  figsize=(width, height),
+  dpi=dpi
+)
+axs = axs.flatten()
+
+for i in enumerate(industries_order):
+
+    df = data_plot.copy().query(f'name == "{i[1]}"')
+    min_value = df["total"].min()
+    max_value = df["total"].max()
+    std_value = df["total"].std()
+    df["total"] = 2*(df["total"]-min_value)/(max_value-min_value)-1
+
+    angles = np.linspace(0, 2*np.pi, len(df), endpoint=False)
+    values = df["total"].values
+    width = 2*np.pi/len(values)
+    offset = np.pi/2
+
+    ax = axs[i[0]]
+    ax.set_theta_offset(offset)
+    ax.set_ylim(-std_value*1400, 1)
+    ax.set_frame_on(False)
+    ax.xaxis.grid(False)
+    ax.yaxis.grid(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    color_values = df["vola_ntile"].values
+    normalize = plt.Normalize(min(color_values), max(color_values))
+    colors = colormap(normalize(color_values))
+
+    ax.bar(
+      angles, values,
+      width=width, color=colors, edgecolor="white", linewidth=0.2
+    )
+
+plt.tight_layout()
+plt.subplots_adjust(wspace=-0.2, hspace=-0.1)
+plt.gcf().savefig(
+  "images/cover-image.png", dpi = 300, pad_inches=0, transparent=False
+)
+```
