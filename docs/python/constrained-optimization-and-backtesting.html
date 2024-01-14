@@ -478,6 +478,12 @@ window.Quarto = {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../python/cover-image.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Cover Image</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../python/clean-enhanced-trace-with-python.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Clean Enhanced TRACE with Python</span></a>
   </div>
@@ -486,12 +492,6 @@ window.Quarto = {
   <div class="sidebar-item-container"> 
   <a href="../python/proofs.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Proofs</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../python/cover-image.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Cover Image</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -554,12 +554,12 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>You are reading the work-in-progress edition of <strong>Tidy Finance with Python</strong>. Code chunks and text might change over the next couple of months. We are always looking for feedback via <a href="mailto:contact@tidy-finance.org">contact@tidy-finance.org</a>. Meanwhile, you can find the complete R version <a href="../r/index.html">here</a>.</p>
+<p>You are reading <strong>Tidy Finance with Python</strong>. You can find the equivalent chapter for the sibling <strong>Tidy Finance with R</strong><a href="../r/constrained-optimization-and-backtesting.html">here</a>.</p>
 </div>
 </div>
-<p> In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
+<p> In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in Python. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
 <p>Throughout this chapter, we use the following Python packages:</p>
-<div id="6014e4d9" class="cell" data-execution_count="2">
+<div id="ab001e83" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -570,113 +570,266 @@ Note
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> expon</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> minimize</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p>Compared to previous chapters, we introduce <code>expon</code> from <code>scipy.stats</code> to calculate exponential continuous random variables.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>We start by loading the required data from our <code>SQLite</code>-database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
-<div id="0916fbb4" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>industry_returns  <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT * FROM industries_ff_monthly"</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>})</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  .drop(columns<span class="op">=</span>[<span class="st">"month"</span>])</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>We start by loading the required data from our SQLite database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
+<div id="b59846a3" class="cell" data-execution_count="4">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>industry_returns <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT * FROM industries_ff_monthly"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>})</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  .drop(columns<span class="op">=</span>[<span class="st">"month"</span>])</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="recap-of-portfolio-choice" class="level2">
 <h2 class="anchored" data-anchor-id="recap-of-portfolio-choice">Recap of Portfolio Choice</h2>
-<p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to <span class="math display">\[\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1\]</span> where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following chunk. </p>
-<div id="65a3de2c" class="cell" data-execution_count="4">
+<p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation that delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to <span id="eq-recap-mvp"><span class="math display">\[\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \tag{1}\]</span></span> where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following chunk. </p>
+<div id="c836f6e3" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n_industries <span class="op">=</span> industry_returns.shape[<span class="dv">1</span>]</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>Sigma <span class="op">=</span> np.array(industry_returns.cov())</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="op">=</span> np.linalg.inv(Sigma) <span class="op">@</span> np.ones(n_industries)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="op">=</span> w_mvp <span class="op">/</span> w_mvp.<span class="bu">sum</span>()</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> np.array(industry_returns.mean()).T</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> np.array(industry_returns.mean()).T</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>sigma <span class="op">=</span> np.array(industry_returns.cov())</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="op">=</span> np.linalg.inv(sigma) <span class="op">@</span> np.ones(n_industries)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="op">=</span> w_mvp<span class="op">/</span>w_mvp.<span class="bu">sum</span>()</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>weights_mvp <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Industry"</span>: industry_returns.columns.tolist(),</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Minimum variance"</span>: w_mvp</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>weights_mvp.<span class="bu">round</span>(<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="5">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Industry</th>
+<th data-quarto-table-cell-role="th">Minimum variance</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>nodur</td>
+<td>0.248</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>durbl</td>
+<td>-0.012</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>manuf</td>
+<td>0.078</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>enrgy</td>
+<td>0.079</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>hitec</td>
+<td>0.008</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>telcm</td>
+<td>0.241</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>shops</td>
+<td>0.092</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>hlth</td>
+<td>0.160</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>utils</td>
+<td>0.470</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>other</td>
+<td>-0.364</td>
+</tr>
+</tbody>
+</table>
+
 </div>
-<p>Next, consider an investor who aims to achieve minimum variance <em>given a required expected portfolio return</em> <span class="math inline">\(\bar{\mu}\)</span> such that she chooses <span class="math display">\[\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.\]</span> We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor <span class="math inline">\(\gamma\)</span>. That means the investor aims to choose portfolio weights as the solution to <span class="math display">\[ \omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1.\]</span> The solution to the optimal portfolio choice problem is: <span class="math display">\[\omega^*_{\gamma}  = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.\]</span> Empirically, this classical solution imposes many problems. In particular, the estimates of <span class="math inline">\(\mu\)</span> are noisy over short horizons, the (<span class="math inline">\(N \times N\)</span>) matrix <span class="math inline">\(\Sigma\)</span> contains <span class="math inline">\(N(N-1)/2\)</span> distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are <span class="citation" data-cites="Brown1976">Brown (<a href="#ref-Brown1976" role="doc-biblioref">1976</a>)</span>, <span class="citation" data-cites="Jobson1980">Jobson and Korkie (<a href="#ref-Jobson1980" role="doc-biblioref">1980</a>)</span>, <span class="citation" data-cites="Jorion1986">Jorion (<a href="#ref-Jorion1986" role="doc-biblioref">1986</a>)</span>, and <span class="citation" data-cites="Chopra1993">Chopra and Ziemba (<a href="#ref-Chopra1993" role="doc-biblioref">1993</a>)</span>.</p>
-<p>Even worse, if the asset universe contains more assets than available time periods <span class="math inline">\((N &gt; T)\)</span>, the sample covariance matrix is no longer positive definite such that the inverse <span class="math inline">\(\Sigma^{-1}\)</span> does not exist anymore. To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool <span class="citation" data-cites="Ledoit2003 Ledoit2004 Ledoit2012 Fan2008">(see, e.g., <a href="#ref-Ledoit2003" role="doc-biblioref">Ledoit and Wolf 2003</a>, <a href="#ref-Ledoit2004" role="doc-biblioref">2004</a>, <a href="#ref-Ledoit2012" role="doc-biblioref">2012</a>; <a href="#ref-Fan2008" role="doc-biblioref">Fan, Fan, and Lv 2008</a>)</span>.</p>
-<p>While the uncertainty associated with estimated parameters is challenging, the data-generating process is also unknown to the investor. In other words, model uncertainty reflects that it is ex-ante not even clear which parameters require estimation (for instance, if returns are driven by a factor model, selecting the universe of relevant factors imposes model uncertainty). <span class="citation" data-cites="Wang2005">Wang (<a href="#ref-Wang2005" role="doc-biblioref">2005</a>)</span> and <span class="citation" data-cites="Garlappi2007">Garlappi, Uppal, and Wang (<a href="#ref-Garlappi2007" role="doc-biblioref">2007</a>)</span> provide theoretical analysis on optimal portfolio choice under model <em>and</em> estimation uncertainty. In the most extreme case, <span class="citation" data-cites="Pflug2012">Pflug, Pichler, and Wozabal (<a href="#ref-Pflug2012" role="doc-biblioref">2012</a>)</span> shows that the naive portfolio which allocates equal wealth to all assets is the optimal choice for an investor averse to model uncertainty.</p>
-<p>On top of the estimation uncertainty, <em>transaction costs</em> are a major concern. Rebalancing portfolios is costly, and, therefore, the optimal choice should depend on the investor’s current holdings. In the presence of transaction costs, the benefits of reallocating wealth may be smaller than the costs associated with turnover. This aspect has been investigated theoretically, among others, for one risky asset by <span class="citation" data-cites="Magill1976">Magill and Constantinides (<a href="#ref-Magill1976" role="doc-biblioref">1976</a>)</span> and <span class="citation" data-cites="Davis1990">Davis and Norman (<a href="#ref-Davis1990" role="doc-biblioref">1990</a>)</span>. Subsequent extensions to the case with multiple assets have been proposed by <span class="citation" data-cites="Balduzzi1999">Balduzzi and Lynch (<a href="#ref-Balduzzi1999" role="doc-biblioref">1999</a>)</span> and <span class="citation" data-cites="Balduzzi2000">Balduzzi and Lynch (<a href="#ref-Balduzzi2000" role="doc-biblioref">2000</a>)</span>. More recent papers on empirical approaches which explicitly account for transaction costs include <span class="citation" data-cites="Garleanu2013">Gârleanu and Pedersen (<a href="#ref-Garleanu2013" role="doc-biblioref">2013</a>)</span>, and <span class="citation" data-cites="DeMiguel2014">DeMiguel, Nogales, and Uppal (<a href="#ref-DeMiguel2014" role="doc-biblioref">2014</a>)</span>, and <span class="citation" data-cites="DeMiguel2015">DeMiguel, Martín-Utrera, and Nogales (<a href="#ref-DeMiguel2015" role="doc-biblioref">2015</a>)</span>.</p>
+</div>
+</div>
+<p>Next, consider an investor who aims to achieve minimum variance <em>given a required expected portfolio return</em> <span class="math inline">\(\bar{\mu}\)</span> such that she chooses <span id="eq-recap-efficient-portfolio"><span class="math display">\[\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}. \tag{2}\]</span></span> We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor <span class="math inline">\(\gamma\)</span>. That means the investor aims to choose portfolio weights as the solution to <span id="eq-recap-mean-variance"><span class="math display">\[ \omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1. \tag{3}\]</span></span> The solution to the optimal portfolio choice problem is: <span id="eq-analytical-solution-mv"><span class="math display">\[\omega^*_{\gamma} = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota. \tag{4}\]</span></span> To proof this statement, we refer to the derivations in <a href="../python/proofs.html">Proofs</a>. Empirically, this classical solution imposes many problems. In particular, the estimates of <span class="math inline">\(\mu\)</span> are noisy over short horizons, the (<span class="math inline">\(N \times N\)</span>) matrix <span class="math inline">\(\Sigma\)</span> contains <span class="math inline">\(N(N-1)/2\)</span> distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are <span class="citation" data-cites="Brown1976">Brown (<a href="#ref-Brown1976" role="doc-biblioref">1976</a>)</span>, <span class="citation" data-cites="Jobson1980">Jobson and Korkie (<a href="#ref-Jobson1980" role="doc-biblioref">1980</a>)</span>, <span class="citation" data-cites="Jorion1986">Jorion (<a href="#ref-Jorion1986" role="doc-biblioref">1986</a>)</span>, and <span class="citation" data-cites="Chopra1993">Chopra and Ziemba (<a href="#ref-Chopra1993" role="doc-biblioref">1993</a>)</span>.</p>
+<p>Even worse, if the asset universe contains more assets than available time periods <span class="math inline">\((N &gt; T)\)</span>, the sample covariance matrix is no longer positive definite such that the inverse <span class="math inline">\(\Sigma^{-1}\)</span> does not exist anymore. To address estimation issues for vast-dimensional covariance matrices, regularization techniques <span class="citation" data-cites="Ledoit2003 Ledoit2004 Ledoit2012 Fan2008">(see, e.g., <a href="#ref-Ledoit2003" role="doc-biblioref">Ledoit and Wolf 2003</a>, <a href="#ref-Ledoit2004" role="doc-biblioref">2004</a>, <a href="#ref-Ledoit2012" role="doc-biblioref">2012</a>; <a href="#ref-Fan2008" role="doc-biblioref">Fan, Fan, and Lv 2008</a>)</span> and the parametric approach from the previous chapter are popular tools.</p>
+<p>While the uncertainty associated with estimated parameters is challenging, the data-generating process is also unknown to the investor. In other words, model uncertainty reflects that it is ex-ante not even clear which parameters require estimation (for instance, if returns are driven by a factor model, selecting the universe of relevant factors imposes model uncertainty). <span class="citation" data-cites="Wang2005">Wang (<a href="#ref-Wang2005" role="doc-biblioref">2005</a>)</span> and <span class="citation" data-cites="Garlappi2007">Garlappi, Uppal, and Wang (<a href="#ref-Garlappi2007" role="doc-biblioref">2007</a>)</span> provide theoretical analysis on optimal portfolio choice under model <em>and</em> estimation uncertainty. In the most extreme case, <span class="citation" data-cites="Pflug2012">Pflug, Pichler, and Wozabal (<a href="#ref-Pflug2012" role="doc-biblioref">2012</a>)</span> shows that the naive portfolio, which allocates equal wealth to all assets, is the optimal choice for an investor averse to model uncertainty.</p>
+<p>On top of the estimation uncertainty, <em>transaction costs</em> are a major concern. Rebalancing portfolios is costly, and, therefore, the optimal choice should depend on the investor’s current holdings. In the presence of transaction costs, the benefits of reallocating wealth may be smaller than the costs associated with turnover. This aspect has been investigated theoretically, among others, for one risky asset by <span class="citation" data-cites="Magill1976">Magill and Constantinides (<a href="#ref-Magill1976" role="doc-biblioref">1976</a>)</span> and <span class="citation" data-cites="Davis1990">Davis and Norman (<a href="#ref-Davis1990" role="doc-biblioref">1990</a>)</span>. Subsequent extensions to the case with multiple assets have been proposed by <span class="citation" data-cites="Balduzzi1999">Balduzzi and Lynch (<a href="#ref-Balduzzi1999" role="doc-biblioref">1999</a>)</span> and <span class="citation" data-cites="Balduzzi2000">Balduzzi and Lynch (<a href="#ref-Balduzzi2000" role="doc-biblioref">2000</a>)</span>. More recent papers on empirical approaches that explicitly account for transaction costs include <span class="citation" data-cites="Garleanu2013">Gârleanu and Pedersen (<a href="#ref-Garleanu2013" role="doc-biblioref">2013</a>)</span>, <span class="citation" data-cites="DeMiguel2014">DeMiguel, Nogales, and Uppal (<a href="#ref-DeMiguel2014" role="doc-biblioref">2014</a>)</span>, and <span class="citation" data-cites="DeMiguel2015">DeMiguel, Martín-Utrera, and Nogales (<a href="#ref-DeMiguel2015" role="doc-biblioref">2015</a>)</span>.</p>
 </section>
 <section id="estimation-uncertainty-and-transaction-costs" class="level2">
 <h2 class="anchored" data-anchor-id="estimation-uncertainty-and-transaction-costs">Estimation Uncertainty and Transaction Costs</h2>
-<p>The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates <span class="math inline">\(\hat \mu\)</span> and <span class="math inline">\(\hat \Sigma\)</span> can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of <span class="math inline">\(\Sigma\)</span>, rely on Bayesian priors inspired by theoretical asset pricing models <span class="citation" data-cites="Kan2007">(<a href="#ref-Kan2007" role="doc-biblioref">Kan and Zhou 2007</a>)</span> or use high-frequency data to improve forecasting <span class="citation" data-cites="Hautsch2015">(<a href="#ref-Hautsch2015" role="doc-biblioref">Hautsch, Kyj, and Malec 2015</a>)</span>. One unifying framework that works easily, effectively (even for large dimensions), and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs <span class="citation" data-cites="Hautsch2019">(<a href="#ref-Hautsch2019" role="doc-biblioref">Hautsch and Voigt 2019</a>)</span>.</p>
-<p>Assume that returns are from a multivariate normal distribution with mean <span class="math inline">\(\mu\)</span> and variance-covariance matrix <span class="math inline">\(\Sigma\)</span>, <span class="math inline">\(N(\mu,\Sigma)\)</span>. Additionally, we assume quadratic transaction costs which penalize rebalancing such that <span class="math display">\[
+<p>The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates <span class="math inline">\(\hat \mu\)</span> and <span class="math inline">\(\hat \Sigma\)</span> can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of <span class="math inline">\(\Sigma\)</span>, rely on Bayesian priors inspired by theoretical asset pricing models <span class="citation" data-cites="Kan2007">(<a href="#ref-Kan2007" role="doc-biblioref">Kan and Zhou 2007</a>)</span>, or use high-frequency data to improve forecasting <span class="citation" data-cites="Hautsch2015">(<a href="#ref-Hautsch2015" role="doc-biblioref">Hautsch, Kyj, and Malec 2015</a>)</span>. One unifying framework that works easily, effectively (even for large dimensions), and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs <span class="citation" data-cites="Hautsch2019">(<a href="#ref-Hautsch2019" role="doc-biblioref">Hautsch and Voigt 2019</a>)</span>.</p>
+<p>Assume that returns are from a multivariate normal distribution with mean <span class="math inline">\(\mu\)</span> and variance-covariance matrix <span class="math inline">\(\Sigma\)</span>, <span class="math inline">\(N(\mu,\Sigma)\)</span>. Additionally, we assume quadratic transaction costs which penalize rebalancing such that <span id="eq-definition-transaction-costs"><span class="math display">\[
 \begin{aligned}
-\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned}\]</span> with cost parameter <span class="math inline">\(\beta&gt;0\)</span> and <span class="math inline">\(\omega_{t^+} = {\omega_t \circ  (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}\)</span>. <span class="math inline">\(\omega_{t^+}\)</span> denotes the portfolio weights just before rebalancing. Note that <span class="math inline">\(\omega_{t^+}\)</span> differs mechanically from <span class="math inline">\(\omega_t\)</span> due to the returns in the past period. Intuitively, transaction costs penalize portfolio performance when the portfolio is shifted from the current holdings <span class="math inline">\(\omega_{t^+}\)</span> to a new allocation <span class="math inline">\(\omega_{t+1}\)</span>. In this setup, transaction costs do not increase linearly. Instead, larger rebalancing is penalized more heavily than small adjustments. Then, the optimal portfolio choice for an investor with mean variance preferences is <span class="math display">\[\begin{aligned}\omega_{t+1} ^* &amp;=  \arg\max \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \text{ s.t. } \iota'\omega = 1\\
+\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned} \tag{5}\]</span></span> with cost parameter <span class="math inline">\(\beta&gt;0\)</span> and <span class="math inline">\(\omega_{t^+} = {\omega_t \circ (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}\)</span>, where <span class="math inline">\(\circ\)</span> is the element-wise Hadamard product. <span class="math inline">\(\omega_{t^+}\)</span> denotes the portfolio weights just before rebalancing. Note that <span class="math inline">\(\omega_{t^+}\)</span> differs mechanically from <span class="math inline">\(\omega_t\)</span> due to the returns in the past period. Intuitively, transaction costs penalize portfolio performance when the portfolio is shifted from the current holdings <span class="math inline">\(\omega_{t^+}\)</span> to a new allocation <span class="math inline">\(\omega_{t+1}\)</span>. In this setup, transaction costs do not increase linearly. Instead, larger rebalancing is penalized more heavily than small adjustments. Then, the optimal portfolio choice for an investor with mean variance preferences is <span id="eq-tc-optimization-problem"><span class="math display">\[\begin{aligned}\omega_{t+1} ^* &amp;= \arg\max \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \text{ s.t. } \iota'\omega = 1\\
 &amp;=\arg\max
-\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t.} \iota'\omega=1,\end{aligned}\]</span> where <span class="math display">\[\mu^*=\mu+\beta \omega_{t^+} \quad  \text{and} \quad \Sigma^*=\Sigma + \frac{\beta}{\gamma} I_N.\]</span> As a result, adjusting for transaction costs implies a standard mean-variance optimal portfolio choice with adjusted return parameters <span class="math inline">\(\Sigma^*\)</span> and <span class="math inline">\(\mu^*\)</span>: <span class="math display">\[\omega^*_{t+1} = \frac{1}{\gamma}\left(\Sigma^{*-1} - \frac{1}{\iota' \Sigma^{*-1}\iota }\Sigma^{*-1}\iota\iota' \Sigma^{*-1} \right) \mu^*  + \frac{1}{\iota' \Sigma^{*-1} \iota }\Sigma^{*-1} \iota.\]</span></p>
-<p>An alternative formulation of the optimal portfolio can be derived as follows: <span class="math display">\[\omega_{t+1} ^*=\arg\max
-\omega'\left(\mu+\beta\left(\omega_{t^+} - \frac{1}{N}\iota\right)\right) - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t. } \iota'\omega=1.\]</span> The optimal weights correspond to a mean-variance portfolio, where the vector of expected returns is such that assets that currently exhibit a higher weight are considered as delivering a higher expected return.</p>
+\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t.} \iota'\omega=1,\end{aligned} \tag{6}\]</span></span> where <span id="eq-tc-optimization-solution"><span class="math display">\[\mu^*=\mu+\beta \omega_{t^+} \quad \text{and} \quad \Sigma^*=\Sigma + \frac{\beta}{\gamma} I_N. \tag{7}\]</span></span> As a result, adjusting for transaction costs implies a standard mean-variance optimal portfolio choice with adjusted return parameters <span class="math inline">\(\Sigma^*\)</span> and <span class="math inline">\(\mu^*\)</span>: <span id="eq-tc-weights"><span class="math display">\[\omega^*_{t+1} = \frac{1}{\gamma}\left(\Sigma^{*-1} - \frac{1}{\iota' \Sigma^{*-1}\iota }\Sigma^{*-1}\iota\iota' \Sigma^{*-1} \right) \mu^* + \frac{1}{\iota' \Sigma^{*-1} \iota }\Sigma^{*-1} \iota. \tag{8}\]</span></span></p>
+<p>An alternative formulation of the optimal portfolio can be derived as follows: <span id="eq-tc-alternative-weights"><span class="math display">\[\omega_{t+1} ^*=\arg\max
+\omega'\left(\mu+\beta\left(\omega_{t^+} - \frac{1}{N}\iota\right)\right) - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t. } \iota'\omega=1. \tag{9}\]</span></span> The optimal weights correspond to a mean-variance portfolio, where the vector of expected returns is such that assets that currently exhibit a higher weight are considered as delivering a higher expected return.</p>
 </section>
 <section id="optimal-portfolio-choice" class="level2">
 <h2 class="anchored" data-anchor-id="optimal-portfolio-choice">Optimal Portfolio Choice</h2>
-<p>The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation). For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>, <code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
-<div id="0420df38" class="cell" data-execution_count="5">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight(Sigma, mu, gamma<span class="op">=</span><span class="dv">2</span>, beta<span class="op">=</span><span class="dv">0</span>,</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                             w_prev<span class="op">=</span>np.ones(Sigma.shape[<span class="dv">1</span>]) <span class="op">/</span> Sigma.shape[<span class="dv">1</span>]):</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> Sigma.shape[<span class="dv">1</span>]</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    iota <span class="op">=</span> np.ones(n)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    Sigma_processed <span class="op">=</span> Sigma <span class="op">+</span> (beta <span class="op">/</span> gamma) <span class="op">*</span> np.eye(n)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    mu_processed <span class="op">=</span> mu <span class="op">+</span> beta <span class="op">*</span> w_prev</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    Sigma_inverse <span class="op">=</span> np.linalg.inv(Sigma_processed)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    w_mvp <span class="op">=</span> Sigma_inverse <span class="op">@</span> iota</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    w_mvp <span class="op">=</span> w_mvp <span class="op">/</span> np.<span class="bu">sum</span>(w_mvp)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    w_opt <span class="op">=</span> w_mvp <span class="op">+</span> (<span class="dv">1</span> <span class="op">/</span> gamma) <span class="op">*</span> <span class="op">\</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>        (Sigma_inverse <span class="op">-</span> np.outer(w_mvp, iota) <span class="op">@</span> Sigma_inverse) <span class="op">@</span> mu_processed</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> w_opt</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>w_efficient <span class="op">=</span> compute_efficient_weight(Sigma, mu)</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(w_efficient, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="5">
-<pre><code>array([ 1.63 ,  0.09 , -1.355,  0.687,  0.333, -0.412,  0.504,  0.402,
-       -0.219, -0.661])</code></pre>
+<p>The function below implements the efficient portfolio weights in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation). For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>, <code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
+<div id="691388f1" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight(sigma, </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                             mu, </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                             gamma<span class="op">=</span><span class="dv">2</span>, </span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                             beta<span class="op">=</span><span class="dv">0</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                             w_prev<span class="op">=</span>np.ones(sigma.shape[<span class="dv">1</span>])<span class="op">/</span>sigma.shape[<span class="dv">1</span>]):</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compute efficient portfolio weights."""</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    n <span class="op">=</span> sigma.shape[<span class="dv">1</span>]</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    iota <span class="op">=</span> np.ones(n)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    sigma_processed <span class="op">=</span> sigma<span class="op">+</span>(beta<span class="op">/</span>gamma)<span class="op">*</span>np.eye(n)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    mu_processed <span class="op">=</span> mu<span class="op">+</span>beta<span class="op">*</span>w_prev</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    sigma_inverse <span class="op">=</span> np.linalg.inv(sigma_processed)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    w_mvp <span class="op">=</span> sigma_inverse <span class="op">@</span> iota</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    w_mvp <span class="op">=</span> w_mvp<span class="op">/</span>np.<span class="bu">sum</span>(w_mvp)</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    w_opt <span class="op">=</span> w_mvp<span class="op">+</span>(<span class="dv">1</span><span class="op">/</span>gamma)<span class="op">*\</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>        (sigma_inverse<span class="op">-</span>np.outer(w_mvp, iota) <span class="op">@</span> sigma_inverse) <span class="op">@</span> mu_processed</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>        </span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> w_opt</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>w_efficient <span class="op">=</span> compute_efficient_weight(sigma, mu)</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>weights_efficient <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Industry"</span>: industry_returns.columns.tolist(),</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Efficient portfolio"</span>: w_efficient</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>weights_efficient.<span class="bu">round</span>(<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="6">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Industry</th>
+<th data-quarto-table-cell-role="th">Efficient portfolio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>nodur</td>
+<td>1.630</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>durbl</td>
+<td>0.090</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>manuf</td>
+<td>-1.356</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>enrgy</td>
+<td>0.687</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>hitec</td>
+<td>0.333</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>telcm</td>
+<td>-0.412</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>shops</td>
+<td>0.504</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>hlth</td>
+<td>0.402</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>utils</td>
+<td>-0.219</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>other</td>
+<td>-0.659</td>
+</tr>
+</tbody>
+</table>
+
 </div>
 </div>
-<p>The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient <span class="math inline">\(\gamma=2\)</span> in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of <span class="math inline">\(-1\)</span> implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
-<div id="4a3e2e9e" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gammas <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">20</span>]</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>betas <span class="op">=</span> <span class="dv">20</span> <span class="op">*</span> expon.ppf(np.arange(<span class="dv">1</span>, <span class="dv">100</span>) <span class="op">/</span> <span class="dv">100</span>, scale<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>transaction_costs <span class="op">=</span> (pd.DataFrame(<span class="bu">list</span>(product(gammas, betas)), </span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>                                  columns<span class="op">=</span>[<span class="st">"gamma"</span>, <span class="st">"beta"</span>])</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  .assign(weights<span class="op">=</span><span class="kw">lambda</span> x: x.<span class="bu">apply</span>(<span class="kw">lambda</span> y:</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>            compute_efficient_weight(Sigma, mu, gamma<span class="op">=</span>y[<span class="st">"gamma"</span>],</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>                                     beta<span class="op">=</span>y[<span class="st">"beta"</span>] <span class="op">/</span> <span class="dv">10000</span>,</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                                     w_prev<span class="op">=</span>w_mvp), axis<span class="op">=</span><span class="dv">1</span>),</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>            concentration<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weights"</span>]</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>              .<span class="bu">apply</span>(<span class="kw">lambda</span> x: np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(x <span class="op">-</span> w_mvp))))</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The code chunk above computes the optimal weight in presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.</p>
-<div id="cell-fig-1701" class="cell" data-execution_count="7">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>rebalancing_plot <span class="op">=</span> (</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    ggplot(transaction_costs, </span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>           aes(x<span class="op">=</span><span class="st">"beta"</span>, y<span class="op">=</span><span class="st">"concentration"</span>,</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>               color<span class="op">=</span><span class="st">"factor(gamma)"</span>, linetype<span class="op">=</span><span class="st">"factor(gamma)"</span>)) <span class="op">+</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    geom_line() <span class="op">+</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    guides(linetype<span class="op">=</span><span class="va">None</span>) <span class="op">+</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    labs(x<span class="op">=</span><span class="st">"Transaction cost parameter"</span>, y<span class="op">=</span><span class="st">"Distance from MVP"</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>         color<span class="op">=</span><span class="st">"Risk aversion"</span>,</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span><span class="st">"Portfolio weights for different risk aversion and transaction cost"</span>)</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>rebalancing_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div id="fig-1701" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion.">
+<p>The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient <span class="math inline">\(\gamma=2\)</span> in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of <span class="math inline">\(-1\)</span> implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
+<div id="7382a723" class="cell" data-execution_count="7">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>gammas <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">20</span>]</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>betas <span class="op">=</span> <span class="dv">20</span><span class="op">*</span>expon.ppf(np.arange(<span class="dv">1</span>, <span class="dv">100</span>)<span class="op">/</span><span class="dv">100</span>, scale<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>transaction_costs <span class="op">=</span> (pd.DataFrame(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="bu">list</span>(product(gammas, betas)), </span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    columns<span class="op">=</span>[<span class="st">"gamma"</span>, <span class="st">"beta"</span>]</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    weights<span class="op">=</span><span class="kw">lambda</span> x: x.<span class="bu">apply</span>(<span class="kw">lambda</span> y:</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>      compute_efficient_weight(</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        sigma, mu, gamma<span class="op">=</span>y[<span class="st">"gamma"</span>], beta<span class="op">=</span>y[<span class="st">"beta"</span>]<span class="op">/</span><span class="dv">10000</span>, w_prev<span class="op">=</span>w_mvp), </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>      axis<span class="op">=</span><span class="dv">1</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    concentration<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weights"</span>].<span class="bu">apply</span>(</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>      <span class="kw">lambda</span> x: np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(x<span class="op">-</span>w_mvp))</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The code chunk above computes the optimal weight in the presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. If transaction costs were absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.</p>
+<div id="cell-fig-1701" class="cell" data-execution_count="8">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>rebalancing_plot <span class="op">=</span> (</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ggplot(transaction_costs, </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>           aes(x<span class="op">=</span><span class="st">"beta"</span>, y<span class="op">=</span><span class="st">"concentration"</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>               color<span class="op">=</span><span class="st">"factor(gamma)"</span>, linetype<span class="op">=</span><span class="st">"factor(gamma)"</span>)) <span class="op">+</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    geom_line() <span class="op">+</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    guides(linetype<span class="op">=</span><span class="va">None</span>) <span class="op">+</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    labs(x<span class="op">=</span><span class="st">"Transaction cost parameter"</span>, y<span class="op">=</span><span class="st">"Distance from MVP"</span>,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>         color<span class="op">=</span><span class="st">"Risk aversion"</span>,</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>         title<span class="op">=</span>(<span class="st">"Portfolio weights for different risk aversion and "</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                <span class="st">"transaction cost"</span>))</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>rebalancing_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="8">
+<div id="fig-1701" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1701-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="lightbox" data-glightbox="description: .lightbox-desc-1" data-gallery="quarto-lightbox-gallery-1"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="img-fluid figure-img" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."></a>
+<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" data-glightbox="description: .lightbox-desc-1"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-1701-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark.
+Figure&nbsp;1: The figure shows portfolio weights for different risk aversion and transaction cost. The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark.
 </figcaption>
 </figure>
 </div>
@@ -686,162 +839,285 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 </section>
 <section id="constrained-optimization" class="level2">
 <h2 class="anchored" data-anchor-id="constrained-optimization">Constrained Optimization</h2>
-<p>Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that <span class="math inline">\(w_i \geq 0\quad \forall i\)</span>). However, numerical optimization allows computing the solutions to such constrained problems.</p>
-<p>We rely on the powerful <code>scipy.optimize</code> package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of <span class="citation" data-cites="Kraft1994">Kraft (<a href="#ref-Kraft1994" role="doc-biblioref">1994</a>)</span> because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.</p>
-<p>We illustrate the use of <code>minimize()</code> by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that <code>np.allclose()</code> is a safe way to compare two vectors for pairwise equality. The alternative <code>==</code> is sensitive to small differences that may occur due to the representation of floating points on a computer, while <code>np.allclose()</code> has a built-in tolerance.</p>
-<div id="cd02a70e" class="cell" data-execution_count="8">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>w_initial <span class="op">=</span> np.ones(n_industries) <span class="op">/</span> n_industries</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_mvp(w):</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.5</span> <span class="op">*</span> w.T <span class="op">@</span> Sigma <span class="op">@</span> w</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_mvp(w):</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> Sigma <span class="op">@</span> w</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> equality_constraint(w):</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.<span class="bu">sum</span>(w) <span class="op">-</span> <span class="dv">1</span></span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> jacobian_equality(w):</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.ones_like(w)</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>constraints <span class="op">=</span> (</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, </span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"jac"</span>: jacobian_equality}</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>options <span class="op">=</span> {</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="st">"tol"</span>:<span class="fl">1e-20</span>,</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="st">"maxiter"</span>: <span class="dv">10000</span>,</span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">"method"</span>:<span class="st">"SLSQP"</span></span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>w_mvp_numerical <span class="op">=</span> minimize(</span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_mvp,</span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_mvp,</span>
-<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
-<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
-<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
-<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
-<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>                  </span>
-<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>np.allclose(w_mvp, w_mvp_numerical.x, </span>
-<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>            atol <span class="op">=</span> <span class="fl">1e-3</span>)</span>
-<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_efficient(w):</span>
-<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span> <span class="op">*</span> <span class="fl">0.5</span> <span class="op">*</span> w.T <span class="op">@</span> Sigma <span class="op">@</span> w <span class="op">-</span> (<span class="dv">1</span> <span class="op">+</span> mu) <span class="op">@</span> w</span>
-<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_efficient(w):</span>
-<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span> <span class="op">*</span> Sigma <span class="op">@</span> w <span class="op">-</span> (<span class="dv">1</span> <span class="op">+</span> mu)</span>
-<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>w_efficient_numerical <span class="op">=</span> minimize(</span>
-<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
-<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_efficient,</span>
-<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_efficient,</span>
-<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
-<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
-<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
-<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
-<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a>np.allclose(w_efficient, w_efficient_numerical.x, </span>
-<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a>            atol <span class="op">=</span> <span class="fl">1e-3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="8">
-<pre><code>True</code></pre>
+<p>Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that <span class="math inline">\(w_i \geq 0\,\forall i\)</span>). However, numerical optimization allows computing the solutions to such constrained problems.</p>
+<p>We rely on the powerful <code>scipy.optimize</code> package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of <span class="citation" data-cites="Kraft1994">Kraft (<a href="#ref-Kraft1994" role="doc-biblioref">1994</a>)</span> because it is able to handle multiple equality and inequality constraints at the same time and is typically used for problems where the objective function and the constraints are twice continuously differentiable. We have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.</p>
+<p>We illustrate the use of <code>minimize()</code> by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that <code>np.allclose()</code> is a safe way to compare two vectors for pairwise equality. The alternative <code>==</code> is sensitive to small differences that may occur due to the representation of floating points on a computer, while <code>np.allclose()</code> has a built-in tolerance. It returns <code>True</code> if both are equal, which is the case in both applications below.</p>
+<div id="d0a57efb" class="cell" data-execution_count="9">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>w_initial <span class="op">=</span> np.ones(n_industries)<span class="op">/</span>n_industries</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_mvp(w):</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fl">0.5</span><span class="op">*</span>w.T <span class="op">@</span> sigma <span class="op">@</span> w</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_mvp(w):</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> sigma <span class="op">@</span> w</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> equality_constraint(w):</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.<span class="bu">sum</span>(w)<span class="op">-</span><span class="dv">1</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> jacobian_equality(w):</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.ones_like(w)</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>constraints <span class="op">=</span> (</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, <span class="st">"jac"</span>: jacobian_equality}</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>options <span class="op">=</span> {</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  <span class="st">"tol"</span>:<span class="fl">1e-20</span>,</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>  <span class="st">"maxiter"</span>: <span class="dv">10000</span>,</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  <span class="st">"method"</span>:<span class="st">"SLSQP"</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>w_mvp_numerical <span class="op">=</span> minimize(</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_mvp,</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_mvp,</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>np.allclose(w_mvp, w_mvp_numerical.x, atol<span class="op">=</span><span class="fl">1e-3</span>)</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_efficient(w):</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span><span class="op">*</span><span class="fl">0.5</span><span class="op">*</span>w.T <span class="op">@</span> sigma <span class="op">@</span> w<span class="op">-</span>(<span class="dv">1</span><span class="op">+</span>mu) <span class="op">@</span> w</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_efficient(w):</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">2</span><span class="op">*</span>sigma <span class="op">@</span> w<span class="op">-</span>(<span class="dv">1</span><span class="op">+</span>mu)</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>w_efficient_numerical <span class="op">=</span> minimize(</span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_efficient,</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_efficient,</span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>np.allclose(w_efficient, w_efficient_numerical.x, atol <span class="op">=</span> <span class="fl">1e-3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-</div>
-<p>The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution.</p>
+<p>The result above shows that the numerical procedure indeed recovered the optimal weights for a scenario where we already know the analytic solution.</p>
 <p>Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies <span class="math inline">\(N\)</span> inequality constraints of the form <span class="math inline">\(\omega_i &gt;=0\)</span>. We can implement the short sale constraints by imposing a vector of lower bounds <code>lb = rep(0, n_industries)</code>.</p>
-<div id="d441833b" class="cell" data-execution_count="9">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>w_no_short_sale <span class="op">=</span> minimize(</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_efficient,</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_efficient,</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  bounds<span class="op">=</span>((<span class="dv">0</span>, <span class="va">None</span>),) <span class="op">*</span> n_industries,</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(w_no_short_sale.x, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="9">
-<pre><code>array([0.61 , 0.   , 0.   , 0.211, 0.   , 0.   , 0.   , 0.179, 0.   ,
-       0.   ])</code></pre>
-</div>
-</div>
-<p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. You can verify that <code>sum(w_no_short_sale$solution)</code> returns 1. In other words: <code>minimize()</code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code>, where negative holdings are forbidden.</p>
-<p><code>minimize()</code> can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation T-constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |\omega_i| \leq 1.5\)</span>. The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. </p>
-<div id="ab69793c" class="cell" data-execution_count="10">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>reg_t <span class="op">=</span> <span class="fl">1.5</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> inequality_constraint(w):</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> reg_t <span class="op">-</span> np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w))</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> jacobian_inequality(w):</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span>np.sign(w)</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_reg_t(w):</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span> w <span class="op">@</span> (<span class="dv">1</span> <span class="op">+</span> mu) <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> <span class="fl">0.5</span> <span class="op">*</span> w.T <span class="op">@</span> Sigma <span class="op">@</span> w</span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_reg_t(w):</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span> (<span class="dv">1</span> <span class="op">+</span> mu) <span class="op">+</span> <span class="dv">2</span> <span class="op">*</span> np.dot(Sigma, w)</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>constraints <span class="op">=</span> (</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, </span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>                 <span class="st">"jac"</span>: jacobian_equality},</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"ineq"</span>, <span class="st">"fun"</span>: inequality_constraint, </span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>                   <span class="st">"jac"</span>: jacobian_inequality}</span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>w_reg_t <span class="op">=</span> minimize(</span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
-<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_reg_t,</span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_reg_t,</span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
-<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
-<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
-<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
-<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(w_reg_t.x, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="a7cd729c" class="cell" data-execution_count="10">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>w_no_short_sale <span class="op">=</span> minimize(</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_efficient,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_efficient,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  bounds<span class="op">=</span>((<span class="dv">0</span>, <span class="va">None</span>), )<span class="op">*</span>n_industries,</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>weights_no_short_sale <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Industry"</span>: industry_returns.columns.tolist(),</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">"No short-sale"</span>: w_no_short_sale.x</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>weights_no_short_sale.<span class="bu">round</span>(<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-display" data-execution_count="10">
-<pre><code>array([ 0.736, -0.   , -0.134,  0.264, -0.   , -0.019,  0.028,  0.223,
-        0.   , -0.097])</code></pre>
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Industry</th>
+<th data-quarto-table-cell-role="th">No short-sale</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>nodur</td>
+<td>0.610</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>durbl</td>
+<td>0.000</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>manuf</td>
+<td>0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>enrgy</td>
+<td>0.211</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>hitec</td>
+<td>0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>telcm</td>
+<td>0.000</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>shops</td>
+<td>0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>hlth</td>
+<td>0.179</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>utils</td>
+<td>0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>other</td>
+<td>0.000</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than in the unrestricted case. You can verify that <code>np.sum(w_no_short_sale.x)</code> returns 1. In other words: <code>minimize()</code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code>, where negative holdings are forbidden.</p>
+<p><code>minimize()</code> can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation T-constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |\omega_i| \leq 1.5\)</span>. The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. </p>
+<div id="c5743e2e" class="cell" data-execution_count="11">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>reg_t <span class="op">=</span> <span class="fl">1.5</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> inequality_constraint(w):</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> reg_t<span class="op">-</span>np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w))</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> jacobian_inequality(w):</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span>np.sign(w)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_reg_t(w):</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span>w <span class="op">@</span> (<span class="dv">1</span><span class="op">+</span>mu)<span class="op">+</span><span class="dv">2</span><span class="op">*</span><span class="fl">0.5</span><span class="op">*</span>w.T <span class="op">@</span> sigma <span class="op">@</span> w</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gradient_reg_t(w):</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="op">-</span>(<span class="dv">1</span><span class="op">+</span>mu)<span class="op">+</span><span class="dv">2</span><span class="op">*</span>np.dot(sigma, w)</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>constraints <span class="op">=</span> (</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, <span class="st">"jac"</span>: jacobian_equality},</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  {<span class="st">"type"</span>: <span class="st">"ineq"</span>, <span class="st">"fun"</span>: inequality_constraint, <span class="st">"jac"</span>: jacobian_inequality}</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>w_reg_t <span class="op">=</span> minimize(</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_reg_t,</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  jac<span class="op">=</span>gradient_reg_t,</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>  constraints<span class="op">=</span>constraints,</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>  tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>weights_reg_t <span class="op">=</span> pd.DataFrame({</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Industry"</span>: industry_returns.columns.tolist(),</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Regulation-T"</span>: w_reg_t.x</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>weights_reg_t.<span class="bu">round</span>(<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="11">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Industry</th>
+<th data-quarto-table-cell-role="th">Regulation-T</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>nodur</td>
+<td>0.733</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>durbl</td>
+<td>-0.000</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>manuf</td>
+<td>-0.144</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>enrgy</td>
+<td>0.264</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>hitec</td>
+<td>0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">5</td>
+<td>telcm</td>
+<td>-0.000</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">6</td>
+<td>shops</td>
+<td>0.031</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">7</td>
+<td>hlth</td>
+<td>0.222</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">8</td>
+<td>utils</td>
+<td>-0.000</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">9</td>
+<td>other</td>
+<td>-0.106</td>
+</tr>
+</tbody>
+</table>
+
+</div>
 </div>
 </div>
 <p><a href="#fig-1702" class="quarto-xref">Figure&nbsp;2</a> shows the optimal allocation weights across all <code>python len(industry_returns.columns)</code> industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.</p>
-<div id="cell-fig-1702" class="cell" data-execution_count="11">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> (pd.DataFrame({</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"No short-sale"</span>: w_no_short_sale.x,</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Minimum Variance"</span>: w_mvp,</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Efficient portfolio"</span>: w_efficient,</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Regulation-T"</span>: w_reg_t.x,</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Industry"</span>: industry_returns.columns.tolist()</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>})</span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars <span class="op">=</span> <span class="st">"Industry"</span>, </span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        var_name <span class="op">=</span><span class="st">"Strategy"</span>, </span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        value_name <span class="op">=</span> <span class="st">"weights"</span>)</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>weights_plot <span class="op">=</span> (</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>  ggplot(weights,</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>         aes(x<span class="op">=</span><span class="st">"Industry"</span>, y<span class="op">=</span><span class="st">"weights"</span>, fill<span class="op">=</span><span class="st">"Strategy"</span>)) <span class="op">+</span></span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>  geom_bar(stat<span class="op">=</span><span class="st">"identity"</span>, position<span class="op">=</span><span class="st">"dodge"</span>, width<span class="op">=</span><span class="fl">0.7</span>) <span class="op">+</span></span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>  coord_flip() <span class="op">+</span></span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>  labs(y<span class="op">=</span><span class="st">"Allocation weight"</span>,</span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>       fill<span class="op">=</span><span class="va">None</span>,</span>
-<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>       title<span class="op">=</span><span class="st">"Optimal allocations for different strategies"</span>) <span class="op">+</span></span>
-<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>  scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>weights_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<div id="fig-1702" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicate extreme long and short positions for the efficient portfolio.">
+<div id="cell-fig-1702" class="cell" data-execution_count="12">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>weights <span class="op">=</span> (weights_mvp</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  .merge(weights_efficient)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  .merge(weights_no_short_sale)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  .merge(weights_reg_t)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  .melt(id_vars<span class="op">=</span><span class="st">"Industry"</span>, var_name<span class="op">=</span><span class="st">"Strategy"</span>, value_name<span class="op">=</span><span class="st">"weights"</span>)</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>weights_plot <span class="op">=</span> (</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  ggplot(weights,</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>         aes(x<span class="op">=</span><span class="st">"Industry"</span>, y<span class="op">=</span><span class="st">"weights"</span>, fill<span class="op">=</span><span class="st">"Strategy"</span>)) <span class="op">+</span></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  geom_bar(stat<span class="op">=</span><span class="st">"identity"</span>, position<span class="op">=</span><span class="st">"dodge"</span>, width<span class="op">=</span><span class="fl">0.7</span>) <span class="op">+</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>  coord_flip() <span class="op">+</span></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  labs(y<span class="op">=</span><span class="st">"Allocation weight"</span>, fill<span class="op">=</span><span class="st">""</span>,</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>       title<span class="op">=</span><span class="st">"Optimal allocations for different strategies"</span>) <span class="op">+</span></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>weights_plot.draw()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="12">
+<div id="fig-1702" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1702-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="lightbox" data-glightbox="description: .lightbox-desc-2" data-gallery="quarto-lightbox-gallery-2"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="img-fluid figure-img" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicate extreme long and short positions for the efficient portfolio."></a>
+<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" data-glightbox="description: .lightbox-desc-2"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio."></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-1702-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.
+Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry portfolios and the four different allocation strategies.
 </figcaption>
 </figure>
 </div>
@@ -849,135 +1125,136 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 </div>
 <p>The results clearly indicate the effect of imposing additional constraints: the extreme holdings the investor implements if she follows the (theoretically optimal) efficient portfolio vanish under, e.g., the Regulation-T constraint. You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints. The short answer is: the <em>efficient portfolio</em> is only efficient if the true parameters of the data generating process correspond to the estimated parameters <span class="math inline">\(\hat\Sigma\)</span> and <span class="math inline">\(\hat\mu\)</span>. Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations, which could result from <em>error-maximization</em> due to estimation uncertainty <span class="citation" data-cites="Jagannathan2003">(<a href="#ref-Jagannathan2003" role="doc-biblioref">Jagannathan and Ma 2003</a>)</span>.</p>
 <p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form <span class="math inline">\(\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
-<div id="48378ead" class="cell" data-execution_count="12">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight_L1_TC(mu, </span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>                                   Sigma, </span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>                                   gamma, </span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>                                   beta, </span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>                                   initial_weights):</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>                                     </span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> objective(w):</span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> (gamma <span class="op">*</span> <span class="fl">0.5</span> <span class="op">*</span> w.T <span class="op">@</span> Sigma <span class="op">@</span> w <span class="op">-</span> (<span class="dv">1</span> <span class="op">+</span> mu) <span class="op">@</span> w</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>                <span class="op">+</span> (beta <span class="op">/</span> <span class="dv">10000</span>) <span class="op">/</span> <span class="dv">2</span> <span class="op">*</span> np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w <span class="op">-</span> initial_weights)))</span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> gradient(w):</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> (<span class="op">-</span>mu <span class="op">+</span> gamma <span class="op">*</span> Sigma <span class="op">@</span> w </span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>               <span class="op">+</span> (beta <span class="op">/</span> <span class="dv">10000</span>) <span class="op">*</span> <span class="fl">0.5</span> <span class="op">*</span> np.sign(w <span class="op">-</span> initial_weights))</span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>      </span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    constraints <span class="op">=</span> (</span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>      {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, </span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>                     <span class="st">"jac"</span>: jacobian_equality}</span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> minimize(</span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>        x0<span class="op">=</span>initial_weights,</span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>        fun<span class="op">=</span>objective,</span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>        jac<span class="op">=</span>gradient,</span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>        constraints<span class="op">=</span>constraints,</span>
-<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>        tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
-<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
-<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
-<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result.x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="1119d3e4" class="cell" data-execution_count="13">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight_L1_TC(mu, sigma, gamma, beta, initial_weights):</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compute efficient portfolio weights with L1 constraint."""</span>       </span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> objective(w):</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> (gamma<span class="op">*</span><span class="fl">0.5</span><span class="op">*</span>w.T <span class="op">@</span> sigma <span class="op">@</span> w<span class="op">-</span>(<span class="dv">1</span><span class="op">+</span>mu) <span class="op">@</span> w</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>               <span class="op">+</span>(beta<span class="op">/</span><span class="dv">10000</span>)<span class="op">/</span><span class="dv">2</span><span class="op">*</span>np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w<span class="op">-</span>initial_weights)))</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> gradient(w):</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> (<span class="op">-</span>mu<span class="op">+</span>gamma<span class="op">*</span>sigma <span class="op">@</span> w </span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>              <span class="op">+</span>(beta<span class="op">/</span><span class="dv">10000</span>)<span class="op">*</span><span class="fl">0.5</span><span class="op">*</span>np.sign(w<span class="op">-</span>initial_weights))</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>      </span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>    constraints <span class="op">=</span> (</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>      {<span class="st">"type"</span>: <span class="st">"eq"</span>, <span class="st">"fun"</span>: equality_constraint, <span class="st">"jac"</span>: jacobian_equality}</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    result <span class="op">=</span> minimize(</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>        x0<span class="op">=</span>initial_weights,</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>        fun<span class="op">=</span>objective,</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>        jac<span class="op">=</span>gradient,</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>        constraints<span class="op">=</span>constraints,</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>        tol<span class="op">=</span>options[<span class="st">"tol"</span>],</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">"maxiter"</span>: options[<span class="st">"maxiter"</span>]},</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>        method<span class="op">=</span>options[<span class="st">"method"</span>]</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> result.x</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="out-of-sample-backtesting" class="level2">
 <h2 class="anchored" data-anchor-id="out-of-sample-backtesting">Out-of-Sample Backtesting</h2>
 <p>For the sake of simplicity, we committed one fundamental error in computing portfolio weights above: we used the full sample of the data to determine the optimal allocation <span class="citation" data-cites="Harvey2019">(<a href="#ref-Harvey2019" role="doc-biblioref">Arnott, Harvey, and Markowitz 2019</a>)</span>. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2021. While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data.</p>
-<p>The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
-<div id="4cd01deb" class="cell" data-execution_count="13">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>window_length <span class="op">=</span> <span class="dv">120</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>periods <span class="op">=</span> industry_returns.shape[<span class="dv">0</span>] <span class="op">-</span> window_length</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>beta <span class="op">=</span> <span class="dv">50</span></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>gamma <span class="op">=</span> <span class="dv">2</span></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">TODO</span><span class="co">: dataframe seems more suitable</span></span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>performance_values <span class="op">=</span> np.empty((periods, <span class="dv">3</span>))</span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>performance_values[:] <span class="op">=</span> np.nan</span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>performance_values <span class="op">=</span> {<span class="st">"MV (TC)"</span>: performance_values.copy(</span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>), <span class="st">"Naive"</span>: performance_values.copy(), <span class="st">"MV"</span>: performance_values.copy()}</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>n_industries <span class="op">=</span> industry_returns.shape[<span class="dv">1</span>]</span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>w_prev_1 <span class="op">=</span> w_prev_2 <span class="op">=</span> w_prev_3 <span class="op">=</span> np.ones(n_industries) <span class="op">/</span> n_industries</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights, which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
+<div id="848bf51b" class="cell" data-execution_count="14">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>window_length <span class="op">=</span> <span class="dv">120</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>periods <span class="op">=</span> industry_returns.shape[<span class="dv">0</span>]<span class="op">-</span>window_length</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>beta <span class="op">=</span> <span class="dv">50</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>gamma <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>performance_values <span class="op">=</span> np.empty((periods, <span class="dv">3</span>))</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>performance_values[:] <span class="op">=</span> np.nan</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>performance_values <span class="op">=</span> {</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"MV (TC)"</span>: performance_values.copy(), </span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"Naive"</span>: performance_values.copy(), </span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">"MV"</span>: performance_values.copy()</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>n_industries <span class="op">=</span> industry_returns.shape[<span class="dv">1</span>]</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>w_prev_1 <span class="op">=</span> w_prev_2 <span class="op">=</span> w_prev_3 <span class="op">=</span> np.ones(n_industries)<span class="op">/</span>n_industries</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs.</p>
-<div id="1ca2e8ab" class="cell" data-execution_count="14">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> adjust_weights(w, next_return):</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    w_prev <span class="op">=</span> <span class="dv">1</span> <span class="op">+</span> w <span class="op">*</span> next_return</span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array(w_prev <span class="op">/</span> np.<span class="bu">sum</span>(np.array(w_prev)))</span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> evaluate_performance(w, w_previous, next_return, beta<span class="op">=</span><span class="dv">50</span>):</span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    raw_return <span class="op">=</span> np.dot(next_return, w)</span>
-<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>    turnover <span class="op">=</span> np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w <span class="op">-</span> w_previous))</span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    net_return <span class="op">=</span> raw_return <span class="op">-</span> beta <span class="op">/</span> <span class="dv">10000</span> <span class="op">*</span> turnover</span>
-<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array([raw_return, turnover, net_return])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>We also define two helper functions: One to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs.</p>
+<div id="68ea990f" class="cell" data-execution_count="15">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> adjust_weights(w, next_return):</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    w_prev <span class="op">=</span> <span class="dv">1</span><span class="op">+</span>w<span class="op">*</span>next_return</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array(w_prev<span class="op">/</span>np.<span class="bu">sum</span>(np.array(w_prev)))</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> evaluate_performance(w, w_previous, next_return, beta<span class="op">=</span><span class="dv">50</span>):</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Calculate portfolio evaluation measures."""</span>  </span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    raw_return <span class="op">=</span> np.dot(next_return, w)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    turnover <span class="op">=</span> np.<span class="bu">sum</span>(np.<span class="bu">abs</span>(w<span class="op">-</span>w_previous))</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    net_return <span class="op">=</span> raw_return<span class="op">-</span>beta<span class="op">/</span><span class="dv">10000</span><span class="op">*</span>turnover</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array([raw_return, turnover, net_return])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The following code chunk performs a rolling-window estimation, which we implement in a loop. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample variance-covariance matrix and ignore the estimation of <span class="math inline">\(\hat\mu\)</span> entirely, but you might use more advanced estimators in practice.</p>
-<div id="36fae47c" class="cell" data-execution_count="15">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> <span class="bu">range</span>(periods):</span>
-<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    returns_window <span class="op">=</span> industry_returns.iloc[p:(p <span class="op">+</span> window_length <span class="op">-</span> <span class="dv">1</span>), :]</span>
-<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    next_return <span class="op">=</span> industry_returns.iloc[p <span class="op">+</span> window_length, :]</span>
-<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>    Sigma_window <span class="op">=</span> np.array(returns_window.cov())</span>
-<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> <span class="dv">0</span> <span class="op">*</span> np.array(returns_window.mean())</span>
-<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Transaction-cost adjusted portfolio</span></span>
-<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>    w_1 <span class="op">=</span> compute_efficient_weight_L1_TC(</span>
-<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>        mu<span class="op">=</span>mu, </span>
-<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>        Sigma<span class="op">=</span>Sigma_window, </span>
-<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>        beta<span class="op">=</span>beta, </span>
-<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>        gamma<span class="op">=</span>gamma, </span>
-<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>        initial_weights<span class="op">=</span>w_prev_1)</span>
-<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"MV (TC)"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
-<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>        w_1, w_prev_1, next_return, beta<span class="op">=</span>beta)</span>
-<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>    w_prev_1 <span class="op">=</span> adjust_weights(w_1, next_return)</span>
-<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Naive portfolio</span></span>
-<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>    w_2 <span class="op">=</span> np.ones(n_industries) <span class="op">/</span> n_industries</span>
-<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"Naive"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
-<span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>        w_2, w_prev_2, next_return)</span>
-<span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>    w_prev_2 <span class="op">=</span> adjust_weights(w_2, next_return)</span>
-<span id="cb18-25"><a href="#cb18-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Mean-variance efficient portfolio (w/o transaction costs)</span></span>
-<span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a>    w_3 <span class="op">=</span> compute_efficient_weight(Sigma<span class="op">=</span>Sigma_window, mu<span class="op">=</span>mu, gamma<span class="op">=</span>gamma)</span>
-<span id="cb18-28"><a href="#cb18-28" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"MV"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
-<span id="cb18-29"><a href="#cb18-29" aria-hidden="true" tabindex="-1"></a>        w_3, w_prev_3, next_return)</span>
-<span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a>    w_prev_3 <span class="op">=</span> adjust_weights(w_3, next_return)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div id="8c828b78" class="cell" data-execution_count="16">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> <span class="bu">range</span>(periods):</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    returns_window <span class="op">=</span> industry_returns.iloc[p:(p<span class="op">+</span>window_length<span class="op">-</span><span class="dv">1</span>), :]</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    next_return <span class="op">=</span> industry_returns.iloc[p<span class="op">+</span>window_length, :]</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    sigma_window <span class="op">=</span> np.array(returns_window.cov())</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    mu <span class="op">=</span> <span class="dv">0</span><span class="op">*</span>np.array(returns_window.mean())</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Transaction-cost adjusted portfolio</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    w_1 <span class="op">=</span> compute_efficient_weight_L1_TC(</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>      mu<span class="op">=</span>mu, sigma<span class="op">=</span>sigma_window, </span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>      beta<span class="op">=</span>beta, </span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>      gamma<span class="op">=</span>gamma, </span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>      initial_weights<span class="op">=</span>w_prev_1</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"MV (TC)"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>      w_1, w_prev_1, next_return, beta<span class="op">=</span>beta</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>    w_prev_1 <span class="op">=</span> adjust_weights(w_1, next_return)</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Naive portfolio</span></span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>    w_2 <span class="op">=</span> np.ones(n_industries)<span class="op">/</span>n_industries</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"Naive"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
+<span id="cb14-24"><a href="#cb14-24" aria-hidden="true" tabindex="-1"></a>      w_2, w_prev_2, next_return</span>
+<span id="cb14-25"><a href="#cb14-25" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-26"><a href="#cb14-26" aria-hidden="true" tabindex="-1"></a>    w_prev_2 <span class="op">=</span> adjust_weights(w_2, next_return)</span>
+<span id="cb14-27"><a href="#cb14-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Mean-variance efficient portfolio (w/o transaction costs)</span></span>
+<span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>    w_3 <span class="op">=</span> compute_efficient_weight(sigma<span class="op">=</span>sigma_window, mu<span class="op">=</span>mu, gamma<span class="op">=</span>gamma)</span>
+<span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a>    performance_values[<span class="st">"MV"</span>][p, :] <span class="op">=</span> evaluate_performance(</span>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a>      w_3, w_prev_3, next_return</span>
+<span id="cb14-32"><a href="#cb14-32" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>    w_prev_3 <span class="op">=</span> adjust_weights(w_3, next_return)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Finally, we get to the evaluation of the portfolio strategies <em>net-of-transaction costs</em>. Note that we compute annualized returns and standard deviations. </p>
-<div id="2693fba1" class="cell" data-execution_count="16">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>performance <span class="op">=</span> pd.DataFrame()</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">enumerate</span>(performance_values.keys()):</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>    tmp_data <span class="op">=</span> pd.DataFrame(</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>      performance_values[i[<span class="dv">1</span>]], </span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>      columns<span class="op">=</span>[<span class="st">"raw_return"</span>, <span class="st">"turnover"</span>, <span class="st">"net_return"</span>]</span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>    tmp_data[<span class="st">"strategy"</span>] <span class="op">=</span> i[<span class="dv">1</span>]</span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>    performance <span class="op">=</span> pd.concat([performance, tmp_data], axis<span class="op">=</span><span class="dv">0</span>)</span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>length_year <span class="op">=</span> <span class="dv">12</span></span>
-<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Calculate the desired summary statistics</span></span>
-<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>performance_table <span class="op">=</span> (performance</span>
-<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"strategy"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>  .agg(</span>
-<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>    Mean<span class="op">=</span>(<span class="st">"net_return"</span>, </span>
-<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>          <span class="kw">lambda</span> x: length_year <span class="op">*</span> <span class="dv">100</span> <span class="op">*</span> x.mean()),</span>
-<span id="cb19-18"><a href="#cb19-18" aria-hidden="true" tabindex="-1"></a>    SD<span class="op">=</span>(<span class="st">"net_return"</span>, </span>
-<span id="cb19-19"><a href="#cb19-19" aria-hidden="true" tabindex="-1"></a>        <span class="kw">lambda</span> x: np.sqrt(length_year) <span class="op">*</span> <span class="dv">100</span> <span class="op">*</span> x.std()),</span>
-<span id="cb19-20"><a href="#cb19-20" aria-hidden="true" tabindex="-1"></a>    Sharpe_ratio<span class="op">=</span>(<span class="st">"net_return"</span>, </span>
-<span id="cb19-21"><a href="#cb19-21" aria-hidden="true" tabindex="-1"></a>                  <span class="kw">lambda</span> x: ((length_year <span class="op">*</span> <span class="dv">100</span> <span class="op">*</span> x.mean()) <span class="op">/</span></span>
-<span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>                    (np.sqrt(length_year) <span class="op">*</span> <span class="dv">100</span> <span class="op">*</span> x.std()) </span>
-<span id="cb19-23"><a href="#cb19-23" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> x.mean() <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> np.nan)),</span>
-<span id="cb19-24"><a href="#cb19-24" aria-hidden="true" tabindex="-1"></a>    Turnover<span class="op">=</span>(<span class="st">"turnover"</span>, <span class="kw">lambda</span> x: <span class="dv">100</span> <span class="op">*</span> x.mean())</span>
-<span id="cb19-25"><a href="#cb19-25" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb19-26"><a href="#cb19-26" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb19-27"><a href="#cb19-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-28"><a href="#cb19-28" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(performance_table, <span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-display" data-execution_count="16">
+<div id="f48567d2" class="cell" data-execution_count="17">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>performance <span class="op">=</span> pd.DataFrame()</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">enumerate</span>(performance_values.keys()):</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    tmp_data <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>      performance_values[i[<span class="dv">1</span>]], </span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>      columns<span class="op">=</span>[<span class="st">"raw_return"</span>, <span class="st">"turnover"</span>, <span class="st">"net_return"</span>]</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    tmp_data[<span class="st">"strategy"</span>] <span class="op">=</span> i[<span class="dv">1</span>]</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    performance <span class="op">=</span> pd.concat([performance, tmp_data], axis<span class="op">=</span><span class="dv">0</span>)</span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>length_year <span class="op">=</span> <span class="dv">12</span></span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>performance_table <span class="op">=</span> (performance</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"strategy"</span>)</span>
+<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  .aggregate(</span>
+<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>    mean<span class="op">=</span>(<span class="st">"net_return"</span>, <span class="kw">lambda</span> x: length_year<span class="op">*</span><span class="dv">100</span><span class="op">*</span>x.mean()),</span>
+<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>    sd<span class="op">=</span>(<span class="st">"net_return"</span>, <span class="kw">lambda</span> x: np.sqrt(length_year)<span class="op">*</span><span class="dv">100</span><span class="op">*</span>x.std()),</span>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>    sharpe_ratio<span class="op">=</span>(<span class="st">"net_return"</span>, <span class="kw">lambda</span> x: (</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>      (length_year<span class="op">*</span><span class="dv">100</span><span class="op">*</span>x.mean())<span class="op">/</span>(np.sqrt(length_year)<span class="op">*</span><span class="dv">100</span><span class="op">*</span>x.std()) </span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> x.mean() <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">else</span> np.nan)</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>    turnover<span class="op">=</span>(<span class="st">"turnover"</span>, <span class="kw">lambda</span> x: <span class="dv">100</span><span class="op">*</span>x.mean())</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>performance_table.<span class="bu">round</span>(<span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display" data-execution_count="17">
 <div>
 
 
@@ -986,36 +1263,36 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
 <th data-quarto-table-cell-role="th">strategy</th>
-<th data-quarto-table-cell-role="th">Mean</th>
-<th data-quarto-table-cell-role="th">SD</th>
-<th data-quarto-table-cell-role="th">Sharpe_ratio</th>
-<th data-quarto-table-cell-role="th">Turnover</th>
+<th data-quarto-table-cell-role="th">mean</th>
+<th data-quarto-table-cell-role="th">sd</th>
+<th data-quarto-table-cell-role="th">sharpe_ratio</th>
+<th data-quarto-table-cell-role="th">turnover</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">0</td>
 <td>MV</td>
-<td>-0.8939</td>
-<td>12.5709</td>
+<td>-0.896</td>
+<td>12.571</td>
 <td>NaN</td>
-<td>211.0725</td>
+<td>211.095</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">1</td>
 <td>MV (TC)</td>
-<td>11.8532</td>
-<td>15.1892</td>
-<td>0.7804</td>
-<td>0.0000</td>
+<td>11.853</td>
+<td>15.189</td>
+<td>0.780</td>
+<td>0.000</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">2</td>
 <td>Naive</td>
-<td>11.8321</td>
-<td>15.1914</td>
-<td>0.7789</td>
-<td>0.2336</td>
+<td>11.832</td>
+<td>15.191</td>
+<td>0.779</td>
+<td>0.234</td>
 </tr>
 </tbody>
 </table>
@@ -1028,7 +1305,7 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <section id="exercises" class="level2">
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
 <ol type="1">
-<li>Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter <span class="math inline">\(\gamma\)</span> <span class="math display">\[\omega_{t+1} ^* =  \arg\max_{\omega \in \mathbb{python}^N,  \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega\]</span> where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">\(\mu\)</span> are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing <em>and</em> proportional to stock illiquidity such that <span class="math display">\[\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right)\]</span> where <span class="math inline">\(B = \text{diag}(ill_1, \ldots, ill_N)\)</span> is a diagonal matrix, where <span class="math inline">\(ill_1, \ldots, ill_N\)</span>. Derive a closed-form solution for the mean-variance efficient portfolio <span class="math inline">\(\omega_{t+1} ^*\)</span> based on the transaction cost specification above. Discuss the effect of illiquidity <span class="math inline">\(ill_i\)</span> on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision.</li>
+<li>Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter <span class="math inline">\(\gamma\)</span> <span id="eq-individual-tc-problem"><span class="math display">\[\omega_{t+1} ^* = \arg\max_{\omega \in \mathbb{R}^N, \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \tag{10}\]</span></span> where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">\(\mu\)</span> are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing <em>and</em> proportional to stock illiquidity such that <span id="eq-amihud-definition"><span class="math display">\[\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right) \tag{11}\]</span></span> where <span class="math inline">\(B = \text{diag}(ill_1, \ldots, ill_N)\)</span> is a diagonal matrix, where <span class="math inline">\(ill_1, \ldots, ill_N\)</span>. Derive a closed-form solution for the mean-variance efficient portfolio <span class="math inline">\(\omega_{t+1} ^*\)</span> based on the transaction cost specification above. Discuss the effect of illiquidity <span class="math inline">\(ill_i\)</span> on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision.</li>
 <li>Use the solution from the previous exercise to update the function <code>compute_efficient_weight()</code> such that you can compute optimal weights conditional on a matrix <span class="math inline">\(B\)</span> with illiquidity measures.</li>
 <li>Illustrate the evolution of the <em>optimal</em> weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.</li>
 <li>Is it always optimal to choose the same <span class="math inline">\(\beta\)</span> in the optimization problem than the value used in evaluating the portfolio performance? In other words: can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed <span class="math inline">\(\beta\)</span> values.</li>
@@ -1036,8 +1313,8 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 
 
 <div class="hidden" aria-hidden="true">
-<span class="glightbox-desc lightbox-desc-1">Figure&nbsp;1: The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark.</span>
-<span class="glightbox-desc lightbox-desc-2">Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the 4 different allocation strategies.</span>
+<span class="glightbox-desc lightbox-desc-1">Figure&nbsp;1: The figure shows portfolio weights for different risk aversion and transaction cost. The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark.</span>
+<span class="glightbox-desc lightbox-desc-2">Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry portfolios and the four different allocation strategies.</span>
 </div>
 
 </section>
@@ -1546,7 +1823,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"selector":".lightbox","descPosition":"bottom","closeEffect":"zoom","openEffect":"zoom","loop":false});
+<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","descPosition":"bottom","selector":".lightbox","loop":false,"openEffect":"zoom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
