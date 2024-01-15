@@ -5,61 +5,54 @@ metadata:
   description-meta: Use this Python code to generate dummy data to run the code chunks in Tidy Finance with Python without access to WRDS.
 ---
 
-In this chapter, we alleviate the constraints of readers who don’t have access to WRDS and hence cannot run the code that we provide. We show how to create a dummy database that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this dummy database. We do not create dummy data for macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd).
+In this appendix chapter, we alleviate the constraints of readers who don’t have access to WRDS and hence cannot run the code that we provide. We show how to create a dummy database that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this dummy database. We do not create dummy data for macro tables because they can be freely downloaded from the original sources - check out [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd).\index{WRDS}
 
 We deliberately use the dummy label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does not contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books.
 
 To generate the dummy database, we use the following packages:
 
 ```{python}
+#| eval: false
 import pandas as pd
 import numpy as np
 import sqlite3
-import random
 import string
 ```
 
-Let us initialize a `tidy_finance_python.sqlite` database or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this blog post will overwrite your data!
+Let us initialize a SQLite database (`tidy_finance_python.sqlite`) or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
 
 ```{python}
-tidy_finance = sqlite3.connect(
-  database="data/tidy_finance_python.sqlite"
-)
+#| eval: false
+tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 ```
 
-Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over 10 years that we then use to create yearly, monthly, and daily data, respectively. 
+Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over ten years that we then use to create yearly, monthly, and daily data, respectively. 
 
 ```{python}
+#| eval: false
 np.random.seed(1234)
 
 start_date = pd.Timestamp("2003-01-01")
 end_date = pd.Timestamp("2022-12-31")
 
-time_series_years = np.arange(
-  start_date.year, end_date.year + 1, 1
-)
-time_series_months = pd.date_range(
-  start_date, end_date, freq="M"
-)
-time_series_days = pd.date_range(
-  start_date, end_date, freq="D"
-)
+dummy_years = np.arange(start_date.year, end_date.year+1, 1)
+dummy_months = pd.date_range(start_date, end_date, freq="M")
+dummy_days = pd.date_range(start_date, end_date, freq="D")
 ```
 
-## Create stock dummy data
+## Create Stock Dummy Data
 
-Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original database, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data. 
+Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original database, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data.
 
 ```{python}
+#| eval: false
 number_of_stocks = 100
 
 industries = pd.DataFrame({
   "industry": ["Agriculture", "Construction", "Finance",
                "Manufacturing", "Mining", "Public", "Retail", 
-               "Services", "Transportation", "Utilities", 
-               "Wholesale"],
-  "n": [81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 
-        457, 904],
+               "Services", "Transportation", "Utilities", "Wholesale"],
+  "n": [81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 457, 904],
   "prob": [0.00319, 0.0113, 0.185, 0.339, 0.0508, 0.0779, 
            0.0620, 0.169, 0.0493, 0.0180, 0.03451]
 })
@@ -71,15 +64,9 @@ exchanges = pd.DataFrame({
 })
 
 stock_identifiers_list = []
-for x in range(1, number_of_stocks + 1):
-  exchange = np.random.choice(
-    exchanges["exchange"], 
-    p=exchanges["prob"]
-  )
-  industry = np.random.choice(
-    industries["industry"], 
-    p=industries["prob"]
-  )
+for x in range(1, number_of_stocks+1):
+  exchange = np.random.choice(exchanges["exchange"], p=exchanges["prob"])
+  industry = np.random.choice(industries["industry"], p=industries["prob"])
 
   exchcd_mapping = {
     "NYSE": np.random.choice([1, 31]),
@@ -103,7 +90,7 @@ for x in range(1, number_of_stocks + 1):
 
   stock_identifiers_list.append({
     "permno": x,
-    "gvkey": str(x + 10000),
+    "gvkey": str(x+10000),
     "exchange": exchange,
     "industry": industry,
     "exchcd": exchcd_mapping[exchange],
@@ -113,42 +100,32 @@ for x in range(1, number_of_stocks + 1):
 stock_identifiers = pd.DataFrame(stock_identifiers_list)
 ```
 
-Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `time_series_years`. The `expand_grid()` function ensures that we get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
+Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `dummy_years`. The `expand_grid()` function ensures that we get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
 
-Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `expand_grid()` function to combine `stock_identifiers` with a new table that has the `month` variable from `time_series_months`. After merging, we select the columns `permno`, `gvkey`, `month`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
+Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `expand_grid()` function to combine `stock_identifiers` with a new table that has the `month` variable from `dummy_months`. After merging, we select the columns `permno`, `gvkey`, `month`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
 
-Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `time_series_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
+Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `dummy_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
 
 ```{python}
+#| eval: false
 stock_panel_yearly = pd.DataFrame({
-  "gvkey": np.tile(stock_identifiers["gvkey"], 
-                   len(time_series_years)),
-  "year": np.repeat(time_series_years, 
-                    len(stock_identifiers))
+  "gvkey": np.tile(stock_identifiers["gvkey"], len(dummy_years)),
+  "year": np.repeat(dummy_years, len(stock_identifiers))
 })
 
 stock_panel_monthly = pd.DataFrame({
-  "permno": np.tile(stock_identifiers["permno"], 
-                    len(time_series_months)),
-  "gvkey": np.tile(stock_identifiers["gvkey"], 
-                   len(time_series_months)),
-  "month": np.repeat(time_series_months, 
-                     len(stock_identifiers)),
-  "siccd": np.tile(stock_identifiers["siccd"], 
-                   len(time_series_months)),
-  "industry": np.tile(stock_identifiers["industry"], 
-                      len(time_series_months)),
-  "exchcd": np.tile(stock_identifiers["exchcd"], 
-                    len(time_series_months)),
-  "exchange": np.tile(stock_identifiers["exchange"], 
-                      len(time_series_months))
+  "permno": np.tile(stock_identifiers["permno"], len(dummy_months)),
+  "gvkey": np.tile(stock_identifiers["gvkey"], len(dummy_months)),
+  "month": np.repeat(dummy_months, len(stock_identifiers)),
+  "siccd": np.tile(stock_identifiers["siccd"], len(dummy_months)),
+  "industry": np.tile(stock_identifiers["industry"], len(dummy_months)),
+  "exchcd": np.tile(stock_identifiers["exchcd"], len(dummy_months)),
+  "exchange": np.tile(stock_identifiers["exchange"], len(dummy_months))
 })
 
 stock_panel_daily = pd.DataFrame({
-  "permno": np.tile(stock_identifiers["permno"], 
-                    len(time_series_days)),
-  "date": np.repeat(time_series_days, 
-                    len(stock_identifiers))
+  "permno": np.tile(stock_identifiers["permno"], len(dummy_days)),
+  "date": np.repeat(dummy_days, len(stock_identifiers))
 })
 ```
 
@@ -160,12 +137,11 @@ We then proceed to create dummy beta values for our `stock_panel_monthly` table.
 #| eval: false
 beta_dummy = (stock_panel_monthly
   .assign(
-    beta_monthly = np.random.normal(
+    beta_monthly=np.random.normal(
       loc=1, scale=1, size=len(stock_panel_monthly)
     ),
-    beta_daily = lambda x: (
-      x["beta_monthly"] + 
-        np.random.normal(scale=0.01, size=len(x))
+    beta_daily=lambda x: (
+      x["beta_monthly"]+np.random.normal(scale=0.01, size=len(x))
     )
   )
 )
@@ -180,9 +156,10 @@ beta_dummy = (stock_panel_monthly
 
 ### Dummy `compustat` table
 
-To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. 
+To create dummy firm characteristics, we take all columns from the `compustat` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. \index{Data!Compustat}
 
 ```{python}
+#| eval: false
 relevant_columns = [
   "seq", "ceq", "at", "lt", "txditc", "txdb", "itcb", 
   "pstkrv", "pstkl", "pstk", "capx", "oancf", "sale", 
@@ -190,15 +167,13 @@ relevant_columns = [
 ]
 
 commands = {
-  col: np.random.rand(len(stock_panel_yearly)) 
-    for col in relevant_columns
+  col: np.random.rand(len(stock_panel_yearly)) for col in relevant_columns
 }
 
 compustat_dummy = (
   stock_panel_yearly
   .assign(
-    datadate = lambda x: 
-      pd.to_datetime(x["year"].astype(str) + "-12-31")
+    datadate=lambda x: pd.to_datetime(x["year"].astype(str)+"-12-31")
   )
   .assign(**commands)
 )
@@ -207,38 +182,29 @@ compustat_dummy = (
   .to_sql(name="compustat", 
           con=tidy_finance, 
           if_exists="replace",
-          index = False)
+          index=False)
 )
 ```
 
 ### Dummy `crsp_monthly` table
 
-The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`.
+The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`. \index{Data!CRSP}
 
 ```{python}
 #| eval: false
 crsp_monthly_dummy = (stock_panel_monthly
   .assign(
-    date = lambda x: x["month"] + pd.offsets.MonthEnd(-1),
-    ret = lambda x: np.fmax(np.random.normal(size=len(x)), -1),
-    ret_excess = lambda x: (
-      np.fmax(x["ret"] - 
-        np.random.uniform(0, 0.0025, len(x)), -1)
+    date=lambda x: x["month"]+pd.offsets.MonthEnd(-1),
+    ret=lambda x: np.fmax(np.random.normal(size=len(x)), -1),
+    ret_excess=lambda x: (
+      np.fmax(x["ret"]-np.random.uniform(0, 0.0025, len(x)), -1)
     ),
-    shrout = 1000 * np.random.uniform(
-      1, 50, len(stock_panel_monthly)
-    ),
-    altprc = np.random.uniform(
-      0, 1000, len(stock_panel_monthly))
-    )
-  .assign(
-    mktcap = lambda x: x["shrout"] * x["altprc"]
-  )
+    shrout=1000*np.random.uniform(1, 50, len(stock_panel_monthly)),
+    altprc=np.random.uniform(0, 1000, len(stock_panel_monthly)))
+  .assign(mktcap=lambda x: x["shrout"]*x["altprc"])
   .sort_values(by=["permno", "month"])
   .assign(
-    mktcap_lag = lambda x: (
-      x.groupby("permno")["mktcap"].shift(1)
-    )
+    mktcap_lag=lambda x: (x.groupby("permno")["mktcap"].shift(1))
   )
   .reset_index(drop=True)
 )
@@ -247,7 +213,7 @@ crsp_monthly_dummy = (stock_panel_monthly
   .to_sql(name="crsp_monthly", 
           con=tidy_finance, 
           if_exists="replace",
-          index = False)
+          index=False)
 )
 ```
 
@@ -259,10 +225,8 @@ The `crsp_daily` table only contains a `month` column and the daily excess retur
 #| eval: false
 crsp_daily_dummy = (stock_panel_daily
   .assign(
-    month = lambda x: x["date"] - pd.offsets.MonthBegin(1),
-    ret_excess = lambda x: (
-      np.fmax(np.random.normal(size=len(x)), -1)
-    )
+    month=lambda x: x["date"]-pd.offsets.MonthBegin(1),
+    ret_excess=lambda x: np.fmax(np.random.normal(size=len(x)), -1)
   )
   .reset_index(drop=True)
 )
@@ -271,54 +235,53 @@ crsp_daily_dummy = (stock_panel_daily
   .to_sql(name="crsp_daily", 
           con=tidy_finance, 
           if_exists="replace",
-          index = False)
+          index=False)
 )
 ```
 
-## Create bond dummy data
+## Create Bond Dummy Data
 
 Lastly, we move to the bond data that we use in our books. 
 
 ### Dummy `fisd` data
 
-To create dummy data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`. 
+To create dummy data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`.\index{Data!FISD}
 
 ```{python}
 #| eval: false
 number_of_bonds = 100
 
 def generate_cusip():
-  cusip = ("".join(
-    random.choices(string.ascii_uppercase + string.digits, k=12)
-    ).upper()
-  )
+  """Generate cusip."""
+  
+  characters = list(string.ascii_uppercase+string.digits)  # Convert to list
+  cusip = ("".join(np.random.choice(characters, size=12))).upper()
+    
   return cusip
 
 fisd_dummy = (pd.DataFrame({
-    "complete_cusip": [
-      generate_cusip() for _ in range(number_of_bonds)
-    ]
+    "complete_cusip": [generate_cusip() for _ in range(number_of_bonds)]
   })
   .assign(
-    maturity=lambda x: np.random.choice(
-      time_series_days, len(x), replace=True
-    ),
+    maturity=lambda x: np.random.choice(dummy_days, len(x), replace=True),
     offering_amt=lambda x: np.random.choice(
-      np.arange(1, 101) * 100000, len(x), replace=True
+      np.arange(1, 101)*100000, len(x), replace=True
     )
   )
   .assign(
-    offering_date=lambda x: x["maturity"] - pd.to_timedelta(
-      np.random.choice(
-        np.arange(1, 26) * 365, len(x), replace=True
-      ), unit="D"
+    offering_date=lambda x: (
+      x["maturity"]-pd.to_timedelta(
+        np.random.choice(np.arange(1, 26)*365, len(x), replace=True), 
+        unit="D"
+      )
     )
   )
   .assign(
-    dated_date=lambda x: x["offering_date"] - pd.to_timedelta(
-      np.random.choice(
-        np.arange(-10, 11), len(x), replace=True
-      ), unit="D"
+    dated_date=lambda x: (
+      x["offering_date"]-pd.to_timedelta(
+        np.random.choice(np.arange(-10, 11), len(x), replace=True), 
+        unit="D"
+      )
     ),
     interest_frequency=lambda x: np.random.choice(
       [0, 1, 2, 4, 12], len(x), replace=True
@@ -331,12 +294,12 @@ fisd_dummy = (pd.DataFrame({
     last_interest_date=lambda x: (
       x[["maturity", "offering_date", "dated_date"]].max(axis=1)
     ),
-    issue_id=lambda x: x.index + 1,
+    issue_id=lambda x: x.index+1,
     issuer_id=lambda x: np.random.choice(
       np.arange(1, 251), len(x), replace=True
     ),
     sic_code=lambda x: (np.random.choice(
-      np.arange(1, 10) * 1000, len(x), replace=True)
+      np.arange(1, 10)*1000, len(x), replace=True)
     ).astype(str)
   )
 )
@@ -345,13 +308,13 @@ fisd_dummy = (pd.DataFrame({
   .to_sql(name="fisd", 
           con=tidy_finance, 
           if_exists="replace",
-          index = False)
+          index=False)
 )
 ```
 
 ### Dummy `trace_enhanced` data
 
-Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. 
+Finally, we create a dummy bond transaction data for the fictional CUSIPs of the dummy `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. \index{Data!TRACE}
 
 ```{python}
 #| eval: false
@@ -362,7 +325,7 @@ end_date = pd.Timestamp("2016-11-30")
 bonds_panel = pd.DataFrame({
   "cusip_id": np.tile(
     fisd_dummy["complete_cusip"], 
-    (end_date - start_date).days + 1
+    (end_date-start_date).days+1
   ),
   "trd_exctn_dt": np.repeat(
     pd.date_range(start_date, end_date), len(fisd_dummy)
@@ -372,20 +335,20 @@ bonds_panel = pd.DataFrame({
 trace_enhanced_dummy = (pd.concat([bonds_panel]*5)
   .assign(
     trd_exctn_tm = lambda x: pd.to_datetime(
-      x["trd_exctn_dt"].astype(str) + " " +
-      np.random.randint(0, 24, size=len(x)).astype(str) + ":" +
-      np.random.randint(0, 60, size=len(x)).astype(str) + ":" +
+      x["trd_exctn_dt"].astype(str)+" " +
+      np.random.randint(0, 24, size=len(x)).astype(str)+":" +
+      np.random.randint(0, 60, size=len(x)).astype(str)+":" +
       np.random.randint(0, 60, size=len(x)).astype(str)
     ),
-    rptd_pr = np.random.uniform(10, 200, len(bonds_panel)*5),
-    entrd_vol_qt = 1000 * np.random.choice(
+    rptd_pr=np.random.uniform(10, 200, len(bonds_panel)*5),
+    entrd_vol_qt=1000*np.random.choice(
       range(1,21), len(bonds_panel)*5, replace=True
     ),
-    yld_pt = np.random.uniform(-10, 10, len(bonds_panel)*5),
-    rpt_side_cd = np.random.choice(
+    yld_pt=np.random.uniform(-10, 10, len(bonds_panel)*5),
+    rpt_side_cd=np.random.choice(
       ["B", "S"], len(bonds_panel)*5, replace=True
     ),
-    cntra_mp_id = np.random.choice(
+    cntra_mp_id=np.random.choice(
       ["C", "D"], len(bonds_panel)*5, replace=True
     )
   )
@@ -396,7 +359,7 @@ trace_enhanced_dummy = (pd.concat([bonds_panel]*5)
   .to_sql(name="trace_enhanced", 
           con=tidy_finance, 
           if_exists="replace",
-          index = False)
+          index=False)
 )
 ```
 

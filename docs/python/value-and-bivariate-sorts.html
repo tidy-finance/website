@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.533">
+<meta name="generator" content="quarto-1.4.538">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -443,8 +443,26 @@ cookieconsent.run({
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="../python/cover-image.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Cover Image</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="../python/clean-enhanced-trace-with-python.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Clean Enhanced TRACE with Python</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/proofs.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Proofs</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../python/colophon.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Colophon</span></a>
   </div>
 </li>
       </ul>
@@ -499,13 +517,13 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>You are reading the work-in-progress edition of <strong>Tidy Finance with Python</strong>. Code chunks and text might change over the next couple of months. We are always looking for feedback via <a href="mailto:contact@tidy-finance.org">contact@tidy-finance.org</a>. Meanwhile, you can find the complete R version <a href="../r/index.html">here</a>.</p>
+<p>You are reading <strong>Tidy Finance with Python</strong>. You can find the equivalent chapter for the sibling <strong>Tidy Finance with R</strong> <a href="../r/value-and-bivariate-sorts.html">here</a>.</p>
 </div>
 </div>
-<p>In this chapter, we extend univariate portfolio analysis to bivariate sorts, which means we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature and are the basis for the Fama and French three factors. However, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.</p>
+<p>In this chapter, we extend the univariate portfolio analysis of <a href="../python/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a> to bivariate sorts, which means we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature and are the basis for the Fama and French three factors. However, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.</p>
 <p>We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required, which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.</p>
 <p>The current chapter relies on this set of Python packages.</p>
-<div id="7f379fcd" class="cell" data-execution_count="2">
+<div id="51928acc" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> datetime <span class="im">as</span> dt</span>
@@ -514,106 +532,105 @@ Note
 <p>Compared to previous chapters, we introduce the <code>datetime</code> module that is part of the Python standard library for manipulating dates.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>First, we load the necessary data from our <code>SQLite</code>-database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in <a href="../python/size-sorts-and-p-hacking.html">Size Sorts and P-Hacking</a>.</p>
-<div id="42590966" class="cell" data-execution_count="3">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span>(<span class="st">"SELECT permno, gvkey, month, ret_excess, mktcap, "</span> </span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>         <span class="st">"mktcap_lag, exchange FROM crsp_monthly"</span>),</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>})</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>First, we load the necessary data from our SQLite database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in <a href="../python/size-sorts-and-p-hacking.html">Size Sorts and P-Hacking</a>.</p>
+<div id="12f54832" class="cell" data-execution_count="3">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span>(<span class="st">"SELECT permno, gvkey, month, ret_excess, mktcap, "</span> </span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>         <span class="st">"mktcap_lag, exchange FROM crsp_monthly"</span>),</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"month"</span>})</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable <code>datadate</code> to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.</p>
-<div id="d447951c" class="cell" data-execution_count="4">
+<div id="3bb35c5f" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>book_equity <span class="op">=</span> (pd.read_sql_query(</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT gvkey, datadate, be FROM compustat"</span>,</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance, </span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"datadate"</span>})</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  .assign(month <span class="op">=</span> <span class="kw">lambda</span> x: (pd.to_datetime(x[<span class="st">"datadate"</span>]).dt.to_period(<span class="st">"M"</span>).dt.to_timestamp()))</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    month<span class="op">=</span><span class="kw">lambda</span> x: (</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>      pd.to_datetime(x[<span class="st">"datadate"</span>]).dt.to_period(<span class="st">"M"</span>).dt.to_timestamp()</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="book-to-market-ratio" class="level2">
 <h2 class="anchored" data-anchor-id="book-to-market-ratio">Book-to-Market Ratio</h2>
-<p>A fundamental problem in handling accounting data is the <em>look-ahead bias</em> - we must not include data in forming a portfolio that is not public knowledge at the time. Of course, researchers have more information when looking into the past than agents had at that moment. However, abnormal excess returns from a trading strategy should not rely on an information advantage because the differential cannot be the result of informed agents’ trades. Hence, we have to lag accounting information.</p>
+<p>A fundamental problem in handling accounting data is the <em>look-ahead bias</em> - we must not include data in forming a portfolio that was not available knowledge at the time. Of course, researchers have more information when looking into the past than agents actually had at that moment. However, abnormal excess returns from a trading strategy should not rely on an information advantage because the differential cannot be the result of informed agents’ trades. Hence, we have to lag accounting information.</p>
 <p>We continue to lag market capitalization and firm size by one month. Then, we compute the book-to-market ratio, which relates a firm’s book equity to its market equity. Firms with high (low) book-to-market ratio are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
-<p>Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the <code>sorting_date</code>-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the <code>fillna()</code>-function after sorting by date and firm (which we identify by <code>permno</code> and <code>gvkey</code>) and on a firm basis (which we do by <code>.groupby()</code> as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.</p>
-<div id="33926b81" class="cell" data-execution_count="5">
+<p>Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the <code>sorting_date</code>-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet, the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the <code>fillna(method="ffill")</code>-function after sorting by date and firm (which we identify by <code>permno</code> and <code>gvkey</code>) and on a firm basis (which we do by <code>.groupby()</code> as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.</p>
+<div id="d239c3f1" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>me <span class="op">=</span> (crsp_monthly</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .assign(sorting_date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"month"</span>]<span class="op">+</span>pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"mktcap"</span>: <span class="st">"me"</span>})</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>, <span class="st">"me"</span>])</span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>bm <span class="op">=</span> (book_equity</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  .merge(crsp_monthly, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"month"</span>])</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    bm <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"be"</span>] <span class="op">/</span> x[<span class="st">"mktcap"</span>],</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    sorting_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"month"</span>] <span class="op">+</span> pd.DateOffset(months<span class="op">=</span><span class="dv">6</span>)</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  .assign(comp_date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"sorting_date"</span>])</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>, <span class="st">"comp_date"</span>, <span class="st">"bm"</span>])</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>data_for_sorts <span class="op">=</span> (crsp_monthly</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  .merge(bm, </span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>         left_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>], </span>
-<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>         right_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>])</span>
-<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>  .merge(me, </span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>         left_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"month"</span>], </span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>         right_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
-<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>, <span class="st">"ret_excess"</span>, </span>
-<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mktcap_lag"</span>, <span class="st">"me"</span>, <span class="st">"bm"</span>, <span class="st">"exchange"</span>, <span class="st">"comp_date"</span>])</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>data_for_sorts <span class="op">=</span> (data_for_sorts</span>
-<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  .sort_values(by<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>])</span>
-<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>])</span>
-<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>      bm <span class="op">=</span> x[<span class="st">"bm"</span>].fillna(method<span class="op">=</span><span class="st">"ffill"</span>), </span>
-<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>      comp_date <span class="op">=</span> x[<span class="st">"comp_date"</span>].fillna(method<span class="op">=</span><span class="st">"ffill"</span>)</span>
-<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop <span class="op">=</span> <span class="va">True</span>)</span>
-<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>    threshold_date <span class="op">=</span> <span class="kw">lambda</span> x: (</span>
-<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"month"</span>] <span class="op">-</span> pd.DateOffset(months<span class="op">=</span><span class="dv">12</span>)</span>
-<span id="cb4-42"><a href="#cb4-42" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-43"><a href="#cb4-43" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-44"><a href="#cb4-44" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"comp_date &gt; threshold_date"</span>)</span>
-<span id="cb4-45"><a href="#cb4-45" aria-hidden="true" tabindex="-1"></a>  .drop(columns<span class="op">=</span>[<span class="st">"comp_date"</span>, <span class="st">"threshold_date"</span>])</span>
-<span id="cb4-46"><a href="#cb4-46" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb4-47"><a href="#cb4-47" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  .assign(bm<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"be"</span>]<span class="op">/</span>x[<span class="st">"mktcap"</span>],</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>          sorting_date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"month"</span>]<span class="op">+</span>pd.DateOffset(months<span class="op">=</span><span class="dv">6</span>))</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  .assign(comp_date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"sorting_date"</span>])</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>, <span class="st">"comp_date"</span>, <span class="st">"bm"</span>])</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>data_for_sorts <span class="op">=</span> (crsp_monthly</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  .merge(bm, </span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>         left_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>], </span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>         right_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>  .merge(me, </span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a>         how<span class="op">=</span><span class="st">"left"</span>, </span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>         left_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"month"</span>], </span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>         right_on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"sorting_date"</span>])</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>, <span class="st">"ret_excess"</span>, </span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mktcap_lag"</span>, <span class="st">"me"</span>, <span class="st">"bm"</span>, <span class="st">"exchange"</span>, <span class="st">"comp_date"</span>])</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>data_for_sorts <span class="op">=</span> (data_for_sorts</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  .sort_values(by<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"gvkey"</span>, <span class="st">"month"</span>])</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"permno"</span>, <span class="st">"gvkey"</span>])</span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true" tabindex="-1"></a>      bm<span class="op">=</span>x[<span class="st">"bm"</span>].fillna(method<span class="op">=</span><span class="st">"ffill"</span>), </span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true" tabindex="-1"></a>      comp_date<span class="op">=</span>x[<span class="st">"comp_date"</span>].fillna(method<span class="op">=</span><span class="st">"ffill"</span>)</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true" tabindex="-1"></a>  .assign(threshold_date <span class="op">=</span> <span class="kw">lambda</span> x: (x[<span class="st">"month"</span>]<span class="op">-</span>pd.DateOffset(months<span class="op">=</span><span class="dv">12</span>)))</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"comp_date &gt; threshold_date"</span>)</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true" tabindex="-1"></a>  .drop(columns<span class="op">=</span>[<span class="st">"comp_date"</span>, <span class="st">"threshold_date"</span>])</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function allowing for the specification of exchanges to use for the breakpoints. Additionally, we reintroduce the argument <code>sorting_variable</code> into the function for defining different sorting variables.</p>
-<div id="ca34522c" class="cell" data-execution_count="6">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, sorting_variable, n_portfolios, exchanges):</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> (data</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>      .query(<span class="st">"exchange in @exchanges"</span>)</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>      .get(sorting_variable)</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>      .quantile(np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, num<span class="op">=</span>n_portfolios<span class="op">+</span><span class="dv">1</span>), </span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>                interpolation<span class="op">=</span><span class="st">"linear"</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>      .drop_duplicates()</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>      data[sorting_variable],</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>      bins<span class="op">=</span>breakpoints,</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>      labels<span class="op">=</span>pd.Series(<span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size)),</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>      include_lowest<span class="op">=</span><span class="va">True</span>,</span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>      duplicates<span class="op">=</span><span class="st">"drop"</span></span>
-<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function, allowing for the specification of exchanges to be used for the breakpoints. Additionally, we reintroduce the argument <code>sorting_variable</code> into the function for defining different sorting variables.</p>
+<div id="75e6a284" class="cell" data-execution_count="6">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, exchanges, sorting_variable, n_portfolios):</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Assign portfolio for a given sorting variable."""</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    breakpoints <span class="op">=</span> (data</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>      .query(<span class="ss">f"exchange in </span><span class="sc">{</span>exchanges<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>      .get(sorting_variable)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>      .quantile(np.linspace(<span class="dv">0</span>, <span class="dv">1</span>, num<span class="op">=</span>n_portfolios<span class="op">+</span><span class="dv">1</span>), </span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>                interpolation<span class="op">=</span><span class="st">"linear"</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>      .drop_duplicates()</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    breakpoints.iloc[<span class="dv">0</span>] <span class="op">=</span> <span class="op">-</span>np.Inf</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    breakpoints.iloc[breakpoints.size<span class="op">-</span><span class="dv">1</span>] <span class="op">=</span> np.Inf</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    assigned_portfolios <span class="op">=</span> pd.cut(</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>      data[sorting_variable],</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>      bins<span class="op">=</span>breakpoints,</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>      labels<span class="op">=</span><span class="bu">range</span>(<span class="dv">1</span>, breakpoints.size),</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>      include_lowest<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>      right<span class="op">=</span><span class="va">False</span></span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>After these data preparation steps, we present bivariate portfolio sorts on an independent and dependent basis.</p>
 </section>
@@ -621,76 +638,93 @@ Note
 <h2 class="anchored" data-anchor-id="independent-sorts">Independent Sorts</h2>
 <p>Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the <em>value premium</em> (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms. The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.</p>
 <p>To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables <code>portfolio_bm</code> and <code>portfolio_me</code>, respectively. Then, these separate portfolios are combined to the final sort stored in <code>portfolio_combined</code>. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.</p>
-<div id="ed570690" class="cell" data-execution_count="7">
+<div id="a5e89175" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>value_portfolios <span class="op">=</span> (data_for_sorts</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>         portfolio_bm <span class="op">=</span> assign_portfolio(data<span class="op">=</span>x,</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>                                         sorting_variable<span class="op">=</span><span class="st">"bm"</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>                                         n_portfolios<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>                                         exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>]),</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>         portfolio_me <span class="op">=</span> assign_portfolio(data<span class="op">=</span>x,</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>                                         sorting_variable<span class="op">=</span><span class="st">"me"</span>,</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                                         n_portfolios<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>                                         exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>])))</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"portfolio_me"</span>])</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>         {<span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])}))</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      portfolio_bm<span class="op">=</span>assign_portfolio(</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>x, sorting_variable<span class="op">=</span><span class="st">"bm"</span>, n_portfolios<span class="op">=</span><span class="dv">5</span>, exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>]</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>      ),</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>      portfolio_me<span class="op">=</span>assign_portfolio(</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>x, sorting_variable<span class="op">=</span><span class="st">"me"</span>, n_portfolios<span class="op">=</span><span class="dv">5</span>, exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>]</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"portfolio_me"</span>])</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>      <span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher’s choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.</p>
-<div id="8aff9dff" class="cell" data-execution_count="8">
+<div id="476f4a6f" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>value_premium <span class="op">=</span> (value_portfolios</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>])</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"ret"</span>: <span class="st">"mean"</span>})</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>         {<span class="st">"value_premium"</span>: (x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span> x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean())}))</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"value_premium"</span>: <span class="st">"mean"</span>})</span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"value_premium"</span>: (</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>        x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span> </span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>          x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean()</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"value_premium"</span>: <span class="st">"mean"</span>})</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The resulting monthly value premium is 0.42 percent with an annualized return of 5.2 percent.</p>
+<p>The resulting monthly value premium is 0.43 percent with an annualized return of 5.3 percent.</p>
 </section>
 <section id="dependent-sorts" class="level2">
 <h2 class="anchored" data-anchor-id="dependent-sorts">Dependent Sorts</h2>
 <p>In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable. In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts ensure an equal amount of stocks within each portfolio.</p>
 <p>To implement the dependent sorts, we first create the size portfolios by calling <code>assign_portfolio()</code> with <code>sorting_variable="me"</code>. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.</p>
-<div id="9e8ddfb1" class="cell" data-execution_count="9">
+<div id="ab114d94" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>value_portfolios <span class="op">=</span> (data_for_sorts</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>, group_keys<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>         portfolio_me <span class="op">=</span> assign_portfolio(data<span class="op">=</span>x,</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>                                         sorting_variable<span class="op">=</span><span class="st">"me"</span>,</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>                                         n_portfolios<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>                                         exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>])))</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_me"</span>], group_keys<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>         portfolio_bm <span class="op">=</span> assign_portfolio(data<span class="op">=</span>x,</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>                                         sorting_variable<span class="op">=</span><span class="st">"bm"</span>,</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>                                         n_portfolios<span class="op">=</span><span class="dv">5</span>,</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>                                         exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>])))</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"portfolio_me"</span>])</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>         {<span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])}))</span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>value_premium <span class="op">=</span> (value_portfolios</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>])</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"ret"</span>: <span class="st">"mean"</span>})</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      portfolio_me<span class="op">=</span>assign_portfolio(</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>x, sorting_variable<span class="op">=</span><span class="st">"me"</span>, n_portfolios<span class="op">=</span><span class="dv">5</span>, exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>]</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_me"</span>])</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>      portfolio_bm<span class="op">=</span>assign_portfolio(</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>x, sorting_variable<span class="op">=</span><span class="st">"bm"</span>, n_portfolios<span class="op">=</span><span class="dv">5</span>, exchanges<span class="op">=</span>[<span class="st">"NYSE"</span>]</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>, <span class="st">"portfolio_me"</span>])</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>      <span class="st">"ret"</span>: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>])</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
-<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
-<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>         {<span class="st">"value_premium"</span>: x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span> x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean()}))</span>
-<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"value_premium"</span>: <span class="st">"mean"</span>})</span>
-<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>value_premium <span class="op">=</span> (value_portfolios</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"month"</span>, <span class="st">"portfolio_bm"</span>])</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"ret"</span>: <span class="st">"mean"</span>})</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"month"</span>)</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series({</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>    <span class="st">"value_premium"</span>: (</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>        x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">max</span>(), <span class="st">"ret"</span>].mean() <span class="op">-</span></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>          x.loc[x[<span class="st">"portfolio_bm"</span>] <span class="op">==</span> x[<span class="st">"portfolio_bm"</span>].<span class="bu">min</span>(), <span class="st">"ret"</span>].mean()</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>  .aggregate({<span class="st">"value_premium"</span>: <span class="st">"mean"</span>})</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The monthly value premium from dependent sorts is 0.36 percent, which translates to an annualized premium of 4.4 percent per year.</p>
-<p>Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of Chapter 8, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.</p>
+<p>The monthly value premium from dependent sorts is 0.37 percent, which translates to an annualized premium of 4.6 percent per year.</p>
+<p>Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of <a href="../python/size-sorts-and-p-hacking.html">Size Sorts and P-Hacking</a>, we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.</p>
 </section>
 <section id="exercises" class="level2">
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>

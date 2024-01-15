@@ -5,11 +5,15 @@ metadata:
   description-meta: Copy the code to clean enhanced TRACE bond transaction data using the programming language Python.
 ---
 
-This appendix contains code to clean enhanced TRACE with Python. It is also available via the following Github [gist](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b).\index{Github!Gist} Hence, you could also source the file with the following chunk.
+This appendix contains code to clean enhanced TRACE with Python.\index{Data!TRACE} It is also available via the following Github [gist](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b).\index{Github!Gist} Hence, you could also source the file with the following chunk.
 
 ```{python}
 #| eval: false
-gist_url = "https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b/raw/8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
+gist_url = (
+  "https://gist.githubusercontent.com/patrick-weiss/"
+  "86ddef6de978fbdfb22609a7840b5d8b/raw/"
+  "8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
+)
 
 with httpimport.remote_repo(gist_url):
   from clean_enhanced_TRACE_python import clean_enhanced_trace
@@ -21,45 +25,43 @@ The function takes a vector of CUSIPs (in `cusips`), a connection to WRDS (`conn
 
 ```{python}
 #| eval: false
-def clean_enhanced_trace(
-  cusips,
-  connection, 
-  start_date="'01/01/2002'", 
-  end_date="'12/31/2023'"
-):
+def clean_enhanced_trace(cusips, 
+                         connection, 
+                         start_date="'01/01/2002'", 
+                         end_date="'12/31/2023'"):
+  """Clean enhanced TRACE data."""
   
   import pandas as pd
   import numpy as np
   
-  # Load main file ------------------------------------------------#
+  # Load main file
   trace_query = (
-    """SELECT cusip_id, bond_sym_id, trd_exctn_dt,
-              trd_exctn_tm, days_to_sttl_ct, lckd_in_ind,
-              wis_fl, sale_cndtn_cd, msg_seq_nb, 
-              trc_st, trd_rpt_dt, trd_rpt_tm, 
-              entrd_vol_qt, rptd_pr, yld_pt, 
-              asof_cd, orig_msg_seq_nb, rpt_side_cd, 
-              cntra_mp_id, stlmnt_dt, spcl_trd_fl """ +
-    "FROM trace.trace_enhanced " +
-    "WHERE cusip_id IN " + cusips + " " +
-    "AND trd_exctn_dt BETWEEN " + start_date + " AND " + end_date
+    "SELECT cusip_id, bond_sym_id, trd_exctn_dt, "
+           "trd_exctn_tm, days_to_sttl_ct, lckd_in_ind, "
+           "wis_fl, sale_cndtn_cd, msg_seq_nb, "
+           "trc_st, trd_rpt_dt, trd_rpt_tm, "
+           "entrd_vol_qt, rptd_pr, yld_pt, " 
+           "asof_cd, orig_msg_seq_nb, rpt_side_cd, "
+           "cntra_mp_id, stlmnt_dt, spcl_trd_fl " 
+    "FROM trace.trace_enhanced " 
+   f"WHERE cusip_id IN {cusips} " 
+         f"AND trd_exctn_dt BETWEEN {start_date} AND {end_date}‚"
   )
 
-  trace_all = (pd.read_sql_query(
-      sql=trace_query,
-      con=connection,
-      parse_dates={"trd_exctn_dt","trd_rpt_dt", "stlmnt_dt"}
-    )
+  trace_all = pd.read_sql_query(
+    sql=trace_query,
+    con=connection,
+    parse_dates={"trd_exctn_dt","trd_rpt_dt", "stlmnt_dt"}
   )
   
-  # Post 2012-06-02 -------------------------------------------------#
-  # Trades (trc_st = T) and correction (trc_st = R)
+  # Post 2012-06-02
+  ## Trades (trc_st = T) and correction (trc_st = R)
   trace_post_TR = (trace_all
     .query("trc_st in ['T', 'R']")
     .query("trd_rpt_dt >= '2012-06-02'")
   )
   
-  # Cancellations (trc_st = X) and correction cancellations (trc_st = C) -----#
+  # Cancellations (trc_st = X) and correction cancellations (trc_st = C)
   trace_post_XC = (trace_all
     .query("trc_st in ['X', 'C']")
     .query("trd_rpt_dt >= '2012-06-02'")
@@ -69,14 +71,14 @@ def clean_enhanced_trace(
     .assign(drop=True)
   )
   
-  # Cleaning corrected and cancelled trades
+  ## Cleaning corrected and cancelled trades
   trace_post_TR = (trace_post_TR
     .merge(trace_post_XC, how="left")
     .query("drop != True")
     .drop(columns="drop")
   )
   
-  # Reversals (trc_st = Y) -----#
+  # Reversals (trc_st = Y) 
   trace_post_Y = (trace_all
     .query("trc_st == 'Y'")
     .query("trd_rpt_dt >= '2012-06-02'")
@@ -88,22 +90,20 @@ def clean_enhanced_trace(
   )
   
   # Clean reversals
-  ## match the orig_msg_seq_nb of the Y-message to
-  ## the msg_seq_nb of the main message
+  ## Match the orig_msg_seq_nb of Y-message to msg_seq_nb of main message
   trace_post = (trace_post_TR
     .merge(trace_post_Y, how="left")
     .query("drop != True")
     .drop(columns="drop")
   )
   
-  # Pre 06-02-12 --------------------------------------------------#
-  # Trades (trc_st = T)
+  # Pre 06-02-12
+  ## Trades (trc_st = T)
   trace_pre_T = (trace_all
-    # .query("trc_st == 'T'")
     .query("trd_rpt_dt < '2012-06-02'")
   )
     
-  # Cancelations (trc_st = C) -----#
+  # Cancelations (trc_st = C) 
   trace_pre_C = (trace_all
     .query("trc_st == 'C'")
     .query("trd_rpt_dt < '2012-06-02'")
@@ -115,15 +115,14 @@ def clean_enhanced_trace(
   )
   
   # Remove cancellations from trades
-  ## match the orig_msg_seq_nb of the C-message
-  ## to the msg_seq_nb of the main message
+  ## Match orig_msg_seq_nb of C-message to msg_seq_nb of main message
   trace_pre_T = (trace_pre_T
     .merge(trace_pre_C, how="left")
     .query("drop != True")
     .drop(columns="drop")
   )
   
-  # Corrections (trc_st = W) - can also correct a previous W -----#
+  # Corrections (trc_st = W)
   trace_pre_W = (trace_all
     .query("trc_st == 'W'")
     .query("trd_rpt_dt < '2012-06-02'")
@@ -185,7 +184,7 @@ def clean_enhanced_trace(
       correction_control_last = len(trace_pre_W)
       continue
   
-  # Reversals (asof_cd = R) -----#
+  # Reversals (asof_cd = R)
   ## Record reversals
   trace_pre_R = (trace_pre_T
     .query("asof_cd == 'R'")
@@ -195,7 +194,9 @@ def clean_enhanced_trace(
   
   ## Prepare final data
   trace_pre = (trace_pre_T
-    .query("asof_cd == None | asof_cd.isnull() | asof_cd not in ['R', 'X', 'D']")
+    .query(
+      "asof_cd == None | asof_cd.isnull() | asof_cd not in ['R', 'X', 'D']"
+    )
     .sort_values(["cusip_id", "trd_exctn_dt",
                  "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm"])
   )
@@ -227,7 +228,7 @@ def clean_enhanced_trace(
     .drop(columns=["reversal", "seq"])
   )
   
-  # Agency trades -------------------------------------------------#
+  # Agency trades
   # Combine pre and post trades
   trace_clean = pd.concat([trace_pre, trace_post])
   
@@ -258,12 +259,22 @@ def clean_enhanced_trace(
   )
   
   # Agency cleaned
-  trace_clean = pd.concat([trace_nonagency,trace_agency_sells,trace_agency_buys_filtered])
+  trace_clean = pd.concat([trace_nonagency, 
+                           trace_agency_sells, 
+                           trace_agency_buys_filtered])
   
-  # Additional Filters --------------------------------------------#
+  # Additional Filters
   trace_add_filters = (trace_clean
-    .assign(days_to_sttl_ct2 = lambda x: (x["stlmnt_dt"] - x["trd_exctn_dt"]).dt.days)
-    .assign(days_to_sttl_ct = lambda x: pd.to_numeric(x["days_to_sttl_ct"], errors='coerce'))
+    .assign(
+      days_to_sttl_ct2 = lambda x: (
+        (x["stlmnt_dt"]-x["trd_exctn_dt"]).dt.days
+      )
+    )
+    .assign(
+      days_to_sttl_ct = lambda x: pd.to_numeric(
+        x["days_to_sttl_ct"], errors='coerce'
+      )
+    )
     .query("days_to_sttl_ct.isnull() | days_to_sttl_ct <= 7")
     .query("days_to_sttl_ct2.isnull() | days_to_sttl_ct2 <= 7")
     .query("wis_fl == 'N'")
@@ -271,14 +282,13 @@ def clean_enhanced_trace(
     .query("asof_cd.isnull() | asof_cd == ''")
   )
   
-  # Output --------------------------------------------------------#
+  # Output
   # Only keep necessary columns
   trace_final = (trace_add_filters
     .sort_values(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"])
-    .get(["cusip_id", "trd_exctn_dt", "trd_exctn_tm",
-        "rptd_pr", "entrd_vol_qt", "yld_pt", "rpt_side_cd", "cntra_mp_id"])
+    .get(["cusip_id", "trd_exctn_dt", "trd_exctn_tm", "rptd_pr", 
+          "entrd_vol_qt", "yld_pt", "rpt_side_cd", "cntra_mp_id"])
   )
   
-  # Return
   return trace_final
 ```
