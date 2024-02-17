@@ -57,56 +57,72 @@ For research on US corporate bonds, the Mergent Fixed Income Securities Database
 We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria [@bessembinder2006]. The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. 
 Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures. 
 
-The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used [see, e.g., @Dick2012; @Ohara2021, among many others].
+The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used [see, e.g., @Dick2012; @Ohara2021, among many others]. In particular, we use the filters listed below. Note that we also treat missing values in these flags.
+
+1. Keep only senior bonds (`security_level = 'SEN'`).
+1. Exclude bonds which are secured lease obligations (`slob = 'N' OR slob IS NULL`).
+1. Exclude secured bonds (`security_pledge IS NULL`).
+1. Exclude asset-backed bonds (`asset_backed = 'N' OR asset_backed IS NULL`).
+1. Exclude defeased bonds (`(defeased = 'N' OR defeased IS NULL) AND defeased_date IS NULL`).
+1. Keep only the bond types US Corporate Debentures (`'CDEB'`), US Corporate Medium Term Notes (`'CMTN'`), US Corporate Zero Coupon Notes and Bonds (`'CMTZ'`, `'CZ'`), and US Corporate Bank Note (`'USBN'`).
+1. Exclude bonds that are payable in kind (`(pay_in_kind != 'Y' OR pay_in_kind IS NULL) AND pay_in_kind_exp_date IS NULL`).
+1. Exclude foreign (`yankee == "N" OR is.na(yankee)`) and Canadian issuers (`canadian = 'N' OR canadian IS NULL`). 
+1. Exclude bonds denominated in foreign currency (`foreign_currency = 'N'`).
+1. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and annual, semi-annual, quarterly, or monthly interest frequencies. 
+1. Exclude bonds that were issued under SEC Rule 144A (`rule_144a = 'N'`).
+1. Exlcude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
+1. Exclude defaulted bonds (`defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL`).
+1. Exclude convertible (`convertible = 'N'`), putable (`putable = 'N' OR putable IS NULL`), exchangeable (`exchangeable = 'N' OR exchangeable IS NULL`), perpetual (`perpetual = 'N'`), or preferred bonds (`preferred_security = 'N' OR preferred_security IS NULL`).
+1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{r}
 fisd_mergedissue_db <- tbl(wrds, in_schema("fisd", "fisd_mergedissue"))
 
 fisd <- fisd_mergedissue_db |>
   filter(
-    security_level == "SEN", # senior bonds
-    slob == "N" | is.na(slob), # secured lease obligation
-    is.na(security_pledge), # unsecured bonds
-    asset_backed == "N" | is.na(asset_backed), # not asset backed
-    defeased == "N" | is.na(defeased), # not defeased
+    security_level == "SEN",
+    slob == "N" | is.na(slob),
+    is.na(security_pledge),
+    asset_backed == "N" | is.na(asset_backed),
+    defeased == "N" | is.na(defeased),
     is.na(defeased_date),
     bond_type %in% c(
-      "CDEB", # US Corporate Debentures
-      "CMTN", # US Corporate MTN (Medium Term Note)
-      "CMTZ", # US Corporate MTN Zero
-      "CZ", # US Corporate Zero,
-      "USBN" # US Corporate Bank Note
+      "CDEB",
+      "CMTN",
+      "CMTZ",
+      "CZ",
+      "USBN"
     ), 
-    pay_in_kind != "Y" | is.na(pay_in_kind), # not payable in kind
+    pay_in_kind != "Y" | is.na(pay_in_kind),
     is.na(pay_in_kind_exp_date),
-    yankee == "N" | is.na(yankee), # no foreign issuer
-    canadian == "N" | is.na(canadian), # not Canadian
-    foreign_currency == "N", # USD
+    yankee == "N" | is.na(yankee),
+    canadian == "N" | is.na(canadian),
+    foreign_currency == "N",
     coupon_type %in% c(
-      "F", # fixed coupon
-      "Z" # zero coupon
+      "F",
+      "Z"
     ), 
     is.na(fix_frequency),
     coupon_change_indicator == "N",
     interest_frequency %in% c(
-      "0", # per year
+      "0",
       "1",
       "2",
       "4",
       "12"
     ),
-    rule_144a == "N", # publicly traded
+    rule_144a == "N",
     private_placement == "N" | is.na(private_placement),
-    defaulted == "N", # not defaulted
+    defaulted == "N",
     is.na(filing_date),
     is.na(settlement),
-    convertible == "N", # not convertible
+    convertible == "N",
     is.na(exchange),
-    putable == "N" | is.na(putable), # not putable
-    unit_deal == "N" | is.na(unit_deal), # not issued with another security
-    exchangeable == "N" | is.na(exchangeable), # not exchangeable
-    perpetual == "N", # not perpetual
-    preferred_security == "N" | is.na(preferred_security) # not preferred
+    putable == "N" | is.na(putable),
+    unit_deal == "N" | is.na(unit_deal),
+    exchangeable == "N" | is.na(exchangeable),
+    perpetual == "N",
+    preferred_security == "N" | is.na(preferred_security)
   ) |> 
   select(
     complete_cusip, maturity,
@@ -149,11 +165,11 @@ The FISD database also contains other data. The issue-based file contains inform
 
 ## TRACE
 
-The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE).\index{Data!TRACE} In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants; standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties' roles and the direction of the trade report. These items become essential in cleaning the messages.
+The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE).\index{Data!TRACE} In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants: standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties' roles and the direction of the trade report. These items become essential in cleaning the messages.
 
 Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-We store code for cleaning enhanced TRACE with R on the following Github [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{Github!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
+We store code for cleaning enhanced TRACE with R on the following GitHub [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{GitHub!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
 
 ```{r, message=FALSE}
 source_gist("3a05b3ab281563b2e94858451c2eb3a4")
@@ -221,7 +237,7 @@ bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
   mutate(type = "Outstanding")
 ```
 
-Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop from above.
+Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
 
 ```{r}
 trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
@@ -256,7 +272,7 @@ bonds_outstanding |>
   )
 ```
 
-We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
+We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60 percent. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. 
 Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
 
 ```{r}
@@ -278,7 +294,7 @@ fisd |>
   )
 ```
 
-We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons.
+We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6 percent in coupons.
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
@@ -307,5 +323,5 @@ On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 
 ## Exercises
 
 1. Compute the amount outstanding across all bonds over time. Make sure to subtract all matured bonds. How would you describe the resulting plot?
-1. Compute the number of days each bond is traded (accounting for the bonds' maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days? 
+1. Compute the number of days each bond is traded (accounting for the bonds' maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75 percent of trading days? 
 1. WRDS provides more information from Mergent FISD such as ratings in the table `fisd_ratings`. Download the ratings table and plot the distribution of ratings for the different rating providers. How would you map the different providers to a common numeric rating scale? \index{Rating}
