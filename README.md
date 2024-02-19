@@ -2,7 +2,7 @@
 
 This is the repository for the website tidy-finance.org combining
 - The book **Tidy Finance with R** by [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo),
-- The book **Tidy Finance with Python** by [Christoph Frey](https://sites.google.com/site/christophfrey/home?utm_source=tidy-finance-repo), [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo)
+- The book **Tidy Finance with Python** by [Christoph Frey](https://sites.google.com/site/christophfrey/home?utm_source=tidy-finance-repo), [Christoph Scheuch](https://christophscheuch.github.io?utm_source=tidy-finance-repo), [Stefan Voigt](https://voigtstefan.me?utm_source=tidy-finance-repo), and [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance-repo), and
 - The **Tidy Finance Blog** which is open to contributions.
 
 The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The website was rendered using [quarto](https://quarto.org/) and it is hosted via GitHub Pages.
