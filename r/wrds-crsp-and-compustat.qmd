@@ -73,14 +73,14 @@ and (ii) the identifying information,
 stksecurityinfohist_db <- tbl(wrds, in_schema("crsp", "stksecurityinfohist"))
 ```
 
-We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.\index{Permno}
+We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share type 
+`"NS"`, , and (iii) we keep only months within permno-specific start dates `secinfostartdt` and end dates `secinfoenddt`.\index{Permno}
 
 ```{r}
 # TODO: update text description above
 # TODO: add column descriptions as comments to code below
 crsp_monthly <- msf_db |>
-  rename(date = mthcaldt) |> 
-  filter(date >= start_date & date <= end_date) |>
+  filter(mthcaldt >= start_date & mthcaldt <= end_date) |>
   inner_join(
     stksecurityinfohist_db |>
       filter(sharetype == "NS" & 
@@ -91,18 +91,16 @@ crsp_monthly <- msf_db |>
       select(permno, secinfostartdt, secinfoenddt),
     join_by(permno)
   ) |>
-  filter(date >= secinfostartdt & date <= secinfoenddt) |>
-  mutate(month = floor_date(date, "month")) |>
+  filter(mthcaldt >= secinfostartdt & mthcaldt <= secinfoenddt) |>
+  mutate(month = floor_date(mthcaldt, "month")) |>
   select(
     permno, # Security identifier
-    date, # Date of the observation
+    date = mthcaldt, # Date of the observation
     month, # Month of the observation
     ret = mthret, # Return
     shrout, # Shares outstanding (in thousands)
     altprc = mthprc, # Last traded price in a month
-    primaryexch, 
-    conditionaltype, 
-    tradingstatusflg,
+    primaryexch, # Primary exchange code
     siccd # Industry code
   ) |>
   collect() |>
@@ -114,13 +112,12 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns `ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist, and CRSP decides to report the mid-quote of the last available order book instead. Hence, we take the absolute value of the market cap. We also keep the market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`altprc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{r}
-# TODO: update the text above
 crsp_monthly <- crsp_monthly |>
   mutate(
-    mktcap = abs(shrout * altprc) / 10^6,
+    mktcap = shrout * altprc / 10^6,
     mktcap = na_if(mktcap, 0)
   )
 ```
@@ -141,7 +138,6 @@ If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |>
 Next, we follow @BaliEngleMurray2016 in transforming listing exchange codes to explicit exchange names. \index{Exchange!Exchange codes}
 
 ```{r}
-# TODO: maybe rename AMEX to NYSE American (was acquired in 2008) to be align with WRDS and CRSP documentation
 crsp_monthly <- crsp_monthly |>
   mutate(exchange = case_when(
     primaryexch == "N" ~ "NYSE",
@@ -171,7 +167,7 @@ crsp_monthly <- crsp_monthly |>
   ))
 ```
 
-Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100 percent makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the table `factors_ff3_monthly`.
+Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100 percent makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the table `factors_ff3_monthly`.
 
 ```{r}
 tidy_finance <- dbConnect(
