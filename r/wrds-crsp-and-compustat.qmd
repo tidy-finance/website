@@ -61,54 +61,49 @@ The remote connection to WRDS is very useful. Yet, the database itself contains 
 
 ## Downloading and Preparing CRSP
 
-\index{Data!CRSP}[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data. Actually, we need three tables to get the desired data: (i) the CRSP monthly security file,
+\index{Data!CRSP}[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data. Actually, we need two tables to get the desired data: (i) the CRSP monthly security file,
 
 ```{r}
-msf_db <- tbl(wrds, in_schema("crsp", "msf"))
+msf_db <- tbl(wrds, in_schema("crsp", "msf_v2"))
 ```
 
-(ii) the identifying information,
+and (ii) the identifying information,
 
 ```{r}
-msenames_db <- tbl(wrds, in_schema("crsp", "msenames"))
-```
-
-and (iii) the delisting information.
-
-```{r}
-msedelist_db <- tbl(wrds, in_schema("crsp", "msedelist"))
+stksecurityinfohist_db <- tbl(wrds, in_schema("crsp", "stksecurityinfohist"))
 ```
 
 We use the three remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via share codes `shrcd` 10 and 11, and (iii) we keep only months within permno-specific start dates `namedt` and end dates `nameendt`. In addition, we add delisting codes  and returns. You can read up in the great textbook of @BaliEngleMurray2016 for an extensive discussion on the filters we apply in the code below.\index{Permno}
 
 ```{r}
+# TODO: update text description above
+# TODO: add column descriptions as comments to code below
 crsp_monthly <- msf_db |>
+  rename(date = mthcaldt) |> 
   filter(date >= start_date & date <= end_date) |>
   inner_join(
-    msenames_db |>
-      filter(shrcd %in% c(10, 11)) |>
-      select(permno, exchcd, siccd, namedt, nameendt),
+    stksecurityinfohist_db |>
+      filter(sharetype == "NS" & 
+               securitytype == "EQTY" & 
+               securitysubtype == "COM" & 
+               usincflg == "Y" & 
+               issuertype %in% c("ACOR", "CORP")) |> 
+      select(permno, secinfostartdt, secinfoenddt),
     join_by(permno)
   ) |>
-  filter(date >= namedt & date <= nameendt) |>
+  filter(date >= secinfostartdt & date <= secinfoenddt) |>
   mutate(month = floor_date(date, "month")) |>
-  left_join(
-    msedelist_db |>
-      select(permno, dlstdt, dlret, dlstcd) |>
-      mutate(month = floor_date(dlstdt, "month")),
-    join_by(permno, month)
-  ) |>
   select(
     permno, # Security identifier
     date, # Date of the observation
     month, # Month of the observation
-    ret, # Return
+    ret = mthret, # Return
     shrout, # Shares outstanding (in thousands)
-    altprc, # Last traded price in a month
-    exchcd, # Exchange code
-    siccd, # Industry code
-    dlret, # Delisting return
-    dlstcd # Delisting code
+    altprc = mthprc, # Last traded price in a month
+    primaryexch, 
+    conditionaltype, 
+    tradingstatusflg,
+    siccd # Industry code
   ) |>
   collect() |>
   mutate(
@@ -122,6 +117,7 @@ Now, we have all the relevant monthly return data in memory and proceed with pre
 The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares `shrout` and the last traded price in a month `altprc`.\index{Market capitalization} Note that in contrast to returns `ret`, these two variables are not adjusted ex-post for any corporate actions like stock splits. Moreover, the `altprc` is negative whenever the last traded price does not exist, and CRSP decides to report the mid-quote of the last available order book instead. Hence, we take the absolute value of the market cap. We also keep the market cap in millions of USD just for convenience as we do not want to print huge numbers in our figures and tables. In addition, we set zero market cap to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{r}
+# TODO: update the text above
 crsp_monthly <- crsp_monthly |>
   mutate(
     mktcap = abs(shrout * altprc) / 10^6,
@@ -145,11 +141,12 @@ If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |>
 Next, we follow @BaliEngleMurray2016 in transforming listing exchange codes to explicit exchange names. \index{Exchange!Exchange codes}
 
 ```{r}
+# TODO: maybe rename AMEX to NYSE American (was acquired in 2008) to be align with WRDS and CRSP documentation
 crsp_monthly <- crsp_monthly |>
   mutate(exchange = case_when(
-    exchcd %in% c(1, 31) ~ "NYSE",
-    exchcd %in% c(2, 32) ~ "AMEX",
-    exchcd %in% c(3, 33) ~ "NASDAQ",
+    exchcd == "N" ~ "NYSE",
+    exchcd == "A" ~ "AMEX",
+    exchcd == "Q" ~ "NASDAQ",
     .default = "Other"
   ))
 ```
@@ -172,21 +169,6 @@ crsp_monthly <- crsp_monthly |>
     siccd >= 9000 & siccd <= 9999 ~ "Public",
     .default = "Missing"
   ))
-```
-
-We also construct returns adjusted for delistings as described by @BaliEngleMurray2016. The delisting of a security usually results when a company ceases operations, declares bankruptcy, merges, does not meet listing requirements, or seeks to become private. The adjustment tries to reflect the returns of investors who bought the stock in the month before the delisting and held it until the delisting date. After this transformation, we can drop the delisting returns and codes.\index{Returns!Delisting}
-
-```{r}
-crsp_monthly <- crsp_monthly |>
-  mutate(ret_adj = case_when(
-    is.na(dlstcd) ~ ret,
-    !is.na(dlstcd) & !is.na(dlret) ~ dlret,
-    dlstcd %in% c(500, 520, 580, 584) |
-      (dlstcd >= 551 & dlstcd <= 574) ~ -0.30,
-    dlstcd == 100 ~ ret,
-    .default = -1
-  )) |>
-  select(-c(dlret, dlstcd))
 ```
 
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop adjusted returns and the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100 percent makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the table `factors_ff3_monthly`.
@@ -346,15 +328,10 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `cat()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. 
 
-Also notice that we adjust the returns for delistings in a different manner than for monthly returns: 
-
-1. If a return is recorded in CRSP daily for a delisting date `dlstdt`, then we replace it with the delisting return `dlret`. 
-2. If no return is recorded in CRSP daily for an existing delisting date, then we add a new row with the delisting return. 
-3. We ensure that no returns after the delisting date `dlstdt` remain in the final table. 
-
 ```{r}
 #| eval: false
-dsf_db <- tbl(wrds, in_schema("crsp", "dsf"))
+# TODO: update column names to dsf_v2
+dsf_db <- tbl(wrds, in_schema("crsp", "dsf_v2"))
 
 factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
   collect()
@@ -380,26 +357,6 @@ for (j in 1:batches) {
     drop_na()
 
   if (nrow(crsp_daily_sub) > 0) {
-    
-    msedelist_sub <- msedelist_db |> 
-    filter(permno %in% permno_batch) |> 
-    select(permno, dlstdt, dlret) |> 
-    collect() |>
-    drop_na()
-    
-    crsp_daily_sub <- crsp_daily_sub |> 
-      left_join(msedelist_sub, join_by(permno, date == dlstdt)) |> 
-      bind_rows(msedelist_sub |> 
-                  anti_join(crsp_daily_sub, 
-                            join_by(permno, dlstdt == date))) |> 
-      mutate(ret = if_else(!is.na(dlret), dlret, ret),
-             date = if_else(!is.na(dlstdt), dlstdt, date)) |> 
-      select(-c(dlret, dlstdt)) |> 
-      left_join(msedelist_sub |> 
-                  select(permno, dlstdt), join_by(permno)) |> 
-      mutate(dlstdt = replace_na(dlstdt, end_date)) |> 
-      filter(date <= dlstdt) |> 
-      select(-dlstdt)
     
     crsp_daily_sub <- crsp_daily_sub |>
       mutate(month = floor_date(date, "month")) |>
