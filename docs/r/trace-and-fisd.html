@@ -358,7 +358,7 @@ cookieconsent.run({
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../r/replicating-fama-and-french-factors.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Replicating Fama and French Factors</span></a>
+ <span class="menu-text">Replicating Fama-French Factors</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -563,55 +563,72 @@ Note
 <h2 class="anchored" data-anchor-id="mergent-fisd">Mergent FISD</h2>
 <p>For research on US corporate bonds, the Mergent Fixed Income Securities Database (FISD) is the primary resource for bond characteristics. There is a <a href="https://wrds-www.wharton.upenn.edu/documents/1364/FixedIncome_Securities_Master_Database_User_Guide_v4.pdf">detailed manual</a> on WRDS, so we only cover the necessary subjects here. FISD data comes in two main variants, namely, centered on issuers or issues. In either case, the most useful identifiers are <a href="https://www.cusip.com/index.html">CUSIPs.</a> 9-digit CUSIPs identify securities issued by issuers. The issuers can be identified from the first six digits of a security CUSIP, which is also called 6-digit CUSIP. Both stocks and bonds have CUSIPs. This connection would, in principle, allow matching them easily, but due to changing issuer details, this approach only yields small coverage.</p>
 <p>We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria <span class="citation" data-cites="bessembinder2006">(<a href="#ref-bessembinder2006" role="doc-biblioref">Bessembinder, Maxwell, and Venkataraman 2006</a>)</span>. The WRDS table <code>fisd_mergedissue</code> contains most of the information we need on a 9-digit CUSIP level. Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures.</p>
-<p>The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used <span class="citation" data-cites="Dick2012 Ohara2021">(see, e.g., <a href="#ref-Dick2012" role="doc-biblioref">Dick-Nielsen, Feldhütter, and Lando 2012</a>; <a href="#ref-Ohara2021" role="doc-biblioref">O’Hara and Zhou 2021</a>, among many others)</span>.</p>
+<p>The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used <span class="citation" data-cites="Dick2012 Ohara2021">(see, e.g., <a href="#ref-Dick2012" role="doc-biblioref">Dick-Nielsen, Feldhütter, and Lando 2012</a>; <a href="#ref-Ohara2021" role="doc-biblioref">O’Hara and Zhou 2021</a>, among many others)</span>. In particular, we use the filters listed below. Note that we also treat missing values in these flags.</p>
+<ol type="1">
+<li>Keep only senior bonds (<code>security_level = 'SEN'</code>).</li>
+<li>Exclude bonds which are secured lease obligations (<code>slob = 'N' OR slob IS NULL</code>).</li>
+<li>Exclude secured bonds (<code>security_pledge IS NULL</code>).</li>
+<li>Exclude asset-backed bonds (<code>asset_backed = 'N' OR asset_backed IS NULL</code>).</li>
+<li>Exclude defeased bonds (<code>(defeased = 'N' OR defeased IS NULL) AND defeased_date IS NULL</code>).</li>
+<li>Keep only the bond types US Corporate Debentures (<code>'CDEB'</code>), US Corporate Medium Term Notes (<code>'CMTN'</code>), US Corporate Zero Coupon Notes and Bonds (<code>'CMTZ'</code>, <code>'CZ'</code>), and US Corporate Bank Note (<code>'USBN'</code>).</li>
+<li>Exclude bonds that are payable in kind (<code>(pay_in_kind != 'Y' OR pay_in_kind IS NULL) AND pay_in_kind_exp_date IS NULL</code>).</li>
+<li>Exclude foreign (<code>yankee == "N" OR is.na(yankee)</code>) and Canadian issuers (<code>canadian = 'N' OR canadian IS NULL</code>).</li>
+<li>Exclude bonds denominated in foreign currency (<code>foreign_currency = 'N'</code>).</li>
+<li>Keep only fixed (<code>F</code>) and zero (<code>Z</code>) coupon bonds with additional requirements of <code>fix_frequency IS NULL</code>, <code>coupon_change_indicator = 'N'</code> and annual, semi-annual, quarterly, or monthly interest frequencies.</li>
+<li>Exclude bonds that were issued under SEC Rule 144A (<code>rule_144a = 'N'</code>).</li>
+<li>Exlcude privately placed bonds (<code>private_placement = 'N' OR private_placement IS NULL</code>).</li>
+<li>Exclude defaulted bonds (<code>defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL</code>).</li>
+<li>Exclude convertible (<code>convertible = 'N'</code>), putable (<code>putable = 'N' OR putable IS NULL</code>), exchangeable (<code>exchangeable = 'N' OR exchangeable IS NULL</code>), perpetual (<code>perpetual = 'N'</code>), or preferred bonds (<code>preferred_security = 'N' OR preferred_security IS NULL</code>).</li>
+<li>Exclude unit deal bonds (<code>(unit_deal = 'N' OR unit_deal IS NULL)</code>).</li>
+</ol>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>fisd_mergedissue_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">in_schema</span>(<span class="st">"fisd"</span>, <span class="st">"fisd_mergedissue"</span>))</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>fisd <span class="ot">&lt;-</span> fisd_mergedissue_db <span class="sc">|&gt;</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    security_level <span class="sc">==</span> <span class="st">"SEN"</span>, <span class="co"># senior bonds</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    slob <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(slob), <span class="co"># secured lease obligation</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(security_pledge), <span class="co"># unsecured bonds</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    asset_backed <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(asset_backed), <span class="co"># not asset backed</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    defeased <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(defeased), <span class="co"># not defeased</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    security_level <span class="sc">==</span> <span class="st">"SEN"</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    slob <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(slob),</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(security_pledge),</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    asset_backed <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(asset_backed),</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    defeased <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(defeased),</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(defeased_date),</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    bond_type <span class="sc">%in%</span> <span class="fu">c</span>(</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CDEB"</span>, <span class="co"># US Corporate Debentures</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CMTN"</span>, <span class="co"># US Corporate MTN (Medium Term Note)</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CMTZ"</span>, <span class="co"># US Corporate MTN Zero</span></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CZ"</span>, <span class="co"># US Corporate Zero,</span></span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>      <span class="st">"USBN"</span> <span class="co"># US Corporate Bank Note</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CDEB"</span>,</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CMTN"</span>,</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CMTZ"</span>,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>      <span class="st">"CZ"</span>,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>      <span class="st">"USBN"</span></span>
 <span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    ), </span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    pay_in_kind <span class="sc">!=</span> <span class="st">"Y"</span> <span class="sc">|</span> <span class="fu">is.na</span>(pay_in_kind), <span class="co"># not payable in kind</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    pay_in_kind <span class="sc">!=</span> <span class="st">"Y"</span> <span class="sc">|</span> <span class="fu">is.na</span>(pay_in_kind),</span>
 <span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(pay_in_kind_exp_date),</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    yankee <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(yankee), <span class="co"># no foreign issuer</span></span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    canadian <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(canadian), <span class="co"># not Canadian</span></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    foreign_currency <span class="sc">==</span> <span class="st">"N"</span>, <span class="co"># USD</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    yankee <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(yankee),</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    canadian <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(canadian),</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    foreign_currency <span class="sc">==</span> <span class="st">"N"</span>,</span>
 <span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    coupon_type <span class="sc">%in%</span> <span class="fu">c</span>(</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>      <span class="st">"F"</span>, <span class="co"># fixed coupon</span></span>
-<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Z"</span> <span class="co"># zero coupon</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>      <span class="st">"F"</span>,</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>      <span class="st">"Z"</span></span>
 <span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>    ), </span>
 <span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(fix_frequency),</span>
 <span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    coupon_change_indicator <span class="sc">==</span> <span class="st">"N"</span>,</span>
 <span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    interest_frequency <span class="sc">%in%</span> <span class="fu">c</span>(</span>
-<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>      <span class="st">"0"</span>, <span class="co"># per year</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>      <span class="st">"0"</span>,</span>
 <span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>      <span class="st">"1"</span>,</span>
 <span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>      <span class="st">"2"</span>,</span>
 <span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>      <span class="st">"4"</span>,</span>
 <span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>      <span class="st">"12"</span></span>
 <span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>    ),</span>
-<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    rule_144a <span class="sc">==</span> <span class="st">"N"</span>, <span class="co"># publicly traded</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true" tabindex="-1"></a>    rule_144a <span class="sc">==</span> <span class="st">"N"</span>,</span>
 <span id="cb3-37"><a href="#cb3-37" aria-hidden="true" tabindex="-1"></a>    private_placement <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(private_placement),</span>
-<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    defaulted <span class="sc">==</span> <span class="st">"N"</span>, <span class="co"># not defaulted</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true" tabindex="-1"></a>    defaulted <span class="sc">==</span> <span class="st">"N"</span>,</span>
 <span id="cb3-39"><a href="#cb3-39" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(filing_date),</span>
 <span id="cb3-40"><a href="#cb3-40" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(settlement),</span>
-<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    convertible <span class="sc">==</span> <span class="st">"N"</span>, <span class="co"># not convertible</span></span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true" tabindex="-1"></a>    convertible <span class="sc">==</span> <span class="st">"N"</span>,</span>
 <span id="cb3-42"><a href="#cb3-42" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(exchange),</span>
-<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    putable <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(putable), <span class="co"># not putable</span></span>
-<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    unit_deal <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(unit_deal), <span class="co"># not issued with another security</span></span>
-<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    exchangeable <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(exchangeable), <span class="co"># not exchangeable</span></span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    perpetual <span class="sc">==</span> <span class="st">"N"</span>, <span class="co"># not perpetual</span></span>
-<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    preferred_security <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(preferred_security) <span class="co"># not preferred</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>    putable <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(putable),</span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>    unit_deal <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(unit_deal),</span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>    exchangeable <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(exchangeable),</span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>    perpetual <span class="sc">==</span> <span class="st">"N"</span>,</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>    preferred_security <span class="sc">==</span> <span class="st">"N"</span> <span class="sc">|</span> <span class="fu">is.na</span>(preferred_security)</span>
 <span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
 <span id="cb3-49"><a href="#cb3-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(</span>
 <span id="cb3-50"><a href="#cb3-50" aria-hidden="true" tabindex="-1"></a>    complete_cusip, maturity,</span>
@@ -649,9 +666,9 @@ Note
 </section>
 <section id="trace" class="level2">
 <h2 class="anchored" data-anchor-id="trace">TRACE</h2>
-<p>The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE). In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants; standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties’ roles and the direction of the trade report. These items become essential in cleaning the messages.</p>
+<p>The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE). In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants: standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties’ roles and the direction of the trade report. These items become essential in cleaning the messages.</p>
 <p>Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by <span class="citation" data-cites="Dick2009">Dick-Nielsen (<a href="#ref-Dick2009" role="doc-biblioref">2009</a>)</span> in detail, and <span class="citation" data-cites="Dick2014">Dick-Nielsen (<a href="#ref-Dick2014" role="doc-biblioref">2014</a>)</span> shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.</p>
-<p>We store code for cleaning enhanced TRACE with R on the following Github <a href="https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4">gist.</a> as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with <code>source_gist()</code>. Alternatively, you can also go to the gist, download it, and <code>source()</code> the respective R-file. The <code>clean_enhanced_trace()</code> function takes a vector of CUSIPs, a connection to WRDS explained in <a href="../r/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>, and a start and end date, respectively.</p>
+<p>We store code for cleaning enhanced TRACE with R on the following GitHub <a href="https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4">gist.</a> as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with <code>source_gist()</code>. Alternatively, you can also go to the gist, download it, and <code>source()</code> the respective R-file. The <code>clean_enhanced_trace()</code> function takes a vector of CUSIPs, a connection to WRDS explained in <a href="../r/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>, and a start and end date, respectively.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source_gist</span>(<span class="st">"3a05b3ab281563b2e94858451c2eb3a4"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
@@ -710,7 +727,7 @@ Note
 <span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(date) <span class="sc">|&gt;</span> </span>
 <span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">type =</span> <span class="st">"Outstanding"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop from above.</p>
+<p>Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"trace_enhanced"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
@@ -750,7 +767,7 @@ Figure&nbsp;1: The number of corporate bonds outstanding each quarter as reporte
 </div>
 </div>
 </div>
-<p>We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60%. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).</p>
+<p>We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60 percent. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>fisd <span class="sc">|&gt;</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">maturity =</span> <span class="fu">as.numeric</span>(maturity <span class="sc">-</span> offering_date) <span class="sc">/</span> <span class="dv">365</span>,</span>
@@ -777,7 +794,7 @@ Figure&nbsp;1: The number of corporate bonds outstanding each quarter as reporte
 3 offering_amt 379.   570.    0.001 0.669 200    1400   15000 </code></pre>
 </div>
 </div>
-<p>We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6% in coupons.</p>
+<p>We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6 percent in coupons.</p>
 <p>Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="sc">|&gt;</span> </span>
@@ -811,7 +828,7 @@ Figure&nbsp;1: The number of corporate bonds outstanding each quarter as reporte
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
 <ol type="1">
 <li>Compute the amount outstanding across all bonds over time. Make sure to subtract all matured bonds. How would you describe the resulting plot?</li>
-<li>Compute the number of days each bond is traded (accounting for the bonds’ maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75% of trading days?</li>
+<li>Compute the number of days each bond is traded (accounting for the bonds’ maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75 percent of trading days?</li>
 <li>WRDS provides more information from Mergent FISD such as ratings in the table <code>fisd_ratings</code>. Download the ratings table and plot the distribution of ratings for the different rating providers. How would you map the different providers to a common numeric rating scale? </li>
 </ol>
 
@@ -1291,7 +1308,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"loop":false,"descPosition":"bottom","selector":".lightbox","openEffect":"zoom","closeEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","selector":".lightbox","closeEffect":"zoom","descPosition":"bottom","loop":false});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
