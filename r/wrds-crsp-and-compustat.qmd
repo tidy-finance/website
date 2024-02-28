@@ -96,7 +96,7 @@ crsp_monthly <- msf_db |>
     month, # Month of the observation
     ret = mthret, # Return
     shrout, # Shares outstanding (in thousands)
-    altprc = mthprc, # Last traded price in a month
+    prc = mthprc, # Last traded price in a month
     primaryexch, # Primary exchange code
     siccd # Industry code
   ) |>
@@ -109,12 +109,12 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`altprc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
   mutate(
-    mktcap = shrout * altprc / 10^6,
+    mktcap = shrout * prc / 10^6,
     mktcap = na_if(mktcap, 0)
   )
 ```
@@ -322,7 +322,7 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for()`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `cat()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
 
 ```{r}
-#| eval: false
+#| output: false
 dsf_db <- tbl(wrds, in_schema("crsp", "dsf_v2"))
 
 factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
