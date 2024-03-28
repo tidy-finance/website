@@ -170,8 +170,9 @@ window.Quarto = {
 <link rel="stylesheet" href="../../assets/css/global.css">
 <meta property="og:title" content="Tidy Finance - CIR Model Calibration using Python">
 <meta property="og:description" content="Routine to calibrate the Cox-Ingersoll-Ross model">
-<meta property="og:image" content="https://www.tidy-finance.org/blog/cir-calibration/assets/img/cover.png">
+<meta property="og:image" content="https://www.tidy-finance.org/blog/cir-calibration/thumbnail.jpeg">
 <meta property="og:site_name" content="Tidy Finance">
+<meta property="og:image:alt" content="A vibrant outdoor scene under a clear, sunny sky, where a group of workers assemble a futuristic machine. The machine, situated in the center, features a complex design with gears and levers but no visible numbers or text. A colorful line chart representing an interest rate time series floats in the air, created by the machine. The chart consists of smooth, winding lines in various colors against a clear background. The workers are dressed in casual attire, and the landscape includes green grass and a few trees, contributing to the overall cheerful ambiance. Created with DALL-E 3.">
 </head>
 
 <body class="nav-fixed">
@@ -243,7 +244,7 @@ window.Quarto = {
         </div>
       </div>
                           <div class="quarto-categories">
-                <div class="quarto-category">Stochastic Finance</div>
+                <div class="quarto-category">Interest rates</div>
                 <div class="quarto-category">Python</div>
               </div>
                   </div>
@@ -293,19 +294,19 @@ window.Quarto = {
 
 
 
-<p>The Cox–Ingersoll–Ross (CIR)<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>(https://www.worldscientific.com/doi/abs/10.1142/9789812701022_0005) model stands as a cornerstone within the vast expanse of Financial Mathematics literature. Originally conceived to refine the well-known Vasicek<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>(https://doi.org/10.1016/0304-405X(77)90016-2) model in Interest Rate Modeling, the CIR model addressed a notable limitation of its predecessor—specifically, the propensity of Gaussian models like Vasicek’s to generate negative interest rates, a feature often deemed undesirable despite the theoretical possibility of negative rates in reality.</p>
-<p>In this concise exposition, I will delineate the process of calibrating the Cox–Ingersoll–Ross model using Python. From a theoretical point of view, I will define OLS estimators that will be tested via Monte Carlo simulations.</p>
+<p>The Cox–Ingersoll–Ross (CIR)<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> model stands as a cornerstone within the vast expanse of Financial Mathematics literature. Originally conceived to refine the well-known Vasicek<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> model in Interest Rate Modeling, the CIR model addressed a notable limitation of its predecessor—specifically, the propensity of Gaussian models like Vasicek’s to generate negative interest rates, a feature often deemed undesirable despite the theoretical possibility of negative rates in reality.</p>
+<p>In this concise exposition, I will delineate the process of calibrating the Cox–Ingersoll–Ross model using Python. From a theoretical point of view, I will define linear models to calibrate the CIR model and test their feasibility via Monte-Carlo simulations.</p>
 <section id="cir-model---overview" class="level3">
 <h3 class="anchored" data-anchor-id="cir-model---overview">CIR Model - Overview</h3>
 <p>The CIR model aims to capture the dynamics of interest rates, offering a powerful alternative to the Vasicek model.</p>
-<p>The Vasicek model can be mathematically defined by an Ornstein–Uhlenbeck process with an added shift term. This is a stochastic process particularly suitable for interest rate dynamics, owing to its inherent properties of <strong>stationarity</strong> and <strong>mean-reversion</strong>. These attributes align with the behavior commonly observed in interest rates.</p>
-<p>The SDE (stochastic differential equation) for the Vasicek model is the following: <span class="math display">\[
+<p>The Vasicek model can be mathematically defined by an Ornstein–Uhlenbeck process with an added drift term. This is a stochastic process particularly suitable for interest rate dynamics, owing to its inherent properties of <strong>stationarity</strong> and <strong>mean-reversion</strong>. These attributes align with the behavior commonly observed in interest rates.</p>
+<p>The SDE (stochastic differential equation) for the Vasicek model is the following (where <span class="math inline">\(dW_t\)</span> denotes the Wiener process): <span class="math display">\[
 dr_t=k(\theta-r_t)dt+\sigma dW_t
 \]</span></p>
-<p>Moreover, it is characterized by the intuitive interpretation of its parameters:</p>
+<p>Moreover, the model yields an intuitive interpretation of its parameters:</p>
 <ul>
-<li><p><span class="math inline">\(k\)</span> is the average return speed</p></li>
-<li><p><span class="math inline">\(\theta\)</span> is the long-term average</p></li>
+<li><p><span class="math inline">\(\theta\)</span> is the long-run average</p></li>
+<li><p><span class="math inline">\(k\)</span> is the intensity with which the process returns to its long-run average</p></li>
 <li><p><span class="math inline">\(\sigma\)</span> is the instantaneous volatility</p></li>
 </ul>
 <p>In contrast, the CIR model differs by introducing a novel component into the diffusion part of the process, precisely <span class="math inline">\(\sqrt{r_t}\)</span>, as depicted below: <span class="math display">\[
@@ -351,7 +352,7 @@ y_i = \beta_1 z_{1,i} + \beta_2 z_{2,i} + \epsilon_i
 <li><code>simulate_cir()</code>: This function simulates a path based on theoretical parameters. It is important to note that in the CIR model, the term <span class="math inline">\(\sqrt{r_t}\)</span> requires that <span class="math inline">\(r_t\)</span> remains non-negative. However, since we are working with a discrete form of the model, simulation errors may arise due to negative rates stemming from the random component of the model. These errors need to be addressed. This is facilitated by the following piece of code: <code>np.sqrt(max(0, r))</code>, which guarantees that no negative interest rate is passed under the square root.</li>
 <li><code>ols_cir()</code>: This function performs the estimates based on a given array of values.</li>
 </ul>
-<div id="5dd89ad8" class="cell" data-execution_count="1">
+<div id="e87b5796" class="cell" data-execution_count="1">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># import libraries</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sklearn.linear_model <span class="im">import</span> LinearRegression</span>
@@ -406,9 +407,9 @@ y_i = \beta_1 z_{1,i} + \beta_2 z_{2,i} + \epsilon_i
 <span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> k0, theta0, sigma0</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The subsequent step involves applying these functions to a specific case by fixing theoretical parameters for the CIR model. In this instance, I will opt for relatively standard parameter values. However, a more formal analysis would require exploring a range of values for each parameter to evaluate the robustness of the estimators under different conditions.</p>
-<div id="2d08120f" class="cell" data-execution_count="2">
+<div id="3f2beae1" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>k_true <span class="op">=</span> <span class="dv">5</span> <span class="co"># True mean reversion speed</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>theta_true <span class="op">=</span> <span class="fl">0.05</span>  <span class="co"># True long-term mean</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>theta_true <span class="op">=</span> <span class="fl">0.05</span>  <span class="co"># True long-run mean</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>sigma_true <span class="op">=</span> <span class="fl">0.03</span> <span class="co"># True volatility of interest rates</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>r0_true <span class="op">=</span> <span class="fl">0.3</span> <span class="co"># True initial interest rate</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>T <span class="op">=</span> <span class="dv">1</span>  <span class="co"># Time horizon</span></span>
@@ -433,7 +434,7 @@ The estimates are: k=5.078, theta=0.051, sigma=0.034</code></pre>
 <h3 class="anchored" data-anchor-id="monte-carlo-results">Monte-Carlo Results</h3>
 <p>The final step entails conducting a Monte Carlo Simulation to thoroughly scrutinize how the estimators perform. The model comprises two components: a deterministic one and a stochastic one. In the preceding step, I calibrated the model using a single vector of Gaussian samples, which generated a particular path. Now, I will repeat this process with several different vectors of Gaussian samples, generating multiple paths while maintaining the same real parameters.</p>
 <p>If the estimators are reasonably accurate, we should observe a convergence of the Monte Carlo estimates means towards the real parameters, indicating the unbiasedness of the estimators in principle.</p>
-<p>It is important to note that due to discretization errors, there is a possibility of generating paths with negative interest rates. To address this issue, I will adopt the approach suggested in Orlando, Mininni, and Bufalo (2020)<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a>(https://doi.org/10.1002/for.2642), which involves shifting all series by the 99th percentile before the calibration. This allows, in most cases, to work with a positive series of data. It is crucial to highlight that if we intend to use the calibrated model for predictions, we must subsequently subtract the same quantity from the predictions. This adjustment is implemented in the code via an if statement within the while loop.</p>
+<p>It is important to note that due to discretization errors, there is a possibility of generating paths with negative interest rates. To address this issue, I will adopt the approach suggested in Orlando, Mininni, and Bufalo (2020)<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a>, which involves shifting all series by the 99th percentile before the calibration. This allows, in most cases, to work with a positive series of data. It is crucial to highlight that if we intend to use the calibrated model for predictions, we must subsequently subtract the same quantity from the predictions. This adjustment is implemented in the code via an if statement within the while loop.</p>
 <div id="cell-fig-blog-cir" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># define variables</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>n_scenarios <span class="op">=</span> <span class="dv">10000</span></span>
@@ -492,7 +493,7 @@ The estimates are: k=5.078, theta=0.051, sigma=0.034</code></pre>
 <div id="fig-blog-cir" class="quarto-figure quarto-figure-center quarto-float anchored" data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="index_files/figure-html/fig-blog-cir-output-1.png" class="lightbox" data-glightbox="description: .lightbox-desc-1" data-gallery="quarto-lightbox-gallery-1"><img src="index_files/figure-html/fig-blog-cir-output-1.png" data-fig-pos="htb" width="636" height="439" class="figure-img"></a>
+<a href="index_files/figure-html/fig-blog-cir-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" data-glightbox="description: .lightbox-desc-1"><img src="index_files/figure-html/fig-blog-cir-output-1.png" data-fig-pos="htb" width="636" height="439" class="figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: Results of Monte Carlo Simulation for parameter k.
@@ -504,7 +505,7 @@ Figure&nbsp;1: Results of Monte Carlo Simulation for parameter k.
 <div id="fig-blog-cir" class="quarto-figure quarto-figure-center quarto-float anchored" data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="index_files/figure-html/fig-blog-cir-output-2.png" class="lightbox" data-glightbox="description: .lightbox-desc-2" data-gallery="quarto-lightbox-gallery-2"><img src="index_files/figure-html/fig-blog-cir-output-2.png" data-fig-pos="htb" width="661" height="439" class="figure-img"></a>
+<a href="index_files/figure-html/fig-blog-cir-output-2.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" data-glightbox="description: .lightbox-desc-2"><img src="index_files/figure-html/fig-blog-cir-output-2.png" data-fig-pos="htb" width="661" height="439" class="figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: Results of Monte Carlo Simulation for parameter Theta.
@@ -516,7 +517,7 @@ Figure&nbsp;2: Results of Monte Carlo Simulation for parameter Theta.
 <div id="fig-blog-cir" class="quarto-figure quarto-figure-center quarto-float anchored" data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="index_files/figure-html/fig-blog-cir-output-3.png" class="lightbox" data-glightbox="description: .lightbox-desc-3" data-gallery="quarto-lightbox-gallery-3"><img src="index_files/figure-html/fig-blog-cir-output-3.png" data-fig-pos="htb" width="636" height="440" class="figure-img"></a>
+<a href="index_files/figure-html/fig-blog-cir-output-3.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" data-glightbox="description: .lightbox-desc-3"><img src="index_files/figure-html/fig-blog-cir-output-3.png" data-fig-pos="htb" width="636" height="440" class="figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-blog-cir-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;3: Results of Monte Carlo Simulation for parameter Sigma.
@@ -539,7 +540,7 @@ Figure&nbsp;3: Results of Monte Carlo Simulation for parameter Sigma.
 <li>Data covers all of 2023</li>
 <li>Following convention, dt is set to 1/252 since there are approximately 252 trading days in a year, and interest rates are expressed in annual terms</li>
 </ul>
-<div id="471b5dfb" class="cell" data-execution_count="4">
+<div id="85bef436" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> yfinance <span class="im">as</span> yf</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Ticker symbol for US interest rate</span></span>
@@ -571,9 +572,9 @@ The estimates are: k=6.442, theta=0.052, sigma=0.03</code></pre>
 <div id="quarto-appendix" class="default"><section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes"><h2 class="anchored quarto-appendix-heading">Footnotes</h2>
 
 <ol>
-<li id="fn1"><p>Cox, J. C., Ingersoll Jr, J. E., &amp; Ross, S. A. (1985). A Theory of the Term Structure of Interest Rates. Econometrica, 53(2), 385-408.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn2"><p>Vasicek, O. (1977). An equilibrium characterization of the term structure. Journal of financial economics, 5(2), 177-188.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn3"><p>Orlando, G., Mininni, R. M., and Bufalo, M. (2020). Forecasting interest rates through vasicek and cir models: A partitioning approach. Journal of Forecasting, 39(4):569–579.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn1"><p>Cox, J. C., Ingersoll Jr, J. E., &amp; Ross, S. A. (1985). A Theory of the Term Structure of Interest Rates. Econometrica, 53(2), 385-408. <a href="https://www.worldscientific.com/doi/abs/10.1142/9789812701022_0005">Link.</a><a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Vasicek, O. (1977). An equilibrium characterization of the term structure. Journal of financial economics, 5(2), 177-188. <a href="https://doi.org/10.1016/0304-405X(77)90016-2">Link.</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Orlando, G., Mininni, R. M., and Bufalo, M. (2020). Forecasting interest rates through vasicek and cir models: A partitioning approach. Journal of Forecasting, 39(4):569–579. <a href="https://doi.org/10.1002/for.2642">Link.</a><a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section></div></main> <!-- /main -->
 <div class="custom-footer">
@@ -1014,7 +1015,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"loop":false,"closeEffect":"zoom","selector":".lightbox","openEffect":"zoom","descPosition":"bottom"});
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","selector":".lightbox","loop":false,"descPosition":"bottom","closeEffect":"zoom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
