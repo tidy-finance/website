@@ -37,8 +37,7 @@ Compared to previous chapters, we introduce `linearmodels` [@linearmodels], whic
 
 ## Data Preparation
 
-We use CRSP and annual Compustat as data sources from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd)
-. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and annual Compustat as data sources from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
 tidy_finance = sqlite3.connect(
@@ -100,7 +99,7 @@ data_investment = (data_investment
 )
 ```
 
-As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.^[Note that in `pandas`, when you index a data frame, you receive a reference to the original data frame. Consequently, modifying a subset will directly impact the initial data frame. To prevent unintended changes to the original data frame, it is advisable to use the `copy()` method as we do here in the `winsorize` function.]‚
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.^[Note that in `pandas`, when you index a dataframee, you receive a reference to the original dataframee. Consequently, modifying a subset will directly impact the initial dataframee. To prevent unintended changes to the original dataframee, it is advisable to use the `copy()` method as we do here in the `winsorize` function.]
 
 ```{python}
 def winsorize(x, cut):
@@ -143,44 +142,41 @@ $$ \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\t
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `PanelOLS()`-function to estimate the simple model so that the output has the same structure as the other regressions below. 
 
 ```{python}
-model_ols = (lm.PanelOLS.from_formula(
-    formula="investment_lead ~ cash_flows + tobins_q + 1",
-    data=data_investment.set_index(["gvkey", "year"]),
-  ).fit()
-)
+model_ols = lm.PanelOLS.from_formula(
+  formula="investment_lead ~ cash_flows + tobins_q + 1",
+  data=data_investment.set_index(["gvkey", "year"]),
+).fit()
 prettify_result(model_ols)
 ```
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
 
-One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects* - i.e., model parameters that are fixed for specific groups [e.g., @Wooldridge2010]. In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
+One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects*; i.e., model parameters that are fixed for specific groups [e.g., @Wooldridge2010]. In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
 $$ \text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$${#eq-tobin-q-fe}
 where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms' investments as deviations from the firms' average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm's average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
 
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 
 ```{python}
-model_fe_firm = (lm.PanelOLS.from_formula(
-    formula="investment_lead ~ cash_flows + tobins_q + EntityEffects",
-    data=data_investment.set_index(["gvkey", "year"]),
-  ).fit()
-)
+model_fe_firm = lm.PanelOLS.from_formula(
+  formula="investment_lead ~ cash_flows + tobins_q + EntityEffects",
+  data=data_investment.set_index(["gvkey", "year"]),
+).fit()
 prettify_result(model_fe_firm)
 ```
 
-The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50%. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
+The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm's cash flow and Tobin's q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
 
 There is another source of variation that we can get rid of in our setting: average investment across firms might vary over time due to macroeconomic factors that affect all firms, such as economic crises. By including year fixed effects, we can take out the effect of unobservables that vary over time. The two-way fixed effects regression is then
 $$ \text{Investment}_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$${#eq-tobin-q-2way}
 where $\alpha_t$ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows. You can include a time fixed effects by using "TimeEffects" in the formula of PanelOLS.
 
 ```{python}
-model_fe_firmyear = (lm.PanelOLS.from_formula(
-    formula=("investment_lead ~ cash_flows + tobins_q + EntityEffects" 
-             " + TimeEffects"),
-    data=data_investment.set_index(["gvkey", "year"]),
-  ).fit()
-)
+model_fe_firmyear = lm.PanelOLS.from_formula(
+  formula=("investment_lead ~ cash_flows + tobins_q + EntityEffects" 
+           " + TimeEffects"),
+  data=data_investment.set_index(["gvkey", "year"]),
+).fit()
 prettify_result(model_fe_firmyear)
 ```
 
@@ -217,7 +213,7 @@ model_cluster_firmyear = lm.PanelOLS.from_formula(
 ```
 
 \index{Robustness tests}
-The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin's q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin's q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$ statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
+The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin's q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin's q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 ```{python}
 prettify_result([
