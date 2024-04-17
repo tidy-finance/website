@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.538">
+<meta name="generator" content="quarto-1.4.549">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -563,7 +563,7 @@ Note
 </div>
 <p> In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in Python. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
 <p>Throughout this chapter, we use the following Python packages:</p>
-<div id="1aff356d" class="cell" data-execution_count="2">
+<div id="218af55f" class="cell" data-execution_count="2">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
@@ -578,7 +578,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We start by loading the required data from our SQLite database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
-<div id="24f486b8" class="cell" data-execution_count="4">
+<div id="e5079091" class="cell" data-execution_count="4">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>industry_returns <span class="op">=</span> (pd.read_sql_query(</span>
@@ -591,8 +591,8 @@ Note
 </section>
 <section id="recap-of-portfolio-choice" class="level2">
 <h2 class="anchored" data-anchor-id="recap-of-portfolio-choice">Recap of Portfolio Choice</h2>
-<p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation that delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, she may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to <span id="eq-recap-mvp"><span class="math display">\[\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \tag{1}\]</span></span> where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following chunk. </p>
-<div id="33a7d2ed" class="cell" data-execution_count="5">
+<p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation that delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, they may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to <span id="eq-recap-mvp"><span class="math display">\[\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \tag{1}\]</span></span> where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following chunk. </p>
+<div id="7b558e08" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n_industries <span class="op">=</span> industry_returns.shape[<span class="dv">1</span>]</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> np.array(industry_returns.mean()).T</span>
@@ -693,7 +693,7 @@ Note
 <section id="optimal-portfolio-choice" class="level2">
 <h2 class="anchored" data-anchor-id="optimal-portfolio-choice">Optimal Portfolio Choice</h2>
 <p>The function below implements the efficient portfolio weights in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation). For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>, <code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
-<div id="fe0a9ab4" class="cell" data-execution_count="6">
+<div id="ce58314e" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight(sigma, </span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                             mu, </span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                             gamma<span class="op">=</span><span class="dv">2</span>, </span>
@@ -791,8 +791,8 @@ Note
 </div>
 </div>
 </div>
-<p>The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient <span class="math inline">\(\gamma=2\)</span> in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of <span class="math inline">\(-1\)</span> implies that the investor takes a short position worth her entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
-<div id="94ef73cc" class="cell" data-execution_count="7">
+<p>The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient <span class="math inline">\(\gamma=2\)</span> in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of <span class="math inline">\(-1\)</span> implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
+<div id="4615ca59" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>gammas <span class="op">=</span> [<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">20</span>]</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>betas <span class="op">=</span> <span class="dv">20</span><span class="op">*</span>expon.ppf(np.arange(<span class="dv">1</span>, <span class="dv">100</span>)<span class="op">/</span><span class="dv">100</span>, scale<span class="op">=</span><span class="dv">1</span>)</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -812,7 +812,7 @@ Note
 <span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The code chunk above computes the optimal weight in the presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses her optimal allocation along the efficient frontier to reflect her own risk preferences. If transaction costs were absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, her optimal portfolio choice reflects a shift toward the efficient portfolio, whereas her current portfolio anchors her investment.</p>
+<p>The code chunk above computes the optimal weight in the presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses their optimal allocation along the efficient frontier to reflect their own risk preferences. If transaction costs were absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, their optimal portfolio choice reflects a shift toward the efficient portfolio, whereas their current portfolio anchors their investment.</p>
 <div id="cell-fig-1701" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>rebalancing_plot <span class="op">=</span> (</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ggplot(transaction_costs, </span>
@@ -830,7 +830,7 @@ Note
 <div id="fig-1701" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1701-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" data-glightbox="description: .lightbox-desc-1"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."></a>
+<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="lightbox" data-glightbox="description: .lightbox-desc-1" data-gallery="quarto-lightbox-gallery-1"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1701-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-1701-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;1: The figure shows portfolio weights for different risk aversion and transaction cost. The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark.
@@ -846,7 +846,7 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <p>Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that <span class="math inline">\(w_i \geq 0\,\forall i\)</span>). However, numerical optimization allows computing the solutions to such constrained problems.</p>
 <p>We rely on the powerful <code>scipy.optimize</code> package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of <span class="citation" data-cites="Kraft1994">Kraft (<a href="#ref-Kraft1994" role="doc-biblioref">1994</a>)</span> because it is able to handle multiple equality and inequality constraints at the same time and is typically used for problems where the objective function and the constraints are twice continuously differentiable. We have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.</p>
 <p>We illustrate the use of <code>minimize()</code> by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that <code>np.allclose()</code> is a safe way to compare two vectors for pairwise equality. The alternative <code>==</code> is sensitive to small differences that may occur due to the representation of floating points on a computer, while <code>np.allclose()</code> has a built-in tolerance. It returns <code>True</code> if both are equal, which is the case in both applications below.</p>
-<div id="cc6de82d" class="cell" data-execution_count="9">
+<div id="8226d03d" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>w_initial <span class="op">=</span> np.ones(n_industries)<span class="op">/</span>n_industries</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_mvp(w):</span>
@@ -902,8 +902,8 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>np.allclose(w_efficient, w_efficient_numerical.x, atol <span class="op">=</span> <span class="fl">1e-3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The result above shows that the numerical procedure indeed recovered the optimal weights for a scenario where we already know the analytic solution.</p>
-<p>Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies <span class="math inline">\(N\)</span> inequality constraints of the form <span class="math inline">\(\omega_i &gt;=0\)</span>. We can implement the short sale constraints by imposing a vector of lower bounds <code>lb = rep(0, n_industries)</code>.</p>
-<div id="e1cc8ce7" class="cell" data-execution_count="10">
+<p>Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies <span class="math inline">\(N\)</span> inequality constraints of the form <span class="math inline">\(\omega_i &gt;=0\)</span>. We can implement the short-sale constraints by imposing a vector of lower bounds <code>lb = rep(0, n_industries)</code>.</p>
+<div id="a37a434a" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>w_no_short_sale <span class="op">=</span> minimize(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  x0<span class="op">=</span>w_initial,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  fun<span class="op">=</span>objective_efficient,</span>
@@ -989,9 +989,9 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 </div>
 </div>
 </div>
-<p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than in the unrestricted case. You can verify that <code>np.sum(w_no_short_sale.x)</code> returns 1. In other words: <code>minimize()</code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code>, where negative holdings are forbidden.</p>
-<p><code>minimize()</code> can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation T-constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |\omega_i| \leq 1.5\)</span>. The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. </p>
-<div id="cff7890b" class="cell" data-execution_count="11">
+<p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than in the unrestricted case. You can verify that <code>np.sum(w_no_short_sale.x)</code> returns 1. In other words, <code>minimize()</code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code>, where negative holdings are forbidden.</p>
+<p><code>minimize()</code> can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation-T constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |\omega_i| \leq 1.5\)</span>. The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. </p>
+<div id="0a2da08e" class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>reg_t <span class="op">=</span> <span class="fl">1.5</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> inequality_constraint(w):</span>
@@ -1042,7 +1042,7 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <tr class="odd">
 <td data-quarto-table-cell-role="th">0</td>
 <td>nodur</td>
-<td>0.733</td>
+<td>0.736</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">1</td>
@@ -1052,7 +1052,7 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <tr class="odd">
 <td data-quarto-table-cell-role="th">2</td>
 <td>manuf</td>
-<td>-0.144</td>
+<td>-0.135</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">3</td>
@@ -1067,17 +1067,17 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <tr class="even">
 <td data-quarto-table-cell-role="th">5</td>
 <td>telcm</td>
-<td>-0.000</td>
+<td>-0.019</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">6</td>
 <td>shops</td>
-<td>0.031</td>
+<td>0.028</td>
 </tr>
 <tr class="even">
 <td data-quarto-table-cell-role="th">7</td>
 <td>hlth</td>
-<td>0.222</td>
+<td>0.223</td>
 </tr>
 <tr class="odd">
 <td data-quarto-table-cell-role="th">8</td>
@@ -1087,7 +1087,7 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <tr class="even">
 <td data-quarto-table-cell-role="th">9</td>
 <td>other</td>
-<td>-0.106</td>
+<td>-0.096</td>
 </tr>
 </tbody>
 </table>
@@ -1118,7 +1118,7 @@ Figure&nbsp;1: The figure shows portfolio weights for different risk aversion an
 <div id="fig-1702" class="quarto-figure quarto-figure-center quarto-float anchored" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-1702-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" data-glightbox="description: .lightbox-desc-2"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio."></a>
+<a href="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="lightbox" data-glightbox="description: .lightbox-desc-2" data-gallery="quarto-lightbox-gallery-2"><img src="constrained-optimization-and-backtesting_files/figure-html/fig-1702-output-1.png" class="img-fluid figure-img" data-fig-pos="htb" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio."></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-1702-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry portfolios and the four different allocation strategies.
@@ -1127,9 +1127,9 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 </div>
 </div>
 </div>
-<p>The results clearly indicate the effect of imposing additional constraints: the extreme holdings the investor implements if she follows the (theoretically optimal) efficient portfolio vanish under, e.g., the Regulation-T constraint. You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints. The short answer is: the <em>efficient portfolio</em> is only efficient if the true parameters of the data generating process correspond to the estimated parameters <span class="math inline">\(\hat\Sigma\)</span> and <span class="math inline">\(\hat\mu\)</span>. Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations, which could result from <em>error-maximization</em> due to estimation uncertainty <span class="citation" data-cites="Jagannathan2003">(<a href="#ref-Jagannathan2003" role="doc-biblioref">Jagannathan and Ma 2003</a>)</span>.</p>
+<p>The results clearly indicate the effect of imposing additional constraints: the extreme holdings the investor implements if they follow the (theoretically optimal) efficient portfolio vanish under, e.g., the Regulation-T constraint. You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints. The short answer is: the <em>efficient portfolio</em> is only efficient if the true parameters of the data-generating process correspond to the estimated parameters <span class="math inline">\(\hat\Sigma\)</span> and <span class="math inline">\(\hat\mu\)</span>. Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations, which could result from <em>error-maximization</em> due to estimation uncertainty <span class="citation" data-cites="Jagannathan2003">(<a href="#ref-Jagannathan2003" role="doc-biblioref">Jagannathan and Ma 2003</a>)</span>.</p>
 <p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form <span class="math inline">\(\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
-<div id="1ef5a4fa" class="cell" data-execution_count="13">
+<div id="c27ffe95" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_efficient_weight_L1_TC(mu, sigma, gamma, beta, initial_weights):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compute efficient portfolio weights with L1 constraint."""</span>       </span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -1162,7 +1162,7 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 <h2 class="anchored" data-anchor-id="out-of-sample-backtesting">Out-of-Sample Backtesting</h2>
 <p>For the sake of simplicity, we committed one fundamental error in computing portfolio weights above: we used the full sample of the data to determine the optimal allocation <span class="citation" data-cites="Harvey2019">(<a href="#ref-Harvey2019" role="doc-biblioref">Arnott, Harvey, and Markowitz 2019</a>)</span>. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2021. While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data.</p>
 <p>The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights, which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
-<div id="69b6c5f0" class="cell" data-execution_count="14">
+<div id="32fe35e8" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>window_length <span class="op">=</span> <span class="dv">120</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>periods <span class="op">=</span> industry_returns.shape[<span class="dv">0</span>]<span class="op">-</span>window_length</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1181,7 +1181,7 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 <span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>w_prev_1 <span class="op">=</span> w_prev_2 <span class="op">=</span> w_prev_3 <span class="op">=</span> np.ones(n_industries)<span class="op">/</span>n_industries</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We also define two helper functions: One to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs.</p>
-<div id="5f4a98f0" class="cell" data-execution_count="15">
+<div id="9191beb1" class="cell" data-execution_count="15">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> adjust_weights(w, next_return):</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    w_prev <span class="op">=</span> <span class="dv">1</span><span class="op">+</span>w<span class="op">*</span>next_return</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array(w_prev<span class="op">/</span>np.<span class="bu">sum</span>(np.array(w_prev)))</span>
@@ -1196,7 +1196,7 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 <span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> np.array([raw_return, turnover, net_return])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The following code chunk performs a rolling-window estimation, which we implement in a loop. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample variance-covariance matrix and ignore the estimation of <span class="math inline">\(\hat\mu\)</span> entirely, but you might use more advanced estimators in practice.</p>
-<div id="581dfcda" class="cell" data-execution_count="16">
+<div id="19818617" class="cell" data-execution_count="16">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> p <span class="kw">in</span> <span class="bu">range</span>(periods):</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    returns_window <span class="op">=</span> industry_returns.iloc[p:(p<span class="op">+</span>window_length<span class="op">-</span><span class="dv">1</span>), :]</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    next_return <span class="op">=</span> industry_returns.iloc[p<span class="op">+</span>window_length, :]</span>
@@ -1232,7 +1232,7 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 <span id="cb14-33"><a href="#cb14-33" aria-hidden="true" tabindex="-1"></a>    w_prev_3 <span class="op">=</span> adjust_weights(w_3, next_return)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Finally, we get to the evaluation of the portfolio strategies <em>net-of-transaction costs</em>. Note that we compute annualized returns and standard deviations. </p>
-<div id="1f720df3" class="cell" data-execution_count="17">
+<div id="d5b8aa90" class="cell" data-execution_count="17">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>performance <span class="op">=</span> pd.DataFrame()</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> i <span class="kw">in</span> <span class="bu">enumerate</span>(performance_values.keys()):</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    tmp_data <span class="op">=</span> pd.DataFrame(</span>
@@ -1304,15 +1304,15 @@ Figure&nbsp;2: The figure shows optimal allocation weights for the ten industry 
 </div>
 </div>
 </div>
-<p>The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers her portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a <em>negative</em> annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: <em>MV (TC)</em> effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters <span class="math inline">\(\hat\mu_t\)</span> and <span class="math inline">\(\hat\Sigma_t\)</span>indicate that the current allocation is too far away from the optimal theoretical portfolio.</p>
+<p>The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a <em>negative</em> annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: <em>MV (TC)</em> effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters <span class="math inline">\(\hat\mu_t\)</span> and <span class="math inline">\(\hat\Sigma_t\)</span> indicate that the current allocation is too far away from the optimal theoretical portfolio.</p>
 </section>
 <section id="exercises" class="level2">
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
 <ol type="1">
-<li>Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter <span class="math inline">\(\gamma\)</span> <span id="eq-individual-tc-problem"><span class="math display">\[\omega_{t+1} ^* = \arg\max_{\omega \in \mathbb{R}^N, \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \tag{10}\]</span></span> where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">\(\mu\)</span> are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing <em>and</em> proportional to stock illiquidity such that <span id="eq-amihud-definition"><span class="math display">\[\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right) \tag{11}\]</span></span> where <span class="math inline">\(B = \text{diag}(ill_1, \ldots, ill_N)\)</span> is a diagonal matrix, where <span class="math inline">\(ill_1, \ldots, ill_N\)</span>. Derive a closed-form solution for the mean-variance efficient portfolio <span class="math inline">\(\omega_{t+1} ^*\)</span> based on the transaction cost specification above. Discuss the effect of illiquidity <span class="math inline">\(ill_i\)</span> on the individual portfolio weights relative to an investor that myopically ignores transaction costs in her decision.</li>
+<li>Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter <span class="math inline">\(\gamma\)</span> <span id="eq-individual-tc-problem"><span class="math display">\[\omega_{t+1} ^* = \arg\max_{\omega \in \mathbb{R}^N, \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \tag{10}\]</span></span> where <span class="math inline">\(\Sigma\)</span> and <span class="math inline">\(\mu\)</span> are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing <em>and</em> proportional to stock illiquidity such that <span id="eq-amihud-definition"><span class="math display">\[\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega_{t^+}\right)'B\left(\omega - \omega_{t^+}\right) \tag{11}\]</span></span> where <span class="math inline">\(B = \text{diag}(ill_1, \ldots, ill_N)\)</span> is a diagonal matrix, where <span class="math inline">\(ill_1, \ldots, ill_N\)</span>. Derive a closed-form solution for the mean-variance efficient portfolio <span class="math inline">\(\omega_{t+1} ^*\)</span> based on the transaction cost specification above. Discuss the effect of illiquidity <span class="math inline">\(ill_i\)</span> on the individual portfolio weights relative to an investor that myopically ignores transaction costs in their decision.</li>
 <li>Use the solution from the previous exercise to update the function <code>compute_efficient_weight()</code> such that you can compute optimal weights conditional on a matrix <span class="math inline">\(B\)</span> with illiquidity measures.</li>
 <li>Illustrate the evolution of the <em>optimal</em> weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.</li>
-<li>Is it always optimal to choose the same <span class="math inline">\(\beta\)</span> in the optimization problem than the value used in evaluating the portfolio performance? In other words: can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed <span class="math inline">\(\beta\)</span> values.</li>
+<li>Is it always optimal to choose the same <span class="math inline">\(\beta\)</span> in the optimization problem than the value used in evaluating the portfolio performance? In other words, can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed <span class="math inline">\(\beta\)</span> values.</li>
 </ol>
 
 
@@ -1581,7 +1581,12 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      return note.innerHTML;
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
     }
   }
   for (var i=0; i<xrefs.length; i++) {
@@ -1828,7 +1833,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"loop":false,"selector":".lightbox","descPosition":"bottom","openEffect":"zoom","closeEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","loop":false,"closeEffect":"zoom","openEffect":"zoom","selector":".lightbox"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
