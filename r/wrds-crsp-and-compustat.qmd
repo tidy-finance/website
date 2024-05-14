@@ -73,7 +73,7 @@ and (ii) the identifying information,
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 ```
 
-We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`), (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf`.\index{Permno}\index{Returns!Delisting}
+We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)^[These three criteria jointly replicate the filter `exchcd %in% c(1, 2, 3, 31, 32, 33)` used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the `conditionaltype == "RW"`, which is equivalent to the restriction of `exchcd %in% c(1, 2, 3)` with the old CRSP format.], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf`. Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.\index{Permno}\index{Returns!Delisting}\index{Industry codes}
 
 ```{r}
 crsp_monthly <- msf_db |>
@@ -81,7 +81,7 @@ crsp_monthly <- msf_db |>
   filter(primaryexch %in% c("N", "A", "Q"),
          conditionaltype %in% c("RW", "NW"),
          tradingstatusflg == "A") |> 
-  select(permno, mthcaldt, mthret, mthretx, shrout, mthprc, primaryexch) |> 
+  select(-siccd) |> 
   inner_join(
     stksecurityinfohist_db |>
       filter(sharetype == "NS" & 
