@@ -73,11 +73,15 @@ and (ii) the identifying information,
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 ```
 
-We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we keep only data in the time windows of interest, (ii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iii) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf`.\index{Permno}\index{Returns!Delisting}
+We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`), (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf`.\index{Permno}\index{Returns!Delisting}
 
 ```{r}
 crsp_monthly <- msf_db |>
   filter(mthcaldt >= start_date & mthcaldt <= end_date) |>
+  filter(primaryexch %in% c("N", "A", "Q"),
+         conditionaltype %in% c("RW", "NW"),
+         tradingstatusflg == "A") |> 
+  select(permno, mthcaldt, mthret, mthretx, shrout, mthprc, primaryexch) |> 
   inner_join(
     stksecurityinfohist_db |>
       filter(sharetype == "NS" & 
@@ -85,7 +89,7 @@ crsp_monthly <- msf_db |>
                securitysubtype == "COM" & 
                usincflg == "Y" & 
                issuertype %in% c("ACOR", "CORP")) |> 
-      select(permno, secinfostartdt, secinfoenddt),
+      select(permno, secinfostartdt, secinfoenddt, siccd),
     join_by(permno)
   ) |>
   filter(mthcaldt >= secinfostartdt & mthcaldt <= secinfoenddt) |>
@@ -109,7 +113,7 @@ crsp_monthly <- msf_db |>
 
 Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
 
-The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
+The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock's price, you need to adjust it with a cumulative adjustment factor.  We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{r}
 crsp_monthly <- crsp_monthly |>
