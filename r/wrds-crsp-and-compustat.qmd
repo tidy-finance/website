@@ -85,16 +85,15 @@ crsp_monthly <- msf_db |>
                securitytype == "EQTY" & 
                securitysubtype == "COM" & 
                usincflg == "Y" & 
-               issuertype %in% c("ACOR", "CORP")) |> 
-      select(permno, secinfostartdt, secinfoenddt, siccd,
-             primaryexch, conditionaltype, tradingstatusflg),
-    join_by(permno)
-  ) |>
-  filter(mthcaldt >= secinfostartdt,
-         mthcaldt <= secinfoenddt,
-         primaryexch %in% c("N", "A", "Q"),
-         conditionaltype %in% c("RW", "NW"),
-         tradingstatusflg == "A") |>
+               issuertype %in% c("ACOR", "CORP") & 
+               primaryexch %in% c("N", "A", "Q") &
+               conditionaltype %in% c("RW", "NW") &
+               tradingstatusflg == "A") |> 
+        select(permno, secinfostartdt, secinfoenddt,
+               primaryexch, siccd),
+      join_by(permno)
+  ) |> 
+  filter(mthcaldt >= secinfostartdt & mthcaldt <= secinfoenddt) |>
   mutate(month = floor_date(mthcaldt, "month")) |>
   select(
     permno, # Security identifier
@@ -352,22 +351,20 @@ for (j in 1:batches) {
   crsp_daily_sub <- dsf_db |>
     filter(permno %in% permno_batch) |> 
     filter(dlycaldt >= start_date & dlycaldt <= end_date) |> 
-    left_join(
+    inner_join(
       stksecurityinfohist_db |>
-        stksecurityinfohist_db |>
         filter(sharetype == "NS" & 
-               securitytype == "EQTY" & 
-               securitysubtype == "COM" & 
-               usincflg == "Y" & 
-               issuertype %in% c("ACOR", "CORP")) |> 
-        select(permno, secinfostartdt, secinfoenddt, 
-               primaryexch, conditionaltype, tradingstatusflg),
+                securitytype == "EQTY" & 
+                securitysubtype == "COM" & 
+                usincflg == "Y" & 
+                issuertype %in% c("ACOR", "CORP") & 
+                primaryexch %in% c("N", "A", "Q") &
+                conditionaltype %in% c("RW", "NW") &
+                tradingstatusflg == "A") |> 
+        select(permno, secinfostartdt, secinfoenddt),
       join_by(permno)
     ) |>
-    filter(dlycaldt >= secinfostartdt & dlycaldt <= secinfoenddt,
-           primaryexch %in% c("N", "A", "Q"),
-           conditionaltype %in% c("RW", "NW"),
-           tradingstatusflg == "A")  |> 
+    filter(dlycaldt >= secinfostartdt & dlycaldt <= secinfoenddt)  |> 
     select(permno, date = dlycaldt, ret = dlyret) |>
     collect() |>
     drop_na()
