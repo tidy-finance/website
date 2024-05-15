@@ -78,10 +78,7 @@ We use the two remote tables to fetch the data we want to put into our local dat
 ```{r}
 crsp_monthly <- msf_db |>
   filter(mthcaldt >= start_date & mthcaldt <= end_date) |>
-  filter(primaryexch %in% c("N", "A", "Q"),
-         conditionaltype %in% c("RW", "NW"),
-         tradingstatusflg == "A") |> 
-  select(-siccd) |> 
+  select(-c(siccd, primaryexch, conditionaltype, tradingstatusflg)) |> 
   inner_join(
     stksecurityinfohist_db |>
       filter(sharetype == "NS" & 
@@ -89,10 +86,15 @@ crsp_monthly <- msf_db |>
                securitysubtype == "COM" & 
                usincflg == "Y" & 
                issuertype %in% c("ACOR", "CORP")) |> 
-      select(permno, secinfostartdt, secinfoenddt, siccd),
+      select(permno, secinfostartdt, secinfoenddt, siccd,
+             primaryexch, conditionaltype, tradingstatusflg),
     join_by(permno)
   ) |>
-  filter(mthcaldt >= secinfostartdt & mthcaldt <= secinfoenddt) |>
+  filter(mthcaldt >= secinfostartdt,
+         mthcaldt <= secinfoenddt,
+         primaryexch %in% c("N", "A", "Q"),
+         conditionaltype %in% c("RW", "NW"),
+         tradingstatusflg == "A") |>
   mutate(month = floor_date(mthcaldt, "month")) |>
   select(
     permno, # Security identifier
@@ -335,15 +337,8 @@ factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
   collect()
 
 permnos <- stksecurityinfohist_db |>
-  filter(sharetype == "NS" & 
-         securitytype == "EQTY" & 
-         securitysubtype == "COM" & 
-         usincflg == "Y" & 
-         issuertype %in% c("ACOR", "CORP")) |>
-  select(permno) |> 
-  collect() |> 
-  distinct(permno) |>
-  pull()
+  distinct(permno) |> 
+  pull(permno)
 
 batch_size <- 500
 batches <- ceiling(length(permnos) / batch_size)
@@ -359,6 +354,12 @@ for (j in 1:batches) {
     filter(dlycaldt >= start_date & dlycaldt <= end_date) |> 
     left_join(
       stksecurityinfohist_db |>
+        stksecurityinfohist_db |>
+        filter(sharetype == "NS" & 
+               securitytype == "EQTY" & 
+               securitysubtype == "COM" & 
+               usincflg == "Y" & 
+               issuertype %in% c("ACOR", "CORP")) |> 
         select(permno, secinfostartdt, secinfoenddt, 
                primaryexch, conditionaltype, tradingstatusflg),
       join_by(permno)
