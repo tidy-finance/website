@@ -327,7 +327,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 
 ```{r}
 #| output: false
-#| execute: false
+#| eval: true
 dsf_db <- tbl(wrds, I("crsp.dsf_v2"))
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 
@@ -356,21 +356,17 @@ for (j in 1:batches) {
 
   crsp_daily_sub <- dsf_db |>
     filter(permno %in% permno_batch) |> 
-    filter(dlycaldt >= start_date & dlycaldt <= end_date) |>
-    filter(primaryexch %in% c("N", "A", "Q"),
-           conditionaltype %in% c("RW", "NW"),
-           tradingstatusflg == "A") |> 
-    inner_join(
+    filter(dlycaldt >= start_date & dlycaldt <= end_date) |> 
+    left_join(
       stksecurityinfohist_db |>
-        filter(sharetype == "NS" & 
-               securitytype == "EQTY" & 
-               securitysubtype == "COM" & 
-               usincflg == "Y" & 
-               issuertype %in% c("ACOR", "CORP")) |> 
-        select(permno, secinfostartdt, secinfoenddt),
+        select(permno, secinfostartdt, secinfoenddt, 
+               primaryexch, conditionaltype, tradingstatusflg),
       join_by(permno)
     ) |>
-    filter(dlycaldt >= secinfostartdt & dlycaldt <= secinfoenddt) 
+    filter(dlycaldt >= secinfostartdt & dlycaldt <= secinfoenddt,
+           primaryexch %in% c("N", "A", "Q"),
+           conditionaltype %in% c("RW", "NW"),
+           tradingstatusflg == "A")  |> 
     select(permno, date = dlycaldt, ret = dlyret) |>
     collect() |>
     drop_na()
