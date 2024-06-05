@@ -1,0 +1,175 @@
+---
+title: "Fast Portfolio Sorts"
+author:
+  - name: Christoph Scheuch
+    url: https://www.tidy-intelligence.com/
+date: "2024-06-06"
+description: A benchmark of R approaches for efficient portfolio sorts
+categories: 
+  - R
+  - Portfolio Sorts
+  - data.table
+image: thumbnail.png
+image-alt: Created by DALL-E 3
+---
+
+In the world of finance and investment management, working with large datasets containing portfolio holdings is a common task. One crucial operation that often needs to be performed on these datasets is portfolio sorts (e.g., see our chapter on [Univariate Portfolio Sorts](../../r/univariate-portfolio-sorts.qmd). While R offers a variety of approaches through its base functions and popular packages like `dplyr` and `data.table`, the performance of these methods can vary significantly, especially when dealing with large datasets. As a data analyst or portfolio manager, it's essential to understand the trade-offs between different sorting approaches in terms of execution time and memory usage. This blog post aims toshed light on this topic by benchmarking the performance of various sorting methods in R, specifically for the use case of sorting portfolio holdings.
+
+We'll dive into the following sorting approaches:
+
+- Use the built-in `base` functions that ship with every R installation.
+- Leverage the popular `dplyr` package and workhorse of [Tidy Finance with R](../../r/index.qmd).
+- Explore the powerful `data.table` package and its sorting capabilities.
+- Combine the `dplyr` syntax with `data.table`'s performance through `dtplyr`.
+
+Throughout this blog post, I'll use the following packages. Notably, `bench` is used to create benchmarking results. 
+
+```{r}
+library(dplyr)
+library(dtplyr)
+library(data.table)
+library(bench)
+library(purrr)
+library(RSQLite)
+```
+
+## Data preparation
+
+First, I start by loading the monthly CRSP data from our database (see [WRDS, CRSP, and Compustat](../../r/wrds-crsp-and-compustat.qmd) for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a `tibble` for `dplyr`, a `data.frame` for `base`, a `data.table` for `data.table` and a “lazy” data table for `dtplyr` because I want to avoid any conversion issues in the portfolio assignments.
+
+```{r}
+tidy_finance <- dbConnect(
+  SQLite(),
+  "../../data/tidy_finance_r.sqlite",
+  extended_types = TRUE
+)
+
+crsp_monthly_dplyr <- tbl(tidy_finance, "crsp_monthly") |>
+  select(permno, month, ret_excess, mktcap_lag) |>
+  collect()
+
+crsp_monthly_base <- as.data.frame(crsp_monthly_dplyr)
+
+crsp_monthly_dt <- copy(as.data.table(crsp_monthly_dplyr))
+
+crsp_monthly_dtplyr <- lazy_dt(crsp_monthly_dplyr)
+```
+
+## Defining portfolio sorts
+
+As a common denominator across approaches, I introduce a stripped down version of `assign_portfolio()` that can also be found in the `[tidyfinance](https://cran.r-project.org/web/packages/tidyfinance/index.html)` package. 
+
+```{r}
+assign_portfolio <- function(data, sorting_variable, n_portfolios) {
+  
+  breakpoints <- quantile(
+    data[[sorting_variable]], 
+    probs = seq(0, 1, length.out = n_portfolios + 1), 
+    na.rm = TRUE, names = FALSE
+  )
+
+  findInterval(
+    data[[sorting_variable]], breakpoints, all.inside = TRUE
+  )
+}
+```
+
+The goal is to apply this function to the cross-section of stocks in each month and then compute average excess returns for each portfolio across all months.  
+
+If we want to apply the function above to each month using only `base`, then we have to first split the `data.frame` into multiple parts and `lapply()` the function to each part. After we combined the parts again to one big data.frame, we can use `aggregate()` to compute the average excess returns. 
+
+```{r}
+sort_base <- function() {
+  df_split <- split(crsp_monthly_base, crsp_monthly_base$month)
+  df_split <- lapply(df_split, function(df) {
+    df$portfolio <- assign_portfolio(df, "mktcap_lag", n_portfolios = 10)
+    return(df)
+  })
+  df <- do.call(rbind, df_split)
+  aggregate(ret_excess ~ portfolio, data = df, FUN = function(x) mean(x, na.rm = TRUE))
+}
+sort_base()
+```
+
+This approach takes about 10 seconds per execution on my machine and is in fact more than 20-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I'll drop the `base` approach going forward. 
+
+If we want to perform the same logic using `dplyr`, we can use the following approach. Note that I use `as.data.frame()` for all approaches to ensure that the output format is the same for all approaches - a necessary requirement for a meaningful benchmark (otherwise code would not be equivalent).
+
+```{r}
+sort_dplyr <- function() {
+  crsp_monthly_dplyr |> 
+    mutate(
+      portfolio = assign_portfolio(
+        pick(everything()), "mktcap_lag", n_portfolios = 10),
+      by = "month"
+    ) |> 
+    group_by(portfolio) |> 
+    summarize(ret = mean(ret_excess, na.rm = TRUE)) |> 
+    as.data.frame()
+}
+sort_dplyr()
+```
+
+The equivalent approach in `data.table` looks as follows. Note that I deliberately don't use any pipe or intermediate assignments as to avoid any performance overhead that these might introduce. 
+
+```{r}
+sort_dt <- function() {
+  as.data.frame(crsp_monthly_dt[
+    , `:=`(portfolio = assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), by = month)
+    ][, .(ret = mean(ret_excess, na.rm = TRUE)), keyby = .(portfolio)])
+}
+sort_dt()
+```
+
+Lastly, I add the `dtplyr` implementation that also takes a `data.table` as input and internally converts `dplyr` code to `data.table` syntax. Note that the final `as.data.frame()` call is used to access the results and ensure that the result format is consistent with the other approaches. 
+
+```{r}
+sort_dtplyr <- function() {
+  crsp_monthly_dtplyr |> 
+    mutate(
+      portfolio = assign_portfolio(
+        pick(everything()), "mktcap_lag", n_portfolios = 10),
+      by = "month"
+    )  |> 
+    group_by(portfolio) |> 
+    summarize(ret = mean(ret_excess, na.rm = TRUE)) |> 
+    as.data.frame()
+}
+sort_dtplyr()
+```
+
+Now that we have verified that all code chunks create the same average excess returns per portfolio, we can proceed to the performance evaluation. 
+
+## Benchmarking results
+
+The `bench` package is a great utility for benchmarking and timing expressions in R. It provides functions that allow you to measure the execution time of  expressions or code chunks. This can be useful for comparing the performance of different approaches or implementations, or for identifying potential bottlenecks in your code. The following code evaluates each approach from above a 100 times and collects the results. 
+
+```{r}
+#| warning: false
+set.seed(1234)
+iterations <- 10
+
+results <- bench::mark(
+  sort_dplyr(), sort_dt(), sort_dtplyr(), 
+  iterations = iterations
+)
+```
+
+```{r}
+#| echo: false 
+saveRDS(results, "data/bench_results.rds") 
+```
+
+The following plot shows the distributions of execution times as violin plots. You can see that...
+
+```{r}
+#| warning: false
+ggplot2::autoplot(results, type = "violin") +
+  labs(y = NULL, x = "Sorting approach", 
+       title = "Execution time of univariate porfolio sorts using dplyr, data.table, and dtplyr")
+```
+
+```{r}
+# TODO: add a plot for memory allocation
+```
+
