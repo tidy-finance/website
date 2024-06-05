@@ -10,7 +10,7 @@ categories:
   - Portfolio Sorts
   - data.table
 image: thumbnail.png
-image-alt: Created by DALL-E 3
+image-alt: A winner's podium with three genderless robots celebrating, each holding a trophy. The robots have a sleek, modern design with neutral features. The podium is positioned in a modern office setting with bright colors, contemporary furniture, large windows letting in natural light, and vibrant decor. The first-place robot stands in the center, elevated above the second and third place robots on either side, all expressing joy. Created by DALL-E.
 ---
 
 In the world of finance and investment management, working with large datasets containing portfolio holdings is a common task. One crucial operation that often needs to be performed on these datasets is portfolio sorts (e.g., see our chapter on [Univariate Portfolio Sorts](../../r/univariate-portfolio-sorts.qmd). While R offers a variety of approaches through its base functions and popular packages like `dplyr` and `data.table`, the performance of these methods can vary significantly, especially when dealing with large datasets. As a data analyst or portfolio manager, it's essential to understand the trade-offs between different sorting approaches in terms of execution time and memory usage. This blog post aims toshed light on this topic by benchmarking the performance of various sorting methods in R, specifically for the use case of sorting portfolio holdings.
@@ -25,6 +25,8 @@ We'll dive into the following sorting approaches:
 Throughout this blog post, I'll use the following packages. Notably, `bench` is used to create benchmarking results. 
 
 ```{r}
+#| message: false
+#| warning: false
 library(dplyr)
 library(dtplyr)
 library(data.table)
@@ -57,7 +59,7 @@ crsp_monthly_dtplyr <- lazy_dt(crsp_monthly_dplyr)
 
 ## Defining portfolio sorts
 
-As a common denominator across approaches, I introduce a stripped down version of `assign_portfolio()` that can also be found in the `[tidyfinance](https://cran.r-project.org/web/packages/tidyfinance/index.html)` package. 
+As a common denominator across approaches, I introduce a stripped down version of `assign_portfolio()` that can also be found in the [`tidyfinance`](https://cran.r-project.org/web/packages/tidyfinance/index.html) package. 
 
 ```{r}
 assign_portfolio <- function(data, sorting_variable, n_portfolios) {
@@ -146,8 +148,9 @@ The `bench` package is a great utility for benchmarking and timing expressions i
 
 ```{r}
 #| warning: false
+#| eval: false
 set.seed(1234)
-iterations <- 10
+iterations <- 100
 
 results <- bench::mark(
   sort_dplyr(), sort_dt(), sort_dtplyr(), 
@@ -157,19 +160,19 @@ results <- bench::mark(
 
 ```{r}
 #| echo: false 
-saveRDS(results, "data/bench_results.rds") 
+#| eval: true
+results <- readRDS("data/bench_results.rds") 
 ```
 
-The following plot shows the distributions of execution times as violin plots. You can see that...
+The following plot shows the distributions of execution times as violin plots. You can see that `data.table` takes the lead and is followed closely by `dbplyr`, while `dtplyr` takes the third place. 
 
 ```{r}
 #| warning: false
-ggplot2::autoplot(results, type = "violin") +
+library(ggplot2)
+
+autoplot(results, type = "violin") +
   labs(y = NULL, x = "Sorting approach", 
-       title = "Execution time of univariate porfolio sorts using dplyr, data.table, and dtplyr")
+       title = "Execution time of porfolio sorts using dplyr, data.table, and dtplyr")
 ```
 
-```{r}
-# TODO: add a plot for memory allocation
-```
-
+Note that all three methods are blazingly fast, given that the task is to assign 10 portfolios across up to 26,000 stocks for 755 months. I personally don't really care for the extra few milliseconds that I'd get through `data.table` by sacrificing the `dplyr` syntax because I code mostly interactively. If your context involves time constraints and needs to be as fast as possible, then you might not only prefer `data.table`, but also thing about more efficient ways to assign portfolios compared to applying the function I have given above. 
