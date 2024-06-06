@@ -38,7 +38,7 @@ library(future)
 
 > we build a large collection of stock-level predictive characteristics based on the cross-section of stock returns literature. These include 94 characteristics (61 of which are updated annually, 13 are updated quarterly, and 20 are updated monthly). In addition, we include 74 industry dummies corresponding to the first two digits of Standard Industrial Classification (SIC) codes. 
 
-The authors provide the dataset with stock-level characteristics online. Idownload this (large) dataset directly from within `R` from the [Dacheng Xiu's homepage](https://dachxiu.chicagobooth.edu/). The data is stored as a .csv file within a zipped folder. For such purposes, the `archive` package is useful. I set `options(timeout = 1200)`, which allows the `R` session to download the dataset for 20 minutes. The default in `R` is 60 seconds which was too short on my machine.
+The authors provide the dataset with stock-level characteristics online. I download this (large) dataset directly from within `R` from the [Dacheng Xiu's homepage](https://dachxiu.chicagobooth.edu/). The data is stored as a .csv file within a zipped folder. For such purposes, the `archive` package is useful. I set `options(timeout = 1200)`, which allows the `R` session to download the dataset for 20 minutes. The default in `R` is 60 seconds which was too short on my machine.
 
 ```{r}
 options(timeout = 1200)
@@ -46,7 +46,7 @@ characteristics <- read_csv(archive_read("https://dachxiu.chicagobooth.edu/downl
                                          file = "datashare.csv"))
 
 characteristics <- characteristics |>
-  rename("month" = "DATE") |>
+  rename(month = DATE) |>
   mutate(
     month = ymd(month),
     month = floor_date(month, "month")
@@ -61,9 +61,9 @@ characteristics <- characteristics |>
 
 The characteristics appear in raw format. As many machine-learning applications are sensitive to the scaling of the data, one typically employs some form of standardization. 
 
-> We cross-sectionally rank all stock characteristics period-by-period and map these ranks into the [-1,1] interval (footnote 29).
+> We cross-sectionally rank all stock characteristics period-by-period and map these ranks into the [-1, 1] interval (footnote 29).
 
-The idea is that at each date, the cross-section of each predictor should be scaled such that the maximum value is 1 and the minimum value is -1. The cross-sectional ranking is be time-consuming. The function below explicitly handles `NA` values, so they do not tamper with the ranking. 
+The idea is that at each date, the cross-section of each predictor should be scaled such that the maximum value is 1 and the minimum value is -1. The cross-sectional ranking is time-consuming. The function below explicitly handles `NA` values, so they do not tamper with the ranking. 
 
 ```{r}
 rank_transform <- function(x) {
@@ -72,9 +72,9 @@ rank_transform <- function(x) {
   min_rank <- 1
   max_rank <- length(na.omit(x))
   
-  if(max_rank==0){ # only NAs
+  if (max_rank == 0) { # only NAs
     return(rep(NA, length(x)))    
-  }else{
+  } else {
     return(2 * ((rank_x - min_rank) / (max_rank - min_rank) - 0.5)) 
   }
 }
@@ -88,11 +88,11 @@ characteristics <- characteristics |>
 > Another issue is missing characteristics, which we replace with the cross-sectional median at each month for each stock, respectively (footnote 30). 
 
 The paper actually claims that each missing value is replaced by the cross-sectional median at each month. 
-However, one of the paper's coauthors also [claims otherwise](https://www.dropbox.com/s/4vsc4hakwvz2j31/ML_QandA.pdf?dl=0)
+However, one of the paper's coauthors also [claims otherwise](https://www.dropbox.com/s/4vsc4hakwvz2j31/ML_QandA.pdf?dl=0):
 
 > NA values are set to zero (Q&A file furnished by Shihoa Gu)
 
-I interpret the divergence as follows: First, I replace missing values with the cross-sectional median. However, for some months, few characteristics (e.g. `absacc` do not have any value at all, leaving the cross-sectional median undefined). Thus, in a second step, I replace remaining missing characteristics with zero. 
+I interpret the divergence as follows: First, I replace missing values with the cross-sectional median. However, for some months, few characteristics (e.g. `absacc`) do not have any value at all, leaving the cross-sectional median undefined. Thus, in a second step, I replace remaining missing characteristics with zero. 
 
 ```{r}
 characteristics <- characteristics |>
@@ -108,12 +108,12 @@ characteristics <- characteristics |>
 
 > We obtain monthly total individual equity returns from CRSP for all firms listed in the NYSE, AMEX, and NASDAQ. Our sample begins in March 1957 (the start date of the S&P 500) (p. 2248)
 
-To retrieve CRSP excess returns, we merge the stock-level characteristics with the prepared monthly CRSP data as described in [Tidy Finance with R](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html). To create portfolio sorts based on the predictions, `mktcap_lag` remains in the sample (albeit it should be mentioned that the main results in Section 2.4.2 of the paper are derived computing equal-weighted portfolios).
+To retrieve CRSP excess returns, we merge the stock-level characteristics with the prepared monthly CRSP data as described in [WRDS, CRSP, and Compustat](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html). To create portfolio sorts based on the predictions, `mktcap_lag` remains in the sample (albeit it should be mentioned that the main results in Section 2.4.2 of the paper are derived computing equal-weighted portfolios).
 
 > We also construct eight macroeconomic predictors following the variable definitions detailed in Welch and Goyal (2008), including dividend-price ratio (dp), earnings-price ratio (ep), book-to-market ratio (bm), net equity expansion
 (ntis), Treasury-bill rate (tbl), term spread (tms), default spread (dfy), and stock variance (svar). (p. 2248)
 
-We rely on the preparation of the macroeconomic predictors from the corresponding chapter in [Tidy Finance with R](https://www.tidy-finance.org/r/accessing-and-managing-financial-data.html#macroeconomic-predictors). The following code snippets merges the stock-level characteristics with the CRSP sample and the macroeconomic predictors. Note that no further adjustment of the timing of excess returns and stock-level characteristics is necessary:
+We rely on the preparation of the macroeconomic predictors from the corresponding chapter in [Accessing and Managing Financial Data](https://www.tidy-finance.org/r/accessing-and-managing-financial-data.html#macroeconomic-predictors). The following code snippets merges the stock-level characteristics with the CRSP sample and the macroeconomic predictors. Note that no further adjustment of the timing of excess returns and stock-level characteristics is necessary:
 
 > In this dataset, we've already adjusted the lags. (e.g. When DATE=19570329 in our dataset, you can use the monthly RET at 195703 as the response variable.) (readme.txt from the available dataset on Dacheng Xiu's homepage). 
 
@@ -163,6 +163,7 @@ rec <- rec |> prep()
 ```
 
 Next, I create the full dataset containing `{r} nrow(characteristics)` monthly observations and 920 covariates. 
+
 ```{r}
 characteristics_prepared <- bake(rec, new_data = characteristics)
 ```
@@ -216,7 +217,7 @@ ggplot(visualisation_data,
   theme_minimal()
 ```
 
-The simple scheme makes model tuning computationally less complex. As there is no need to create several validation sets and thus to reestimate the models several times, the overall time to compute predictions is reduced substantially. One may discuss the substantial sampling variation of the resulting MSPE from the validation sample (typically cross-validation is used to obtain more than one estimate of the prediction error). However, the authors clearly state
+The simple scheme makes model tuning computationally less complex. As there is no need to create several validation sets and thus to reestimate the models several times, the overall time to compute predictions is reduced substantially. One may discuss the substantial sampling variation of the resulting MSPE from the validation sample (typically cross-validation is used to obtain more than one estimate of the prediction error). However, the authors clearly state:
 
 > We do not use cross-validation to maintain the temporal ordering of the data. (footnote 32)
 
@@ -230,13 +231,13 @@ characteristics_prepared <- open_dataset(sources = "data/characteristics_prepare
 
 > For OLS, ENet, GLM, and GBRT, we present their robust versions using Huber loss, which perform better than the version without. (p. 2250)
 
-For the sake of simplicity, Ifit linear models using $l2$ loss functions. In `R`, the package `hqreg` implements algorithms for fitting regularization paths for Lasso or elastic net penalized regression models with Huber loss. However, `hqreg` is not a running engine for `pairsnip` (yet). 
+For the sake of simplicity, I fit linear models using $l2$ loss functions. In `R`, the package `hqreg` implements algorithms for fitting regularization paths for Lasso or elastic net penalized regression models with Huber loss. However, `hqreg` is not a running engine for `pairsnip` (yet). 
 
 > Table A.5 (online appendix) describes the set of hyperparameters and their potential values used for tuning each machine learning model.
 
 For instance, to fit the elastic net it seems necessary to evaluate the mean-squared prediction error in the validation sample for *only* two values of the penalty term. Instead of tuning the elastic net mixture coefficient, I follow the paper and fix its value to $0.5$. 
 
-In the following I rely on the well-documented `tidymodels` workflow to estimate the elastic net. 
+In the following I rely on the well-documented `tidymodels` workflow (e.g. [Factor Selection with Machine Learning](https://www.tidy-finance.org/r/factor-selection-via-machine-learning.html#the-tidymodels-workflow)) to estimate the elastic net. 
 
 ```{r}
 elastic_net <- linear_reg( 
@@ -262,13 +263,16 @@ The following performs the model estimation to create predictions for the year 1
 
 ```{r}
 i <- 1
-split_dates <- estimation_periods |> filter(row_number() == i)
+split_dates <- estimation_periods |> 
+  filter(row_number() == i)
 
 train <- characteristics_prepared |> 
   filter(year(month) < split_dates$training_end) |> 
   collect()
+
 validation <- characteristics_prepared |>  
-  filter(year(month) >= split_dates$validation_start & year(month) <= split_dates$validation_end) |>
+  filter(year(month) >= split_dates$validation_start & 
+           year(month) <= split_dates$validation_end) |>
   collect()
 
 data_split <- make_splits(
@@ -279,7 +283,8 @@ folds <- manual_rset(list(data_split),
                      ids = "split")
 ```
 
-I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user prespecifies a plan. 
+I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. 
+
 ```{r}
 plan(sequential)
 
@@ -292,6 +297,7 @@ ml_fit <- ml_workflow |>
 
 show_best(ml_fit, metric = "rmse")
 ```
+
 Above we see the mean-squared prediction error for the validation period (`{r} split_dates$validation_start` until `{r} split_dates$validation_end`) for the two different values for the penalty parameter in the elastic net. If more computation time is available, it is likely advisable to expand the number of evaluation by providing a wider grid of possible parameter constellations. 
 
 ```{r}
@@ -303,11 +309,12 @@ ml_workflow_final <- ml_workflow |>
   fit(bind_rows(train, validation))
 ```
 
-While this blog post only shows how to implement the prediction procedure based on the elastic net, it is no problem to generate predictions for the remaining main methods (random forests, neural networks) presented in the paper. Below, I provide code for models that come as close as possible to the specifications laid out in the Online Appendix of the paper. 
+While this blog post only shows how to implement the prediction procedure based on the elastic net, it is no problem to generate predictions for the remaining main methods (random forests, neural networks) presented in the original paper. Below, I provide code for models that come as close as possible to the specifications laid out in the Online Appendix of the paper. 
 
-For the random forest, Table A5 in the Online Appendix states that the number of grown trees is fixed to 300. The number of features in each split is set to $\in \{3, 5, 10, 20, 30, 50, ...\}$. It is not clear to me what $...$ means in that context, for that reason I fix the number of choices to six. Finally, in the paper *depth* is chosen asa hyperparameter, ranging from one (pruned tree) to six (more complex tree). `ranger` does not support *depth* as a hyperparameter but rather allows to dynamically stop growing further branches once a minimum number of observations in a group is reached. The effect is similar (if `min_n` is small, the tree can grow deep, otherwise we expect pruned trees), but cannot be translated directly into `depth`. 
+For the random forest, Table A5 in the Online Appendix states that the number of grown trees is fixed to 300. The number of features in each split is set to $\in \{3, 5, 10, 20, 30, 50, ...\}$. It is not clear to me what $...$ means in that context, for that reason I fix the number of choices to six. Finally, in the paper *depth* is chosen as a hyperparameter, ranging from one (pruned tree) to six (more complex tree). `ranger` does not support *depth* as a hyperparameter but rather allows to dynamically stop growing further branches once a minimum number of observations in a group is reached. The effect is similar (if `min_n` is small, the tree can grow deep, otherwise we expect pruned trees), but cannot be translated directly into `depth`. 
 
-```{r, eval = FALSE}
+```{r}
+#| eval: false
 # install.packages("ranger")
 
 rf_model <- rand_forest(
@@ -333,17 +340,17 @@ NN2 has two hidden layers with 32 and 16 neurons, respectively; NN3 has three hi
 > We use the same activation function at all nodes, and choose a popular functional form in recent literature known as the
 rectified linear unit (ReLU) (p. 2244)
 
-
 In the following I show the exemplary implementation of the neural network with two hidden layers using the package `brulee`. Most information is taken from Table A5 in the online appendix. The table mentions a parameter `patience = 5` which I understand as a command on how many iterations with no improvement before stopping.
 
-```{r, eval = FALSE}
+```{r}
+#| eval: false
 # install.packages("brulee")
 
 deep_nnet_model <- mlp(
   epochs = 100,
   hidden_units = c(32, 16),
   activation = "relu",
-  learn_rate = tune()
+  learn_rate = tune(),
   penalty = tune(),
   batch_size = 10000,
   stop_iter = 5
