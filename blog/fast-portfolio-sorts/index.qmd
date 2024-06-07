@@ -84,18 +84,25 @@ If we want to apply the function above to each month using only `base`, then we 
 
 ```{r}
 sort_base <- function() {
-  df_split <- split(crsp_monthly_base, crsp_monthly_base$month)
-  df_split <- lapply(df_split, function(df) {
-    df$portfolio <- assign_portfolio(df, "mktcap_lag", n_portfolios = 10)
-    return(df)
-  })
-  df <- do.call(rbind, df_split)
-  aggregate(ret_excess ~ portfolio, data = df, FUN = function(x) mean(x, na.rm = TRUE))
+  crsp_monthly_base$portfolio <- with(
+    crsp_monthly_base, 
+    ave(mktcap_lag, month, FUN = function(x) assign_portfolio(data.frame(mktcap_lag = x), "mktcap_lag", n_portfolios = 10))
+  )
+  
+  mean_ret_excess <- with(
+    crsp_monthly_base, 
+    tapply(ret_excess, portfolio, function(x) mean(x, na.rm = TRUE))
+  )
+
+  data.frame(
+    portfolio = names(mean_ret_excess), 
+    ret = unlist(mean_ret_excess)
+  )
 }
 sort_base()
 ```
 
-This approach takes about 10 seconds per execution on my machine and is in fact more than 20-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I'll drop the `base` approach going forward. 
+This approach takes about 3 seconds per execution on my machine and is in fact more than 8-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I'll drop the `base` approach going forward. 
 
 If we want to perform the same logic using `dplyr`, we can use the following approach. Note that I use `as.data.frame()` for all approaches to ensure that the output format is the same for all approaches - a necessary requirement for a meaningful benchmark (otherwise code would not be equivalent).
 
