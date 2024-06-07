@@ -54,7 +54,7 @@ crsp_monthly_base <- as.data.frame(crsp_monthly_dplyr)
 
 crsp_monthly_dt <- copy(as.data.table(crsp_monthly_dplyr))
 
-crsp_monthly_dtplyr <- lazy_dt(crsp_monthly_dt)
+crsp_monthly_dtplyr <- lazy_dt(copy(crsp_monthly_dt))
 ```
 
 Note `data.table` in R uses reference semantics, which means that modifying one `data.table` object could potentially modify another if they share the same underlying data. Therefore, `copy()` ensures that `crsp_monthly_dt` is an independent copy of the data, preventing unintentional side effects from modifications in subsequent operations and ensuring a fair comparison. 
@@ -106,9 +106,11 @@ This approach takes about 3 seconds per execution on my machine and is in fact m
 
 If we want to perform the same logic using `dplyr`, we can use the following approach. Note that I use `as.data.frame()` for all approaches to ensure that the output format is the same for all approaches - a necessary requirement for a meaningful benchmark (otherwise code would not be equivalent).
 
+
 ```{r}
 sort_dplyr <- function() {
   crsp_monthly_dplyr |> 
+    group_by(month) |> 
     mutate(
       portfolio = assign_portfolio(
         pick(everything()), "mktcap_lag", n_portfolios = 10),
@@ -125,9 +127,9 @@ The equivalent approach in `data.table` looks as follows. Note that I deliberate
 
 ```{r}
 sort_dt <- function() {
-  as.data.frame(crsp_monthly_dt[
-    , `:=`(portfolio = assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), by = month)
-    ][, .(ret = mean(ret_excess, na.rm = TRUE)), keyby = .(portfolio)])
+  as.data.frame(copy(crsp_monthly_dt)[
+    , `:=`(portfolio = assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), by = "month"), 
+    by = .(month)][, .(ret = mean(ret_excess, na.rm = TRUE)), keyby = .(portfolio)])
 }
 sort_dt()
 ```
@@ -137,6 +139,7 @@ Lastly, I add the `dtplyr` implementation that also takes a `data.table` as inpu
 ```{r}
 sort_dtplyr <- function() {
   crsp_monthly_dtplyr |> 
+    group_by(month) |> 
     mutate(
       portfolio = assign_portfolio(
         pick(everything()), "mktcap_lag", n_portfolios = 10),
