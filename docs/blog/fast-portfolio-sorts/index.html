@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Christoph Scheuch">
-<meta name="dcterms.date" content="2024-06-06">
+<meta name="dcterms.date" content="2024-06-08">
 <meta name="description" content="A benchmark of R approaches for efficient portfolio sorts">
 
 <title>Tidy Finance - Fast Portfolio Sorts</title>
@@ -241,7 +241,7 @@ cookieconsent.run({
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">June 6, 2024</p>
+        <p class="date">June 8, 2024</p>
       </div>
     </div>
     
@@ -260,6 +260,7 @@ cookieconsent.run({
   <li><a href="#data-preparation" id="toc-data-preparation" class="nav-link active" data-scroll-target="#data-preparation">Data preparation</a></li>
   <li><a href="#defining-portfolio-sorts" id="toc-defining-portfolio-sorts" class="nav-link" data-scroll-target="#defining-portfolio-sorts">Defining portfolio sorts</a></li>
   <li><a href="#benchmarking-results" id="toc-benchmarking-results" class="nav-link" data-scroll-target="#benchmarking-results">Benchmarking results</a></li>
+  <li><a href="#concluding-remarks" id="toc-concluding-remarks" class="nav-link" data-scroll-target="#concluding-remarks">Concluding remarks</a></li>
   </ul>
 <div class="toc-actions"><ul><li><a href="https://github.com/tidy-finance/website/blob/main/blog/fast-portfolio-sorts/index.qmd" class="toc-action"><i class="bi bi-github"></i>View source</a></li></ul></div></nav>
     </div>
@@ -270,12 +271,13 @@ cookieconsent.run({
 
 
 
-<p>In the world of finance and investment management, working with large datasets containing portfolio holdings is a common task. One crucial operation that often needs to be performed on these datasets is portfolio sorts (e.g., see our chapter on <a href="../../r/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>. While R offers a variety of approaches through its base functions and popular packages like <code>dplyr</code> and <code>data.table</code>, the performance of these methods can vary significantly, especially when dealing with large datasets. As a data analyst or portfolio manager, it’s essential to understand the trade-offs between different sorting approaches in terms of execution time and memory usage. This blog post aims toshed light on this topic by benchmarking the performance of various sorting methods in R, specifically for the use case of sorting portfolio holdings.</p>
+<p>In the world of finance and investment management, implementing standard tasks like portfolio sorts in R can be approached in various ways, including using base R, <code>dplyr</code>, or <code>data.table</code>. For researchers and data analysts, it’s crucial that these implementations are both correct and efficient. Even though portfolio sorting is a relatively simple task, the need to sort portfolios in numerous ways due to the variety of sorting variables and methodological uncertainties can make computational efficiency critical. This blog post will benchmark the performance of different sorting methods in R, focusing on execution time and memory usage, to provide insights for data analysts and portfolio managers on choosing the most efficient approach.</p>
 <p>We’ll dive into the following sorting approaches:</p>
 <ul>
 <li>Use the built-in <code>base</code> functions that ship with every R installation.</li>
 <li>Leverage the popular <code>dplyr</code> package and workhorse of <a href="../../r/index.html">Tidy Finance with R</a>.</li>
-<li>Explore the powerful <code>data.table</code> package and its sorting capabilities.</li>
+<li>Explore the powerful <code>data.table</code> package using on-the-fly column creation.</li>
+<li>Compare to the <code>data.table</code> variant with in-place mutations.</li>
 <li>Combine the <code>dplyr</code> syntax with <code>data.table</code>’s performance through <code>dtplyr</code>.</li>
 </ul>
 <p>Throughout this blog post, I’ll use the following packages. Notably, <code>bench</code> is used to create benchmarking results.</p>
@@ -285,11 +287,12 @@ cookieconsent.run({
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(data.table)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(bench)</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(purrr)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data preparation</h2>
-<p>First, I start by loading the monthly CRSP data from our database (see <a href="../../r/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a> for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a <code>tibble</code> for <code>dplyr</code>, a <code>data.frame</code> for <code>base</code>, a <code>data.table</code> for <code>data.table</code> and a “lazy” data table for <code>dtplyr</code> because I want to avoid any conversion issues in the portfolio assignments.</p>
+<p>First, I start by loading the monthly CRSP data from our database (see <a href="../../r/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a> for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a <code>tibble</code> for <code>dplyr</code>, a <code>data.frame</code> for <code>base</code>, two <code>data.table</code>s for the two <code>data.table</code> approaches, and a ‘lazy’ data table for <code>dtplyr</code> because I want to avoid any conversion issues in the portfolio assignments.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SQLite</span>(),</span>
@@ -305,8 +308,11 @@ cookieconsent.run({
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>crsp_monthly_dt <span class="ot">&lt;-</span> <span class="fu">copy</span>(<span class="fu">as.data.table</span>(crsp_monthly_dplyr))</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>crsp_monthly_dtplyr <span class="ot">&lt;-</span> <span class="fu">lazy_dt</span>(crsp_monthly_dplyr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>crsp_monthly_dtip <span class="ot">&lt;-</span> <span class="fu">copy</span>(<span class="fu">as.data.table</span>(crsp_monthly_dplyr))</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>crsp_monthly_dtplyr <span class="ot">&lt;-</span> <span class="fu">lazy_dt</span>(<span class="fu">copy</span>(crsp_monthly_dt))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p>Note <code>data.table</code> in R uses reference semantics, which means that modifying one <code>data.table</code> object could potentially modify another if they share the same underlying data. Therefore, <code>copy()</code> ensures that <code>crsp_monthly_dt</code> is an independent copy of the data, preventing unintentional side effects from modifications in subsequent operations and ensuring a fair comparison.</p>
 </section>
 <section id="defining-portfolio-sorts" class="level2">
 <h2 class="anchored" data-anchor-id="defining-portfolio-sorts">Defining portfolio sorts</h2>
@@ -329,106 +335,130 @@ cookieconsent.run({
 <p>If we want to apply the function above to each month using only <code>base</code>, then we have to first split the <code>data.frame</code> into multiple parts and <code>lapply()</code> the function to each part. After we combined the parts again to one big data.frame, we can use <code>aggregate()</code> to compute the average excess returns.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>sort_base <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  df_split <span class="ot">&lt;-</span> <span class="fu">split</span>(crsp_monthly_base, crsp_monthly_base<span class="sc">$</span>month)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  df_split <span class="ot">&lt;-</span> <span class="fu">lapply</span>(df_split, <span class="cf">function</span>(df) {</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    df<span class="sc">$</span>portfolio <span class="ot">&lt;-</span> <span class="fu">assign_portfolio</span>(df, <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">return</span>(df)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  })</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  df <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, df_split)</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aggregate</span>(ret_excess <span class="sc">~</span> portfolio, <span class="at">data =</span> df, <span class="at">FUN =</span> <span class="cf">function</span>(x) <span class="fu">mean</span>(x, <span class="at">na.rm =</span> <span class="cn">TRUE</span>))</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_base</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  crsp_monthly_base<span class="sc">$</span>portfolio <span class="ot">&lt;-</span> <span class="fu">with</span>(</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    crsp_monthly_base, </span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ave</span>(mktcap_lag, month, <span class="at">FUN =</span> <span class="cf">function</span>(x) <span class="fu">assign_portfolio</span>(<span class="fu">data.frame</span>(<span class="at">mktcap_lag =</span> x), <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>))</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  mean_ret_excess <span class="ot">&lt;-</span> <span class="fu">with</span>(</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    crsp_monthly_base, </span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tapply</span>(ret_excess, portfolio, mean)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio =</span> <span class="fu">names</span>(mean_ret_excess), </span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">ret =</span> <span class="fu">unlist</span>(mean_ret_excess)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>bench<span class="sc">::</span><span class="fu">system_time</span>(<span class="fu">sort_base</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>   portfolio ret_excess
-1          1    0.02270
-2          2    0.00512
-3          3    0.00482
-4          4    0.00515
-5          5    0.00548
-6          6    0.00608
-7          7    0.00637
-8          8    0.00680
-9          9    0.00647
-10        10    0.00579</code></pre>
+<pre><code>process    real 
+  3.11s   3.08s </code></pre>
 </div>
 </div>
-<p>This approach takes about 10 seconds per execution on my machine and is in fact more than 20-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I’ll drop the <code>base</code> approach going forward.</p>
+<p>This approach takes about 3 seconds per execution on my machine and is in fact more than 8-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I’ll drop the <code>base</code> approach going forward.</p>
 <p>If we want to perform the same logic using <code>dplyr</code>, we can use the following approach. Note that I use <code>as.data.frame()</code> for all approaches to ensure that the output format is the same for all approaches - a necessary requirement for a meaningful benchmark (otherwise code would not be equivalent).</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>sort_dplyr <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  crsp_monthly_dplyr <span class="sc">|&gt;</span> </span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      <span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pick</span>(<span class="fu">everything</span>()), <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>      <span class="at">by =</span> <span class="st">"month"</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span> </span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span> </span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>()</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dplyr</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span> </span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pick</span>(<span class="fu">everything</span>()), <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>),</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">by =</span> <span class="st">"month"</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">|&gt;</span> </span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span> </span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess)) <span class="sc">|&gt;</span> </span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>()</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dplyr</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   portfolio     ret
-1          1 0.02351
-2          2 0.00666
-3          3 0.00485
-4          4 0.00455
-5          5 0.00491
-6          6 0.00604
-7          7 0.00656
-8          8 0.00607
-9          9 0.00556
-10        10 0.00607</code></pre>
+1          1 0.02270
+2          2 0.00512
+3          3 0.00482
+4          4 0.00515
+5          5 0.00548
+6          6 0.00608
+7          7 0.00637
+8          8 0.00680
+9          9 0.00647
+10        10 0.00579</code></pre>
 </div>
 </div>
-<p>The equivalent approach in <code>data.table</code> looks as follows. Note that I deliberately don’t use any pipe or intermediate assignments as to avoid any performance overhead that these might introduce.</p>
+<p>The equivalent approach in <code>data.table</code> looks as follows. Note that I deliberately don’t use any pipe or intermediate assignments as to avoid any performance overhead that these might introduce. I also avoid using the in-place modifier <code>:=</code> because it would create a new permanent column in <code>crsp_monthly_dt</code>, which I don’t need for the on-the-fly aggregation and it also doesn’t happen in <code>dplyr</code>.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sort_dt <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>(crsp_monthly_dt[</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    , <span class="st">`</span><span class="at">:=</span><span class="st">`</span>(<span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(.SD, <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>), <span class="at">by =</span> month)</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    ][, .(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)), <span class="at">keyby =</span> .(portfolio)])</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    , .(<span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(.SD, <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>), month, ret_excess), <span class="at">by =</span> .(month)][</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>      , .(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess)), <span class="at">keyby =</span> .(portfolio)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      ])</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   portfolio     ret
-1          1 0.02351
-2          2 0.00666
-3          3 0.00485
-4          4 0.00455
-5          5 0.00491
-6          6 0.00604
-7          7 0.00656
-8          8 0.00607
-9          9 0.00556
-10        10 0.00607</code></pre>
+1          1 0.02270
+2          2 0.00512
+3          3 0.00482
+4          4 0.00515
+5          5 0.00548
+6          6 0.00608
+7          7 0.00637
+8          8 0.00680
+9          9 0.00647
+10        10 0.00579</code></pre>
+</div>
+</div>
+<p>However, as the performance benefit of <code>data.table</code> may manifest itself through its in-place modification capabilties, I also introduce a second version of the <code>data.table</code> expression. Note that in this version <code>crsp_monthly_dtip</code> gets a permanent column <code>portfolio</code> that is overwritten in each iteration.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>sort_dtip <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.data.frame</span>(crsp_monthly_dtip[</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    , <span class="at">portfolio :=</span> <span class="fu">assign_portfolio</span>(.SD, <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>), <span class="at">by =</span> .(month)][</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>      , .(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess)), <span class="at">keyby =</span> .(portfolio)</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>      ])</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dtip</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   portfolio     ret
+1          1 0.02270
+2          2 0.00512
+3          3 0.00482
+4          4 0.00515
+5          5 0.00548
+6          6 0.00608
+7          7 0.00637
+8          8 0.00680
+9          9 0.00647
+10        10 0.00579</code></pre>
 </div>
 </div>
 <p>Lastly, I add the <code>dtplyr</code> implementation that also takes a <code>data.table</code> as input and internally converts <code>dplyr</code> code to <code>data.table</code> syntax. Note that the final <code>as.data.frame()</code> call is used to access the results and ensure that the result format is consistent with the other approaches.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>sort_dtplyr <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  crsp_monthly_dtplyr <span class="sc">|&gt;</span> </span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>      <span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pick</span>(<span class="fu">everything</span>()), <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>),</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>      <span class="at">by =</span> <span class="st">"month"</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>    )  <span class="sc">|&gt;</span> </span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span> </span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>()</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dtplyr</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>sort_dtplyr <span class="ot">&lt;-</span> <span class="cf">function</span>() {</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  crsp_monthly_dtplyr <span class="sc">|&gt;</span> </span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span> </span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pick</span>(<span class="fu">everything</span>()), <span class="st">"mktcap_lag"</span>, <span class="at">n_portfolios =</span> <span class="dv">10</span>),</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>      <span class="at">by =</span> <span class="st">"month"</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    )  <span class="sc">|&gt;</span> </span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">group_by</span>(portfolio) <span class="sc">|&gt;</span> </span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">summarize</span>(<span class="at">ret =</span> <span class="fu">mean</span>(ret_excess, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.data.frame</span>()</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="fu">sort_dtplyr</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   portfolio     ret
-1          1 0.02351
-2          2 0.00666
-3          3 0.00485
-4          4 0.00455
-5          5 0.00491
-6          6 0.00604
-7          7 0.00656
-8          8 0.00607
-9          9 0.00556
-10        10 0.00607</code></pre>
+1          1 0.02270
+2          2 0.00512
+3          3 0.00482
+4          4 0.00515
+5          5 0.00548
+6          6 0.00608
+7          7 0.00637
+8          8 0.00680
+9          9 0.00647
+10        10 0.00579</code></pre>
 </div>
 </div>
 <p>Now that we have verified that all code chunks create the same average excess returns per portfolio, we can proceed to the performance evaluation.</p>
@@ -437,21 +467,19 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="benchmarking-results">Benchmarking results</h2>
 <p>The <code>bench</code> package is a great utility for benchmarking and timing expressions in R. It provides functions that allow you to measure the execution time of expressions or code chunks. This can be useful for comparing the performance of different approaches or implementations, or for identifying potential bottlenecks in your code. The following code evaluates each approach from above a 100 times and collects the results.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">1234</span>)</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>iterations <span class="ot">&lt;-</span> <span class="dv">100</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> bench<span class="sc">::</span><span class="fu">mark</span>(</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sort_dplyr</span>(), <span class="fu">sort_dt</span>(), <span class="fu">sort_dtplyr</span>(), </span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">iterations =</span> iterations</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>iterations <span class="ot">&lt;-</span> <span class="dv">100</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>results <span class="ot">&lt;-</span> bench<span class="sc">::</span><span class="fu">mark</span>(</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sort_dplyr</span>(), <span class="fu">sort_dt</span>(), <span class="fu">sort_dtip</span>(), <span class="fu">sort_dtplyr</span>(), </span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">iterations =</span> iterations</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>The following plot shows the distributions of execution times as violin plots. You can see that <code>data.table</code> takes the lead and is followed closely by <code>dbplyr</code>, while <code>dtplyr</code> takes the third place.</p>
+<p>The following plot shows the distributions of execution times as violin plots. You can see that <code>dplyr</code> takes the lead and is followed closely by both <code>data.table</code> variants, while <code>dtplyr</code> takes the third place.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="fu">autoplot</span>(results, <span class="at">type =</span> <span class="st">"violin"</span>) <span class="sc">+</span></span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">x =</span> <span class="st">"Sorting approach"</span>, </span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">title =</span> <span class="st">"Execution time of porfolio sorts using dplyr, data.table, and dtplyr"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">autoplot</span>(results, <span class="at">type =</span> <span class="st">"violin"</span>) <span class="sc">+</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="cn">NULL</span>, <span class="at">x =</span> <span class="cn">NULL</span>, </span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>       <span class="at">title =</span> <span class="st">"Execution time of porfolio sorts using dplyr, data.table, and dtplyr"</span>,</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"'dt' refers to data.table without in-place modification and 'dtip' with in-place modification"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -460,7 +488,14 @@ cookieconsent.run({
 </div>
 </div>
 </div>
-<p>Note that all three methods are blazingly fast, given that the task is to assign 10 portfolios across up to 26,000 stocks for 755 months. I personally don’t really care for the extra few milliseconds that I’d get through <code>data.table</code> by sacrificing the <code>dplyr</code> syntax because I code mostly interactively. If your context involves time constraints and needs to be as fast as possible, then you might not only prefer <code>data.table</code>, but also thing about more efficient ways to assign portfolios compared to applying the function I have given above.</p>
+<p>Note that all three methods are quite fast and take less than 1 second, given that the task is to assign 10 portfolios across up to 26,000 stocks for 755 months. In fact, <code>dplyr</code> yields the fastest execution times, followed by both <code>data.table</code> implementations and <code>dtplyr</code>.</p>
+<p>Why is <code>data.table</code> slower than <code>dplyr</code>? It is generally believed that <code>data.table</code> is faster than <code>dplyr</code> for data manipulation tasks. The example above shows that it actually depends on the application. On the one hand, the data set might be ‘too small’ for the performance benefits of <code>data.table</code> to kick in. On the other hand, sorting the portfolios using the <code>assign_portfolio()</code> function might be better suited for the <code>dplyr</code> execution backend than the <code>data.table</code> backend.</p>
+<p>Why is <code>dtplyr</code> slower than <code>data.table</code>? On the one hand, <code>dtplyr</code> translates <code>dplyr</code> operations into <code>data.table</code> syntax. This translation process introduces some overhead, as <code>dtplyr</code> needs to interpret the <code>dplyr</code> code and convert it into equivalent <code>data.table</code> operations. On the other hand, <code>dtplyr</code> does not modify in place by default, so it typcially makes a copy that would not be necessary if you were using <code>data.table</code> directly.</p>
+</section>
+<section id="concluding-remarks" class="level2">
+<h2 class="anchored" data-anchor-id="concluding-remarks">Concluding remarks</h2>
+<p>The key takeway is that neither of the libraries is strictly more efficient than the other. If you really search for performance among R libraries, you have to carefully choose a library for your specific application and think hard about optimizing the logic of your code to the chosen library.</p>
+<p>If you have ideas how to optimize any of the approaches, please reach out to us! In particular, we’d love to optimize <code>base</code> sufficiently for it to be included in the benchmark tests.</p>
 
 
 </section>
@@ -899,7 +934,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"loop":false,"descPosition":"bottom","selector":".lightbox","closeEffect":"zoom","openEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"loop":false,"selector":".lightbox","openEffect":"zoom","closeEffect":"zoom","descPosition":"bottom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
