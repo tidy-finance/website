@@ -3,7 +3,7 @@ title: "Fast Portfolio Sorts"
 author:
   - name: Christoph Scheuch
     url: https://www.tidy-intelligence.com/
-date: "2024-06-06"
+date: "2024-06-08"
 description: A benchmark of R approaches for efficient portfolio sorts
 categories: 
   - R
@@ -19,7 +19,8 @@ We'll dive into the following sorting approaches:
 
 - Use the built-in `base` functions that ship with every R installation.
 - Leverage the popular `dplyr` package and workhorse of [Tidy Finance with R](../../r/index.qmd).
-- Explore the powerful `data.table` package and its sorting capabilities.
+- Explore the powerful `data.table` package using on-the-fly column creation.
+- Compare to the `data.table` variant with in-place mutations. 
 - Combine the `dplyr` syntax with `data.table`'s performance through `dtplyr`.
 
 Throughout this blog post, I'll use the following packages. Notably, `bench` is used to create benchmarking results. 
@@ -33,16 +34,17 @@ library(data.table)
 library(bench)
 library(purrr)
 library(RSQLite)
+library(ggplot2)
 ```
 
 ## Data preparation
 
-First, I start by loading the monthly CRSP data from our database (see [WRDS, CRSP, and Compustat](../../r/wrds-crsp-and-compustat.qmd) for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a `tibble` for `dplyr`, a `data.frame` for `base`, a `data.table` for `data.table` and a “lazy” data table for `dtplyr` because I want to avoid any conversion issues in the portfolio assignments.
+First, I start by loading the monthly CRSP data from our database (see [WRDS, CRSP, and Compustat](../../r/wrds-crsp-and-compustat.qmd) for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a `tibble` for `dplyr`, a `data.frame` for `base`, two `data.table`s for the two `data.table` approaches, and a 'lazy' data table for `dtplyr` because I want to avoid any conversion issues in the portfolio assignments.
 
 ```{r}
 tidy_finance <- dbConnect(
   SQLite(),
-  "../../data/tidy_finance_r.sqlite",
+  "data/tidy_finance_r.sqlite",
   extended_types = TRUE
 )
 
@@ -53,6 +55,8 @@ crsp_monthly_dplyr <- tbl(tidy_finance, "crsp_monthly") |>
 crsp_monthly_base <- as.data.frame(crsp_monthly_dplyr)
 
 crsp_monthly_dt <- copy(as.data.table(crsp_monthly_dplyr))
+
+crsp_monthly_dtip <- copy(as.data.table(crsp_monthly_dplyr))
 
 crsp_monthly_dtplyr <- lazy_dt(copy(crsp_monthly_dt))
 ```
@@ -91,7 +95,7 @@ sort_base <- function() {
   
   mean_ret_excess <- with(
     crsp_monthly_base, 
-    tapply(ret_excess, portfolio, function(x) mean(x, na.rm = TRUE))
+    tapply(ret_excess, portfolio, mean)
   )
 
   data.frame(
@@ -99,7 +103,7 @@ sort_base <- function() {
     ret = unlist(mean_ret_excess)
   )
 }
-sort_base()
+bench::system_time(sort_base())
 ```
 
 This approach takes about 3 seconds per execution on my machine and is in fact more than 8-times slower than the other approaches! To create a more nuanced picture for the fast and arguably more interesting approaches, I'll drop the `base` approach going forward. 
@@ -117,21 +121,34 @@ sort_dplyr <- function() {
       by = "month"
     ) |> 
     group_by(portfolio) |> 
-    summarize(ret = mean(ret_excess, na.rm = TRUE)) |> 
+    summarize(ret = mean(ret_excess)) |> 
     as.data.frame()
 }
 sort_dplyr()
 ```
 
-The equivalent approach in `data.table` looks as follows. Note that I deliberately don't use any pipe or intermediate assignments as to avoid any performance overhead that these might introduce. 
+The equivalent approach in `data.table` looks as follows. Note that I deliberately don't use any pipe or intermediate assignments as to avoid any performance overhead that these might introduce. I also avoid using the in-place modifier `:=` because it would create a new permanent column in `crsp_monthly_dt`, which I don't need for the on-the-fly aggregation and it also doesn't happen in `dplyr`.
 
 ```{r}
 sort_dt <- function() {
-  as.data.frame(copy(crsp_monthly_dt)[
-    , `:=`(portfolio = assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), by = "month"), 
-    by = .(month)][, .(ret = mean(ret_excess, na.rm = TRUE)), keyby = .(portfolio)])
+  as.data.frame(crsp_monthly_dt[
+    , .(portfolio = assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), month, ret_excess), by = .(month)][
+      , .(ret = mean(ret_excess)), keyby = .(portfolio)
+      ])
 }
 sort_dt()
+```
+
+However, as the performance benefit of `data.table` may manifest itself through its in-place modification capabilties, I also introduce a second version of the `data.table` expression. Note that in this version `crsp_monthly_dtip` gets a permanent column `portfolio` that is overwritten in each iteration.
+
+```{r}
+sort_dtip <- function() {
+  as.data.frame(crsp_monthly_dtip[
+    , portfolio := assign_portfolio(.SD, "mktcap_lag", n_portfolios = 10), by = .(month)][
+      , .(ret = mean(ret_excess)), keyby = .(portfolio)
+      ])
+}
+sort_dtip()
 ```
 
 Lastly, I add the `dtplyr` implementation that also takes a `data.table` as input and internally converts `dplyr` code to `data.table` syntax. Note that the final `as.data.frame()` call is used to access the results and ensure that the result format is consistent with the other approaches. 
@@ -160,25 +177,33 @@ The `bench` package is a great utility for benchmarking and timing expressions i
 
 ```{r}
 #| warning: false
-#| cache: true
 iterations <- 100
 
 results <- bench::mark(
-  sort_dplyr(), sort_dt(), sort_dtplyr(), 
+  sort_dplyr(), sort_dt(), sort_dtip(), sort_dtplyr(), 
   iterations = iterations
 )
 ```
 
-The following plot shows the distributions of execution times as violin plots. You can see that `data.table` takes the lead and is followed closely by `dbplyr`, while `dtplyr` takes the third place. 
+The following plot shows the distributions of execution times as violin plots. You can see that `dplyr` takes the lead and is followed closely by both `data.table` variants, while `dtplyr` takes the third place. 
 
 ```{r}
 #| warning: false
-#| cache: true
-library(ggplot2)
-
 autoplot(results, type = "violin") +
-  labs(y = NULL, x = "Sorting approach", 
-       title = "Execution time of porfolio sorts using dplyr, data.table, and dtplyr")
+  labs(y = NULL, x = NULL, 
+       title = "Execution time of porfolio sorts using dplyr, data.table, and dtplyr",
+       subtitle = "'dt' refers to data.table without in-place modification and 'dtip' with in-place modification")
 ```
 
-Note that all three methods are blazingly fast, given that the task is to assign 10 portfolios across up to 26,000 stocks for 755 months. I personally don't really care for the extra few milliseconds that I'd get through `data.table` by sacrificing the `dplyr` syntax because I code mostly interactively. If your context involves time constraints and needs to be as fast as possible, then you might not only prefer `data.table`, but also think about more efficient ways to assign portfolios compared to applying the function I have given above. 
+Note that all three methods are quite fast and take less than 1 second, given that the task is to assign 10 portfolios across up to 26,000 stocks for 755 months. In fact, `dplyr` yields the fastest execution times, followed by both `data.table` implementations and `dtplyr`. 
+
+Why is `data.table` slower than `dplyr`? It is generally believed that `data.table` is faster than `dplyr` for data manipulation tasks. The example above shows that it actually depends on the application. On the one hand, the data set might be 'too small' for the performance benefits of `data.table` to kick in. On the other hand, sorting the portfolios using the `assign_portfolio()` function might be better suited for the `dplyr` execution backend than the `data.table` backend.
+
+Why is `dtplyr` slower than `data.table`? On the one hand, `dtplyr` translates `dplyr` operations into `data.table` syntax. This translation process introduces some overhead, as `dtplyr` needs to interpret the `dplyr` code and convert it into equivalent `data.table` operations. On the other hand, `dtplyr` does not modify in place by default, so it typcially makes a copy that would not be necessary if you were using `data.table` directly. 
+
+## Concluding remarks
+
+The key takeway is that neither of the libraries is strictly more efficient than the other. If you really search for performance among R libraries, you have to carefully choose a library for your specific application and think hard about optimizing the logic of your code to the chosen library. 
+
+If you have ideas how to optimize any of the approaches, please reach out to us! In particular, we'd love to optimize `base` sufficiently for it to be included in the benchmark tests.
+
