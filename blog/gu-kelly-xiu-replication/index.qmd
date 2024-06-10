@@ -260,7 +260,7 @@ penalty_grid = tibble(penalty = c(1e-4, 1e-1))
 ```{r}
 rec_final <- recipe(ret_excess ~ 0 + ., 
                     data = characteristics_prepared |> head() |> collect()) |>
-  update_role(permno, month, mktcap_lag, year, new_role = "id") 
+  update_role(permno, month, mktcap_lag, year, new_role = "id")
 
 ml_workflow <- workflow() |>
   add_model(elastic_net) |>
@@ -277,8 +277,8 @@ split_dates <- estimation_periods |>
   filter(row_number() == j)
 
 train <- characteristics_prepared |> 
-  filter(year(month) < split_dates$training_end) |> 
-  collect()
+  filter(year(month) < split_dates$training_end) |>
+  collect() 
 
 validation <- characteristics_prepared |>  
   filter(year(month) >= split_dates$validation_start & 
@@ -318,6 +318,8 @@ ml_workflow_final <- ml_workflow |>
   finalize_workflow(ml_fit_best) |> 
   fit(bind_rows(train, validation))
 ```
+
+## Other ML models
 
 While this blog post only shows how to implement the prediction procedure based on the elastic net, it is no problem to generate predictions for the remaining main methods (random forests, neural networks) presented in the original paper. Below, I provide code for models that come as close as possible to the specifications laid out in the Online Appendix of the paper. 
 
@@ -400,18 +402,31 @@ ml_portfolios <- oos |>
   mutate(
     portfolio = tidyfinance::assign_portfolio(
       data = pick(everything()),
-      sorting_variable = .pred,
+      sorting_variable = ".pred",
       n_portfolios = 10
     ),
     portfolio = as.factor(portfolio)
   ) |>
   group_by(portfolio, month) |>
   summarize(
+    ret_predicted = mean(.pred),
     ret_excess = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )
 ```
 
-TODO: evaluation in terms of Predicted return Average return SD SR for the 10 portfolios + 10-1
+TODO: evaluation in terms of Predicted return Average return SD SR for the 10 portfolios + 10-1 (Pred Avg SD SR)
+
+Finally, we evaluate the performance of the ML-portfolios. The table reports the predicted return, the average realized return, the standard deviation and the out-of-sample Sharpe ratio for each of the decile portfolios as well as the long-short zero-cost portfolio. 
+```{r}
+hml_portfolio <- ml_portfolios |> 
+ summarise("H-L" = ret_excess[portfolio == min(portfolio)] -
+                   ret_excess[portfolio == max(portfolio)])
+
+ml_portfolios |>
+    group_by(portfolio) |>
+    summarise(Pred = mean())
+
+```
 
 Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
