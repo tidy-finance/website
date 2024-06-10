@@ -17,9 +17,8 @@ categories:
 This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
 
 ::: {.callout-warning}
-To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replicating on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. 
+To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. 
 :::
-
 
 ```{r}
 library(tidyverse)
@@ -28,17 +27,17 @@ library(arrow)
 library(RSQLite)
 library(tidymodels)
 library(future)
+library(tidyfinance) # for portfolio sorts
 # install.packages("glmnet") # In the application below, tidymodels requires glmnet so make sure to install the package before running the code
 ```
 
 ## Data preparation
 
-
 ### Download stock-characteristics
 
 > we build a large collection of stock-level predictive characteristics based on the cross-section of stock returns literature. These include 94 characteristics (61 of which are updated annually, 13 are updated quarterly, and 20 are updated monthly). In addition, we include 74 industry dummies corresponding to the first two digits of Standard Industrial Classification (SIC) codes. 
 
-The authors provide the dataset with stock-level characteristics online. I download this (large) dataset directly from within `R` from the [Dacheng Xiu's homepage](https://dachxiu.chicagobooth.edu/). The data is stored as a .csv file within a zipped folder. For such purposes, the `archive` package is useful. I set `options(timeout = 1200)`, which allows the `R` session to download the dataset for 20 minutes. The default in `R` is 60 seconds which was too short on my machine.
+The authors provide the dataset with stock-level characteristics online. While the original sample from the published version ended in December 2016, the author furnished the stock-level characteristics dataset until 2021. I download this (large) dataset directly from within `R` from the [Dacheng Xiu's homepage](https://dachxiu.chicagobooth.edu/). The data is stored as a .csv file within a zipped folder. For such purposes, the `archive` package is useful. I set `options(timeout = 1200)`, which allows the `R` session to download the dataset for 20 minutes. The default in `R` is 60 seconds which was too short on my machine.
 
 ```{r}
 options(timeout = 1200)
@@ -103,12 +102,14 @@ characteristics <- characteristics |>
 
 characteristics <- characteristics |>
   mutate(across(contains("characteristic"), 
-                replace_na, 0))
+                \(x) replace_na(x, 0)))
 ```
 
 > We obtain monthly total individual equity returns from CRSP for all firms listed in the NYSE, AMEX, and NASDAQ. Our sample begins in March 1957 (the start date of the S&P 500) (p. 2248)
 
-To retrieve CRSP excess returns, we merge the stock-level characteristics with the prepared monthly CRSP data as described in [WRDS, CRSP, and Compustat](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html). To create portfolio sorts based on the predictions, `mktcap_lag` remains in the sample (albeit it should be mentioned that the main results in Section 2.4.2 of the paper are derived computing equal-weighted portfolios).
+To retrieve CRSP excess returns, we merge the stock-level characteristics with the prepared monthly CRSP data as described in [WRDS, CRSP, and Compustat](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html). Note that in the book we start the CRSP sample in the year 1960 (partially due to data availability). The difference of three years may explain some deviations in the predictive performance. You can easily adjust the variable `start_date <- ymd("1957-03-01")` when running the code to reproduce the file `tidy_finance_r.sqlite`. 
+
+To create portfolio sorts based on the predictions, `mktcap_lag` remains in the sample (albeit it should be mentioned that the main results in Section 2.4.2 of the paper are derived computing equal-weighted portfolios).
 
 > We also construct eight macroeconomic predictors following the variable definitions detailed in Welch and Goyal (2008), including dividend-price ratio (dp), earnings-price ratio (ep), book-to-market ratio (bm), net equity expansion
 (ntis), Treasury-bill rate (tbl), term spread (tms), default spread (dfy), and stock variance (svar). (p. 2248)
@@ -116,6 +117,8 @@ To retrieve CRSP excess returns, we merge the stock-level characteristics with t
 We rely on the preparation of the macroeconomic predictors from the corresponding chapter in [Accessing and Managing Financial Data](https://www.tidy-finance.org/r/accessing-and-managing-financial-data.html#macroeconomic-predictors). The following code snippets merges the stock-level characteristics with the CRSP sample and the macroeconomic predictors. Note that no further adjustment of the timing of excess returns and stock-level characteristics is necessary:
 
 > In this dataset, we've already adjusted the lags. (e.g. When DATE=19570329 in our dataset, you can use the monthly RET at 195703 as the response variable.) (readme.txt from the available dataset on Dacheng Xiu's homepage). 
+
+To remain consistent, we only lag the macropredictors by one month.  
 
 ```{r}
 tidy_finance <- dbConnect(SQLite(), 
@@ -131,7 +134,10 @@ macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
   collect() |>
   rename_with(~ paste0("macro_", .), -month)
 
-# TODO: check if macro predictors should be lagged in this application
+macro_predictors <- macro_predictors |>
+  select(month) |>
+  left_join(macro_predictors |> mutate(month = month %m+% months(1)), 
+            join_by(month))
 
 characteristics <- characteristics |>
   inner_join(crsp_monthly, join_by(month, permno)) |>
@@ -148,7 +154,7 @@ Before applying machine-learning models, the authors include interaction terms b
 
 > We include 74 industry dummies corresponding to the first two digits of Standard Industrial Classification (SIC) codes. [...] [The stock-level covariates also include] interactions between stock-level characteristics and macroeconomic state variables. The total number of covariates is 94×(8+1)+74=920. (p. 2249)
 
-The following recipe creates dummies for each `sic2` code and adds interaction terms between macro variables and stock characteristics. Note that `data` for the recipe is only required to identify the columns in the sample. No computations are performed at the first step. 
+The following recipe creates dummies for each `sic2` code and adds interaction terms between macro variables and stock characteristics. Note that `data` for the recipe is only required to identify the columns in the sample. No computations are performed at the first step. For that reason, I call `head()` to keep the computational burden a bit lower without affecting the outcome. 
 
 ```{r}
 rec <- recipe(ret_excess ~ ., data = characteristics |> head())|>
@@ -168,7 +174,7 @@ Next, I create the full dataset containing `{r} nrow(characteristics)` monthly o
 characteristics_prepared <- bake(rec, new_data = characteristics)
 ```
 
-I store the prepared file for your convenience. Furthermore, the authors neer use the entire dataset for training, instead, only a fraction needs to be available in memory at any given point in time. 
+I store the prepared file for your convenience. Furthermore, the authors never use the entire dataset for training, instead, only a fraction needs to be available in memory at any given point in time. 
 
 ```{r}
 characteristics_prepared |>
@@ -176,9 +182,11 @@ characteristics_prepared |>
   write_dataset(path = "data/characteristics_prepared")
 ```
 
+## Sample splitting and tuning
+
 > We divide the 60 years of data into 18 years of training sample (1957–1974), 12 years of validation sample (1975–1986), and the remaining 30 years (1987–2016) for out-of-sample testing. Because machine learning algorithms are computationally intensive, we avoid recursively refitting models each month. Instead, we refit once every year as most of our signals are updated once per year. Each time we refit, we increase the training sample by 1 year. We maintain the same size of the validation sample, but roll it forward to include the most recent 12 months
 
-We visualize our understanding of this data-budget below.
+I visualize my understanding of this data-budget below.
 
 ```{r}
 validation_length <- 12
@@ -221,7 +229,7 @@ The simple scheme makes model tuning computationally less complex. As there is n
 
 > We do not use cross-validation to maintain the temporal ordering of the data. (footnote 32)
 
-## Model specification
+### Model specification
 
 The paper describes a collection of machine learning methods that was used in the analysis. I refer to Section 1 for a detailed description of the individual models. This blog post focuses on the implementation issues that arise when applying off-the-shelf ML methods on such a large dataset. 
 
@@ -259,12 +267,14 @@ ml_workflow <- workflow() |>
   add_recipe(rec_final)
 ```
 
-The following performs the model estimation to create predictions for the year 1987. For a complete replication of the procedure laid out in the paper, you'll have to run a loop over all out-of-sample years (`i`).
+### Model fitting
+The following performs the model estimation to create predictions for the year 2021. For a complete replication of the procedure laid out in the paper, you'll have to run a loop over all out-of-sample years (`j`). 
 
 ```{r}
-i <- 1
+j <- nrow(estimation_periods)
+
 split_dates <- estimation_periods |> 
-  filter(row_number() == i)
+  filter(row_number() == j)
 
 train <- characteristics_prepared |> 
   filter(year(month) < split_dates$training_end) |> 
@@ -356,7 +366,7 @@ deep_nnet_model <- mlp(
   stop_iter = 5
 ) |>
   set_mode("regression") |>
-  set_engine("brulee", verbose = FALSE)
+  set_engine("brulee")
 
 nn_grid <- expand_grid(
   learn_rate = c(0.001, 0.01),
@@ -385,36 +395,10 @@ oos <- oos |>
 ```
 
 ```{r}
-assign_portfolio <- function(data, 
-                             sorting_variable, 
-                             n_portfolios) {
-  # Compute breakpoints
-  breakpoints <- data |>
-    pull({{ sorting_variable }}) |>
-    quantile(
-      probs = seq(0, 1, length.out = n_portfolios + 1),
-      na.rm = TRUE,
-      names = FALSE
-    )
-
-  # Assign portfolios
-  assigned_portfolios <- data |>
-    mutate(portfolio = findInterval(
-      pick(everything()) |>
-        pull({{ sorting_variable }}),
-      breakpoints,
-      all.inside = TRUE
-    )) |>
-    pull(portfolio)
-  
-  # Output
-  return(assigned_portfolios)
-}
-
 ml_portfolios <- oos |>
   group_by(month) |>
   mutate(
-    portfolio = assign_portfolio(
+    portfolio = tidyfinance::assign_portfolio(
       data = pick(everything()),
       sorting_variable = .pred,
       n_portfolios = 10
@@ -429,3 +413,5 @@ ml_portfolios <- oos |>
 ```
 
 TODO: evaluation in terms of Predicted return Average return SD SR for the 10 portfolios + 10-1
+
+Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
