@@ -12,6 +12,9 @@ categories:
   - R
   - Replications
   - Machine learning
+  
+execute:
+  eval: false
 ---
 
 This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
@@ -28,6 +31,7 @@ library(arrow)
 library(RSQLite)
 library(tidymodels)
 library(butcher)
+library(future)
 library(tidyfinance) # for portfolio sorts
 # install.packages("glmnet") 
 # install.packages("ranger")
@@ -43,7 +47,6 @@ library(tidyfinance) # for portfolio sorts
 The authors provide the dataset with stock-level characteristics online. While the original sample from the published version ended in December 2016, the author furnished the stock-level characteristics dataset until 2021. I download this (large) dataset directly from within `R` from the [Dacheng Xiu's homepage](https://dachxiu.chicagobooth.edu/). The data is stored as a .csv file within a zipped folder. For such purposes, the `archive` package is useful. I set `options(timeout = 1200)`, which allows the `R` session to download the dataset for 20 minutes. The default in `R` is 60 seconds which was too short on my machine.
 
 ```{r}
-#| eval: false
 options(timeout = 1200)
 characteristics <- read_csv(archive_read("https://dachxiu.chicagobooth.edu/download/datashare.zip", 
                                          file = "datashare.csv"))
@@ -69,8 +72,6 @@ The characteristics appear in raw format. As many machine-learning applications 
 The idea is that at each date, the cross-section of each predictor should be scaled such that the maximum value is 1 and the minimum value is -1. The cross-sectional ranking is time-consuming. The function below explicitly handles `NA` values, so they do not tamper with the ranking. 
 
 ```{r}
-#| eval: false
-
 rank_transform <- function(x) {
   rank_x <- rank(x)
   rank_x[is.na(x)] <- NA
@@ -104,8 +105,6 @@ However, one of the paper's coauthors also [claims otherwise](https://www.dropbo
 I interpret the divergence as follows: First, I replace missing values with the cross-sectional median. However, for some months, few characteristics (e.g. `absacc`) do not have any value at all, leaving the cross-sectional median undefined. Thus, in a second step, I replace remaining missing characteristics with zero. 
 
 ```{r}
-#| eval: false
-
 characteristics <- characteristics |>
   group_by(month) |> 
   mutate(across(contains("characteristic"), 
@@ -133,8 +132,6 @@ We rely on the preparation of the macroeconomic predictors from the correspondin
 To remain consistent, we only lag the macropredictors by one month.  
 
 ```{r}
-#| eval: false
-
 tidy_finance <- dbConnect(SQLite(), 
                           "data/tidy_finance_r.sqlite",
                           extended_types = TRUE)
@@ -171,8 +168,6 @@ Before applying machine-learning models, the authors include interaction terms b
 The following recipe creates dummies for each `sic2` code and adds interaction terms between macro variables and stock characteristics. Note that `data` for the recipe is only required to identify the columns in the sample. No computations are performed at the first step. For that reason, I call `head()` to keep the computational burden a bit lower without affecting the outcome. 
 
 ```{r}
-#| eval: false
-
 rec <- recipe(ret_excess ~ ., data = characteristics |> head())|>
   update_role(permno, month, mktcap_lag, 
               new_role = "id") |>
@@ -187,14 +182,12 @@ rec <- rec |> prep()
 Next, I create the full dataset containing 3,046,332 monthly observations and 920 covariates. 
 
 ```{r}
-#| eval: false
 characteristics_prepared <- bake(rec, new_data = characteristics)
 ```
 
 I store the prepared file for your convenience. Furthermore, the authors never use the entire dataset for training, instead, only a fraction needs to be available in memory at any given point in time. 
 
 ```{r}
-#| eval: false
 characteristics_prepared |>
   group_by(year = year(month)) |> 
   write_dataset(path = "data/characteristics_prepared")
@@ -207,6 +200,8 @@ characteristics_prepared |>
 I visualize my understanding of this data-budget below.
 
 ```{r}
+#| eval: true
+
 validation_length <- 12
 
 estimation_periods <- tibble(oos_year = 1987:2021,
@@ -317,23 +312,22 @@ folds <- manual_rset(list(data_split),
                      ids = "split")
 ```
 
-I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. 
+I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. I set the option `parallel_over = "resamples"` so that the formula is processed only once and then reused across all models that need to be fit. Parallelisation across the hyperparameter grid in `tidymodels` is done by initiating a `plan()` according to the [documentation](https://tune.tidymodels.org/articles/extras/optimizations.html).
 
 ```{r}
-#| eval: false
+plan(multisession, workers = 12)
 
 ml_fit <- ml_workflow |>
   tune_grid(
     resample = folds,
     grid = rf_grid,
-    metrics = metric_set(rmse))
+    metrics = metric_set(rmse),
+    control = control_grid(parallel_over = "resamples"))
 ```
 
 If more computation time is available, it is likely advisable to expand the number of evaluation by providing a wider grid of possible parameter constellations. Next, we finalize the process by selecting the hyperparameter constellation which delivered the smallest mean squared prediction error and fit the model once more using the entire (training and validation) datasets.  
 
 ```{r}
-#| eval: false
-
 ml_fit_best <- ml_fit |>
   select_best(metric = "rmse")
 
@@ -345,8 +339,6 @@ ml_workflow_final <- ml_workflow |>
 Trained workflows contain a lot of information which may be redundant for the task at hand: generating predictions. The `butcher` package provides tooling to “axe” parts of the fitted output that are no longer needed, without sacrificing prediction functionality from the original model object. To provide an intermediary anchor (also to ensure reprocudibility), I follow this [example](https://github.com/juliasilge/modelops-playground/blob/main/train-model/train.md#save-model) to store the trained model. Julia Silge provided some reflections on best practices [here](https://forum.posit.co/t/saving-a-model-fit-with-tidymodels/114839/2) which I tried to incorporate. 
 
 ```{r}
-#| eval: false
-
 fitted_workflow <- butcher::butcher(ml_workflow_final)
 readr::write_rds(fitted_workflow, file = "data/fitted_workflow.rds")
 ```
@@ -363,7 +355,8 @@ For instance, to fit the elastic net it seems necessary to evaluate the mean-squ
 
 
 ```{r}
-#| eval: false
+# install.packages("glmnet")
+
 elastic_net <- linear_reg( 
   penalty = tune(),
   mixture = 0.5
@@ -384,7 +377,6 @@ rectified linear unit (ReLU) (p. 2244)
 In the following I show the exemplary implementation of the neural network with two hidden layers using the package `brulee`. Most information is taken from Table A5 in the online appendix. The table mentions a parameter `patience = 5` which I understand as a command on how many iterations with no improvement before stopping the optimization process.
 
 ```{r}
-#| eval: false
 # install.packages("brulee")
 
 deep_nnet_model <- mlp(
@@ -414,6 +406,7 @@ After fitting the model(s), there are plenty ways to evaluate the predictive per
 The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. I chose a value-weighted scheme which is arguably less sensitive to trading cost (see the discussion on p. 2265 of the paper).
 
 ```{r}
+#| eval: true
 oos <- characteristics_prepared |> 
   filter(year(month) == split_dates$oos_year) |>
   collect()
@@ -427,6 +420,8 @@ oos <- oos |>
 ```
 
 ```{r}
+  #| eval: true
+
 ml_portfolios <- oos |>
   group_by(month) |>
   mutate(
@@ -446,6 +441,8 @@ ml_portfolios <- oos |>
 ```
 Finally, we evaluate the performance of the ML-portfolios. The table reports the predicted return, the average realized return, the standard deviation and the out-of-sample Sharpe ratio for each of the decile portfolios as well as the long-short zero-cost portfolio. 
 ```{r}
+#| eval: true
+
 hml_portfolio <- ml_portfolios |> 
     reframe(ret_excess = ret_excess[portfolio == 10] -
                   ret_excess[portfolio == 1],
@@ -465,3 +462,13 @@ print(n=Inf)
 
 ```
 Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
+
+::: {.callout-tip collapse="true"}
+## Some comments on parallelisation
+
+Arguably, the dataset used for this application is huge. So is the computational effort to train the ML methods. Even though I have substantial computing power available, I decided to keep the computational burden limited in the interest of simplicity and time. Should you not have a supercomputer available, the following tipps may help:
+
+1. When expanding the characteristics to include all interaction terms by applying the recipe (`bake()`), you do not have to use the entire dataset in memory as I do above. It seems plausible to store the characteristics (e.g., in `parquet` form) and apply `bake()` to each year individually before storing the data year-by-year. The all-in procedure from above requires around 140GB in memory which can be reduced to $\approx 140/60$ when applying the recipe on an annual basis.
+2. In the blog post, I only fit the random forest for one single year (`j = 35`, the final of the 35 out-of-sample periods). It is straightforward to loop over `j`, starting from 1 until 35 and to store the predictions individually for each year.  
+3. Tuning the model for one out-of-sample period like above is still going to be computational heavy, and I am afraid there is no way around that. For the final out-of-sample period 2021, the training set contains more than two million rows with 920 columns as the set of predictors. The only way I can imagine to reduce the computational burden and still retain some (hopefully) useful predictions is to pre-select a well-balanced set of firms from the CRSP sample which differ with respect to some firm characteristics, e.g. by sampling from the well-known size and book-to-market double sort decile groups. 
+:::
