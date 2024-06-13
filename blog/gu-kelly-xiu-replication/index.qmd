@@ -17,12 +17,13 @@ execute:
   eval: false
 ---
 
-This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
+This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. In its essence, the paper presents a horse-race for off-the-shelf ML models to predict return premia. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
 
 ::: {.callout-warning}
-To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. 
+To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. I provide some reflections on reducing the computational burden at the end of the blog post. 
 :::
 
+The code relies on the following R packages.  
 Note that the packages `glmnet`, `ranger`, and `brulee` are only needed if you want to implement the elastic net, random forests, or neural networks, respectively. 
 ```{r}
 library(tidyverse)
@@ -403,7 +404,7 @@ After fitting the model(s), there are plenty ways to evaluate the predictive per
 
 > At the end of each month, we calculate 1-month-ahead out-of-sample stock return predictions for each method. We then sort stocks into deciles based on each model’s forecasts. We reconstitute portfolios each month using value weights. Finally, we construct a zero-net-investment portfolio that buys the highest expected return stocks (decile 10) and sells the lowest (decile 1). (p. 2264)
 
-The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. I chose a value-weighted scheme which is arguably less sensitive to trading cost (see the discussion on p. 2265 of the paper).
+The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p. 2265 of the paper).
 
 ```{r}
 #| eval: true
@@ -435,7 +436,7 @@ ml_portfolios <- oos |>
   group_by(portfolio, month) |>
   summarize(
     ret_predicted = mean(.pred),
-    ret_excess = weighted.mean(ret_excess, mktcap_lag),
+    ret_excess = mean(ret_excess),
     .groups = "drop"
   )
 ```
