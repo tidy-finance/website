@@ -7,28 +7,36 @@ author:
 date: "2025-06-01"
 description: A partial replication in R of the paper *Empirical Asset Pricing via Machine Learning*.
 image: thumbnail.jpeg
-image-alt: This image visually compares machine learning methods in finance for measuring equity risk premiums. It features a neural network model, predictive charts, and Sharpe ratio comparisons. The color scheme conveys reliability and trustworthiness. Created with Copilot.
+image-alt: Two abstract horse silhouettes, depicted with graceful, sweeping brushstrokes, emerge from a misty gray background. The minimalistic strokes capture the essence of movement and speed, evoking a sense of mystery and tranquility reminiscent of Japanese calligraphy. Created with Copilot.
 categories: 
   - R
   - Replications
   - Machine learning
+  
+execute:
+  eval: false
 ---
 
-This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
+This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. In its essence, the paper presents a horse-race for off-the-shelf ML models to predict return premia. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
 
 ::: {.callout-warning}
-To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. 
+To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. I provide some reflections on reducing the computational burden at the end of the blog post. 
 :::
 
+The code relies on the following R packages.  
+Note that the packages `glmnet`, `ranger`, and `brulee` are only needed if you want to implement the elastic net, random forests, or neural networks, respectively. 
 ```{r}
 library(tidyverse)
 library(archive)
 library(arrow)
 library(RSQLite)
 library(tidymodels)
+library(butcher)
 library(future)
 library(tidyfinance) # for portfolio sorts
-# install.packages("glmnet") # In the application below, tidymodels requires glmnet so make sure to install the package before running the code
+# install.packages("glmnet") 
+# install.packages("ranger")
+# install.packages("brulee")
 ```
 
 ## Data preparation
@@ -83,6 +91,10 @@ characteristics <- characteristics |>
   mutate(across(contains("characteristic"), rank_transform)) |>
   ungroup()
 ```
+
+::: {.callout-warning}
+In this blog post I only run code which fits a random forest. Random forests are known for being low-maintenance when it comes to feature engineering and indeed, the transformation and scaling of the predictors does not affect the fitted Random forest. However, as I also show how to fit methods which are sensitive to the scaling of the predictors, I include this crucial part of data preparation.
+:::
 
 > Another issue is missing characteristics, which we replace with the cross-sectional median at each month for each stock, respectively (footnote 30). 
 
@@ -168,7 +180,7 @@ rec <- recipe(ret_excess ~ ., data = characteristics |> head())|>
 rec <- rec |> prep()
 ```
 
-Next, I create the full dataset containing `{r} nrow(characteristics)` monthly observations and 920 covariates. 
+Next, I create the full dataset containing 3,046,332 monthly observations and 920 covariates. 
 
 ```{r}
 characteristics_prepared <- bake(rec, new_data = characteristics)
@@ -189,6 +201,8 @@ characteristics_prepared |>
 I visualize my understanding of this data-budget below.
 
 ```{r}
+#| eval: true
+
 validation_length <- 12
 
 estimation_periods <- tibble(oos_year = 1987:2021,
@@ -237,24 +251,29 @@ The paper describes a collection of machine learning methods that was used in th
 characteristics_prepared <- open_dataset(sources = "data/characteristics_prepared")
 ```
 
-> For OLS, ENet, GLM, and GBRT, we present their robust versions using Huber loss, which perform better than the version without. (p. 2250)
-
-For the sake of simplicity, I fit linear models using $l2$ loss functions. In `R`, the package `hqreg` implements algorithms for fitting regularization paths for Lasso or elastic net penalized regression models with Huber loss. However, `hqreg` is not a running engine for `pairsnip` (yet). 
-
 > Table A.5 (online appendix) describes the set of hyperparameters and their potential values used for tuning each machine learning model.
 
-For instance, to fit the elastic net it seems necessary to evaluate the mean-squared prediction error in the validation sample for *only* two values of the penalty term. Instead of tuning the elastic net mixture coefficient, I follow the paper and fix its value to $0.5$. 
+In the following I rely on the well-documented `tidymodels` workflow (e.g. [Factor Selection with Machine Learning](https://www.tidy-finance.org/r/factor-selection-via-machine-learning.html#the-tidymodels-workflow)) to estimate the random forest model. 
 
-In the following I rely on the well-documented `tidymodels` workflow (e.g. [Factor Selection with Machine Learning](https://www.tidy-finance.org/r/factor-selection-via-machine-learning.html#the-tidymodels-workflow)) to estimate the elastic net. 
+For the random forest, Table A5 in the Online Appendix states that the number of grown trees is fixed to 300. The number of features in each split is set to $\in \{3, 5, 10, 20, 30, 50, ...\}$. It is not clear to me what $...$ means in that context, for that reason I fix the number of choices to six. Finally, in the paper *depth* is chosen as a hyperparameter, ranging from one (pruned tree) to six (more complex tree). `ranger` does not support *depth* as a hyperparameter but rather allows to dynamically stop growing further branches once a minimum number of observations in a group is reached. The effect is similar (if `min_n` is small, the tree can grow deep, otherwise we expect pruned trees), but cannot be translated directly into `depth`. I set the option `num.threads` to allow parallelization for the construction of the trees according to the [documentation](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html#other-notes) of the `ranger` engine in `tidymodels`.
 
 ```{r}
-elastic_net <- linear_reg( 
-  penalty = tune(),
-  mixture = 0.5
-) |>
-  set_engine("glmnet")
+# install.packages("ranger")
 
-penalty_grid = tibble(penalty = c(1e-4, 1e-1))
+rf_model <- rand_forest(
+  mtry = tune(),
+  trees = 300,
+  min_n = tune()
+) |>
+  set_engine("ranger", 
+             num.threads = parallel::detectCores(logical = FALSE) - 1) |>
+  set_mode("regression")
+
+# Define the grid for hyperparameter tuning
+rf_grid <- expand_grid(
+  mtry = c(3, 5, 10, 20, 30, 50),
+  min_n = c(5000, 10000) 
+)
 ```
 
 ```{r}
@@ -263,8 +282,9 @@ rec_final <- recipe(ret_excess ~ 0 + .,
   update_role(permno, month, mktcap_lag, year, new_role = "id")
 
 ml_workflow <- workflow() |>
-  add_model(elastic_net) |>
+  add_model(rf_model) |>
   add_recipe(rec_final)
+
 ```
 
 ### Model fitting
@@ -293,22 +313,20 @@ folds <- manual_rset(list(data_split),
                      ids = "split")
 ```
 
-I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. 
+I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. I set the option `parallel_over = "resamples"` so that the formula is processed only once and then reused across all models that need to be fit. Parallelisation across the hyperparameter grid in `tidymodels` is done by initiating a `plan()` according to the [documentation](https://tune.tidymodels.org/articles/extras/optimizations.html).
 
 ```{r}
-plan(sequential)
+plan(multisession, workers = 12)
 
 ml_fit <- ml_workflow |>
   tune_grid(
     resample = folds,
-    grid = penalty_grid,
-    metrics = metric_set(rmse)
-  )
-
-show_best(ml_fit, metric = "rmse")
+    grid = rf_grid,
+    metrics = metric_set(rmse),
+    control = control_grid(parallel_over = "resamples"))
 ```
 
-Above we see the mean-squared prediction error for the validation period (`{r} split_dates$validation_start` until `{r} split_dates$validation_end`) for the two different values for the penalty parameter in the elastic net. If more computation time is available, it is likely advisable to expand the number of evaluation by providing a wider grid of possible parameter constellations. 
+If more computation time is available, it is likely advisable to expand the number of evaluation by providing a wider grid of possible parameter constellations. Next, we finalize the process by selecting the hyperparameter constellation which delivered the smallest mean squared prediction error and fit the model once more using the entire (training and validation) datasets.  
 
 ```{r}
 ml_fit_best <- ml_fit |>
@@ -319,29 +337,34 @@ ml_workflow_final <- ml_workflow |>
   fit(bind_rows(train, validation))
 ```
 
-## Other ML models
-
-While this blog post only shows how to implement the prediction procedure based on the elastic net, it is no problem to generate predictions for the remaining main methods (random forests, neural networks) presented in the original paper. Below, I provide code for models that come as close as possible to the specifications laid out in the Online Appendix of the paper. 
-
-For the random forest, Table A5 in the Online Appendix states that the number of grown trees is fixed to 300. The number of features in each split is set to $\in \{3, 5, 10, 20, 30, 50, ...\}$. It is not clear to me what $...$ means in that context, for that reason I fix the number of choices to six. Finally, in the paper *depth* is chosen as a hyperparameter, ranging from one (pruned tree) to six (more complex tree). `ranger` does not support *depth* as a hyperparameter but rather allows to dynamically stop growing further branches once a minimum number of observations in a group is reached. The effect is similar (if `min_n` is small, the tree can grow deep, otherwise we expect pruned trees), but cannot be translated directly into `depth`. 
+Trained workflows contain a lot of information which may be redundant for the task at hand: generating predictions. The `butcher` package provides tooling to “axe” parts of the fitted output that are no longer needed, without sacrificing prediction functionality from the original model object. To provide an intermediary anchor (also to ensure reprocudibility), I follow this [example](https://github.com/juliasilge/modelops-playground/blob/main/train-model/train.md#save-model) to store the trained model. Julia Silge provided some reflections on best practices [here](https://forum.posit.co/t/saving-a-model-fit-with-tidymodels/114839/2) which I tried to incorporate. 
 
 ```{r}
-#| eval: false
-# install.packages("ranger")
+fitted_workflow <- butcher::butcher(ml_workflow_final)
+readr::write_rds(fitted_workflow, file = "data/fitted_workflow.rds")
+```
 
-rf_model <- rand_forest(
-  mtry = tune(),
-  trees = 300,
-  min_n = tune()
+## Other ML models
+
+While this blog post only shows how to implement the prediction procedure based on the random forest, it is no problem to generate predictions for the remaining main methods (elastic net, neural networks, ...) presented in the original paper. Below, I provide code for models that come as close as possible to the specifications laid out in the Online Appendix of the paper. 
+
+> For OLS, ENet, GLM, and GBRT, we present their robust versions using Huber loss, which perform better than the version without. (p. 2250)
+
+For the sake of simplicity, I only show how to fit linear models using $l2$ loss functions. In R, the package `hqreg` implements algorithms for fitting regularization paths for Lasso or elastic net penalized regression models with Huber loss. However, `hqreg` is not a running engine for `pairsnip` (yet). 
+
+For instance, to fit the elastic net it seems necessary to evaluate the mean-squared prediction error in the validation sample for *only* two values of the penalty term. Instead of tuning the elastic net mixture coefficient, I follow the paper and show how to fix its value to $0.5$. 
+
+
+```{r}
+# install.packages("glmnet")
+
+elastic_net <- linear_reg( 
+  penalty = tune(),
+  mixture = 0.5
 ) |>
-  set_engine("ranger") |>
-  set_mode("regression")
+  set_engine("glmnet")
 
-# Define the grid for hyperparameter tuning
-rf_grid <- expand_grid(
-  mtry = c(3, 5, 10, 20, 30, 50),
-  min_n = c(10, 50, 100) 
-)
+penalty_grid = tibble(penalty = c(1e-4, 1e-1))
 ```
 
 For the neural network, the paper specifies the manifold architecture choices
@@ -355,7 +378,6 @@ rectified linear unit (ReLU) (p. 2244)
 In the following I show the exemplary implementation of the neural network with two hidden layers using the package `brulee`. Most information is taken from Table A5 in the online appendix. The table mentions a parameter `patience = 5` which I understand as a command on how many iterations with no improvement before stopping the optimization process.
 
 ```{r}
-#| eval: false
 # install.packages("brulee")
 
 deep_nnet_model <- mlp(
@@ -382,14 +404,16 @@ After fitting the model(s), there are plenty ways to evaluate the predictive per
 
 > At the end of each month, we calculate 1-month-ahead out-of-sample stock return predictions for each method. We then sort stocks into deciles based on each model’s forecasts. We reconstitute portfolios each month using value weights. Finally, we construct a zero-net-investment portfolio that buys the highest expected return stocks (decile 10) and sells the lowest (decile 1). (p. 2264)
 
-The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. I chose a value-weighted scheme which is arguably less sensitive to trading cost (see the discussion on p. 2265 of the paper).
+The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p. 2265 of the paper).
 
 ```{r}
+#| eval: true
 oos <- characteristics_prepared |> 
   filter(year(month) == split_dates$oos_year) |>
   collect()
 
-oos_predictions <- ml_workflow_final |> predict(oos)
+fitted_workflow <- readr::read_rds("data/fitted_workflow.rds")
+oos_predictions <- fitted_workflow |> predict(oos)
 
 oos <- oos |>
   select(permno, month, mktcap_lag, ret_excess) |>
@@ -397,6 +421,8 @@ oos <- oos |>
 ```
 
 ```{r}
+  #| eval: true
+
 ml_portfolios <- oos |>
   group_by(month) |>
   mutate(
@@ -410,23 +436,40 @@ ml_portfolios <- oos |>
   group_by(portfolio, month) |>
   summarize(
     ret_predicted = mean(.pred),
-    ret_excess = weighted.mean(ret_excess, mktcap_lag),
+    ret_excess = mean(ret_excess),
     .groups = "drop"
   )
 ```
-
-TODO: evaluation in terms of Predicted return Average return SD SR for the 10 portfolios + 10-1 (Pred Avg SD SR)
-
 Finally, we evaluate the performance of the ML-portfolios. The table reports the predicted return, the average realized return, the standard deviation and the out-of-sample Sharpe ratio for each of the decile portfolios as well as the long-short zero-cost portfolio. 
 ```{r}
+#| eval: true
+
 hml_portfolio <- ml_portfolios |> 
- summarise("H-L" = ret_excess[portfolio == min(portfolio)] -
-                   ret_excess[portfolio == max(portfolio)])
+    reframe(ret_excess = ret_excess[portfolio == 10] -
+                  ret_excess[portfolio == 1],
+            ret_predicted = ret_predicted[portfolio == 10] - ret_predicted[portfolio == 1],
+            month = month[portfolio == 10],
+            portfolio = factor("H-L", levels = as.character(c(1:10, "H-L"))),
+            ) 
 
 ml_portfolios |>
-    group_by(portfolio) |>
-    summarise(Pred = mean())
+    bind_rows(hml_portfolio) |>
+    group_by(portfolio = portfolio) |>
+    summarise(Pred = mean(ret_predicted), 
+              Avg = mean(ret_excess),
+              SD = sd(ret_excess),
+SR = Avg / SD) |>
+print(n=Inf)
 
 ```
-
 Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
+
+::: {.callout-tip collapse="true"}
+## Some comments on parallelisation
+
+Arguably, the dataset used for this application is huge. So is the computational effort to train the ML methods. Even though I have substantial computing power available, I decided to keep the computational burden limited in the interest of simplicity and time. Should you not have a supercomputer available, the following tipps may help:
+
+1. When expanding the characteristics to include all interaction terms by applying the recipe (`bake()`), you do not have to use the entire dataset in memory as I do above. It seems plausible to store the characteristics (e.g., in `parquet` form) and apply `bake()` to each year individually before storing the data year-by-year. The all-in procedure from above requires around 140GB in memory which can be reduced to $\approx 140/60$ when applying the recipe on an annual basis.
+2. In the blog post, I only fit the random forest for one single year (`j = 35`, the final of the 35 out-of-sample periods). It is straightforward to loop over `j`, starting from 1 until 35 and to store the predictions individually for each year.  
+3. Tuning the model for one out-of-sample period like above is still going to be computational heavy, and I am afraid there is no way around that. For the final out-of-sample period 2021, the training set contains more than two million rows with 920 columns as the set of predictors. The only way I can imagine to reduce the computational burden and still retain some (hopefully) useful predictions is to pre-select a well-balanced set of firms from the CRSP sample which differ with respect to some firm characteristics, e.g. by sampling from the well-known size and book-to-market double sort decile groups. 
+:::
