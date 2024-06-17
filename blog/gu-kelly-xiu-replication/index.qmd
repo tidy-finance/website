@@ -1,23 +1,23 @@
 ---
+title: "Replicating Gu, Kelly & Xiu (2020)"
 author:
   - name: Stefan Voigt
     url: https://voigtstefan.me
     affiliations:
       - name: University of Copenhagen and Danish Finance Institute (DFI)
 date: "2024-06-17"
-description: A partial replication in R of the paper *Empirical Asset Pricing via Machine Learning*.
+description: A partial replication of the paper *Empirical Asset Pricing via Machine Learning* using R.
 image: thumbnail.jpeg
 image-alt: Two abstract horse silhouettes, depicted with graceful, sweeping brushstrokes, emerge from a misty gray background. The minimalistic strokes capture the essence of movement and speed, evoking a sense of mystery and tranquility reminiscent of Japanese calligraphy. Created with Copilot.
 categories: 
   - R
   - Replications
   - Machine learning
-  
 execute:
   eval: false
 ---
 
-This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. In its essence, the paper presents a horse-race for off-the-shelf ML models to predict return premia. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
+This blog post is an attempt to replicate the core elements of the paper *Empirical Asset Pricing via Machine Learning* by Shihao Gu, Brian Kelly, and Dacheng Xiu^[The Review of Financial Studies, Volume 33, Issue 5, May 2020, Pages 2223–2273, [https://doi.org/10.1093/rfs/hhaa009](https://doi.org/10.1093/rfs/hhaa009)]. In its essence, the paper presents a horse-race for off-the-shelf machine learning (ML) models to predict return premia. For the replication I often refer to the Online Appendix of the paper, which is available [here](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/33/5/10.1093_rfs_hhaa009/4/hhaa009_supplementary_data.pdf?Expires=1720164914&Signature=pI~pCSKjhY6iCTt-Oqn0MR2E45Z2AH9OG1rBFzaD9FGfPzjPjgrvYWyOaqGZqjqfHvzdOU~P5el14F2-c-gVWEHOn0D2W6pL4lGbsGT1wngrni3LcJjEznjKGQQAlfogXlEUwK2PCI5Nsa8gRt1FBjFcOqM~9K6eEZ2ACyKXu0ZTU1~-aCi-7aLyk-auBEwf98gEknIxz78cDnLk8XgwkANx8XD5qjKAYvPoOOySA0Ljndz3rJjoKspqLlm~xt1D3TDu1KfUepZuGPmIDTwQ087EU~YXj~rlOppMlwHIzjNqd~ApLhQh92ciGuWpo-a8VvRjQ1i5RXRUAvv-sGI-Aw__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA).
 
 ::: {.callout-warning}
 To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. I provide some reflections on reducing the computational burden at the end of the blog post. 
@@ -26,6 +26,9 @@ To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB 
 The code relies on the following R packages. Note that the packages `ranger`, `glmnet`, and `brulee` are only needed if you want to implement the random forests, elastic net, or neural networks, respectively. 
 
 ```{r}
+#| message: false
+#| warning: false
+#| eval: true
 library(tidyverse)
 library(archive)
 library(arrow)
@@ -202,7 +205,6 @@ I visualize my understanding of this data-budget below.
 
 ```{r}
 #| eval: true
-
 validation_length <- 12
 
 estimation_periods <- tibble(oos_year = 1987:2021,
@@ -227,15 +229,11 @@ visualization_data = pmap_dfr(estimation_periods,
   drop_na()
 
 ggplot(visualization_data, 
-       aes(x = year, 
-           y = oos_year, 
-           color = classification)) +
+       aes(x = year, y = oos_year, color = classification)) +
   geom_point(size = 1) +
   scale_y_continuous(breaks = NULL) +
   labs(title = "Data classification timeline",
-       x = NULL,
-       y = NULL,
-       color = NULL) +
+       x = NULL, y = NULL, color = NULL) +
   theme_minimal()
 ```
 
@@ -248,6 +246,7 @@ The simple scheme makes model tuning computationally less complex. As there is n
 The paper describes a collection of machine learning methods that was used in the analysis. I refer to Section 1 for a detailed description of the individual models. This blog post focuses on the implementation issues that arise when applying off-the-shelf ML methods on such a large dataset. 
 
 ```{r}
+#| eval: true
 characteristics_prepared <- open_dataset(sources = "data/characteristics_prepared")
 ```
 
@@ -289,6 +288,7 @@ ml_workflow <- workflow() |>
 The following performs the model estimation to create predictions for the year 2021. For a complete replication of the procedure laid out in the paper, you'll have to run a loop over all out-of-sample years (`j`). 
 
 ```{r}
+#| eval: true
 j <- nrow(estimation_periods)
 
 split_dates <- estimation_periods |> 
@@ -338,8 +338,8 @@ ml_workflow_final <- ml_workflow |>
 Trained workflows contain a lot of information which may be redundant for the task at hand: generating predictions. The `butcher` package provides tooling to “axe” parts of the fitted output that are no longer needed, without sacrificing prediction functionality from the original model object. To provide an intermediary anchor (also to ensure reprocudibility), I follow this [example](https://github.com/juliasilge/modelops-playground/blob/main/train-model/train.md#save-model) to store the trained model. Julia Silge provided some reflections on best practices [here](https://forum.posit.co/t/saving-a-model-fit-with-tidymodels/114839/2) which I tried to incorporate. 
 
 ```{r}
-fitted_workflow <- butcher::butcher(ml_workflow_final)
-readr::write_rds(fitted_workflow, file = "data/fitted_workflow.rds")
+fitted_workflow <- butcher(ml_workflow_final)
+write_rds(fitted_workflow, file = "data/fitted_workflow.rds")
 ```
 
 ## Other ML models
@@ -353,6 +353,7 @@ For the sake of simplicity, I only show how to fit linear models using $l2$ loss
 For instance, to fit the elastic net it seems necessary to evaluate the mean-squared prediction error in the validation sample for *only* two values of the penalty term. Instead of tuning the elastic net mixture coefficient, I follow the paper and show how to fix its value to $0.5$. 
 
 ```{r}
+#| eval: false
 # install.packages("glmnet")
 
 elastic_net <- linear_reg( 
@@ -375,6 +376,7 @@ rectified linear unit (ReLU) (p. 2244)
 In the following I show the exemplary implementation of the neural network with two hidden layers using the package `brulee`. Most information is taken from Table A5 in the online appendix. The table mentions a parameter `patience = 5` which I understand as a command on how many iterations with no improvement before stopping the optimization process.
 
 ```{r}
+#| eval: false
 # install.packages("brulee")
 
 deep_nnet_model <- mlp(
@@ -405,24 +407,28 @@ The following code chunks performs the predictions for the out-of-sample year (`
 
 ```{r}
 #| eval: true
-oos <- characteristics_prepared |> 
+out_of_sample <- characteristics_prepared |> 
   filter(year(month) == split_dates$oos_year) |>
   collect()
 
-fitted_workflow <- readr::read_rds("data/fitted_workflow.rds")
-oos_predictions <- fitted_workflow |> predict(oos)
+fitted_workflow <- read_rds("data/fitted_workflow.rds")
+  
+out_of_sample_predictions <- fitted_workflow |> 
+  predict(out_of_sample)
 
-oos <- oos |>
+out_of_sample <- out_of_sample |>
   select(permno, month, mktcap_lag, ret_excess) |>
-  bind_cols(oos_predictions)
+  bind_cols(out_of_sample_predictions)
 ```
+
+To assign portfolios using the predictions, I use the `assign_portfolio()` from the `tidyfinance` package. 
 
 ```{r}
 #| eval: true
-ml_portfolios <- oos |>
+ml_portfolios <- out_of_sample |>
   group_by(month) |>
   mutate(
-    portfolio = tidyfinance::assign_portfolio(
+    portfolio = assign_portfolio(
       data = pick(everything()),
       sorting_variable = ".pred",
       n_portfolios = 10
@@ -436,7 +442,9 @@ ml_portfolios <- oos |>
     .groups = "drop"
   )
 ```
+
 Finally, we evaluate the performance of the ML-portfolios. The table reports the predicted return, the average realized return, the standard deviation and the out-of-sample Sharpe ratio for each of the decile portfolios as well as the long-short zero-cost portfolio. 
+
 ```{r}
 #| eval: true
 hml_portfolio <- ml_portfolios |> 
@@ -454,7 +462,7 @@ ml_portfolios |>
             Avg = mean(ret_excess),
             SD = sd(ret_excess),
             SR = Avg / SD) |>
-print(n = Inf)
+  print(n = Inf)
 ```
 
 Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
