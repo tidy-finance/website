@@ -4,7 +4,7 @@ author:
     url: https://voigtstefan.me
     affiliations:
       - name: University of Copenhagen and Danish Finance Institute (DFI)
-date: "2025-06-01"
+date: "2024-06-17"
 description: A partial replication in R of the paper *Empirical Asset Pricing via Machine Learning*.
 image: thumbnail.jpeg
 image-alt: Two abstract horse silhouettes, depicted with graceful, sweeping brushstrokes, emerge from a misty gray background. The minimalistic strokes capture the essence of movement and speed, evoking a sense of mystery and tranquility reminiscent of Japanese calligraphy. Created with Copilot.
@@ -23,8 +23,8 @@ This blog post is an attempt to replicate the core elements of the paper *Empiri
 To render this blog post, I used a virtual machine with 32 CPU cores and 192 GB of memory. Given the dataset I work with is huge, the later may play a major role for replication on your own machine. However, the data-intensive tasks can be split into many smaller tasks, so with minor adjustments everybody should be able to replicate everything I do. I provide some reflections on reducing the computational burden at the end of the blog post. 
 :::
 
-The code relies on the following R packages.  
-Note that the packages `glmnet`, `ranger`, and `brulee` are only needed if you want to implement the elastic net, random forests, or neural networks, respectively. 
+The code relies on the following R packages. Note that the packages `ranger`, `glmnet`, and `brulee` are only needed if you want to implement the random forests, elastic net, or neural networks, respectively. 
+
 ```{r}
 library(tidyverse)
 library(archive)
@@ -34,8 +34,8 @@ library(tidymodels)
 library(butcher)
 library(future)
 library(tidyfinance) # for portfolio sorts
-# install.packages("glmnet") 
 # install.packages("ranger")
+# install.packages("glmnet") 
 # install.packages("brulee")
 ```
 
@@ -177,7 +177,7 @@ rec <- recipe(ret_excess ~ ., data = characteristics |> head())|>
   step_dummy(sic2, 
              one_hot = TRUE)
 
-rec <- rec |> prep()
+rec <- prep(rec)
 ```
 
 Next, I create the full dataset containing 3,046,332 monthly observations and 920 covariates. 
@@ -212,7 +212,7 @@ estimation_periods <- tibble(oos_year = 1987:2021,
                              training_end = validation_start - 1) |>
   select(contains("training"), validation_start, validation_end, oos_year)
 
-visualisation_data = pmap_dfr(estimation_periods, 
+visualization_data = pmap_dfr(estimation_periods, 
                               \(training_start, 
                                 training_end, 
                                 validation_start, 
@@ -226,7 +226,7 @@ visualisation_data = pmap_dfr(estimation_periods,
   }) |> 
   drop_na()
 
-ggplot(visualisation_data, 
+ggplot(visualization_data, 
        aes(x = year, 
            y = oos_year, 
            color = classification)) +
@@ -269,7 +269,6 @@ rf_model <- rand_forest(
              num.threads = parallel::detectCores(logical = FALSE) - 1) |>
   set_mode("regression")
 
-# Define the grid for hyperparameter tuning
 rf_grid <- expand_grid(
   mtry = c(3, 5, 10, 20, 30, 50),
   min_n = c(5000, 10000) 
@@ -284,7 +283,6 @@ rec_final <- recipe(ret_excess ~ 0 + .,
 ml_workflow <- workflow() |>
   add_model(rf_model) |>
   add_recipe(rec_final)
-
 ```
 
 ### Model fitting
@@ -313,7 +311,7 @@ folds <- manual_rset(list(data_split),
                      ids = "split")
 ```
 
-I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. I set the option `parallel_over = "resamples"` so that the formula is processed only once and then reused across all models that need to be fit. Parallelisation across the hyperparameter grid in `tidymodels` is done by initiating a `plan()` according to the [documentation](https://tune.tidymodels.org/articles/extras/optimizations.html).
+I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. I set the option `parallel_over = "resamples"` so that the formula is processed only once and then reused across all models that need to be fit. parallelization across the hyperparameter grid in `tidymodels` is done by initiating a `plan()` according to the [documentation](https://tune.tidymodels.org/articles/extras/optimizations.html).
 
 ```{r}
 plan(multisession, workers = 12)
@@ -353,7 +351,6 @@ While this blog post only shows how to implement the prediction procedure based 
 For the sake of simplicity, I only show how to fit linear models using $l2$ loss functions. In R, the package `hqreg` implements algorithms for fitting regularization paths for Lasso or elastic net penalized regression models with Huber loss. However, `hqreg` is not a running engine for `pairsnip` (yet). 
 
 For instance, to fit the elastic net it seems necessary to evaluate the mean-squared prediction error in the validation sample for *only* two values of the penalty term. Instead of tuning the elastic net mixture coefficient, I follow the paper and show how to fix its value to $0.5$. 
-
 
 ```{r}
 # install.packages("glmnet")
@@ -421,8 +418,7 @@ oos <- oos |>
 ```
 
 ```{r}
-  #| eval: true
-
+#| eval: true
 ml_portfolios <- oos |>
   group_by(month) |>
   mutate(
@@ -443,29 +439,28 @@ ml_portfolios <- oos |>
 Finally, we evaluate the performance of the ML-portfolios. The table reports the predicted return, the average realized return, the standard deviation and the out-of-sample Sharpe ratio for each of the decile portfolios as well as the long-short zero-cost portfolio. 
 ```{r}
 #| eval: true
-
 hml_portfolio <- ml_portfolios |> 
-    reframe(ret_excess = ret_excess[portfolio == 10] -
-                  ret_excess[portfolio == 1],
-            ret_predicted = ret_predicted[portfolio == 10] - ret_predicted[portfolio == 1],
-            month = month[portfolio == 10],
-            portfolio = factor("H-L", levels = as.character(c(1:10, "H-L"))),
-            ) 
+  reframe(
+    ret_excess = ret_excess[portfolio == 10] - ret_excess[portfolio == 1],
+    ret_predicted = ret_predicted[portfolio == 10] - ret_predicted[portfolio == 1],
+    month = month[portfolio == 10],
+    portfolio = factor("H-L", levels = as.character(c(1:10, "H-L"))),
+  ) 
 
 ml_portfolios |>
-    bind_rows(hml_portfolio) |>
-    group_by(portfolio = portfolio) |>
-    summarise(Pred = mean(ret_predicted), 
-              Avg = mean(ret_excess),
-              SD = sd(ret_excess),
-SR = Avg / SD) |>
-print(n=Inf)
-
+  bind_rows(hml_portfolio) |>
+  group_by(portfolio = portfolio) |>
+  summarize(Pred = mean(ret_predicted), 
+            Avg = mean(ret_excess),
+            SD = sd(ret_excess),
+            SR = Avg / SD) |>
+print(n = Inf)
 ```
+
 Obviously, the paper is doing much more. In particular, the debate on "which covariates matter" is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper. 
 
 ::: {.callout-tip collapse="true"}
-## Some comments on parallelisation
+## Some comments on parallelization
 
 Arguably, the dataset used for this application is huge. So is the computational effort to train the ML methods. Even though I have substantial computing power available, I decided to keep the computational burden limited in the interest of simplicity and time. Should you not have a supercomputer available, the following tipps may help:
 
