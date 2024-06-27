@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.4.553">
+<meta name="generator" content="quarto-1.4.537">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -170,7 +170,7 @@ window.Quarto = {
 <link rel="stylesheet" href="../../assets/css/global.css">
 <meta property="og:title" content="Tidy Finance - Replicating Gu, Kelly &amp; Xiu (2020)">
 <meta property="og:description" content="A partial replication of the paper Empirical Asset Pricing via Machine Learning using R.">
-<meta property="og:image" content="https://www.tidy-finance.org/blog/gu-kelly-xiu-replication/thumbnail.jpeg">
+<meta property="og:image" content="https://www.tidy-finance.org/blog/gu-kelly-xiu-replication/thumbnail.jpg">
 <meta property="og:site_name" content="Tidy Finance">
 <meta property="og:image:alt" content="Two abstract horse silhouettes, depicted with graceful, sweeping brushstrokes, emerge from a misty gray background. The minimalistic strokes capture the essence of movement and speed, evoking a sense of mystery and tranquility reminiscent of Japanese calligraphy. Created with Copilot.">
 </head>
@@ -588,9 +588,9 @@ ggplot2 3.5.0.</code></pre>
 </section>
 <section id="model-fitting" class="level3">
 <h3 class="anchored" data-anchor-id="model-fitting">Model fitting</h3>
-<p>The following performs the model estimation to create predictions for the year 2021. For a complete replication of the procedure laid out in the paper, you’ll have to run a loop over all out-of-sample years (<code>j</code>).</p>
+<p>The following performs the model estimation to create predictions for all the years until 2021. For a complete replication of the procedure laid out in the paper, you’ll have to run a loop over all out-of-sample years (<code>j</code>).</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>j <span class="ot">&lt;-</span> <span class="fu">nrow</span>(estimation_periods)</span>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>j <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="co"># loop until nrow(estimation_periods) for full replication</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>split_dates <span class="ot">&lt;-</span> estimation_periods <span class="sc">|&gt;</span> </span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">row_number</span>() <span class="sc">==</span> j)</span>
@@ -613,7 +613,7 @@ ggplot2 3.5.0.</code></pre>
 </div>
 <p>I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. <code>tidymodels</code> takes care of this as long as the user specifies a plan. I set the option <code>parallel_over = "resamples"</code> so that the formula is processed only once and then reused across all models that need to be fit. parallelization across the hyperparameter grid in <code>tidymodels</code> is done by initiating a <code>plan()</code> according to the <a href="https://tune.tidymodels.org/articles/extras/optimizations.html">documentation</a>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plan</span>(multisession, <span class="at">workers =</span> <span class="dv">12</span>)</span>
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plan</span>(multisession, <span class="at">workers =</span> <span class="fu">nbrOfWorkers</span>())</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>ml_fit <span class="ot">&lt;-</span> ml_workflow <span class="sc">|&gt;</span></span>
 <span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tune_grid</span>(</span>
@@ -634,7 +634,7 @@ ggplot2 3.5.0.</code></pre>
 <p>Trained workflows contain a lot of information which may be redundant for the task at hand: generating predictions. The <code>butcher</code> package provides tooling to “axe” parts of the fitted output that are no longer needed, without sacrificing prediction functionality from the original model object. To provide an intermediary anchor (also to ensure reprocudibility), I follow this <a href="https://github.com/juliasilge/modelops-playground/blob/main/train-model/train.md#save-model">example</a> to store the trained model. Julia Silge provided some reflections on best practices <a href="https://forum.posit.co/t/saving-a-model-fit-with-tidymodels/114839/2">here</a> which I tried to incorporate.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>fitted_workflow <span class="ot">&lt;-</span> <span class="fu">butcher</span>(ml_workflow_final)</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write_rds</span>(fitted_workflow, <span class="at">file =</span> <span class="st">"data/fitted_workflow.rds"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="fu">write_rds</span>(fitted_workflow, <span class="at">file =</span> <span class="fu">paste0</span>(<span class="st">"data/fitted_workflow_"</span>,split_dates<span class="sc">$</span>oos_year,<span class="st">".rds"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 </section>
@@ -692,24 +692,49 @@ ggplot2 3.5.0.</code></pre>
 <blockquote class="blockquote">
 <p>At the end of each month, we calculate 1-month-ahead out-of-sample stock return predictions for each method. We then sort stocks into deciles based on each model’s forecasts. We reconstitute portfolios each month using value weights. Finally, we construct a zero-net-investment portfolio that buys the highest expected return stocks (decile 10) and sells the lowest (decile 1). (p.&nbsp;2264)</p>
 </blockquote>
-<p>The following code chunks performs the predictions for the out-of-sample year (2021): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p.&nbsp;2265 of the paper).</p>
+<p>The following code chunks performs the predictions for every out-of-sample year (starting from 1987): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p.&nbsp;2265 of the paper). Note that in the original paper, the model parameters are updated each year.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>out_of_sample <span class="ot">&lt;-</span> characteristics_prepared <span class="sc">|&gt;</span> </span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">year</span>(month) <span class="sc">==</span> split_dates<span class="sc">$</span>oos_year) <span class="sc">|&gt;</span></span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>fitted_workflow <span class="ot">&lt;-</span> <span class="fu">read_rds</span>(<span class="st">"data/fitted_workflow_1987.rds"</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>create_predictions <span class="ot">&lt;-</span> <span class="cf">function</span>(oos_year){</span>
 <span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>fitted_workflow <span class="ot">&lt;-</span> <span class="fu">read_rds</span>(<span class="st">"data/fitted_workflow.rds"</span>)</span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>out_of_sample_predictions <span class="ot">&lt;-</span> fitted_workflow <span class="sc">|&gt;</span> </span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">predict</span>(out_of_sample)</span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>out_of_sample <span class="ot">&lt;-</span> out_of_sample <span class="sc">|&gt;</span></span>
-<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, month, mktcap_lag, ret_excess) <span class="sc">|&gt;</span></span>
-<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_cols</span>(out_of_sample_predictions)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  out_of_sample <span class="ot">&lt;-</span> characteristics_prepared <span class="sc">|&gt;</span> </span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(<span class="fu">year</span>(month) <span class="sc">==</span> oos_year) <span class="sc">|&gt;</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">collect</span>()</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  <span class="co">#fitted_workflow &lt;- read_rds(paste0("data/fitted_workflow_", oos_year,".rds"))</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>  out_of_sample_predictions <span class="ot">&lt;-</span> fitted_workflow <span class="sc">|&gt;</span> </span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">predict</span>(out_of_sample)</span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a> out_of_sample <span class="ot">&lt;-</span> out_of_sample <span class="sc">|&gt;</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(permno, month, mktcap_lag, ret_excess) <span class="sc">|&gt;</span></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bind_cols</span>(out_of_sample_predictions)</span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a><span class="fu">return</span>(out_of_sample)</span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb20-20"><a href="#cb20-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-21"><a href="#cb20-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-22"><a href="#cb20-22" aria-hidden="true" tabindex="-1"></a>oos_predictions <span class="ot">&lt;-</span> estimation_periods <span class="sc">|&gt;</span></span>
+<span id="cb20-23"><a href="#cb20-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pull</span>(oos_year) <span class="sc">|&gt;</span></span>
+<span id="cb20-24"><a href="#cb20-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_dfr</span>(\(x) <span class="fu">create_predictions</span>(oos_year))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Note that I am calling the fitted model from the first out-of-sample year (1987) in each iteration. In other words, the model parameters do not get updated every year as in the original paper. <em>If</em> you estimated the model for each value of <span class="math inline">\(k\)</span> as described above, you can replace the line above to replicate the original procedure.</p>
+</div>
 </div>
 <p>To assign portfolios using the predictions, I use the <code>assign_portfolio()</code> from the <code>tidyfinance</code> package.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>ml_portfolios <span class="ot">&lt;-</span> out_of_sample <span class="sc">|&gt;</span></span>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>ml_portfolios <span class="ot">&lt;-</span> oos_predictions <span class="sc">|&gt;</span></span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">portfolio =</span> <span class="fu">assign_portfolio</span>(</span>
@@ -748,22 +773,22 @@ ggplot2 3.5.0.</code></pre>
 <pre><code># A tibble: 11 × 5
    portfolio predicted_mean realized_mean realized_sd sharpe_ratio
    &lt;fct&gt;              &lt;dbl&gt;         &lt;dbl&gt;       &lt;dbl&gt;        &lt;dbl&gt;
- 1 1                0.00577        0.0138      0.0404        0.342
- 2 2                0.00782        0.0190      0.0378        0.502
- 3 3                0.00893        0.0191      0.0336        0.569
- 4 4                0.00991        0.0220      0.0360        0.611
- 5 5                0.0109         0.0194      0.0347        0.560
- 6 6                0.0120         0.0252      0.0340        0.740
- 7 7                0.0134         0.0215      0.0417        0.515
- 8 8                0.0155         0.0189      0.0464        0.406
- 9 9                0.0193         0.0261      0.0830        0.314
-10 10               0.0298         0.0441      0.159         0.278
-11 H-L              0.0241         0.0303      0.150         0.203</code></pre>
+ 1 1              -0.0516        -0.162        0.105        -1.54 
+ 2 2              -0.0287        -0.126        0.0808       -1.55 
+ 3 3              -0.0181        -0.0977       0.0814       -1.20 
+ 4 4              -0.0111        -0.0639       0.0672       -0.950
+ 5 5              -0.00558       -0.0350       0.0534       -0.655
+ 6 6              -0.000535      -0.00536      0.0462       -0.116
+ 7 7               0.00447        0.0222       0.0504        0.441
+ 8 8               0.0101         0.0502       0.0688        0.730
+ 9 9               0.0165         0.0849       0.0977        0.870
+10 10              0.0290         0.198        0.218         0.909
+11 H-L             0.0805         0.360        0.168         2.14 </code></pre>
 </div>
 </div>
 <p>Obviously, the paper is doing much more. In particular, the debate on “which covariates matter” is interesting and not necessarily trivial to implement. However, covering even more goes beyond the scope of a simple blog post. I hope that the code base above helps to overcome any issues with implementing the more intriguing parts of the paper.</p>
 <div class="callout callout-style-default callout-tip callout-titled">
-<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-3-contents" aria-controls="callout-3" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-4-contents" aria-controls="callout-4" aria-expanded="false" aria-label="Toggle callout">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
@@ -772,7 +797,7 @@ Some comments on parallelization
 </div>
 <div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
 </div>
-<div id="callout-3" class="callout-3-contents callout-collapse collapse">
+<div id="callout-4" class="callout-4-contents callout-collapse collapse">
 <div class="callout-body-container callout-body">
 <p>Arguably, the dataset used for this application is huge. So is the computational effort to train the ML methods. Even though I have substantial computing power available, I decided to keep the computational burden limited in the interest of simplicity and time. Should you not have a supercomputer available, the following tipps may help:</p>
 <ol type="1">
@@ -890,11 +915,6 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     for (var i=0; i<links.length; i++) {
       const link = links[i];
       if (!isInternal(link.href)) {
-        // undo the damage that might have been done by quarto-nav.js in the case of
-        // links that we want to consider external
-        if (link.dataset.originalHref !== undefined) {
-          link.href = link.dataset.originalHref;
-        }
           // target, if specified
           link.setAttribute("target", "_blank");
           if (link.getAttribute("rel") === null) {
@@ -936,11 +956,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       try { href = new URL(href).hash; } catch {}
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
-      if (note) {
-        return note.innerHTML;
-      } else {
-        return "";
-      }
+      return note.innerHTML;
     });
   }
   const xrefs = window.document.querySelectorAll('a.quarto-xref');
@@ -988,12 +1004,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       if (window.Quarto?.typesetMath) {
         window.Quarto.typesetMath(note);
       }
-      // TODO in 1.5, we should make sure this works without a callout special case
-      if (note.classList.contains("callout")) {
-        return note.outerHTML;
-      } else {
-        return note.innerHTML;
-      }
+      return note.innerHTML;
     }
   }
   for (var i=0; i<xrefs.length; i++) {
@@ -1228,7 +1239,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"closeEffect":"zoom","selector":".lightbox","descPosition":"bottom","openEffect":"zoom","loop":false});
+<script>var lightboxQuarto = GLightbox({"openEffect":"zoom","selector":".lightbox","loop":false,"descPosition":"bottom","closeEffect":"zoom"});
 window.onload = () => {
   lightboxQuarto.on('slide_before_load', (data) => {
     const { slideIndex, slideNode, slideConfig, player, trigger } = data;
