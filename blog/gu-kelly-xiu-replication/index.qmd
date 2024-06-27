@@ -286,11 +286,10 @@ ml_workflow <- workflow() |>
 ```
 
 ### Model fitting
-The following performs the model estimation to create predictions for the year 2021. For a complete replication of the procedure laid out in the paper, you'll have to run a loop over all out-of-sample years (`j`). 
+The following performs the model estimation to create predictions for all the years until 2021. For a complete replication of the procedure laid out in the paper, you'll have to run a loop over all out-of-sample years (`j`). 
 
 ```{r}
-#| eval: true
-j <- nrow(estimation_periods)
+j <- 1 # loop until nrow(estimation_periods) for full replication
 
 split_dates <- estimation_periods |> 
   filter(row_number() == j)
@@ -315,7 +314,7 @@ folds <- manual_rset(list(data_split),
 I tune the model and - after selecting the optimal tuning parameter value based on the prediction error in the validation set - fit the penalized regression using the available data (training and validation test set). The process can be faster by distribution the parameter tuning across multiple workers. `tidymodels` takes care of this as long as the user specifies a plan. I set the option `parallel_over = "resamples"` so that the formula is processed only once and then reused across all models that need to be fit. parallelization across the hyperparameter grid in `tidymodels` is done by initiating a `plan()` according to the [documentation](https://tune.tidymodels.org/articles/extras/optimizations.html).
 
 ```{r}
-plan(multisession, workers = 12)
+plan(multisession, workers = nbrOfWorkers())
 
 ml_fit <- ml_workflow |>
   tune_grid(
@@ -340,7 +339,7 @@ Trained workflows contain a lot of information which may be redundant for the ta
 
 ```{r}
 fitted_workflow <- butcher(ml_workflow_final)
-write_rds(fitted_workflow, file = "data/fitted_workflow.rds")
+write_rds(fitted_workflow, file = paste0("data/fitted_workflow_",split_dates$oos_year,".rds"))
 ```
 
 ## Other ML models
@@ -404,29 +403,53 @@ After fitting the model(s), there are plenty ways to evaluate the predictive per
 
 > At the end of each month, we calculate 1-month-ahead out-of-sample stock return predictions for each method. We then sort stocks into deciles based on each model’s forecasts. We reconstitute portfolios each month using value weights. Finally, we construct a zero-net-investment portfolio that buys the highest expected return stocks (decile 10) and sells the lowest (decile 1). (p. 2264)
 
-The following code chunks performs the predictions for the out-of-sample year (`{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p. 2265 of the paper).
+The following code chunks performs the predictions for every out-of-sample year (starting from `{r} split_dates$oos_year`): First, I predict stock excess returns based on the fitted model, then we sort assets into portfolios based on the prediction. In line with the original paper, I chose an equal-weighted scheme which is arguably more sensitive to trading cost (see the discussion on p. 2265 of the paper). Note that in the original paper, the model parameters are updated each year.
 
 ```{r}
-#| eval: true
-out_of_sample <- characteristics_prepared |> 
-  filter(year(month) == split_dates$oos_year) |>
-  collect()
 
-fitted_workflow <- read_rds("data/fitted_workflow.rds")
+fitted_workflow <- read_rds("data/fitted_workflow_1987.rds")
+
+create_predictions <- function(oos_year){
+
+  out_of_sample <- characteristics_prepared |> 
+    filter(year(month) == oos_year) |>
+    collect()
+
+  #fitted_workflow <- read_rds(paste0("data/fitted_workflow_", oos_year,".rds"))
   
-out_of_sample_predictions <- fitted_workflow |> 
-  predict(out_of_sample)
+  out_of_sample_predictions <- fitted_workflow |> 
+    predict(out_of_sample)
 
-out_of_sample <- out_of_sample |>
-  select(permno, month, mktcap_lag, ret_excess) |>
-  bind_cols(out_of_sample_predictions)
+ out_of_sample <- out_of_sample |>
+    select(permno, month, mktcap_lag, ret_excess) |>
+    bind_cols(out_of_sample_predictions)
+
+return(out_of_sample)
+}
+
+
+oos_predictions <- estimation_periods |>
+  pull(oos_year) |>
+  map_dfr(\(x) create_predictions(oos_year))
 ```
+
+::: {.callout-warning}
+Note that I am calling the fitted model from the first out-of-sample year (1987) in each iteration. In other words, the model parameters do not get updated every year as in the original paper. *If* you estimated the model for each value of $k$ as described above, you can replace the line above to replicate the original procedure. 
+:::
 
 To assign portfolios using the predictions, I use the `assign_portfolio()` from the `tidyfinance` package. 
 
 ```{r}
+#| echo: false
 #| eval: true
-ml_portfolios <- out_of_sample |>
+
+oos_predictions <- read_feather("data/oos_predictions.feather")
+```
+
+```{r}
+#| eval: true
+
+ml_portfolios <- oos_predictions |>
   group_by(month) |>
   mutate(
     portfolio = assign_portfolio(
