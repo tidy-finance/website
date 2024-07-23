@@ -7,6 +7,7 @@ This is the repository for the website tidy-finance.org combining
 
 The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The website was rendered using [quarto](https://quarto.org/) and it is hosted via GitHub Pages.
 
- **Tidy Finance with R** was released as a print version via [Chapman & Hall / CRC](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349). Consider the [following distribution channels](https://www.tidy-finance.org/support.html#get-your-copy-of-the-book) to support the authors. 
+[**Tidy Finance with R**](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349) and [**Tidy Finance with Python**](https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418) were released as print versions via Chapman & Hall / CRC. Consider the [following distribution channels](https://www.tidy-finance.org/support.html#get-your-copy-of-the-book) to support the authors. 
 
-![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](assets/img/cover-book-r.jpg)
+![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](assets/img/cover-book-r.jpg) ![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](assets/img/cover-book-python.jpg)
+
