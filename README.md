@@ -9,5 +9,7 @@ The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlik
 
 [**Tidy Finance with R**](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349) and [**Tidy Finance with Python**](https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418) were released as print versions via Chapman & Hall / CRC. Consider the [following distribution channels](https://www.tidy-finance.org/support.html#get-your-copy-of-the-book) to support the authors. 
 
-![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](assets/img/cover-book-r.jpg)
-![<img src="https://www.tidy-finance.org" class="logo" align="right" style="width:60px;"/>](assets/img/cover-book-python.jpg)
+<div class="book-container">
+  <a href="https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349" target="_top"><img src="assets/img/cover-book-r.jpg" class="book" width="214" height="280"/></a>
+  <a href="https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418" target="_top"><img src="assets/img/cover-book-python.jpg" class="book" width="214" height="280"/></a>
+</div>
