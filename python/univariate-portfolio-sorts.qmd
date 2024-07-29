@@ -44,21 +44,21 @@ We start with loading the required data from our SQLite database introduced in [
 tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
 crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, month, ret_excess, mktcap_lag FROM crsp_monthly",
+    sql="SELECT permno, date, ret_excess, mktcap_lag FROM crsp_monthly",
     con=tidy_finance,
-    parse_dates={"month"})
+    parse_dates={"date"})
 )
 
 factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
+  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 
 beta = (pd.read_sql_query(
-    sql="SELECT permno, month, beta_monthly FROM beta",
+    sql="SELECT permno, date, beta_monthly FROM beta",
     con=tidy_finance,
-    parse_dates={"month"})
+    parse_dates={"date"})
 )
 ```
 
@@ -68,14 +68,14 @@ Next, we merge our sorting variable with the return data. We use the one-month *
 
 ```{python}
 beta_lag = (beta
-  .assign(month=lambda x: x["month"]+pd.DateOffset(months=1))
-  .get(["permno", "month", "beta_monthly"])
+  .assign(date=lambda x: x["date"]+pd.DateOffset(months=1))
+  .get(["permno", "date", "beta_monthly"])
   .rename(columns={"beta_monthly": "beta_lag"})
   .dropna()
 )
 
 data_for_sorts = (crsp_monthly
-  .merge(beta_lag, how="inner", on=["permno", "month"])
+  .merge(beta_lag, how="inner", on=["permno", "date"])
 )
 ```
 
@@ -83,14 +83,14 @@ The first step to conduct portfolio sorts is to calculate periodic breakpoints t
 
 ```{python}
 beta_portfolios = (data_for_sorts
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: (x.assign(
       portfolio=pd.qcut(
         x["beta_lag"], q=[0, 0.5, 1], labels=["low", "high"]))
     )
   )
   .reset_index(drop=True)
-  .groupby(["portfolio","month"])
+  .groupby(["portfolio","date"])
   .apply(lambda x: np.average(x["ret_excess"], weights=x["mktcap_lag"]))
   .reset_index(name="ret")
 )
@@ -102,7 +102,7 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 
 ```{python}
 beta_longshort = (beta_portfolios
-  .pivot_table(index="month", columns="portfolio", values="ret")
+  .pivot_table(index="date", columns="portfolio", values="ret")
   .reset_index()
   .assign(long_short=lambda x: x["high"]-x["low"])
 )
@@ -153,19 +153,19 @@ We can use the above function to sort stocks into ten portfolios each month usin
 
 ```{python}
 beta_portfolios = (data_for_sorts
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: x.assign(
       portfolio=assign_portfolio(x, "beta_lag", 10)
     )
   )
   .reset_index(drop=True)
-  .groupby(["portfolio", "month"])
+  .groupby(["portfolio", "date"])
   .apply(lambda x: x.assign(
       ret=np.average(x["ret_excess"], weights=x["mktcap_lag"])
     )
   )
   .reset_index(drop=True)
-  .merge(factors_ff3_monthly, how="left", on="month")
+  .merge(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -264,9 +264,9 @@ beta_longshort = (beta_portfolios
     )
   )
   .query("portfolio in ['low', 'high']")
-  .pivot_table(index="month", columns="portfolio", values="ret")
+  .pivot_table(index="date", columns="portfolio", values="ret")
   .assign(long_short=lambda x: x["high"]-x["low"])
-  .merge(factors_ff3_monthly, how="left", on="month")
+  .merge(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -302,7 +302,7 @@ prettify_result(model_fit)
 #| fig-alt: "Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods."
 #| fig-pos: "htb"
 beta_longshort_year = (beta_longshort
-  .assign(year=lambda x: x["month"].dt.year)
+  .assign(year=lambda x: x["date"].dt.year)
   .groupby("year")
   .aggregate(
     low=("low", lambda x: (1+x).prod()-1),

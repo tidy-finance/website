@@ -111,17 +111,17 @@ trace_aggregated = (trace_enhanced
   .dropna(subset=["avg_yield"])
   .query("trades >= 5")
   .assign(trd_exctn_dt=lambda x: pd.to_datetime(x["trd_exctn_dt"]))
-  .assign(month=lambda x: x["trd_exctn_dt"]-pd.offsets.MonthBegin())
+  .assign(date=lambda x: x["trd_exctn_dt"]-pd.offsets.MonthBegin())
 )
 
 date_index = (trace_aggregated
-  .groupby(["cusip_id", "month"])["trd_exctn_dt"]
+  .groupby(["cusip_id", "date"])["trd_exctn_dt"]
   .idxmax()
 )
 
 trace_aggregated = (trace_aggregated
   .loc[date_index]
-  .get(["cusip_id", "month", "avg_yield"])
+  .get(["cusip_id", "date", "avg_yield"])
 )
 ```
 
@@ -140,11 +140,11 @@ Before we can run the first regression, we need to define the `treated` indicato
 bonds_panel = (bonds_panel
   .assign(
     post_period=lambda x: (
-      x["month"] >= (treatment_date-pd.offsets.MonthBegin())
+      x["date"] >= (treatment_date-pd.offsets.MonthBegin())
     )
   )
   .assign(treated=lambda x: x["polluter"] & x["post_period"])
-  .assign(month_cat=lambda x: pd.Categorical(x["month"], ordered=True))
+  .assign(date_cat=lambda x: pd.Categorical(x["date"], ordered=True))
 )
 ```
 
@@ -164,18 +164,18 @@ np.round(bonds_panel_summary, 2)
 
 The PA is a legally binding international treaty on climate change. It was adopted by 196 parties at COP 21 in Paris on December 12, 2015 and entered into force on November 4, 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an ordinary least square (OLS) regression without fixed effects where we include the `treated`, `post_period`, and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.\index{Yields}\index{Regression!Panel}
 
-The second model follows the typical DD regression approach by including individual (`cusip_id`) and time (`month`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
+The second model follows the typical DD regression approach by including individual (`cusip_id`) and time (`date`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
 
 ```{python}
 model_without_fe = lm.PanelOLS.from_formula(
   formula=("avg_yield ~ treated + post_period + polluter + log_offering_amt"
            " + time_to_maturity + 1"),
-  data=bonds_panel.set_index(["cusip_id", "month"]),
+  data=bonds_panel.set_index(["cusip_id", "date"]),
 ).fit()
 
 model_with_fe = lm.PanelOLS.from_formula(
   formula=("avg_yield ~ treated + EntityEffects + TimeEffects"),
-  data=bonds_panel.set_index(["cusip_id", "month"]),
+  data=bonds_panel.set_index(["cusip_id", "date"]),
 ).fit()
 
 prettify_result([model_without_fe, model_with_fe])
@@ -195,7 +195,7 @@ To provide such visual evidence, we revisit the simple OLS model and replace the
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 #| fig-pos: "htb"
 model_without_fe_time = (smf.ols(
-    formula=("avg_yield ~ polluter + month_cat:polluter + time_to_maturity"
+    formula=("avg_yield ~ polluter + date_cat:polluter + time_to_maturity"
              " + log_offering_amt"),
     data=bonds_panel)
   .fit()
@@ -206,12 +206,12 @@ model_without_fe_coefs = (
   pd.DataFrame(model_without_fe_time.tables[1].data[1:],
                columns=["term", "estimate", "std_error",
                         "t_stat", "p_value", "ci_1", "ci_2"])
-  .query("term.str.contains('month_cat')")
+  .query("term.str.contains('date_cat')")
   .assign(
-    month=lambda x: 
+    date=lambda x: 
       x["term"].str.extract(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
   )
-  .assign(month=lambda x: pd.to_datetime(x["month"]))
+  .assign(date=lambda x: pd.to_datetime(x["date"]))
   .assign(treatment=lambda x: x["term"].str.contains("True"))
   .assign(estimate=lambda x: x["estimate"].astype(float),
           std_error=lambda x: x["std_error"].astype(float))
@@ -221,7 +221,7 @@ model_without_fe_coefs = (
 
 polluters_plot = (
   ggplot(model_without_fe_coefs, 
-         aes(x="month", y="estimate",
+         aes(x="date", y="estimate",
              color="treatment", linetype="treatment", shape="treatment")) +
   geom_vline(xintercept=pd.to_datetime(treatment_date) -
              pd.offsets.MonthBegin(), linetype="dashed") +
@@ -246,7 +246,7 @@ bonds_panel_alt = (bonds_panel
   .assign(
     diff_to_treatment=lambda x: (
       np.round(
-        ((x["month"]-(treatment_date- 
+        ((x["date"]-(treatment_date- 
             pd.offsets.MonthBegin())).dt.days/365)*12, 0
       ).astype(int)
     )
@@ -254,16 +254,16 @@ bonds_panel_alt = (bonds_panel
 )
 
 variables = (bonds_panel_alt
-  .get(["diff_to_treatment", "month"])
+  .get(["diff_to_treatment", "date"])
   .drop_duplicates()
-  .sort_values("month")
+  .sort_values("date")
   .copy()
   .assign(variable_name=np.nan)
   .reset_index(drop=True)
 )
 ```
 
-In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `month` fixed effects. 
+In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects. 
 
 ```{python}
 formula = "avg_yield ~ 1 + "
@@ -289,7 +289,7 @@ formula = formula + " + EntityEffects + TimeEffects"
 
 model_with_fe_time = (lm.PanelOLS.from_formula(
     formula=formula,
-    data=bonds_panel_alt.set_index(["cusip_id", "month"]))
+    data=bonds_panel_alt.set_index(["cusip_id", "date"]))
   .fit()
   .summary
 )
@@ -305,7 +305,7 @@ lag0_row = pd.DataFrame({
   "ci_2": [0],
   "ci_up": [0],
   "ci_low": [0],
-  "month": [treatment_date - pd.offsets.MonthBegin()]
+  "date": [treatment_date - pd.offsets.MonthBegin()]
 })
 
 model_with_fe_time_coefs = (
@@ -336,7 +336,8 @@ model_with_fe_time_coefs = pd.concat(
 #| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
 #| fig-pos: "htb"
 polluter_plot = (
-  ggplot(model_with_fe_time_coefs, aes(x="month", y="estimate")) +
+  ggplot(model_with_fe_time_coefs, 
+         aes(x="date", y="estimate")) +
   geom_vline(aes(xintercept=treatment_date - pd.offsets.MonthBegin()), 
                  linetype="dashed") +
   geom_hline(aes(yintercept=0), linetype="dashed") +

@@ -36,7 +36,7 @@ tidy_finance <- dbConnect(
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
     select(
-    permno, gvkey, month, ret_excess,
+    permno, gvkey, date, ret_excess,
     mktcap, mktcap_lag, exchange
   ) |> 
   collect() |>
@@ -50,7 +50,7 @@ book_equity <- tbl(tidy_finance, "compustat") |>
   select(gvkey, datadate, be) |>
   collect() |>
   drop_na() |>
-  mutate(month = floor_date(ymd(datadate), "month"))
+  mutate(date = floor_date(ymd(datadate), "month"))
 ```
 
 ## Book-to-Market Ratio
@@ -63,36 +63,36 @@ Having both variables, i.e., firm size lagged by one month and book-to-market la
 
 ```{r}
 me <- crsp_monthly |>
-  mutate(sorting_date = month %m+% months(1)) |>
+  mutate(sorting_date = date %m+% months(1)) |>
   select(permno, sorting_date, me = mktcap)
 
 bm <- book_equity |>
-  inner_join(crsp_monthly, join_by(gvkey, month)) |>
+  inner_join(crsp_monthly, join_by(gvkey, date)) |>
   mutate(
     bm = be / mktcap,
-    sorting_date = month %m+% months(6),
+    sorting_date = date %m+% months(6),
     comp_date = sorting_date
   ) |>
   select(permno, gvkey, sorting_date, comp_date, bm)
 
 data_for_sorts <- crsp_monthly |>
   left_join(
-    bm, join_by(permno, gvkey, month == sorting_date)
+    bm, join_by(permno, gvkey, date == sorting_date)
   ) |>
   left_join(
-    me, join_by(permno, month == sorting_date)
+    me, join_by(permno, date == sorting_date)
   ) |>
   select(
-    permno, gvkey, month, ret_excess,
+    permno, gvkey, date, ret_excess,
     mktcap_lag, me, bm, exchange, comp_date
   )
 
 data_for_sorts <- data_for_sorts |>
-  arrange(permno, gvkey, month) |>
+  arrange(permno, gvkey, date) |>
   group_by(permno, gvkey) |>
   fill(bm, comp_date) |>
   ungroup() |> 
-  filter(comp_date > month %m-% months(12)) |>
+  filter(comp_date > date %m-% months(12)) |>
   select(-comp_date) |>
   drop_na()
 ```
@@ -136,7 +136,7 @@ To implement the independent bivariate portfolio sort, we assign monthly portfol
 
 ```{r}
 value_portfolios <- data_for_sorts |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
@@ -150,7 +150,7 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     )) |>
-  group_by(month, portfolio_bm, portfolio_me) |>
+  group_by(date, portfolio_bm, portfolio_me) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
@@ -161,7 +161,7 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 
 ```{r}
 value_premium <- value_portfolios |>
-  group_by(month, portfolio_bm) |>
+  group_by(date, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(
     value_premium = ret[portfolio_bm == max(portfolio_bm)] -
@@ -182,14 +182,14 @@ To implement the dependent sorts, we first create the size portfolios by calling
 
 ```{r}
 value_portfolios <- data_for_sorts |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(portfolio_me = assign_portfolio(
     data = pick(everything()),
     sorting_variable = "me",
     n_portfolios = 5,
     exchanges = c("NYSE")
   )) |>
-  group_by(month, portfolio_me) |>
+  group_by(date, portfolio_me) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
@@ -197,14 +197,14 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     )) |>
-  group_by(month, portfolio_me, portfolio_bm) |>
+  group_by(date, portfolio_me, portfolio_bm) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )
 
 value_premium <- value_portfolios |>
-  group_by(month, portfolio_bm) |>
+  group_by(date, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
   summarize(
     value_premium = ret[portfolio_bm == max(portfolio_bm)] -

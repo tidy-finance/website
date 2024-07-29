@@ -51,13 +51,13 @@ tidy_finance = sqlite3.connect(
 crsp_monthly = pd.read_sql_query(
   sql="SELECT * FROM crsp_monthly", 
   con=tidy_finance, 
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 
 factors_ff3_monthly = pd.read_sql_query(
   sql="SELECT * FROM factors_ff3_monthly", 
   con=tidy_finance, 
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 ```
 
@@ -73,7 +73,7 @@ Before we build our size portfolios, we investigate the distribution of the vari
 #| fig-alt: "Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."
 #| fig-pos: "htb"
 market_cap_concentration = (crsp_monthly
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: x.assign(
     top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
     top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
@@ -81,7 +81,7 @@ market_cap_concentration = (crsp_monthly
     top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)))
   )
   .reset_index(drop=True)
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: pd.Series({
     "Largest 1%": x["mktcap"][x["top01"]].sum()/x["mktcap"].sum(),
     "Largest 5%": x["mktcap"][x["top05"]].sum()/x["mktcap"].sum(),
@@ -90,12 +90,12 @@ market_cap_concentration = (crsp_monthly
     })
   )
   .reset_index()
-  .melt(id_vars="month", var_name="name", value_name="value")
+  .melt(id_vars="date", var_name="name", value_name="value")
 )
 
 plot_market_cap_concentration = (
   ggplot(market_cap_concentration, 
-         aes(x="month", y="value", 
+         aes(x="date", y="value", 
          color="name", linetype="name")) +
   geom_line() +
   scale_y_continuous(labels=percent_format()) +
@@ -116,10 +116,10 @@ Next, firm sizes also differ across listing exchanges. The primary listings of s
 #| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 #| fig-pos: "htb"
 market_cap_share = (crsp_monthly
-  .groupby(["month", "exchange"])
+  .groupby(["date", "exchange"])
   .aggregate({"mktcap": "sum"})
   .reset_index(drop=False)
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x:
     x.assign(total_market_cap=lambda x: x["mktcap"].sum(),
              share=lambda x: x["mktcap"]/x["total_market_cap"]
@@ -130,7 +130,7 @@ market_cap_share = (crsp_monthly
 
 plot_market_cap_share = (
   ggplot(market_cap_share, 
-         aes(x="month", y="share", 
+         aes(x="date", y="share", 
              fill="exchange", color="exchange")) +
   geom_area(position="stack", stat="identity", alpha=0.5) +
   geom_line(position="stack") +
@@ -169,7 +169,7 @@ def compute_summary(data, variable, filter_variable, percentiles):
     return summary.round(0)
 
 compute_summary(
-  crsp_monthly[crsp_monthly["month"] == crsp_monthly["month"].max()],
+  crsp_monthly[crsp_monthly["date"] == crsp_monthly["date"].max()],
   variable="mktcap",
   filter_variable="exchange",
   percentiles=[0.05, 0.5, 0.95]
@@ -228,18 +228,18 @@ def compute_portfolio_returns(n_portfolios=10,
     """Compute (value-weighted) portfolio returns."""
     
     returns = (data
-      .groupby("month")
+      .groupby("date")
       .apply(lambda x: x.assign(
         portfolio=assign_portfolio(x, exchanges, 
                                    "mktcap_lag", n_portfolios))
       )
       .reset_index(drop=True)
-      .groupby(["portfolio", "month"])
+      .groupby(["portfolio", "date"])
       .apply(lambda x: x.assign(
         ret=calculate_returns(x, value_weighted))
       )
       .reset_index(drop=True)
-      .groupby("month")
+      .groupby("date")
       .apply(lambda x: 
         pd.Series({"size_premium": x.loc[x["portfolio"].idxmin(), "ret"]-
           x.loc[x["portfolio"].idxmax(), "ret"]}))
@@ -295,8 +295,8 @@ value_weighted = [True, False]
 data = [
   crsp_monthly,
   crsp_monthly[crsp_monthly["industry"] != "Finance"],
-  crsp_monthly[crsp_monthly["month"] < "1990-06-01"],
-  crsp_monthly[crsp_monthly["month"] >= "1990-06-01"],
+  crsp_monthly[crsp_monthly["date"] < "1990-06-01"],
+  crsp_monthly[crsp_monthly["date"] >= "1990-06-01"],
 ]
 p_hacking_setup = list(
   product(n_portfolios, exchanges, value_weighted, data)

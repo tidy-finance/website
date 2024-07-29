@@ -102,7 +102,7 @@ stock_identifiers = pd.DataFrame(stock_identifiers_list)
 
 Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `dummy_years`. The `expand_grid()` function ensures that we get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
 
-Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `expand_grid()` function to combine `stock_identifiers` with a new table that has the `month` variable from `dummy_months`. After merging, we select the columns `permno`, `gvkey`, `month`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
+Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `expand_grid()` function to combine `stock_identifiers` with a new table that has the `date` variable from `dummy_months`. After merging, we select the columns `permno`, `gvkey`, `date`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
 
 Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `dummy_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
 
@@ -116,7 +116,7 @@ stock_panel_yearly = pd.DataFrame({
 stock_panel_monthly = pd.DataFrame({
   "permno": np.tile(stock_identifiers["permno"], len(dummy_months)),
   "gvkey": np.tile(stock_identifiers["gvkey"], len(dummy_months)),
-  "month": np.repeat(dummy_months, len(stock_identifiers)),
+  "date": np.repeat(dummy_months, len(stock_identifiers)),
   "siccd": np.tile(stock_identifiers["siccd"], len(dummy_months)),
   "industry": np.tile(stock_identifiers["industry"], len(dummy_months)),
   "exchcd": np.tile(stock_identifiers["exchcd"], len(dummy_months)),
@@ -194,7 +194,6 @@ The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_
 #| eval: false
 crsp_monthly_dummy = (stock_panel_monthly
   .assign(
-    date=lambda x: x["month"]+pd.offsets.MonthEnd(1),
     ret=lambda x: np.fmax(np.random.normal(size=len(x)), -1),
     ret_excess=lambda x: (
       np.fmax(x["ret"]-np.random.uniform(0, 0.0025, len(x)), -1)
@@ -202,7 +201,7 @@ crsp_monthly_dummy = (stock_panel_monthly
     shrout=1000*np.random.uniform(1, 50, len(stock_panel_monthly)),
     altprc=np.random.uniform(0, 1000, len(stock_panel_monthly)))
   .assign(mktcap=lambda x: x["shrout"]*x["altprc"])
-  .sort_values(by=["permno", "month"])
+  .sort_values(by=["permno", "date"])
   .assign(
     mktcap_lag=lambda x: (x.groupby("permno")["mktcap"].shift(1))
   )
@@ -219,13 +218,12 @@ crsp_monthly_dummy = (stock_panel_monthly
 
 ### Dummy `crsp_daily` table
 
-The `crsp_daily` table only contains a `month` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.  
+The `crsp_daily` table only contains a `date` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.  
 
 ```{python}
 #| eval: false
 crsp_daily_dummy = (stock_panel_daily
   .assign(
-    month=lambda x: x["date"].dt.to_period('M').dt.start_time,
     ret_excess=lambda x: np.fmax(np.random.normal(size=len(x)), -1)
   )
   .reset_index(drop=True)

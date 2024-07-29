@@ -40,7 +40,7 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  select(gvkey, month, mktcap) |>
+  select(gvkey, date, mktcap) |>
   collect()
 
 compustat <- tbl(tidy_finance, "compustat") |>
@@ -52,7 +52,7 @@ The classical investment regressions model the capital investment of a firm as a
 
 ```{r}
 data_investment <- compustat |>
-  mutate(month = floor_date(datadate, "month")) |>
+  mutate(date = floor_date(datadate, "month")) |>
   left_join(compustat |>
     select(gvkey, year, at_lag = at) |>
     mutate(year = year + 1),
@@ -76,8 +76,7 @@ Tobin's q is the ratio of the market value of capital to its replacement costs.\
 
 ```{r}
 data_investment <- data_investment |>
-  left_join(crsp_monthly,
-            join_by(gvkey, month)) |>
+  left_join(crsp_monthly, join_by(gvkey, date)) |>
   mutate(tobins_q = (mktcap + at - be + txdb) / at) |>
   select(gvkey, year, investment_lead, cash_flows, tobins_q) |>
   drop_na()

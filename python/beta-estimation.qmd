@@ -48,20 +48,20 @@ The estimation procedure is based on a rolling-window estimation, where we may u
 tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
 crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, month, industry, ret_excess FROM crsp_monthly",
+    sql="SELECT permno, date, industry, ret_excess FROM crsp_monthly",
     con=tidy_finance,
-    parse_dates={"month"})
+    parse_dates={"date"})
   .dropna()
 )
 
 factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
+  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(factors_ff3_monthly, how="left", on="month")
+  .merge(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -111,8 +111,8 @@ We hence collect information about the first and last listing date of each `perm
 permno_information = (crsp_monthly
   .merge(valid_permnos, how="inner", on="permno")
   .groupby(["permno"])
-  .aggregate(first_month=("month", "min"),
-             last_month=("month", "max"))
+  .aggregate(first_date=("date", "min"),
+             last_date=("date", "max"))
   .reset_index()
 )
 ```
@@ -121,26 +121,26 @@ To complete the missing observations in the CRSP sample, we obtain all possible 
 
 ```{python}
 unique_permno = crsp_monthly["permno"].unique()
-unique_month = factors_ff3_monthly["month"].unique()
+unique_month = factors_ff3_monthly["date"].unique()
 
 all_combinations = pd.DataFrame(
   product(unique_permno, unique_month), 
-  columns=["permno", "month"]
+  columns=["permno", "date"]
 )
 ```
 
-Finally, we expand the CRSP sample and include a row (with missing excess returns) for each possible `permno`-`month` observation that falls within the start and end date where the respective `permno` has been publicly listed. 
+Finally, we expand the CRSP sample and include a row (with missing excess returns) for each possible `permno`-`date` observation that falls within the start and end date where the respective `permno` has been publicly listed. 
 
 ```{python}
 returns_monthly = (all_combinations
-  .merge(crsp_monthly.get(["permno", "month", "ret_excess"]), 
-         how="left", on=["permno", "month"])
+  .merge(crsp_monthly.get(["permno", "date", "ret_excess"]), 
+         how="left", on=["permno", "date"])
   .merge(permno_information, how="left", on="permno")
-  .query("(month >= first_month) & (month <= last_month)")
-  .drop(columns=["first_month", "last_month"])
-  .merge(crsp_monthly.get(["permno", "month", "industry"]),
-         how="left", on=["permno", "month"])
-  .merge(factors_ff3_monthly, how="left", on="month")
+  .query("(date >= first_date) & (date <= last_date)")
+  .drop(columns=["first_date", "last_date"])
+  .merge(crsp_monthly.get(["permno", "date", "industry"]),
+         how="left", on=["permno", "date"])
+  .merge(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -150,7 +150,7 @@ The following function implements the CAPM regression for a dataframe (or a part
 def roll_capm_estimation(data, window_size, min_obs):
     """Calculate rolling CAPM estimation."""
     
-    data = data.sort_values("month")
+    data = data.sort_values("date")
 
     result = (RollingOLS.from_formula(
       formula="ret_excess ~ mkt_excess",
@@ -197,7 +197,7 @@ beta_example = (returns_monthly
 #| fig-pos: "htb"
 plot_beta = (
   ggplot(beta_example, 
-         aes(x="month", y="beta", color="company", linetype="company")) + 
+         aes(x="date", y="beta", color="company", linetype="company")) + 
   geom_line() + 
   labs(x="", y="", color="", linetype="",
        title="Monthly beta estimates for example stocks") +
@@ -214,10 +214,7 @@ Next, we perform the rolling window estimation for the entire cross-section of s
 def roll_capm_estimation_for_joblib(permno, group):
     """Calculate rolling CAPM estimation using joblib."""
     
-    if "date" in group.columns:
-      group = group.sort_values(by="date")
-    else:
-      group = group.sort_values(by="month")
+    group = group.sort_values(by="date")
 
     beta_values = (RollingOLS.from_formula(
         formula="ret_excess ~ mkt_excess",
@@ -232,16 +229,8 @@ def roll_capm_estimation_for_joblib(permno, group):
     
     result = pd.DataFrame(beta_values)
     result.columns = ["beta"]
-    result["month"] = group["month"].values
+    result["date"] = group["date"].values
     result["permno"] = permno
-    
-    try:
-      result["date"] = group["date"].values
-      result = result[
-        (result.groupby("month")["date"].transform("max")) == result["date"]
-      ]
-    except(KeyError):
-      pass
     
     return result
 
@@ -265,7 +254,7 @@ beta_monthly = (
 
 ## Estimating Beta Using Daily Returns
 
-Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. As loading the full daily CRSP data requires relatively large amounts of memory, we split the beta estimation into smaller chunks.\index{Parallelization} 
+Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. As loading the full daily CRSP data requires relatively large amounts of memory, we split the beta estimation into smaller chunks.\index{Parallelization} The logic follows the approach that we use to download the daily CRSP data (see [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd)).
 
 First, we load the daily Fama-French market excess returns and extract the vector of dates.
 
@@ -309,7 +298,7 @@ for j in range(1, batches+1):
     permno_string = f"({permno_batch_formatted})"
     
     crsp_daily_sub_query = (
-      "SELECT permno, month, date, ret_excess "
+      "SELECT permno, date, ret_excess "
         "FROM crsp_daily "
        f"WHERE permno IN {permno_string}" 
     )
@@ -318,7 +307,7 @@ for j in range(1, batches+1):
       sql=crsp_daily_sub_query,
       con=tidy_finance,
       dtype={"permno": int},
-      parse_dates={"date", "month"}
+      parse_dates={"date"}
     )
     
     valid_permnos = (crsp_daily_sub
@@ -366,6 +355,19 @@ for j in range(1, batches+1):
       .rename(columns={"beta": "beta_daily"})
     )
     
+    beta_daily_sub = (beta_daily_sub
+      .assign(
+          month = lambda x: 
+            x["date"].dt.to_period("M").dt.to_timestamp()
+        )
+      .sort_values("date") 
+      .groupby(["permno", "month"])
+      .last()
+      .reset_index()
+      .drop(columns="date")
+      .rename(columns={"month": "date"})
+    )
+    
     beta_daily.append(beta_daily_sub)
               
     print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
@@ -383,7 +385,7 @@ What is a typical value for stock betas? To get some feeling, we illustrate the 
 #| fig.alt: "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
 #| fig-pos: "htb"
 beta_industries = (beta_monthly
-  .merge(crsp_monthly, how="inner", on=["permno", "month"])
+  .merge(crsp_monthly, how="inner", on=["permno", "date"])
   .dropna(subset="beta_monthly")
   .groupby(["industry","permno"])["beta_monthly"]
   .aggregate("mean")
@@ -417,7 +419,7 @@ Next, we illustrate the time-variation in the cross-section of estimated betas. 
 #| fig-alt: "Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top ten percent quantile on average is around two but varies substantially over time. The lowest ten percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly."
 #| fig-pos: "htb"
 beta_quantiles = (beta_monthly
-  .groupby("month")["beta_monthly"]
+  .groupby("date")["beta_monthly"]
   .quantile(q=np.arange(0.1, 1.0, 0.1))
   .reset_index()
   .rename(columns={"level_1": "quantile"})
@@ -430,7 +432,7 @@ n_quantiles = beta_quantiles["quantile"].nunique()
 
 plot_beta_quantiles = (
   ggplot(beta_quantiles, 
-         aes(x="month", y="beta_monthly", 
+         aes(x="date", y="beta_monthly", 
          color="factor(quantile)", linetype="factor(quantile)")) +
   geom_line() +
   labs(x="", y="", color="", linetype="",
@@ -451,21 +453,21 @@ To compare the difference between daily and monthly data, we combine beta estima
 #| fig-alt: "Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus three years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency."
 #| fig-pos: "h!tb"
 beta = (beta_monthly
-  .get(["permno", "month", "beta_monthly"])
-  .merge(beta_daily.get(["permno", "month", "beta_daily"]),
-         how="outer", on=["permno", "month"])
+  .get(["permno", "date", "beta_monthly"])
+  .merge(beta_daily.get(["permno", "date", "beta_daily"]),
+         how="outer", on=["permno", "date"])
 )
 
 beta_comparison = (beta
   .merge(examples, on="permno")
-  .melt(id_vars=["permno", "month", "company"], var_name="name",
+  .melt(id_vars=["permno", "date", "company"], var_name="name",
         value_vars=["beta_monthly", "beta_daily"], value_name="value")
   .dropna()
 )
 
 plot_beta_comparison = (
   ggplot(beta_comparison,
-         aes(x="month", y="value", color="name")) +
+         aes(x="date", y="value", color="name")) +
   geom_line() +
   facet_wrap("~company", ncol=1) +
   labs(x="", y="", color="",
@@ -500,20 +502,20 @@ Whenever you perform some kind of estimation, it also makes sense to do rough pl
 #| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using five years of monthly or three months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta."
 #| fig-pos: "htb"
 beta_long = (crsp_monthly
-  .merge(beta, how="left", on=["permno", "month"])
-  .melt(id_vars=["permno", "month"], var_name="name",
+  .merge(beta, how="left", on=["permno", "date"])
+  .melt(id_vars=["permno", "date"], var_name="name",
         value_vars=["beta_monthly", "beta_daily"], value_name="value")
 )
 
 beta_shares = (beta_long
-  .groupby(["month", "name"])
+  .groupby(["date", "name"])
   .aggregate(share=("value", lambda x: sum(~x.isna())/len(x)))
   .reset_index()
 )
 
 plot_beta_long = (
   ggplot(beta_shares, 
-         aes(x="month", y="share", color="name", linetype="name")) +
+         aes(x="date", y="share", color="name", linetype="name")) +
   geom_line() +
   labs(x="", y="", color="", linetype="",
        title="End-of-month share of securities with beta estimates") + 
@@ -542,7 +544,7 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 ## Exercises
 
 1. Compute beta estimates based on monthly data using one, three, and five years of data and impose a minimum number of observations of 10, 28, and 48 months with return data, respectively. How strongly correlated are the estimated betas?
-1. Compute beta estimates based on monthly data using five years of data and impose different numbers of minimum observations. How does the share of `permno`-`month` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
+1. Compute beta estimates based on monthly data using five years of data and impose different numbers of minimum observations. How does the share of `permno`-`date` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
 1. Instead of using `joblib`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
 1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? 
 1. Compute beta estimates for multi-factor models such as the Fama-French three-factor model. For that purpose, you extend your regression to 

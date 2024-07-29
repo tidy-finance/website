@@ -79,8 +79,7 @@ We use the two remote tables to fetch the data we want to put into our local dat
 
 ```{python}
 crsp_monthly_query = (
-  "SELECT msf.permno, msf.mthcaldt AS date, "
-         "date_trunc('month', msf.mthcaldt)::date AS month, "
+  "SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "
          "msf.mthret AS ret, msf.shrout, msf.mthprc AS altprc, "
          "ssih.primaryexch, ssih.siccd "
     "FROM crsp.msf_v2 AS msf "
@@ -103,12 +102,12 @@ crsp_monthly = (pd.read_sql_query(
     sql=crsp_monthly_query,
     con=wrds,
     dtype={"permno": int, "siccd": int},
-    parse_dates={"date", "month"})
+    parse_dates={"date"})
   .assign(shrout=lambda x: x["shrout"]*1000)
 )
 ```
 
-Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters. 
+Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters.
 
 The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock's price, you need to adjust it with a cumulative adjustment factor.  We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
@@ -124,14 +123,14 @@ The next variable we frequently use is the one-month *lagged* market capitalizat
 ```{python}
 mktcap_lag = (crsp_monthly
   .assign(
-    month=lambda x: x["month"]+pd.DateOffset(months=1),
+    date=lambda x: x["date"]+pd.DateOffset(months=1),
     mktcap_lag=lambda x: x["mktcap"]
   )
-  .get(["permno", "month", "mktcap_lag"])
+  .get(["permno", "date", "mktcap_lag"])
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(mktcap_lag, how="left", on=["permno", "month"])
+  .merge(mktcap_lag, how="left", on=["permno", "date"])
 )
 ```
 
@@ -193,13 +192,13 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
 factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT month, rf FROM factors_ff3_monthly",
+  sql="SELECT date, rf FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
   
 crsp_monthly = (crsp_monthly
-  .merge(factors_ff3_monthly, how="left", on="month")
+  .merge(factors_ff3_monthly, how="left", on="date")
   .assign(ret_excess=lambda x: x["ret"]-x["rf"])
   .assign(ret_excess=lambda x: x["ret_excess"].clip(lower=-1))
   .drop(columns=["rf"])
@@ -265,12 +264,12 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 cpi_monthly = pd.read_sql_query(
   sql="SELECT * FROM cpi_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 
 market_cap_per_exchange = (crsp_monthly
-  .merge(cpi_monthly, how="left", on="month")
-  .groupby(["month", "exchange"])
+  .merge(cpi_monthly, how="left", on="date")
+  .groupby(["date", "exchange"])
   .apply(
     lambda group: pd.Series({
       "mktcap": group["mktcap"].sum()/group["cpi"].mean()
@@ -281,7 +280,7 @@ market_cap_per_exchange = (crsp_monthly
 
 market_cap_per_exchange_figure = (
   ggplot(market_cap_per_exchange, 
-         aes(x="month", y="mktcap/1000", 
+         aes(x="date", y="mktcap/1000", 
              color="exchange", linetype="exchange")) +
   geom_line() +
   labs(x="", y="", color="", linetype="",
@@ -332,8 +331,8 @@ We also compute the market cap of all stocks belonging to the respective industr
 #| fig-alt: "Title: Monthly total market cap by industry in billions as of Dec 2022 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2022 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past."
 #| fig-pos: "htb"
 market_cap_per_industry = (crsp_monthly
-  .merge(cpi_monthly, how="left", on="month")
-  .groupby(["month", "industry"])
+  .merge(cpi_monthly, how="left", on="date")
+  .groupby(["date", "industry"])
   .apply(
     lambda group: pd.Series({
       "mktcap": (group["mktcap"].sum()/group["cpi"].mean())
@@ -344,7 +343,7 @@ market_cap_per_industry = (crsp_monthly
 
 market_cap_per_industry_figure = (
   ggplot(market_cap_per_industry, 
-         aes(x="month", y="mktcap/1000", 
+         aes(x="date", y="mktcap/1000", 
              color="industry", linetype="industry")) +
   geom_line() + 
   labs(x="", y="", color="", linetype="",
@@ -366,7 +365,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 
 ```{python}
 #| output: false
-#| eval: false
+#| eval: true
 factors_ff3_daily = pd.read_sql(
   sql="SELECT * FROM factors_ff3_daily", 
   con=tidy_finance,
@@ -426,17 +425,13 @@ for j in range(1, batches+1):
   if not crsp_daily_sub.empty:
     
       crsp_daily_sub = (crsp_daily_sub
-        .assign(
-          month = lambda x: 
-            x["date"].dt.to_period("M").dt.to_timestamp()
-        )
         .merge(factors_ff3_daily[["date", "rf"]], 
                on="date", how="left")
         .assign(
           ret_excess = lambda x: 
             ((x["ret"] - x["rf"]).clip(lower=-1))
         )
-        .get(["permno", "date", "month", "ret_excess"])
+        .get(["permno", "date", "ret_excess"])
       )
         
       if j == 1:
@@ -454,7 +449,7 @@ for j in range(1, batches+1):
   print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
 ```
 
-Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
+Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
 
 ## Preparing Compustat Data
 
@@ -600,7 +595,7 @@ Before we close this chapter, let us look at an interesting descriptive statisti
 #| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2022 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
 #| fig-pos: "htb"
 share_with_be = (crsp_monthly
-  .assign(year=lambda x: pd.DatetimeIndex(x["month"]).year)
+  .assign(year=lambda x: pd.DatetimeIndex(x["date"]).year)
   .sort_values("date")
   .groupby(["permno", "year"])
   .tail(1)

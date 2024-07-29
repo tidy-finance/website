@@ -31,7 +31,8 @@ We first download daily prices for one stock symbol, e.g., the Apple stock, *AAP
 
 ```{r}
 #| cache: true
-prices <- tq_get("AAPL",
+prices <- tq_get(
+  x = "AAPL",
   get = "stock.prices",
   from = "2000-01-01",
   to = "2022-12-31"
@@ -152,20 +153,21 @@ Conveniently, `tidyquant` provides a function to get all stocks in a stock index
 
 ```{r}
 #| cache: true
-index_prices <- tq_get(symbols,
+prices_daily <- tq_get(
+  x = symbols,
   get = "stock.prices",
   from = "2000-01-01",
   to = "2022-12-31"
 )
 ```
 
-The resulting tibble contains `r nrow(index_prices)` daily observations for `r index_prices |> count(company) |> nrow()` different corporations. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting tibble contains `r nrow(prices_daily)` daily observations for `r prices_daily |> count(company) |> nrow()` different corporations. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ```{r}
 #| label: fig-103
 #| fig-cap: "Prices in USD, adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Stock prices of DOW index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the DOW index."
-index_prices |>
+prices_daily |>
   ggplot(aes(
     x = date,
     y = adjusted,
@@ -186,13 +188,13 @@ Do you notice the small differences relative to the code we used before? `tq_get
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.
 
 ```{r}
-all_returns <- index_prices |>
+returns_daily <- prices_daily |>
   group_by(symbol) |>
   mutate(ret = adjusted / lag(adjusted) - 1) |>
   select(symbol, date, ret) |>
   drop_na(ret)
 
-all_returns |>
+returns_daily |>
   group_by(symbol) |>
   summarize(across(
     ret,
@@ -219,7 +221,7 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 #| label: fig-104
 #| fig-cap: "Total daily trading volume in billion USD."
 #| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2022, with a maximum of more than 100."
-trading_volume <- index_prices |>
+trading_volume <- prices_daily |>
   group_by(date) |>
   summarize(trading_volume = sum(volume * adjusted))
 
@@ -264,16 +266,16 @@ In the previous part, we show how to download stock market data and inspect it w
 \index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfies the condition that no other portfolio exists with a higher expected return but with the same volatility (the square root of the variance, i.e., the risk), see, e.g., @Merton1972.\index{Return volatility} We compute and visualize the efficient frontier for several stocks. First, we extract each asset's *monthly* returns. In order to keep things simple, we work with a balanced panel and exclude DOW constituents for which we do not observe a price on every single trading day since the year 2000.
 
 ```{r}
-index_prices <- index_prices |>
+prices_daily <- prices_daily |>
   group_by(symbol) |>
   mutate(n = n()) |>
   ungroup() |>
   filter(n == max(n)) |>
   select(-n)
 
-returns <- index_prices |>
-  mutate(month = floor_date(date, "month")) |>
-  group_by(symbol, month) |>
+returns_monthly <- prices_daily |>
+  mutate(date = floor_date(date, "month")) |>
+  group_by(symbol, date) |>
   summarize(price = last(adjusted), .groups = "drop_last") |>
   mutate(ret = price / lag(price) - 1) |>
   drop_na(ret) |>
@@ -285,12 +287,12 @@ Here, `floor_date()` is a function from the `lubridate` package [@lubridate], wh
 Next, we transform the returns from a tidy tibble into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days to compute the sample average return vector $$\hat\mu = \frac{1}{T}\sum\limits_{t=1}^T r_t$$ where $r_t$ is the $N$ vector of returns on date $t$ and the sample covariance matrix $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ We achieve this by using `pivot_wider()` with the new column names from the column `symbol` and setting the values to `ret`. We compute the vector of sample average returns and the sample variance-covariance matrix, which we consider as proxies for the parameters of the distribution of future stock returns. Thus, for simplicity, we refer to $\Sigma$ and $\mu$ instead of explicitly highlighting that the sample moments are estimates. \index{Covariance} In later chapters, we discuss the issues that arise once we take estimation uncertainty into account.
 
 ```{r}
-returns_matrix <- returns |>
+returns_matrix <- returns_monthly |>
   pivot_wider(
     names_from = symbol,
     values_from = ret
   ) |>
-  select(-month)
+  select(-date)
 sigma <- cov(returns_matrix)
 mu <- colMeans(returns_matrix)
 ```
@@ -334,15 +336,15 @@ efp_weights <- mvp_weights +
 ```{r}
 length_year <- 12
 a <- seq(from = -0.4, to = 1.9, by = 0.01)
-res <- tibble(
+results <- tibble(
   a = a,
   mu = NA,
   sd = NA
 )
 for (i in seq_along(a)) {
   w <- (1 - a[i]) * mvp_weights + (a[i]) * efp_weights
-  res$mu[i] <- length_year * t(w) %*% mu   
-  res$sd[i] <- sqrt(length_year) * sqrt(t(w) %*% sigma %*% w)
+  results$mu[i] <- length_year * t(w) %*% mu   
+  results$sd[i] <- sqrt(length_year) * sqrt(t(w) %*% sigma %*% w)
 }
 ```
 
@@ -353,11 +355,11 @@ $$\omega^* = a\omega_\text{eff}(\bar\mu) + (1-a)\omega_\text{mvp} = \omega_\text
 #| label: fig-106
 #| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers 3 times the expected return of the minimum variance portfolio, respectively. The small dots indicate the location of the individual constituents."
 #| fig-alt: "Title: Efficient frontier for DOW index constituents. The figure shows DOW index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
-res |>
+results |>
   ggplot(aes(x = sd, y = mu)) +
   geom_point() +
   geom_point(
-    data = res |> filter(a %in% c(0, 1)),
+    data = results |> filter(a %in% c(0, 1)),
     size = 4
   ) +
   geom_point(
@@ -380,10 +382,10 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1. Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the ticker’s un-adjusted and adjusted closing prices. Explain the differences.
+1. Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain the differences.
 1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
-1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of tickers (e.g., `ticker <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
-1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the ticker `AAPL`.
+1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.
 1.Compute monthly returns from the downloaded stock market prices. Compute the vector of historical average returns and the sample variance-covariance matrix. Compute the minimum variance portfolio weights and the portfolio volatility and average returns. Visualize the mean-variance efficient frontier. Choose one of your assets and identify the portfolio which yields the same historical volatility but achieves the highest possible average return.
 1. In the portfolio choice analysis, we restricted our sample to all assets trading every day since 2000. How is such a decision a problem when you want to infer future expected portfolio performance from the results?
 1. The efficient frontier characterizes the portfolios with the highest expected return for different levels of risk. Identify the portfolio with the highest expected return per standard deviation. Which famous performance measure is close to the ratio of average returns to the standard deviation of returns?

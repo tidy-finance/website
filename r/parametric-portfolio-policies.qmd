@@ -34,30 +34,29 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  select(permno, month, ret_excess, mktcap, mktcap_lag) |>
+  select(permno, date, ret_excess, mktcap, mktcap_lag) |>
   collect()
 ```
 
 To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas.\index{Data!Fama-French factors} 
 ```{r}
 factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(month, mkt_excess) |>
+  select(date, mkt_excess) |>
   collect()
 ```
 
-Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t-13$ and $t-2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. 
-To construct the correct lagged values, we use the approach introduced in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
+Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. \index{Momentum} In particular, we record the lagged one-year return momentum (`momentum_lag`), defined as the compounded return between months $t-13$ and $t-2$ for each firm. In finance, momentum is the empirically observed tendency for rising asset prices to rise further, and falling prices to keep falling [@Jegadeesh1993]. \index{Size!Size effect} The second characteristic is the firm's market equity (`size_lag`), defined as the log of the price per share times the number of shares outstanding [@Banz1981]. To construct the correct lagged values, we use the approach introduced in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
 
 ```{r}
 crsp_monthly_lags <- crsp_monthly |>
   transmute(permno,
-    month_13 = month %m+% months(13),
+    date_13 = date %m+% months(13),
     mktcap
   )
 
 crsp_monthly <- crsp_monthly |>
   inner_join(crsp_monthly_lags,
-    join_by(permno, month == month_13),
+    join_by(permno, date == date_13),
     suffix = c("", "_13")
   )
 
@@ -87,7 +86,7 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 
 ```{r}
 data_portfolios <- data_portfolios |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(
     n = n(),
     relative_mktcap = mktcap_lag / sum(mktcap_lag),
@@ -135,7 +134,7 @@ compute_portfolio_weights <- function(theta,
                                       value_weighting = TRUE,
                                       allow_short_selling = TRUE) {
   data |>
-    group_by(month) |>
+    group_by(date) |>
     bind_cols(
       characteristic_tilt = data |>
         transmute(across(contains("lag"), ~ . / n)) |>
@@ -194,20 +193,20 @@ evaluate_portfolio <- function(weights_crsp,
                                length_year = 12) {
   
   evaluation <- weights_crsp |>
-    group_by(month) |>
+    group_by(date) |>
     summarize(
       tilt = weighted.mean(ret_excess, weight_tilt),
       benchmark = weighted.mean(ret_excess, weight_benchmark)
     ) |>
-    pivot_longer(-month,
+    pivot_longer(
+      -date,
       values_to = "portfolio_return",
       names_to = "model"
     ) 
   
   evaluation_stats <- evaluation |>
     group_by(model) |>
-    left_join(factors_ff3_monthly, 
-              join_by(month)) |>
+    left_join(factors_ff3_monthly, join_by(date)) |>
     summarize(tibble(
       "Expected utility" = mean(power_utility(portfolio_return)),
       "Average return" = 100 * mean(length_year * portfolio_return),
@@ -219,8 +218,7 @@ evaluate_portfolio <- function(weights_crsp,
   
   if (capm_evaluation) {
     evaluation_capm <- evaluation |> 
-      left_join(factors_ff3_monthly, 
-                join_by(month)) |>
+      left_join(factors_ff3_monthly, join_by(date)) |>
       group_by(model) |>
       summarize(
       "CAPM alpha" = coefficients(lm(portfolio_return ~ mkt_excess))[1],
@@ -233,9 +231,9 @@ evaluate_portfolio <- function(weights_crsp,
 
   if (full_evaluation) {
     evaluation_weights <- weights_crsp |>
-      select(month, contains("weight")) |>
-      pivot_longer(-month, values_to = "weight", names_to = "model") |>
-      group_by(model, month) |>
+      select(date, contains("weight")) |>
+      pivot_longer(-date, values_to = "weight", names_to = "model") |>
+      group_by(model, date) |>
       mutate(
         "Absolute weight" = abs(weight),
         "Max. weight" = max(weight),
@@ -245,7 +243,7 @@ evaluate_portfolio <- function(weights_crsp,
         .keep = "none"
       ) |>
       group_by(model) |>
-      summarize(across(-month, ~ 100 * mean(.))) |>
+      summarize(across(-date, ~ 100 * mean(.))) |>
       mutate(model = str_remove(model, "weight_")) 
     
     evaluation_stats <- evaluation_stats |> 

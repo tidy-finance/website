@@ -94,11 +94,10 @@ crsp_monthly <- msf_db |>
       join_by(permno)
   ) |> 
   filter(mthcaldt >= secinfostartdt & mthcaldt <= secinfoenddt) |>
-  mutate(month = floor_date(mthcaldt, "month")) |>
+  mutate(date = floor_date(mthcaldt, "month")) |>
   select(
     permno, # Security identifier
-    date = mthcaldt, # Date of the observation
-    month, # Month of the observation
+    date, # Month of the observation
     ret = mthret, # Return
     shrout, # Shares outstanding (in thousands)
     prc = mthprc, # Last traded price in a month
@@ -107,7 +106,7 @@ crsp_monthly <- msf_db |>
   ) |>
   collect() |>
   mutate(
-    month = ymd(month),
+    date = ymd(date),
     shrout = shrout * 1000
   )
 ```
@@ -128,11 +127,11 @@ The next variable we frequently use is the one-month *lagged* market capitalizat
 
 ```{r}
 mktcap_lag <- crsp_monthly |>
-  mutate(month = month %m+% months(1)) |>
-  select(permno, month, mktcap_lag = mktcap)
+  mutate(date = date %m+% months(1)) |>
+  select(permno, date, mktcap_lag = mktcap)
 
 crsp_monthly <- crsp_monthly |>
-  left_join(mktcap_lag, join_by(permno, month))
+  left_join(mktcap_lag, join_by(permno, date))
 ```
 
 If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |> group_by(permno) |> mutate(mktcap_lag = lag(mktcap))`, take a look at the Exercises.
@@ -179,12 +178,12 @@ tidy_finance <- dbConnect(
 )
 
 factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(month, rf) |>
+  select(date, rf) |>
   collect()
 
 crsp_monthly <- crsp_monthly |>
   left_join(factors_ff3_monthly,
-    join_by(month)
+    join_by(date)
   ) |>
   mutate(
     ret_excess = ret - rf,
@@ -203,7 +202,8 @@ crsp_monthly <- crsp_monthly |>
 Finally, we store the monthly CRSP file in our database. 
 
 ```{r}
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "crsp_monthly",
   value = crsp_monthly,
   overwrite = TRUE
@@ -239,16 +239,16 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 #| fig-cap: "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2022."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2022. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2022, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."
 tbl(tidy_finance, "crsp_monthly") |>
-  left_join(tbl(tidy_finance, "cpi_monthly"), join_by(month)) |>
-  group_by(month, exchange) |>
+  left_join(tbl(tidy_finance, "cpi_monthly"), join_by(date)) |>
+  group_by(date, exchange) |>
   summarize(
     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
     .groups = "drop"
   ) |>
   collect() |>
-  mutate(month = ymd(month)) |>
+  mutate(date = ymd(date)) |>
   ggplot(aes(
-    x = month, y = mktcap / 1000,
+    x = date, y = mktcap / 1000,
     color = exchange, linetype = exchange
   )) +
   geom_line() +
@@ -274,8 +274,8 @@ Next, we look at the same descriptive statistics by industry. @fig-213 plots the
 #| fig-cap: "Number of stocks in the CRSP sample associated with different industries."
 #| fig-alt: "Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2022 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2022, the segment of firms within public administration is the largest in terms of the number of listed stocks."
 crsp_monthly_industry <- crsp_monthly |>
-  left_join(cpi_monthly, join_by(month)) |>
-  group_by(month, industry) |>
+  left_join(cpi_monthly, join_by(date)) |>
+  group_by(date, industry) |>
   summarize(
     securities = n_distinct(permno),
     mktcap = sum(mktcap) / mean(cpi),
@@ -284,7 +284,7 @@ crsp_monthly_industry <- crsp_monthly |>
 
 crsp_monthly_industry |>
   ggplot(aes(
-    x = month,
+    x = date,
     y = securities,
     color = industry,
     linetype = industry
@@ -306,7 +306,7 @@ We also compute the market cap of all stocks belonging to the respective industr
 #| fig-alt: "Title: Monthly total market cap by industry in billions as of Dec 2022 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2022 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. "
 crsp_monthly_industry |>
   ggplot(aes(
-    x = month,
+    x = date,
     y = mktcap / 1000,
     color = industry,
     linetype = industry
@@ -324,11 +324,11 @@ crsp_monthly_industry |>
 
 Before we turn to accounting data, we provide a proposal for downloading daily CRSP data with the same filters used for the monthly data (i.e., using information from `stksecurityinfohist`). While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20 GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire dataset to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your R session. 
 
-There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `cat()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
+There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `message()`. Notice that we also use the function `dbWriteTable()` here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
 
 ```{r}
 #| output: false
-#| eval: false
+#| eval: true
 dsf_db <- tbl(wrds, I("crsp.dsf_v2"))
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 
@@ -372,16 +372,16 @@ for (j in 1:batches) {
   if (nrow(crsp_daily_sub) > 0) {
     
     crsp_daily_sub <- crsp_daily_sub |>
-      mutate(month = floor_date(date, "month")) |>
       left_join(factors_ff3_daily |>
         select(date, rf), join_by(date)) |>
       mutate(
         ret_excess = ret - rf,
         ret_excess = pmax(ret_excess, -1)
       ) |>
-      select(permno, date, month, ret, ret_excess)
+      select(permno, date, ret, ret_excess)
 
-    dbWriteTable(tidy_finance,
+    dbWriteTable(
+      tidy_finance,
       "crsp_daily",
       value = crsp_daily_sub,
       overwrite = ifelse(j == 1, TRUE, FALSE),
@@ -389,11 +389,11 @@ for (j in 1:batches) {
     )
   }
 
-  cat("Batch", j, "out of", batches, "done (", percent(j / batches), ")\n")
+  message("Batch ", j, " out of ", batches, " done (", percent(j / batches), ")\n")
 }
 ```
 
-Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno`, `date`, and `month` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
+Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
 
 ## Preparing Compustat Data
 
@@ -481,7 +481,8 @@ compustat <- compustat |>
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database.
 
 ```{r}
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "compustat",
   value = compustat,
   overwrite = TRUE
@@ -525,7 +526,8 @@ crsp_monthly <- crsp_monthly |>
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local database.
 
 ```{r}
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "crsp_monthly",
   value = crsp_monthly,
   overwrite = TRUE
@@ -539,7 +541,7 @@ Before we close this chapter, let us look at an interesting descriptive statisti
 #| fig-cap: "End-of-year share of securities with book equity values by listing exchange."
 #| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2022 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
 crsp_monthly |>
-  group_by(permno, year = year(month)) |>
+  group_by(permno, year = year(date)) |>
   filter(date == max(date)) |>
   ungroup() |>
   left_join(compustat, join_by(gvkey, year)) |>

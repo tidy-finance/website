@@ -35,9 +35,7 @@ Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for
 
 ## Data Preparation
 
-We start with loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP}
-Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors}
-`beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
+We start with loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP} Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors} `beta` is the tibble with market betas computed in the previous chapter.\index{Beta}
 
 ```{r}
 tidy_finance <- dbConnect(
@@ -47,15 +45,15 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  select(permno, month, ret_excess, mktcap_lag) |>
+  select(permno, date, ret_excess, mktcap_lag) |>
   collect()
 
 factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(month, mkt_excess) |>
+  select(date, mkt_excess) |>
   collect()
 
 beta <- tbl(tidy_finance, "beta") |>
-  select(permno, month, beta_monthly) |>
+  select(permno, date, beta_monthly) |>
   collect()
 ```
 
@@ -69,12 +67,12 @@ This procedure, however, does not work correctly if there are non-explicit missi
 
 ```{r}
 beta_lag <- beta |>
-  mutate(month = month %m+% months(1)) |>
-  select(permno, month, beta_lag = beta_monthly) |>
+  mutate(date = date %m+% months(1)) |>
+  select(permno, date, beta_lag = beta_monthly) |>
   drop_na()
 
 data_for_sorts <- crsp_monthly |>
-  inner_join(beta_lag, join_by(permno, month))
+  inner_join(beta_lag, join_by(permno, date))
 ```
 
 The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.\index{Breakpoints} 
@@ -83,7 +81,7 @@ We then compute the value-weighted returns for each of the two resulting portfol
 
 ```{r}
 beta_portfolios <- data_for_sorts |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(
     breakpoint = median(beta_lag),
     portfolio = case_when(
@@ -91,7 +89,7 @@ beta_portfolios <- data_for_sorts |>
       beta_lag > breakpoint ~ "high"
     )
   ) |>
-  group_by(month, portfolio) |>
+  group_by(date, portfolio) |>
   summarize(ret = weighted.mean(ret_excess, mktcap_lag), 
             .groups = "drop")
 ```
@@ -102,7 +100,7 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 
 ```{r}
 beta_longshort <- beta_portfolios |>
-  pivot_wider(id_cols = month, names_from = portfolio, values_from = ret) |>
+  pivot_wider(id_cols = date, names_from = portfolio, values_from = ret) |>
   mutate(long_short = high - low)
 ```
 
@@ -153,7 +151,7 @@ We can use the above function to sort stocks into ten portfolios each month usin
 
 ```{r}
 beta_portfolios <- data_for_sorts |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(
     portfolio = assign_portfolio(
       data = pick(everything()),
@@ -162,12 +160,12 @@ beta_portfolios <- data_for_sorts |>
     ),
     portfolio = as.factor(portfolio)
   ) |>
-  group_by(portfolio, month) |>
+  group_by(portfolio, date) |>
   summarize(
     ret_excess = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )|>
-  left_join(factors_ff3_monthly, join_by(month))
+  left_join(factors_ff3_monthly, join_by(date))
 ```
 
 ## More Performance Evaluation
@@ -176,7 +174,7 @@ In the next step, we compute summary statistics for each beta portfolio. Namely,
 
 ```{r}
 beta_portfolios_summary <- beta_portfolios |>
-  nest(data = c(month, ret_excess, mkt_excess)) |>
+  nest(data = c(date, ret_excess, mkt_excess)) |>
   mutate(estimates = map(
     data, ~ tidy(lm(ret_excess ~ 1 + mkt_excess, data = .x))
   )) |>
@@ -260,11 +258,11 @@ beta_longshort <- beta_portfolios |>
     portfolio == min(as.numeric(portfolio)) ~ "low"
   )) |>
   filter(portfolio %in% c("low", "high")) |>
-  pivot_wider(id_cols = month, 
+  pivot_wider(id_cols = date, 
               names_from = portfolio, 
               values_from = ret_excess) |>
   mutate(long_short = high - low) |>
-  left_join(factors_ff3_monthly, join_by(month))
+  left_join(factors_ff3_monthly, join_by(date))
 ```
 
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 
@@ -290,7 +288,7 @@ coeftest(lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
 #| fig-cap: "We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks."
 #| fig.alt: "Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods."
 beta_longshort |>
-  group_by(year = year(month)) |>
+  group_by(year = year(date)) |>
   summarize(
     low = prod(1 + low) - 1,
     high = prod(1 + high) - 1,

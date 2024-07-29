@@ -50,7 +50,7 @@ tidy_finance <- dbConnect(
 )
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  select(permno, gvkey, month, ret_excess, mktcap) |>
+  select(permno, gvkey, date, ret_excess, mktcap) |>
   collect()
 
 compustat <- tbl(tidy_finance, "compustat") |>
@@ -58,7 +58,7 @@ compustat <- tbl(tidy_finance, "compustat") |>
   collect()
 
 beta <- tbl(tidy_finance, "beta") |>
-  select(month, permno, beta_monthly) |>
+  select(date, permno, beta_monthly) |>
   collect()
 ```
 
@@ -67,28 +67,28 @@ Furthermore, we also use the CAPM betas based on monthly returns we computed in 
 
 ```{r}
 characteristics <- compustat |>
-  mutate(month = floor_date(ymd(datadate), "month")) |>
-  left_join(crsp_monthly, by = c("gvkey", "month")) |>
-  left_join(beta, by = c("permno", "month")) |>
+  mutate(date = floor_date(ymd(datadate), "month")) |>
+  left_join(crsp_monthly, join_by(gvkey, date)) |>
+  left_join(beta, join_by(permno, date)) |>
   transmute(gvkey,
     bm = be / mktcap,
     log_mktcap = log(mktcap),
     beta = beta_monthly,
-    sorting_date = month %m+% months(6)
+    sorting_date = date %m+% months(6)
   )
 
 data_fama_macbeth <- crsp_monthly |>
-  left_join(characteristics, by = c("gvkey", "month" = "sorting_date")) |>
+  left_join(characteristics, join_by(gvkey, date == sorting_date)) |>
   group_by(permno) |>
-  arrange(month) |>
+  arrange(date) |>
   fill(c(beta, bm, log_mktcap), .direction = "down") |>
   ungroup() |>
   left_join(crsp_monthly |>
-    select(permno, month, ret_excess_lead = ret_excess) |>
-    mutate(month = month %m-% months(1)),
-  by = c("permno", "month")
+    select(permno, date, ret_excess_lead = ret_excess) |>
+    mutate(date = date %m-% months(1)),
+  join_by(permno, date)
   ) |>
-  select(permno, month, ret_excess_lead, beta, log_mktcap, bm) |>
+  select(permno, date, ret_excess_lead, beta, log_mktcap, bm) |>
   drop_na()
 ```
 
@@ -123,8 +123,8 @@ It is common to adjust for autocorrelation when reporting standard errors of ris
 
 ```{r}
 regressions_for_newey_west <- risk_premiums |>
-  select(month, factor = term, estimate) |>
-  nest(data = c(month, estimate)) |>
+  select(date, factor = term, estimate) |>
+  nest(data = c(date, estimate)) |>
   mutate(
     model = map(data, ~ lm(estimate ~ 1, .)),
     mean = map(model, tidy)
@@ -142,7 +142,7 @@ price_of_risk_newey_west <- regressions_for_newey_west |>
 left_join(price_of_risk,
   price_of_risk_newey_west |>
     select(factor, t_statistic_newey_west),
-  by = "factor"
+  join_by(factor)
 )
 ```
 
