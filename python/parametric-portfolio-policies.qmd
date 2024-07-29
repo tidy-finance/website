@@ -38,10 +38,10 @@ To get started, we load the monthly CRSP file, which forms our investment univer
 tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
 crsp_monthly = (pd.read_sql_query(
-    sql=("SELECT permno, month, ret_excess, mktcap, mktcap_lag "
+    sql=("SELECT permno, date, ret_excess, mktcap, mktcap_lag "
          "FROM crsp_monthly"),
     con=tidy_finance,
-    parse_dates={"month"})
+    parse_dates={"date"})
   .dropna()
 )
 ```
@@ -50,9 +50,9 @@ To evaluate the performance of portfolios, we further use monthly market returns
 
 ```{python}
 factors_ff_monthly = pd.read_sql_query(
-  sql="SELECT month, mkt_excess FROM factors_ff3_monthly",
+  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 ```
 
@@ -60,13 +60,13 @@ Next, we retrieve some stock characteristics that have been shown to have an eff
 
 ```{python}
 crsp_monthly_lags = (crsp_monthly
-  .assign(month=lambda x: x["month"]+pd.DateOffset(months=13))
-  .get(["permno", "month", "mktcap"])
+  .assign(date=lambda x: x["date"]+pd.DateOffset(months=13))
+  .get(["permno", "date", "mktcap"])
 )
 
 crsp_monthly = (crsp_monthly
   .merge(crsp_monthly_lags, 
-         how="inner", on=["permno", "month"], suffixes=["", "_13"])
+         how="inner", on=["permno", "date"], suffixes=["", "_13"])
 )
 
 data_portfolios = (crsp_monthly
@@ -96,14 +96,14 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 
 ```{python}
 data_portfolios = (data_portfolios
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: x.assign(
       relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
     )
   )
   .reset_index(drop=True)
-  .set_index("month")
-  .groupby(level="month")
+  .set_index("date")
+  .groupby(level="date")
   .transform(
     lambda x: (x-x.mean())/x.std() if x.name.endswith("lag") else x
   )
@@ -148,7 +148,7 @@ def compute_portfolio_weights(theta,
     theta = pd.DataFrame(theta, index=lag_columns)
 
     data = (data
-      .groupby("month")
+      .groupby("date")
       .apply(lambda x: x.assign(
           characteristic_tilt=x[theta.index] @ theta / x.shape[0]
         )
@@ -169,7 +169,7 @@ def compute_portfolio_weights(theta,
         )
 
     data = (data
-      .groupby("month")
+      .groupby("date")
       .apply(lambda x: x.assign(
         weight_tilt=lambda x: x["weight_tilt"]/x["weight_tilt"].sum()))
       .reset_index(drop=True)
@@ -214,7 +214,7 @@ def evaluate_portfolio(weights_data,
                        length_year=12):
     """Calculate portfolio evaluation measures."""
     evaluation = (weights_data
-        .groupby("month")
+        .groupby("date")
         .apply(lambda x: pd.Series(
           np.average(x[["ret_excess", "ret_excess"]],
                      weights=x[["weight_tilt", "weight_benchmark"]],
@@ -222,7 +222,7 @@ def evaluate_portfolio(weights_data,
           ["return_tilt", "return_benchmark"])
         )
         .reset_index()
-        .melt(id_vars="month", var_name="model",
+        .melt(id_vars="date", var_name="model",
               value_vars=["return_tilt", "return_benchmark"],
               value_name="portfolio_return")
         .assign(model=lambda x: x["model"].str.replace("return_", ""))
@@ -241,7 +241,7 @@ def evaluate_portfolio(weights_data,
 
     if capm_evaluation:
         evaluation_capm = (evaluation
-            .merge(factors_ff_monthly, how="left", on="month")
+            .merge(factors_ff_monthly, how="left", on="date")
             .groupby("model")
             .apply(lambda x: 
               smf.ols(formula="portfolio_return ~ 1 + mkt_excess", data=x)
@@ -256,10 +256,10 @@ def evaluate_portfolio(weights_data,
 
     if full_evaluation:
         evaluation_weights = (weights_data
-          .melt(id_vars="month", var_name="model",
+          .melt(id_vars="date", var_name="model",
                 value_vars=["weight_benchmark", "weight_tilt"],
                 value_name="weight")
-          .groupby(["model", "month"])["weight"]
+          .groupby(["model", "date"])["weight"]
           .aggregate([
             ("Mean abs. weight", lambda x: np.mean(abs(x))),
             ("Max. weight", lambda x: max(x)),
@@ -268,7 +268,7 @@ def evaluate_portfolio(weights_data,
             ("Avg. share of neg. weights", lambda x: np.mean(x < 0))
           ])
           .reset_index()
-          .drop(columns=["month"])
+          .drop(columns=["date"])
           .groupby(["model"])
           .aggregate(lambda x: np.average(x)*100)
           .reset_index()
