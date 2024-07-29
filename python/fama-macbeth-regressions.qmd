@@ -44,9 +44,9 @@ We illustrate @Fama1973 with the monthly CRSP sample and use three characteristi
 tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
 crsp_monthly = pd.read_sql_query(
-  sql="SELECT permno, gvkey, month, ret_excess, mktcap FROM crsp_monthly",
+  sql="SELECT permno, gvkey, date, ret_excess, mktcap FROM crsp_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 
 compustat = pd.read_sql_query(
@@ -56,9 +56,9 @@ compustat = pd.read_sql_query(
 )
 
 beta = pd.read_sql_query(
-  sql="SELECT month, permno, beta_monthly FROM beta",
+  sql="SELECT date, permno, beta_monthly FROM beta",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 ```
 
@@ -66,13 +66,13 @@ We use the Compustat and CRSP data to compute the book-to-market ratio and the (
 
 ```{python}
 characteristics = (compustat
-  .assign(month=lambda x: x["datadate"].dt.to_period("M").dt.to_timestamp())
-  .merge(crsp_monthly, how="left", on=["gvkey", "month"], )
-  .merge(beta, how="left", on=["permno", "month"])
+  .assign(date=lambda x: x["datadate"].dt.to_period("M").dt.to_timestamp())
+  .merge(crsp_monthly, how="left", on=["gvkey", "date"], )
+  .merge(beta, how="left", on=["permno", "date"])
   .assign(
     bm=lambda x: x["be"]/x["mktcap"],
     log_mktcap=lambda x: np.log(x["mktcap"]),
-    sorting_date=lambda x: x["month"]+pd.DateOffset(months=6)
+    sorting_date=lambda x: x["date"]+pd.DateOffset(months=6)
   )
   .get(["gvkey", "bm", "log_mktcap", "beta_monthly", "sorting_date"])
   .rename(columns={"beta_monthly": "beta"})
@@ -81,8 +81,8 @@ characteristics = (compustat
 data_fama_macbeth = (crsp_monthly
   .merge(characteristics, 
          how="left",
-         left_on=["gvkey", "month"], right_on=["gvkey", "sorting_date"])
-  .sort_values(["month", "permno"])
+         left_on=["gvkey", "date"], right_on=["gvkey", "sorting_date"])
+  .sort_values(["date", "permno"])
   .groupby("permno")
   .apply(lambda x: x.assign(
       beta=x["beta"].fillna(method="ffill"),
@@ -94,14 +94,14 @@ data_fama_macbeth = (crsp_monthly
 )
 
 data_fama_macbeth_lagged = (data_fama_macbeth
-  .assign(month=lambda x: x["month"]-pd.DateOffset(months=1))
-  .get(["permno", "month", "ret_excess"])
+  .assign(date=lambda x: x["date"]-pd.DateOffset(months=1))
+  .get(["permno", "date", "ret_excess"])
   .rename(columns={"ret_excess": "ret_excess_lead"})
 )
 
 data_fama_macbeth = (data_fama_macbeth
-  .merge(data_fama_macbeth_lagged, how="left", on=["permno", "month"])
-  .get(["permno", "month", "ret_excess_lead", "beta", "log_mktcap", "bm"])
+  .merge(data_fama_macbeth_lagged, how="left", on=["permno", "date"])
+  .get(["permno", "date", "ret_excess_lead", "beta", "log_mktcap", "bm"])
   .dropna()
 )
 ```
@@ -112,7 +112,7 @@ Next, we run the cross-sectional regressions with the characteristics as explana
 
 ```{python}
 risk_premiums = (data_fama_macbeth
-  .groupby("month")
+  .groupby("date")
   .apply(lambda x: smf.ols(
       formula="ret_excess_lead ~ beta + log_mktcap + bm", 
       data=x
@@ -129,7 +129,7 @@ Now that we have the risk premiums' estimates for each period, we can average ac
 
 ```{python}
 price_of_risk = (risk_premiums
-  .melt(id_vars="month", var_name="factor", value_name="estimate")
+  .melt(id_vars="date", var_name="factor", value_name="estimate")
   .groupby("factor")["estimate"]
   .apply(lambda x: pd.Series({
       "risk_premium": 100*x.mean(),
@@ -146,7 +146,7 @@ It is common to adjust for autocorrelation when reporting standard errors of ris
 
 ```{python}
 price_of_risk_newey_west = (risk_premiums
-  .melt(id_vars="month", var_name="factor", value_name="estimate")
+  .melt(id_vars="date", var_name="factor", value_name="estimate")
   .groupby("factor")
   .apply(lambda x: (
       x["estimate"].mean()/ 
