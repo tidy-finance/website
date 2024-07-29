@@ -39,7 +39,7 @@ tidy_finance <- dbConnect(
 
 crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
   select(
-    permno, gvkey, month, ret_excess,
+    permno, gvkey, date, ret_excess,
     mktcap, mktcap_lag, exchange
   ) |>
   collect()
@@ -49,11 +49,11 @@ compustat <- tbl(tidy_finance, "compustat") |>
     collect() 
 
 factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(month, smb, hml) |>
+  select(date, smb, hml) |>
   collect()
 
 factors_ff5_monthly <- tbl(tidy_finance, "factors_ff5_monthly") |>
-  select(month, smb, hml, rmw, cma) |>
+  select(date, smb, hml, rmw, cma) |>
   collect()
 ```
 
@@ -65,13 +65,13 @@ To implement all these time lags, we again employ the temporary `sorting_date`-c
 
 ```{r}
 size <- crsp_monthly |>
-  filter(month(month) == 6) |>
-  mutate(sorting_date = month %m+% months(1)) |>
+  filter(month(date) == 6) |>
+  mutate(sorting_date = date %m+% months(1)) |>
   select(permno, exchange, sorting_date, size = mktcap)
 
 market_equity <- crsp_monthly |>
-  filter(month(month) == 12) |>
-  mutate(sorting_date = ymd(str_c(year(month) + 1, "0701)"))) |>
+  filter(month(date) == 12) |>
+  mutate(sorting_date = ymd(str_c(year(date) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, me = mktcap)
 
 book_to_market <- compustat |>
@@ -142,8 +142,8 @@ Next, we merge the portfolios to the return data for the rest of the year. To im
 ```{r}
 portfolios <- crsp_monthly |>
   mutate(sorting_date = case_when(
-    month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
-    month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
+    month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
+    month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
   )) |>
   inner_join(portfolios, join_by(permno, sorting_date))
 ```
@@ -154,11 +154,11 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 
 ```{r}
 factors_replicated <- portfolios |>
-  group_by(portfolio_size, portfolio_bm, month) |>
+  group_by(portfolio_size, portfolio_bm, date) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
   ) |>
-  group_by(month) |>
+  group_by(date) |>
   summarize(
     smb_replicated = mean(ret[portfolio_size == 1]) -
       mean(ret[portfolio_size == 2]),
@@ -173,7 +173,7 @@ In the previous section, we replicated the size and value premiums following the
 
 ```{r}
 test <- factors_ff3_monthly |>
-  inner_join(factors_replicated, join_by(month)) |>
+  inner_join(factors_replicated, join_by(date)) |>
   mutate(
     across(c(smb_replicated, hml_replicated), ~round(., 4))
   )
@@ -246,8 +246,8 @@ portfolios <- sorting_variables |>
 
 portfolios <- crsp_monthly |>
   mutate(sorting_date = case_when(
-    month(month) <= 6 ~ ymd(str_c(year(month) - 1, "0701")),
-    month(month) >= 7 ~ ymd(str_c(year(month), "0701"))
+    month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
+    month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
   )) |>
   inner_join(portfolios, join_by(permno, sorting_date))
 ```
@@ -256,14 +256,14 @@ Now, we want to construct each of the factors, but this time the size factor act
 
 ```{r}
 portfolios_value <- portfolios |>
-  group_by(portfolio_size, portfolio_bm, month) |>
+  group_by(portfolio_size, portfolio_bm, date) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), 
     .groups = "drop"
   )
 
 factors_value <- portfolios_value |>
-  group_by(month) |>
+  group_by(date) |>
   summarize(
     hml_replicated = mean(ret[portfolio_bm == 3]) -
       mean(ret[portfolio_bm == 1])
@@ -274,14 +274,14 @@ For the profitability factor, RMW, we take a long position in the two high profi
 
 ```{r}
 portfolios_profitability <- portfolios |>
-  group_by(portfolio_size, portfolio_op, month) |>
+  group_by(portfolio_size, portfolio_op, date) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), 
     .groups = "drop"
   ) 
 
 factors_profitability <- portfolios_profitability |>
-  group_by(month) |>
+  group_by(date) |>
   summarize(
     rmw_replicated = mean(ret[portfolio_op == 3]) -
       mean(ret[portfolio_op == 1])
@@ -292,14 +292,14 @@ For the investment factor, CMA, we go long the two low investment portfolios and
 
 ```{r}
 portfolios_investment <- portfolios |>
-  group_by(portfolio_size, portfolio_inv, month) |>
+  group_by(portfolio_size, portfolio_inv, date) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag), 
     .groups = "drop"
   )
 
 factors_investment <- portfolios_investment |>
-  group_by(month) |>
+  group_by(date) |>
   summarize(
     cma_replicated = mean(ret[portfolio_inv == 1]) -
       mean(ret[portfolio_inv == 3])
@@ -314,7 +314,7 @@ factors_size <- bind_rows(
   portfolios_profitability,
   portfolios_investment
 ) |> 
-  group_by(month) |>
+  group_by(date) |>
   summarize(
     smb_replicated = mean(ret[portfolio_size == 1]) -
       mean(ret[portfolio_size == 2])
@@ -325,18 +325,12 @@ We then join all factors together into one dataframe and construct again a suita
 
 ```{r}
 factors_replicated <- factors_size |>
-  full_join(
-    factors_value, join_by(month)
-  ) |>
-  full_join(
-    factors_profitability, join_by(month)
-  ) |>
-  full_join(
-    factors_investment, join_by(month)
-  )
+  full_join(factors_value, join_by(date)) |>
+  full_join(factors_profitability, join_by(date)) |>
+  full_join(factors_investment, join_by(date))
 
 test <- factors_ff5_monthly |>
-  inner_join(factors_replicated, join_by(month)) |>
+  inner_join(factors_replicated, join_by(date)) |>
   mutate(
     across(c(smb_replicated, hml_replicated, 
              rmw_replicated, cma_replicated), ~round(., 4))
