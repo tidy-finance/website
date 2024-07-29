@@ -1,0 +1,852 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "---\n",
+        "title: Beta Estimation\n",
+        "metadata:\n",
+        "  pagetitle: Beta Estimation with Python\n",
+        "  description-meta: Estimate CAPM betas using monthly or daily CRSP data and the programming language Python. \n",
+        "---"
+      ],
+      "id": "136a64cf"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "exec(open(\"./render-settings.py\").read())"
+      ],
+      "id": "02ac83fe",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "::: {.callout-note}\n",
+        "You are reading **Tidy Finance with Python**. You can find the equivalent chapter for the sibling **Tidy Finance with R** [here](../r/beta-estimation.qmd).\n",
+        ":::\n",
+        "\n",
+        "In this chapter, we introduce an important concept in financial economics: The exposure of an individual stock to changes in the market portfolio. According to the Capital Asset Pricing Model (CAPM) of @Sharpe1964, @Lintner1965, and @Mossin1966, cross-sectional variation in expected asset returns should be a function of the covariance between the excess return of the asset and the excess return on the market portfolio.\\index{CAPM} The regression coefficient of excess market returns on excess stock returns is usually called the market beta. We show an estimation procedure for the market betas.\\index{Beta} We do not go into details about the foundations of market beta but simply refer to any treatment of the [CAPM](https://en.wikipedia.org/wiki/Capital_asset_pricing_model) for further information. Instead, we provide details about all the functions that we use to compute the results. In particular, we leverage useful computational concepts: Rolling-window estimation and parallelization.\n",
+        "\n",
+        "We use the following Python packages throughout this chapter:\n"
+      ],
+      "id": "f518cbaf"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "import pandas as pd\n",
+        "import numpy as np\n",
+        "import sqlite3\n",
+        "import statsmodels.formula.api as smf\n",
+        "\n",
+        "from regtabletotext import prettify_result\n",
+        "from statsmodels.regression.rolling import RollingOLS\n",
+        "from plotnine import *\n",
+        "from mizani.breaks import date_breaks\n",
+        "from mizani.formatters import percent_format, date_format\n",
+        "from joblib import Parallel, delayed, cpu_count\n",
+        "from itertools import product"
+      ],
+      "id": "59f0427f",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "exec(open(\"./render-plotnine-custom.py\").read())"
+      ],
+      "id": "c183594c",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmodels] for regression analysis and for sliding-window regressions and `joblib` [@joblib] for parallelization.\\index{Parallelization}\n",
+        "\n",
+        "## Estimating Beta Using Monthly Returns\n",
+        "\n",
+        "The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\\index{Data!CRSP}\\index{Data!Fama-French factors}\n"
+      ],
+      "id": "8c45a197"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "tidy_finance = sqlite3.connect(database=\"data/tidy_finance_python.sqlite\")\n",
+        "\n",
+        "crsp_monthly = (pd.read_sql_query(\n",
+        "    sql=\"SELECT permno, date, industry, ret_excess FROM crsp_monthly\",\n",
+        "    con=tidy_finance,\n",
+        "    parse_dates={\"date\"})\n",
+        "  .dropna()\n",
+        ")\n",
+        "\n",
+        "factors_ff3_monthly = pd.read_sql_query(\n",
+        "  sql=\"SELECT date, mkt_excess FROM factors_ff3_monthly\",\n",
+        "  con=tidy_finance,\n",
+        "  parse_dates={\"date\"}\n",
+        ")\n",
+        "\n",
+        "crsp_monthly = (crsp_monthly\n",
+        "  .merge(factors_ff3_monthly, how=\"left\", on=\"date\")\n",
+        ")"
+      ],
+      "id": "fc7d1f8e",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "To estimate the CAPM regression coefficients\n",
+        "$$\n",
+        "r_{i, t} - r_{f, t} = \\alpha_i + \\beta_i(r_{m, t}-r_{f,t})+\\varepsilon_{i, t},\n",
+        "$${#eq-capm-equation}\n",
+        "we regress stock excess returns `ret_excess` on excess returns of the market portfolio `mkt_excess`. \n",
+        "\n",
+        "Python provides a simple solution to estimate (linear) models with the function `smf.ols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `smf.ols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\\hat\\alpha_i$ as well as $\\hat\\beta_i$.\\index{Linear regression}\n"
+      ],
+      "id": "98b2a5a8"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "model_beta = (smf.ols(\n",
+        "    formula=\"ret_excess ~ mkt_excess\",\n",
+        "    data=crsp_monthly.query(\"permno == 14593\"))\n",
+        "  .fit()\n",
+        ")\n",
+        "prettify_result(model_beta)"
+      ],
+      "id": "2b4648d1",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "`smf.ols()` returns an object of class `RegressionModel`, which contains all the information we usually care about with linear models. `prettify_result()` returns an overview of the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\\hat\\beta_i$ is above one ($\\hat\\beta_i \\approx 1.4$). \n",
+        "\n",
+        "## Rolling-Window Estimation\n",
+        "\n",
+        "After we estimated the regression coefficients on an example, we scale the estimation of $\\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\\index{Rolling-window estimation} \n",
+        "\n",
+        "We take a total of five years of data (`window_size`) and require at least 48 months with return data to compute our betas (`min_obs`). Check out the Exercises if you want to compute beta for different time periods. We first identify firm identifiers (`permno`) for which CRSP contains sufficiently many records.\n"
+      ],
+      "id": "0b2aa35f"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "window_size = 60\n",
+        "min_obs = 48\n",
+        "\n",
+        "valid_permnos = (crsp_monthly\n",
+        "  .dropna()\n",
+        "  .groupby(\"permno\")[\"permno\"]\n",
+        "  .count()\n",
+        "  .reset_index(name=\"counts\")\n",
+        "  .query(f\"counts > {window_size}+1\")\n",
+        ")"
+      ],
+      "id": "b186ec1e",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Before we proceed with the estimation, one important issue is worth emphasizing: `RollingOLS` returns the estimated parameters of a linear regression by incorporating a window of the last `window_size` rows. Whenever monthly returns are implicitly missing (which means there is simply no entry recorded, e.g., because a company was delisted and only traded publicly again later), such a fixed window size may cause outdated observations to influence the estimation results. We thus recommend making such implicit missing rows explicit. \n",
+        "\n",
+        "We hence collect information about the first and last listing date of each `permno`. \n"
+      ],
+      "id": "e713af67"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "permno_information = (crsp_monthly\n",
+        "  .merge(valid_permnos, how=\"inner\", on=\"permno\")\n",
+        "  .groupby([\"permno\"])\n",
+        "  .aggregate(first_date=(\"date\", \"min\"),\n",
+        "             last_date=(\"date\", \"max\"))\n",
+        "  .reset_index()\n",
+        ")"
+      ],
+      "id": "b5600ed5",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "To complete the missing observations in the CRSP sample, we obtain all possible `permno`-`month` combinations.\n"
+      ],
+      "id": "4c81c6c6"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "unique_permno = crsp_monthly[\"permno\"].unique()\n",
+        "unique_month = factors_ff3_monthly[\"date\"].unique()\n",
+        "\n",
+        "all_combinations = pd.DataFrame(\n",
+        "  product(unique_permno, unique_month), \n",
+        "  columns=[\"permno\", \"date\"]\n",
+        ")"
+      ],
+      "id": "03358b74",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Finally, we expand the CRSP sample and include a row (with missing excess returns) for each possible `permno`-`date` observation that falls within the start and end date where the respective `permno` has been publicly listed. \n"
+      ],
+      "id": "d4b54cc4"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "returns_monthly = (all_combinations\n",
+        "  .merge(crsp_monthly.get([\"permno\", \"date\", \"ret_excess\"]), \n",
+        "         how=\"left\", on=[\"permno\", \"date\"])\n",
+        "  .merge(permno_information, how=\"left\", on=\"permno\")\n",
+        "  .query(\"(date >= first_date) & (date <= last_date)\")\n",
+        "  .drop(columns=[\"first_date\", \"last_date\"])\n",
+        "  .merge(crsp_monthly.get([\"permno\", \"date\", \"industry\"]),\n",
+        "         how=\"left\", on=[\"permno\", \"date\"])\n",
+        "  .merge(factors_ff3_monthly, how=\"left\", on=\"date\")\n",
+        ")"
+      ],
+      "id": "0c3e93f4",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "The following function implements the CAPM regression for a dataframe (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated (i.e., the time series is too short) the function returns a missing value. \n"
+      ],
+      "id": "426bd3e6"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "def roll_capm_estimation(data, window_size, min_obs):\n",
+        "    \"\"\"Calculate rolling CAPM estimation.\"\"\"\n",
+        "    \n",
+        "    data = data.sort_values(\"date\")\n",
+        "\n",
+        "    result = (RollingOLS.from_formula(\n",
+        "      formula=\"ret_excess ~ mkt_excess\",\n",
+        "      data=data,\n",
+        "      window=window_size,\n",
+        "      min_nobs=min_obs,\n",
+        "      missing=\"drop\")\n",
+        "      .fit()\n",
+        "      .params.get(\"mkt_excess\")\n",
+        "    )\n",
+        "    \n",
+        "    result.index = data.index\n",
+        "    \n",
+        "    return result"
+      ],
+      "id": "b65e2e99",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Before we approach the whole CRSP sample, let us focus on a couple of examples for well-known firms.\n"
+      ],
+      "id": "2afa9dbe"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "examples = pd.DataFrame({\n",
+        "  \"permno\": [14593, 10107, 93436, 17778],\n",
+        "  \"company\": [\"Apple\", \"Microsoft\", \"Tesla\", \"Berkshire Hathaway\"]\n",
+        "})"
+      ],
+      "id": "8226d4cb",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk and the resulting @fig-601. \n"
+      ],
+      "id": "62f1e430"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "beta_example = (returns_monthly\n",
+        "  .merge(examples, how=\"inner\", on=\"permno\")\n",
+        "  .groupby([\"permno\"])\n",
+        "  .apply(lambda x: x.assign(\n",
+        "    beta=roll_capm_estimation(x, window_size, min_obs))\n",
+        "  )\n",
+        "  .reset_index(drop=True)\n",
+        "  .dropna()\n",
+        ")"
+      ],
+      "id": "e22c5016",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| label: fig-601\n",
+        "#| fig-cap: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.\n",
+        "#| fig-alt: 'Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock.'\n",
+        "#| fig-pos: htb\n",
+        "plot_beta = (\n",
+        "  ggplot(beta_example, \n",
+        "         aes(x=\"date\", y=\"beta\", color=\"company\", linetype=\"company\")) + \n",
+        "  geom_line() + \n",
+        "  labs(x=\"\", y=\"\", color=\"\", linetype=\"\",\n",
+        "       title=\"Monthly beta estimates for example stocks\") +\n",
+        "  scale_x_datetime(breaks=date_breaks(\"5 year\"), labels=date_format(\"%Y\")) \n",
+        ")\n",
+        "plot_beta.draw()"
+      ],
+      "id": "fig-601",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Parallelized Rolling-Window Estimation\n",
+        "\n",
+        "Next, we perform the rolling window estimation for the entire cross-section of stocks in the CRSP sample. For that purpose, we can apply the code snippet from the example above to compute rolling window regression coefficients for all stocks. This is how to do it with the `joblib` package to use multiple cores. Note that we use `cpu_count()` to determine the number of cores available for parallelization but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs.\\index{Parallelization}\n"
+      ],
+      "id": "eefd2f21"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "def roll_capm_estimation_for_joblib(permno, group):\n",
+        "    \"\"\"Calculate rolling CAPM estimation using joblib.\"\"\"\n",
+        "    \n",
+        "    group = group.sort_values(by=\"date\")\n",
+        "\n",
+        "    beta_values = (RollingOLS.from_formula(\n",
+        "        formula=\"ret_excess ~ mkt_excess\",\n",
+        "        data=group,\n",
+        "        window=window_size,\n",
+        "        min_nobs=min_obs,\n",
+        "        missing=\"drop\"\n",
+        "      )\n",
+        "      .fit()\n",
+        "      .params.get(\"mkt_excess\")\n",
+        "    )\n",
+        "    \n",
+        "    result = pd.DataFrame(beta_values)\n",
+        "    result.columns = [\"beta\"]\n",
+        "    result[\"date\"] = group[\"date\"].values\n",
+        "    result[\"permno\"] = permno\n",
+        "    \n",
+        "    return result\n",
+        "\n",
+        "permno_groups = (returns_monthly\n",
+        "  .merge(valid_permnos, how=\"inner\", on=\"permno\")\n",
+        "  .groupby(\"permno\", group_keys=False)\n",
+        ")\n",
+        "\n",
+        "n_cores = cpu_count()-1\n",
+        "\n",
+        "beta_monthly = (\n",
+        "  pd.concat(\n",
+        "    Parallel(n_jobs=n_cores)\n",
+        "    (delayed(roll_capm_estimation_for_joblib)(name, group)\n",
+        "    for name, group in permno_groups)\n",
+        "  )\n",
+        "  .dropna()\n",
+        "  .rename(columns={\"beta\": \"beta_monthly\"})\n",
+        ")"
+      ],
+      "id": "1e680e0e",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Estimating Beta Using Daily Returns\n",
+        "\n",
+        "Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. As loading the full daily CRSP data requires relatively large amounts of memory, we split the beta estimation into smaller chunks.\\index{Parallelization} The logic follows the approach that we use to download the daily CRSP data (see [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd)).\n",
+        "\n",
+        "First, we load the daily Fama-French market excess returns and extract the vector of dates.\n"
+      ],
+      "id": "98c9b714"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "factors_ff3_daily = pd.read_sql_query(\n",
+        "  sql=\"SELECT date, mkt_excess FROM factors_ff3_daily\",\n",
+        "  con=tidy_finance,\n",
+        "  parse_dates={\"date\"}\n",
+        ")\n",
+        "\n",
+        "unique_date = factors_ff3_daily[\"date\"].unique()"
+      ],
+      "id": "91ae3f20",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "For the daily data, we consider around three months of data (i.e., 60 trading days), require at least 50 observations, and estimate betas in batches of 500.\n"
+      ],
+      "id": "30fae6c5"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "window_size = 60\n",
+        "min_obs = 50\n",
+        "\n",
+        "permnos = list(crsp_monthly[\"permno\"].unique().astype(str))\n",
+        "\n",
+        "batch_size = 500\n",
+        "batches = np.ceil(len(permnos)/batch_size).astype(int)"
+      ],
+      "id": "e9d57bc0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, transform implicit missing returns to explicit ones, keep only valid stocks with a minimum number of rows, and parallelize the beta estimation across stocks. \n"
+      ],
+      "id": "a6293d4b"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| output: false\n",
+        "beta_daily = []\n",
+        "\n",
+        "for j in range(1, batches+1):  \n",
+        "    \n",
+        "    permno_batch = permnos[\n",
+        "      ((j-1)*batch_size):(min(j*batch_size, len(permnos)))\n",
+        "    ]\n",
+        "    \n",
+        "    permno_batch_formatted = (\n",
+        "      \", \".join(f\"'{permno}'\" for permno in permno_batch)\n",
+        "    )\n",
+        "    permno_string = f\"({permno_batch_formatted})\"\n",
+        "    \n",
+        "    crsp_daily_sub_query = (\n",
+        "      \"SELECT permno, date, ret_excess \"\n",
+        "        \"FROM crsp_daily \"\n",
+        "       f\"WHERE permno IN {permno_string}\" \n",
+        "    )\n",
+        "      \n",
+        "    crsp_daily_sub = pd.read_sql_query(\n",
+        "      sql=crsp_daily_sub_query,\n",
+        "      con=tidy_finance,\n",
+        "      dtype={\"permno\": int},\n",
+        "      parse_dates={\"date\"}\n",
+        "    )\n",
+        "    \n",
+        "    valid_permnos = (crsp_daily_sub\n",
+        "      .groupby(\"permno\")[\"permno\"]\n",
+        "      .count()\n",
+        "      .reset_index(name=\"counts\")\n",
+        "      .query(f\"counts > {window_size}+1\")\n",
+        "      .drop(columns=\"counts\")\n",
+        "    )\n",
+        "    \n",
+        "    permno_information = (crsp_daily_sub\n",
+        "      .merge(valid_permnos, how=\"inner\", on=\"permno\")\n",
+        "      .groupby([\"permno\"])\n",
+        "      .aggregate(first_date=(\"date\", \"min\"),\n",
+        "                 last_date=(\"date\", \"max\"),)\n",
+        "      .reset_index()\n",
+        "    )\n",
+        "    \n",
+        "    unique_permno = permno_information[\"permno\"].unique()\n",
+        "    \n",
+        "    all_combinations = pd.DataFrame(\n",
+        "      product(unique_permno, unique_date), \n",
+        "      columns=[\"permno\", \"date\"]\n",
+        "    )\n",
+        "    \n",
+        "    returns_daily = (crsp_daily_sub\n",
+        "      .merge(all_combinations, how=\"right\", on=[\"permno\", \"date\"])\n",
+        "      .merge(permno_information, how=\"left\", on=\"permno\")\n",
+        "      .query(\"(date >= first_date) & (date <= last_date)\")\n",
+        "      .drop(columns=[\"first_date\", \"last_date\"])\n",
+        "      .merge(factors_ff3_daily, how=\"left\", on=\"date\")\n",
+        "    )\n",
+        "    \n",
+        "    permno_groups = (returns_daily\n",
+        "      .groupby(\"permno\", group_keys=False)\n",
+        "    )\n",
+        "    \n",
+        "    beta_daily_sub = (\n",
+        "      pd.concat(\n",
+        "        Parallel(n_jobs=n_cores)\n",
+        "        (delayed(roll_capm_estimation_for_joblib)(name, group)\n",
+        "        for name, group in permno_groups)\n",
+        "      )\n",
+        "      .dropna()\n",
+        "      .rename(columns={\"beta\": \"beta_daily\"})\n",
+        "    )\n",
+        "    \n",
+        "    beta_daily_sub = (beta_daily_sub\n",
+        "      .assign(\n",
+        "          month = lambda x: \n",
+        "            x[\"date\"].dt.to_period(\"M\").dt.to_timestamp()\n",
+        "        )\n",
+        "      .sort_values(\"date\") \n",
+        "      .groupby([\"permno\", \"month\"])\n",
+        "      .last()\n",
+        "      .reset_index()\n",
+        "      .drop(columns=\"date\")\n",
+        "      .rename(columns={\"month\": \"date\"})\n",
+        "    )\n",
+        "    \n",
+        "    beta_daily.append(beta_daily_sub)\n",
+        "              \n",
+        "    print(f\"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\\n\")\n",
+        "  \n",
+        "beta_daily = pd.concat(beta_daily)"
+      ],
+      "id": "135c1aa0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Comparing Beta Estimates\n",
+        "\n",
+        "What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\\hat\\beta_i$ across different industries and across time below. @fig-602 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\\index{Graph!Box plot}\n"
+      ],
+      "id": "55a6b94f"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "fig.alt": "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
+      },
+      "source": [
+        "#| label: fig-602\n",
+        "#| fig-cap: The box plots show the average firm-specific beta estimates by industry.\n",
+        "#| fig-pos: htb\n",
+        "beta_industries = (beta_monthly\n",
+        "  .merge(crsp_monthly, how=\"inner\", on=[\"permno\", \"date\"])\n",
+        "  .dropna(subset=\"beta_monthly\")\n",
+        "  .groupby([\"industry\",\"permno\"])[\"beta_monthly\"]\n",
+        "  .aggregate(\"mean\")\n",
+        "  .reset_index()\n",
+        ")\n",
+        "\n",
+        "industry_order = (beta_industries\n",
+        "  .groupby(\"industry\")[\"beta_monthly\"]\n",
+        "  .aggregate(\"median\")\n",
+        "  .sort_values()\n",
+        "  .index.tolist()\n",
+        ")\n",
+        "\n",
+        "plot_beta_industries = (\n",
+        "  ggplot(beta_industries, \n",
+        "         aes(x=\"industry\", y=\"beta_monthly\")) +\n",
+        "  geom_boxplot() +\n",
+        "  coord_flip() +\n",
+        "  labs(x=\"\", y=\"\", \n",
+        "       title=\"Firm-specific beta distributions by industry\") +\n",
+        "  scale_x_discrete(limits=industry_order)\n",
+        ")\n",
+        "plot_beta_industries.draw()"
+      ],
+      "id": "fig-602",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Next, we illustrate the time-variation in the cross-section of estimated betas. @fig-603 shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks, the correlation with the market increases, while for others it decreases. Note also here: stocks with negative betas are a rare exception.\\index{Beta}\n"
+      ],
+      "id": "eaa85acf"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| label: fig-603\n",
+        "#| fig-cap: The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.\n",
+        "#| fig-alt: 'Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top ten percent quantile on average is around two but varies substantially over time. The lowest ten percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly.'\n",
+        "#| fig-pos: htb\n",
+        "beta_quantiles = (beta_monthly\n",
+        "  .groupby(\"date\")[\"beta_monthly\"]\n",
+        "  .quantile(q=np.arange(0.1, 1.0, 0.1))\n",
+        "  .reset_index()\n",
+        "  .rename(columns={\"level_1\": \"quantile\"})\n",
+        "  .assign(quantile=lambda x: (x[\"quantile\"]*100).astype(int))\n",
+        "  .dropna()\n",
+        ")\n",
+        "\n",
+        "linetypes = [\"-\", \"--\", \"-.\", \":\"]\n",
+        "n_quantiles = beta_quantiles[\"quantile\"].nunique()\n",
+        "\n",
+        "plot_beta_quantiles = (\n",
+        "  ggplot(beta_quantiles, \n",
+        "         aes(x=\"date\", y=\"beta_monthly\", \n",
+        "         color=\"factor(quantile)\", linetype=\"factor(quantile)\")) +\n",
+        "  geom_line() +\n",
+        "  labs(x=\"\", y=\"\", color=\"\", linetype=\"\",\n",
+        "       title=\"Monthly deciles of estimated betas\") +\n",
+        "  scale_x_datetime(breaks=date_breaks(\"5 year\"), labels=date_format(\"%Y\")) +\n",
+        "  scale_linetype_manual(\n",
+        "    values=[linetypes[l % len(linetypes)] for l in range(n_quantiles)]\n",
+        "  ) \n",
+        ")\n",
+        "plot_beta_quantiles.draw()"
+      ],
+      "id": "fig-603",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604. \n"
+      ],
+      "id": "f2a82fe7"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| label: fig-604\n",
+        "#| fig-cap: The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or three months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.\n",
+        "#| fig-alt: 'Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus three years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency.'\n",
+        "#| fig-pos: h!tb\n",
+        "beta = (beta_monthly\n",
+        "  .get([\"permno\", \"date\", \"beta_monthly\"])\n",
+        "  .merge(beta_daily.get([\"permno\", \"date\", \"beta_daily\"]),\n",
+        "         how=\"outer\", on=[\"permno\", \"date\"])\n",
+        ")\n",
+        "\n",
+        "beta_comparison = (beta\n",
+        "  .merge(examples, on=\"permno\")\n",
+        "  .melt(id_vars=[\"permno\", \"date\", \"company\"], var_name=\"name\",\n",
+        "        value_vars=[\"beta_monthly\", \"beta_daily\"], value_name=\"value\")\n",
+        "  .dropna()\n",
+        ")\n",
+        "\n",
+        "plot_beta_comparison = (\n",
+        "  ggplot(beta_comparison,\n",
+        "         aes(x=\"date\", y=\"value\", color=\"name\")) +\n",
+        "  geom_line() +\n",
+        "  facet_wrap(\"~company\", ncol=1) +\n",
+        "  labs(x=\"\", y=\"\", color=\"\",\n",
+        "       title=\"Comparison of beta estimates using monthly and daily data\") + \n",
+        "  scale_x_datetime(breaks=date_breaks(\"10 years\"), \n",
+        "                   labels=date_format(\"%Y\")) +\n",
+        "  theme(figure_size=(6.4, 6.4))\n",
+        ")\n",
+        "plot_beta_comparison.draw()"
+      ],
+      "id": "fig-604",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "The estimates in @fig-604 look as expected. As you can see,  the beta estimates really depend on the estimation window and data frequency. Nevertheless, one can observe a clear connection between daily and monthly betas in this example, in magnitude and the dynamics over time.\n",
+        "\n",
+        "Finally, we write the estimates to our database so that we can use them in later chapters. \n"
+      ],
+      "id": "16b385f4"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| output: false\n",
+        "(beta.to_sql(\n",
+        "  name=\"beta\", \n",
+        "  con=tidy_finance, \n",
+        "  if_exists=\"replace\",\n",
+        "  index=False\n",
+        "  )\n",
+        ")"
+      ],
+      "id": "dc09550c",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. This descriptive analysis helps us discover potential errors in our data preparation or the estimation procedure. For instance, suppose there was a gap in our output without any betas. In this case, we would have to go back and check all previous steps to find out what went wrong. @fig-605 does not indicate any troubles, so let us move on to the next check. \n"
+      ],
+      "id": "037efbea"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| label: fig-605\n",
+        "#| fig-cap: The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or three months of daily data.\n",
+        "#| fig-alt: 'Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using five years of monthly or three months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta.'\n",
+        "#| fig-pos: htb\n",
+        "beta_long = (crsp_monthly\n",
+        "  .merge(beta, how=\"left\", on=[\"permno\", \"date\"])\n",
+        "  .melt(id_vars=[\"permno\", \"date\"], var_name=\"name\",\n",
+        "        value_vars=[\"beta_monthly\", \"beta_daily\"], value_name=\"value\")\n",
+        ")\n",
+        "\n",
+        "beta_shares = (beta_long\n",
+        "  .groupby([\"date\", \"name\"])\n",
+        "  .aggregate(share=(\"value\", lambda x: sum(~x.isna())/len(x)))\n",
+        "  .reset_index()\n",
+        ")\n",
+        "\n",
+        "plot_beta_long = (\n",
+        "  ggplot(beta_shares, \n",
+        "         aes(x=\"date\", y=\"share\", color=\"name\", linetype=\"name\")) +\n",
+        "  geom_line() +\n",
+        "  labs(x=\"\", y=\"\", color=\"\", linetype=\"\",\n",
+        "       title=\"End-of-month share of securities with beta estimates\") + \n",
+        "  scale_y_continuous(labels=percent_format()) +\n",
+        "  scale_x_datetime(breaks=date_breaks(\"10 year\"), labels=date_format(\"%Y\")) \n",
+        ")\n",
+        "plot_beta_long.draw()"
+      ],
+      "id": "fig-605",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\\index{Summary statistics}\n"
+      ],
+      "id": "0ae7ac33"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "beta_long.groupby(\"name\")[\"value\"].describe().round(2)"
+      ],
+      "id": "c23c3a63",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "The summary statistics also look plausible for the two estimation procedures. \n",
+        "\n",
+        "Finally, since we have two different estimators for the same theoretical object, we expect the estimators to be at least positively correlated (although not perfectly as the estimators are based on different sample periods and frequencies).\n"
+      ],
+      "id": "5243db01"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "beta.get([\"beta_monthly\", \"beta_daily\"]).corr().round(2)"
+      ],
+      "id": "76f57292",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Indeed, we find a positive correlation between our beta estimates. In the subsequent chapters, we mainly use the estimates based on monthly data, as most readers should be able to replicate them and should not encounter potential memory limitations that might arise with the daily data.\n",
+        "\n",
+        "## Exercises\n",
+        "\n",
+        "1. Compute beta estimates based on monthly data using one, three, and five years of data and impose a minimum number of observations of 10, 28, and 48 months with return data, respectively. How strongly correlated are the estimated betas?\n",
+        "1. Compute beta estimates based on monthly data using five years of data and impose different numbers of minimum observations. How does the share of `permno`-`date` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? \n",
+        "1. Instead of using `joblib`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.\n",
+        "1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? \n",
+        "1. Compute beta estimates for multi-factor models such as the Fama-French three-factor model. For that purpose, you extend your regression to \n",
+        "$$\n",
+        "r_{i, t} - r_{f, t} = \\alpha_i + \\sum\\limits_{j=1}^k\\beta_{i,k}(r_{j, t}-r_{f,t})+\\varepsilon_{i, t}\n",
+        "$${#eq-multi-factor}\n",
+        "where $r_{i, t}$ are the $k$ factor returns. Thus, you estimate four parameters ($\\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors."
+      ],
+      "id": "a3d202f5"
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python3",
+      "language": "python",
+      "display_name": "Python 3 (ipykernel)",
+      "path": "/Users/krise/Documents/GitHub/tidy-finance/website/renv/python/virtualenvs/renv-python-3.10/share/jupyter/kernels/python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
