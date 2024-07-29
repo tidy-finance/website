@@ -46,13 +46,13 @@ We can use the `download_french_data()` function of the package to download mont
 factors_ff3_monthly_raw <- download_french_data("Fama/French 3 Factors")
 factors_ff3_monthly <- factors_ff3_monthly_raw$subsets$data[[1]] |>
   mutate(
-    month = floor_date(ymd(str_c(date, "01")), "month"),
+    date = floor_date(ymd(str_c(date, "01")), "month"),
     across(c(RF, `Mkt-RF`, SMB, HML), ~as.numeric(.) / 100),
     .keep = "none"
   ) |>
   rename_with(str_to_lower) |>
   rename(mkt_excess = `mkt-rf`) |> 
-  filter(month >= start_date & month <= end_date)
+  filter(date >= start_date & date <= end_date)
 ```
 
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the monthly factors are constructed in the chapter [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
@@ -63,13 +63,13 @@ factors_ff5_monthly_raw <- download_french_data("Fama/French 5 Factors (2x3)")
 
 factors_ff5_monthly <- factors_ff5_monthly_raw$subsets$data[[1]] |>
   mutate(
-    month = floor_date(ymd(str_c(date, "01")), "month"),
+    date = floor_date(ymd(str_c(date, "01")), "month"),
     across(c(RF, `Mkt-RF`, SMB, HML, RMW, CMA), ~as.numeric(.) / 100),
     .keep = "none"
   ) |>
   rename_with(str_to_lower) |>
   rename(mkt_excess = `mkt-rf`) |> 
-  filter(month >= start_date & month <= end_date)
+  filter(date >= start_date & date <= end_date)
 ```
 
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
@@ -96,10 +96,10 @@ In a subsequent chapter, we also use the 10 monthly industry portfolios, so let 
 industries_ff_monthly_raw <- download_french_data("10 Industry Portfolios")
 
 industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
-  mutate(month = floor_date(ymd(str_c(date, "01")), "month")) |>
+  mutate(date = floor_date(ymd(str_c(date, "01")), "month")) |>
   mutate(across(where(is.numeric), ~ . / 100)) |>
-  select(month, everything(), -date) |>
-  filter(month >= start_date & month <= end_date) |> 
+  select(date, everything()) |>
+  filter(date >= start_date & date <= end_date) |> 
   rename_with(str_to_lower)
 ```
 
@@ -117,12 +117,12 @@ factors_q_monthly_link <-
   "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2022.csv"
 
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
-  mutate(month = ymd(str_c(year, month, "01", sep = "-"))) |>
+  mutate(date = ymd(str_c(year, month, "01", sep = "-"))) |>
   select(-R_F, -R_MKT, -year) |>
   rename_with(~ str_remove(., "R_")) |>
   rename_with(~ str_to_lower(.)) |>
-  mutate(across(-month, ~ . / 100)) |>
-  filter(month >= start_date & month <= end_date)
+  mutate(across(-date, ~ . / 100)) |>
+  filter(date >= start_date & date <= end_date)
 ```
 
 ## Macroeconomic Predictors
@@ -171,7 +171,7 @@ macro_predictors <- read_xlsx(
   "macro_predictors.xlsx",
   sheet = "Monthly"
 ) |>
-  mutate(month = ym(yyyymm)) |>
+  mutate(date = ym(yyyymm)) |>
   mutate(across(where(is.character), as.numeric)) |>
   mutate(
     IndexDiv = Index + D12,
@@ -185,11 +185,12 @@ macro_predictors <- read_xlsx(
     tms = lty - tbl, # Term spread
     dfy = BAA - AAA # Default yield spread
   ) |>
-  select(month, rp_div, dp, dy, ep, de, svar,
+  select(
+    date, rp_div, dp, dy, ep, de, svar,
     bm = `b/m`, ntis, tbl, lty, ltr,
     tms, dfy, infl
   ) |>
-  filter(month >= start_date & month <= end_date) |>
+  filter(date >= start_date & date <= end_date) |>
   drop_na()
 ```
 
@@ -209,14 +210,15 @@ The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data
 #| message: false
 library(tidyquant)
 
-cpi_monthly <- tq_get("CPIAUCNS",
+cpi_monthly <- tq_get(
+  x = "CPIAUCNS",
   get = "economic.data",
   from = start_date,
   to = end_date
 ) |>
   mutate(
-    month = floor_date(date, "month"),
-    cpi = price / price[month == max(month)],
+    date = floor_date(date, "month"),
+    cpi = price / price[date == max(date)],
     .keep = "none"
   )
 ```
@@ -250,7 +252,8 @@ tidy_finance <- dbConnect(
 Next, we create a remote table with the monthly Fama-French factor data. We do so with the function `dbWriteTable()`, which copies the data to our SQLite-database.
 
 ```{r}
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "factors_ff3_monthly",
   value = factors_ff3_monthly,
   overwrite = TRUE
@@ -272,14 +275,14 @@ All `dplyr` calls are evaluated lazily, i.e., the data is not in our R session's
 
 ```{r}
 factors_ff3_monthly_db |>
-  select(month, rf)
+  select(date, rf)
 ```
 
 If we want to have the whole table in memory, we need to `collect()` it. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Fetch}
 
 ```{r}
 factors_ff3_monthly_db |>
-  select(month, rf) |>
+  select(date, rf) |>
   collect()
 ```
 
@@ -288,37 +291,43 @@ The last couple of code chunks is really all there is to organizing a simple dat
 Before we move on to the next data source, let us also store the other five tables in our new SQLite database.
 
 ```{r}
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "factors_ff5_monthly",
   value = factors_ff5_monthly,
   overwrite = TRUE
 )
 
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "factors_ff3_daily",
   value = factors_ff3_daily,
   overwrite = TRUE
 )
 
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "industries_ff_monthly",
   value = industries_ff_monthly,
   overwrite = TRUE
 )
 
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "factors_q_monthly",
   value = factors_q_monthly,
   overwrite = TRUE
 )
 
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "macro_predictors",
   value = macro_predictors,
   overwrite = TRUE
 )
 
-dbWriteTable(tidy_finance,
+dbWriteTable(
+  tidy_finance,
   "cpi_monthly",
   value = cpi_monthly,
   overwrite = TRUE

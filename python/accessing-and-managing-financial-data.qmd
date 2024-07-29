@@ -55,8 +55,8 @@ factors_ff3_monthly_raw = pdr.DataReader(
 
 factors_ff3_monthly = (factors_ff3_monthly_raw
   .divide(100)
-  .reset_index(names="month")
-  .assign(month=lambda x: pd.to_datetime(x["month"].astype(str)))
+  .reset_index(names="date")
+  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
   .rename(str.lower, axis="columns")
   .rename(columns={"mkt-rf": "mkt_excess"})
 )
@@ -73,8 +73,8 @@ factors_ff5_monthly_raw = pdr.DataReader(
 
 factors_ff5_monthly = (factors_ff5_monthly_raw
   .divide(100)
-  .reset_index(names="month")
-  .assign(month=lambda x: pd.to_datetime(x["month"].astype(str)))
+  .reset_index(names="date")
+  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
   .rename(str.lower, axis="columns")
   .rename(columns={"mkt-rf": "mkt_excess"})
 )
@@ -108,8 +108,8 @@ industries_ff_monthly_raw = pdr.DataReader(
 
 industries_ff_monthly = (industries_ff_monthly_raw
   .divide(100)
-  .reset_index(names="month")
-  .assign(month=lambda x: pd.to_datetime(x["month"].astype(str)))
+  .reset_index(names="date")
+  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
   .rename(str.lower, axis="columns")
 )
 ```
@@ -130,13 +130,13 @@ factors_q_monthly_link = (
 
 factors_q_monthly = (pd.read_csv(factors_q_monthly_link)
   .assign(
-    month=lambda x: (
+    date=lambda x: (
       pd.to_datetime(x["year"].astype(str) + "-" +
         x["month"].astype(str) + "-01"))
   )
   .drop(columns=["R_F", "R_MKT", "year"])
   .rename(columns=lambda x: x.replace("R_", "").lower())
-  .query(f"month >= '{start_date}' and month <= '{end_date}'")
+  .query(f"date >= '{start_date}' and date <= '{end_date}'")
   .assign(
     **{col: lambda x: x[col]/100 for col in ["me", "ia", "roe", "eg"]}
   )
@@ -178,7 +178,7 @@ For variable definitions and the required data transformations, you can consult 
 macro_predictors = (
   pd.read_csv(macro_predictors_link, thousands=",")
   .assign(
-    month=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
+    date=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
     dp=lambda x: np.log(x["D12"])-np.log(x["Index"]),
     dy=lambda x: np.log(x["D12"])-np.log(x["Index"].shift(1)),
     ep=lambda x: np.log(x["E12"])-np.log(x["Index"]),
@@ -187,9 +187,9 @@ macro_predictors = (
     dfy=lambda x: x["BAA"]-x["AAA"]
   )
   .rename(columns={"b/m": "bm"})
-  .get(["month", "dp", "dy", "ep", "de", "svar", "bm", 
+  .get(["date", "dp", "dy", "ep", "de", "svar", "bm", 
         "ntis", "tbl", "lty", "ltr", "tms", "dfy", "infl"])
-  .query("month >= @start_date and month <= @end_date")
+  .query("date >= @start_date and date <= @end_date")
   .dropna()
 )
 ```
@@ -205,7 +205,7 @@ cpi_monthly = (pdr.DataReader(
     start=start_date, 
     end=end_date
   )
-  .reset_index(names="month")
+  .reset_index(names="date")
   .rename(columns={"CPIAUCNS": "cpi"})
   .assign(cpi=lambda x: x["cpi"]/x["cpi"].iloc[-1])
 )
@@ -245,9 +245,9 @@ Now, if we want to have the whole table in memory, we need to call `pd.read_sql_
 
 ```{python}
 pd.read_sql_query(
-  sql="SELECT month, rf FROM factors_ff3_monthly",
+  sql="SELECT date, rf FROM factors_ff3_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 ```
 
@@ -286,7 +286,7 @@ tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 factors_q_monthly = pd.read_sql_query(
   sql="SELECT * FROM factors_q_monthly",
   con=tidy_finance,
-  parse_dates={"month"}
+  parse_dates={"date"}
 )
 ```
 
