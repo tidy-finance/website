@@ -62,7 +62,7 @@ Then, we aggregate the firms within each bucket and compute the buckets' share o
 #| fig-cap: "We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month."
 #| fig-alt: "Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."
 crsp_monthly |>
-  group_by(month) |>
+  group_by(date) |>
   mutate(
     top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1, 0),
     top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1, 0),
@@ -78,13 +78,13 @@ crsp_monthly |>
     .groups = "drop"
   ) |>
   select(-total_market_cap) |> 
-  pivot_longer(cols = -month) |>
+  pivot_longer(cols = -date) |>
   mutate(name = factor(name, levels = c(
     "Largest 1% of stocks", "Largest 5% of stocks",
     "Largest 10% of stocks", "Largest 25% of stocks"
   ))) |>
   ggplot(aes(
-    x = month, 
+    x = date, 
     y = value, 
     color = name,
     linetype = name)) +
@@ -103,12 +103,12 @@ Next, firm sizes also differ across listing exchanges. Stocks' primary listings 
 #| fig-cap: "Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis."
 #| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 crsp_monthly |>
-  group_by(month, exchange) |>
+  group_by(date, exchange) |>
   summarize(mktcap = sum(mktcap),
             .groups = "drop_last") |>
   mutate(share = mktcap / sum(mktcap)) |>
   ggplot(aes(
-    x = month, 
+    x = date, 
     y = share, 
     fill = exchange, 
     color = exchange)) +
@@ -146,11 +146,11 @@ create_summary <- function(data, column_name) {
 }
 
 crsp_monthly |>
-  filter(month == max(month)) |>
+  filter(date == max(date)) |>
   group_by(exchange) |>
   create_summary(mktcap) |>
   add_row(crsp_monthly |>
-            filter(month == max(month)) |>
+            filter(date == max(date)) |>
             create_summary(mktcap) |>
             mutate(exchange = "Overall"))
 ```
@@ -200,13 +200,13 @@ compute_portfolio_returns <- function(n_portfolios = 10,
                                       value_weighted = TRUE,
                                       data = crsp_monthly) {
   data |>
-    group_by(month) |>
+    group_by(date) |>
     mutate(portfolio = assign_portfolio(
       n_portfolios = n_portfolios,
       exchanges = exchanges,
       data = pick(everything())
     )) |>
-    group_by(month, portfolio) |>
+    group_by(date, portfolio) |>
     summarize(
       ret = if_else(value_weighted,
         weighted.mean(ret_excess, mktcap_lag),
