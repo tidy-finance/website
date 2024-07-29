@@ -99,22 +99,20 @@ tidy_finance <- dbConnect(
 
 factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   collect() |>
-  rename_with(~ str_c("factor_ff_", .), -month)
+  rename_with(~ str_c("factor_ff_", .), -date)
 
 factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") |>
   collect() |>
-  rename_with(~ str_c("factor_q_", .), -month)
+  rename_with(~ str_c("factor_q_", .), -date)
 
 macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
   collect() |>
-  rename_with(~ str_c("macro_", .), -month) |>
+  rename_with(~ str_c("macro_", .), -date) |>
   select(-macro_rp_div)
 
 industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
   collect() |>
-  pivot_longer(-month,
-    names_to = "industry", values_to = "ret"
-  ) |>
+  pivot_longer(-date, names_to = "industry", values_to = "ret") |>
   arrange(desc(industry)) |> 
   mutate(industry = as_factor(industry))
 ```
@@ -123,13 +121,13 @@ We combine all the monthly observations into one dataframe.
 
 ```{r, eval = TRUE}
 data <- industries_ff_monthly |>
-  left_join(factors_ff3_monthly, join_by(month)) |>
-  left_join(factors_q_monthly, join_by(month)) |>
-  left_join(macro_predictors, join_by(month)) |>
+  left_join(factors_ff3_monthly, join_by(date)) |>
+  left_join(factors_q_monthly, join_by(date)) |>
+  left_join(macro_predictors, join_by(date)) |>
   mutate(
     ret = ret - factor_ff_rf
   ) |>
-  select(month, industry, ret_excess = ret, everything()) |>
+  select(date, industry, ret_excess = ret, everything()) |>
   drop_na()
 ```
 
@@ -192,7 +190,7 @@ $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t
 
 ```{r}
 rec <- recipe(ret_excess ~ ., data = training(split)) |>
-  step_rm(month) |>
+  step_rm(date) |>
   step_interact(terms = ~ contains("factor"):contains("macro")) |>
   step_normalize(all_predictors())
 ```
@@ -254,11 +252,11 @@ predicted_values <- lm_fit |>
   fit(data = training(split)) |>
   predict(data |> filter(industry == "manuf")) |>
   bind_cols(data |> filter(industry == "manuf")) |>
-  select(month,
-    "Fitted value" = .pred,
-    "Realization" = ret_excess
+  select(date, 
+         "Fitted value" = .pred,
+         "Realization" = ret_excess
   ) |>
-  pivot_longer(-month, names_to = "Variable")
+  pivot_longer(-date, names_to = "Variable")
 ```
 
 ```{r}
@@ -267,7 +265,7 @@ predicted_values <- lm_fit |>
 #| fig-alt: "Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premiums. The figure seems to indicate that the predictions capture most of the return dynamics."
 predicted_values |>
   ggplot(aes(
-    x = month, 
+    x = date, 
     y = value, 
     color = Variable,
     linetype = Variable
@@ -302,8 +300,8 @@ predicted_values |>
     labels = percent
   ) +
   annotate("rect",
-    xmin = testing(split) |> pull(month) |> min(),
-    xmax = testing(split) |> pull(month) |> max(),
+    xmin = testing(split) |> pull(date) |> min(),
+    xmax = testing(split) |> pull(date) |> max(),
     ymin = -Inf, ymax = Inf,
     alpha = 0.5, fill = "grey70"
   )
@@ -350,7 +348,7 @@ bind_rows(
   ggplot(aes(x = lambda, y = estimate, color = Variable)) +
   geom_line() +
   scale_x_log10() +
-  facet_wrap(~Model, scales = "free_x") +
+  facet_wrap(~ Model, scales = "free_x") +
   labs(
     x = "Penalty factor (lambda)", y = NULL,
     title = "Estimated coefficient paths for different penalty factors"
@@ -398,7 +396,7 @@ For our sample, we consider a time-series cross-validation sample. This means th
 ```{r}
 data_folds <- time_series_cv(
   data        = training(split),
-  date_var    = month,
+  date_var    = date,
   initial     = "5 years",
   assess      = "48 months",
   cumulative  = FALSE,
@@ -466,7 +464,7 @@ select_variables <- function(input) {
   # Data folds for cross-validation
   data_folds <- time_series_cv(
     data = training(split),
-    date_var = month,
+    date_var = date,
     initial = "5 years",
     assess = "48 months",
     cumulative = FALSE,
