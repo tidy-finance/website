@@ -26,14 +26,12 @@ The current chapter relies on this set of Python packages.
 import pandas as pd
 import numpy as np
 import sqlite3
-import linearmodels as lm
-import statsmodels.formula.api as smf
+import pyfixest as pf
 
 from plotnine import *
 from scipy.stats import norm
 from mizani.breaks import date_breaks
 from mizani.formatters import date_format
-from regtabletotext import prettify_result
 ```
 
 ```{python}
@@ -167,18 +165,19 @@ The PA is a legally binding international treaty on climate change. It was adopt
 The second model follows the typical DD regression approach by including individual (`cusip_id`) and time (`date`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
 
 ```{python}
-model_without_fe = lm.PanelOLS.from_formula(
-  formula=("avg_yield ~ treated + post_period + polluter + log_offering_amt"
-           " + time_to_maturity + 1"),
-  data=bonds_panel.set_index(["cusip_id", "date"]),
-).fit()
+model_without_fe = pf.feols(
+  "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
+  vcov = "iid",
+  data = bonds_panel
+)
 
-model_with_fe = lm.PanelOLS.from_formula(
-  formula=("avg_yield ~ treated + EntityEffects + TimeEffects"),
-  data=bonds_panel.set_index(["cusip_id", "date"]),
-).fit()
+model_with_fe = pf.feols(
+  "avg_yield ~ treated | cusip_id + date",
+  vcov = "iid",
+  data = bonds_panel
+)
 
-prettify_result([model_without_fe, model_with_fe])
+pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 ```
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models. 
@@ -194,29 +193,24 @@ To provide such visual evidence, we revisit the simple OLS model and replace the
 #| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 #| fig-pos: "htb"
-model_without_fe_time = (smf.ols(
-    formula=("avg_yield ~ polluter + date_cat:polluter + time_to_maturity"
-             " + log_offering_amt"),
-    data=bonds_panel)
-  .fit()
-  .summary()
+model_without_fe_time = pf.feols(
+  "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
+  vcov = "iid",
+  data = bonds_panel.assign(date = lambda x: x["date"].astype(str))
 )
 
-model_without_fe_coefs = (
-  pd.DataFrame(model_without_fe_time.tables[1].data[1:],
-               columns=["term", "estimate", "std_error",
-                        "t_stat", "p_value", "ci_1", "ci_2"])
-  .query("term.str.contains('date_cat')")
+model_without_fe_coefs = (pd.DataFrame({
+    "estimate": model_without_fe_time.coef(),
+    "std_error": model_without_fe_time.se()
+  })
+  .reset_index(names="term")
+  .query("term.str.contains('date')")
   .assign(
-    date=lambda x: 
-      x["term"].str.extract(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+    treatment=lambda x: x["term"].str.contains(":polluter"),
+    date=lambda x: x["term"].str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
+    ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
+    ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
   )
-  .assign(date=lambda x: pd.to_datetime(x["date"]))
-  .assign(treatment=lambda x: x["term"].str.contains("True"))
-  .assign(estimate=lambda x: x["estimate"].astype(float),
-          std_error=lambda x: x["std_error"].astype(float))
-  .assign(ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
-          ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"])
 )
 
 polluters_plot = (
@@ -285,13 +279,12 @@ for j in range(variables.shape[0]):
         bonds_panel_alt[new_var_name]=bonds_panel_alt["new_var"]
         formula += (f" + {new_var_name}" if j > 0 else new_var_name)
 
-formula = formula + " + EntityEffects + TimeEffects"
+formula = formula + " | cusip_id + date "
 
-model_with_fe_time = (lm.PanelOLS.from_formula(
-    formula=formula,
-    data=bonds_panel_alt.set_index(["cusip_id", "date"]))
-  .fit()
-  .summary
+model_with_fe_time = pf.feols(
+  formula,
+  vcov = "iid",
+  data = bonds_panel_alt
 )
 ```
 
@@ -301,25 +294,24 @@ We then collect the regression results into a dataframe that contains the estima
 lag0_row = pd.DataFrame({
   "term": ["lag0"],
   "estimate": [0],
-  "ci_1": [0],
-  "ci_2": [0],
+  "std_error": [0],
   "ci_up": [0],
   "ci_low": [0],
+  "diff_to_treatment": [0],
   "date": [treatment_date - pd.offsets.MonthBegin()]
 })
 
-model_with_fe_time_coefs = (
-  pd.DataFrame(model_with_fe_time.tables[1].data[1:],
-               columns=["term", "estimate", "std_error",
-                        "t_stat", "p_value", "ci_1", "ci_2"])
-  .assign(term=lambda x: x["term"].str.replace("[T.True]", ""))
-  .assign(estimate=lambda x: x["estimate"].astype(float),
-          std_error=lambda x: x["std_error"].astype(float))
-  .assign(ci_up=lambda x: x["estimate"] + norm.ppf(0.975)*x["std_error"],
-          ci_low=lambda x: x["estimate"] + norm.ppf(0.025)*x["std_error"])
+model_with_fe_time_coefs = (pd.DataFrame({
+    "estimate": model_with_fe_time.coef(),
+    "std_error": model_with_fe_time.se()
+  })
+  .reset_index(names="term")
+  .assign(
+    ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
+    ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
+  )
   .merge(variables, how="left", left_on="term", right_on="variable_name")
   .drop(columns="variable_name")
-  .query("term != 'Intercept'")
 )
 
 model_with_fe_time_coefs = pd.concat(
