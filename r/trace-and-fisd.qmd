@@ -20,10 +20,10 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
+library(tidyfinance)
 library(dbplyr)
 library(RSQLite)
 library(RPostgres)
-library(devtools)
 ```
 
 Compared to previous chapters, we load the `devtools` package [@devtools] to source code that we provided to the public via [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists)
@@ -150,6 +150,12 @@ fisd <- fisd |>
   select(-country_domicile)
 ```
 
+To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
+
+```{r}
+fisd <- download_data("wrds_fisd")
+```
+
 Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
@@ -169,12 +175,7 @@ The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting
 
 Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
 
-We store code for cleaning enhanced TRACE with R on the following GitHub [gist.](https://gist.github.com/patrick-weiss/3a05b3ab281563b2e94858451c2eb3a4) \index{GitHub!Gist} as a function. The appendix also contains the code for reference. We only need to source the code from the gist, which we can do with `source_gist()`. Alternatively, you can also go to the gist, download it, and `source()` the respective R-file. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
-
-```{r}
-#| message: false
-source_gist("3a05b3ab281563b2e94858451c2eb3a4")
-```
+We use the `download_data()` function from the `tidyfinance` package to download and clean enhanced TRACE with R. The appendix contains the code that is executed in the backend of the package for reference. The `download_dta()` function accepts a vector of CUSIPs, automaticall establishes a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
 
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
@@ -196,9 +197,9 @@ Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-
 batches <- length(fisd_parts)
 
 for (j in 1:batches) {
-  trace_enhanced <- clean_enhanced_trace(
+  trace_enhanced <- download_data(
+    type = "wrds_trace_enhanced",
     cusips = fisd_parts[[j]],
-    connection = wrds,
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
   )
@@ -223,13 +224,12 @@ While many news outlets readily provide information on stocks and the underlying
 We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
 
 ```{r}
-bonds_outstanding <- expand_grid("date" = seq(ymd("2014-01-01"),
-                                              ymd("2016-11-30"), 
-                                              by = "quarter"), 
-                                 "complete_cusip" = fisd$complete_cusip) |> 
-  left_join(fisd |> select(complete_cusip, 
-                              offering_date,
-                              maturity), 
+bonds_outstanding <- expand_grid(
+  "date" = seq(ymd("2014-01-01"), ymd("2016-11-30"), by = "quarter"), 
+  "complete_cusip" = fisd$complete_cusip
+) |> 
+  left_join(fisd |> 
+              select(complete_cusip, offering_date, maturity), 
             join_by(complete_cusip)) |> 
   mutate(offering_date = floor_date(offering_date),
          maturity = floor_date(maturity)) |> 

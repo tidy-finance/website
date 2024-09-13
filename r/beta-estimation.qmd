@@ -82,6 +82,8 @@ estimate_capm <- function(data, min_obs = 1) {
 }
 ```
 
+Note that the `tidyfinance` package provides an `estimate_model()` function that provides more flexibility with respect to the model. 
+
 Next, we define a function that does the rolling estimation. The `slide_period` function is able to handle months in its window input in a straightforward manner. We thus avoid using any time-series package (e.g., `zoo`) and converting the data to fit the package functions, but rather stay in the world of the `tidyverse`.
 
 The following function takes input data and slides across the `date` vector, considering only a total of `months` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding beta estimates. As we demonstrate further below, we can also apply the same function to daily returns data. 
@@ -215,6 +217,14 @@ beta_monthly <- crsp_monthly_nested |>
   drop_na()
 ```
 
+If you want to implement the above estimation steps using the `tidyfinance` package, then you can use the `estimate_betas()` function:
+
+```{r}
+#| eval: false
+beta_monthly <- crsp_monthly |>
+  estimate_betas(model = "ret_excess ~ mkt_excess", lookback = months(60), min_obs = 48, use_furrr = TRUE)
+```
+
 ## Estimating Beta Using Daily Returns
 
 Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. As loading the full daily CRSP data requires relatively large amounts of memory, we split the beta estimation into smaller chunks.\index{Parallelization} The logic follows the approach that we use to download the daily CRSP data (see [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd)).
@@ -278,6 +288,8 @@ for (j in 1:batches) {
 }
 beta_daily <- bind_rows(beta_daily)
 ```
+
+You can also use the `estimate_betas()` function from the `tidyfinance` package to estimate betas based on daily data. Please consult the corresponding documentation and exercise below. 
 
 ## Comparing Beta Estimates
 
@@ -442,3 +454,4 @@ $$
 r_{i, t} - r_{f, t} = \alpha_i + \sum\limits_{j=1}^k\beta_{i,k}(r_{j, t}-r_{f,t})+\varepsilon_{i, t}
 $${#eq-multi-factor}
 where $r_{i, t}$ are the $k$ factor returns. Thus, you estimate four parameters ($\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors.
+1. Estimate market betas based on daily CRSP using the `estimate_betas()` function from the `tidyfinance` package. Note that a memory-efficient way is to adjust the loop that we use above to handle daily CRSP data. 

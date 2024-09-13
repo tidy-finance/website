@@ -20,6 +20,7 @@ First, we load the R packages that we use throughout this chapter. Later on, we 
 ```{r}
 #| message: false
 library(tidyverse)
+library(tidyfinance)
 library(scales)
 library(RSQLite)
 library(dbplyr)
@@ -55,6 +56,14 @@ wrds <- dbConnect(
   user = Sys.getenv("WRDS_USER"),
   password = Sys.getenv("WRDS_PASSWORD")
 )
+```
+
+You can also use the `tidyfinance` package to set the login credentials and create a connection.
+
+```{r}
+#| eval: false
+set_wrds_credentials()
+wrds <- get_wrds_connection()
 ```
 
 The remote connection to WRDS is very useful. Yet, the database itself contains many different tables. You can check the WRDS homepage to identify the table's name you are looking for (if you go beyond our exposition). Alternatively, you can also query the data structure with the function `dbSendQuery()`. If you are interested, there is an exercise below that is based on WRDS' tutorial on ["Querying WRDS Data using R".](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/)  Furthermore, the penultimate section of this chapter shows how to investigate the structure of databases.
@@ -190,6 +199,17 @@ crsp_monthly <- crsp_monthly |>
     ret_excess = pmax(ret_excess, -1)
   ) |>
   select(-rf)
+```
+
+The `tidyfinance` package provides shortcut to implement all these processing steps from above.
+
+```{r}
+#| eval: false
+wrds_crsp_monthly <- download_data(
+  type = "wrds_crsp_monthly", 
+  start_date = start_date,
+  end_date = end_date
+)
 ```
 
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization. 
@@ -395,6 +415,19 @@ for (j in 1:batches) {
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
 
+To download the daily CRSP data via the `tidyfinance` package, you can call:
+
+```{r}
+#| eval: false
+crsp_daily <- download_data(
+  type = "wrds_crsp_daily",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend to use loop the function over different date periods and store the results. 
+
 ## Preparing Compustat Data
 
 Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence,](https://www.spglobal.com/marketintelligence/en/) which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
@@ -490,6 +523,17 @@ dbWriteTable(
 )
 ```
 
+The `tidyfinance` package provides a shortcut for the processing steps as well:
+
+```{r}
+#| eval: false
+compustat <- download_data(
+  type = "wrds_compustat_annual",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
 ## Merging CRSP with Compustat
 
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table}
@@ -519,14 +563,21 @@ ccm_links <- crsp_monthly |>
   filter(!is.na(gvkey) & 
            (date >= linkdt & date <= linkenddt)) |>
   select(permno, gvkey, date)
+```
 
-crsp_monthly <- crsp_monthly |>
-  left_join(ccm_links, join_by(permno, date))
+To fetch the linktable via `tidyfinance`, you can call:
+
+```{r}
+#| eval: false
+ccm_links <- download_data(type = "wrds_ccm_links")
 ```
 
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local database.
 
 ```{r}
+crsp_monthly <- crsp_monthly |>
+  left_join(ccm_links, join_by(permno, date))
+
 dbWriteTable(
   tidy_finance,
   "crsp_monthly",

@@ -11,36 +11,35 @@ metadata:
 You are reading **Tidy Finance with R**. You can find the equivalent chapter for the sibling **Tidy Finance with Python** [here](../python/introduction-to-tidy-finance.qmd).
 :::
 
-The main aim of this chapter is to familiarize yourself with the `tidyverse`. We start by downloading and visualizing stock data from Yahoo!Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
+The main aim of this chapter is to familiarize yourself with the `tidyverse`. We start by downloading and visualizing stock data from Yahoo Finance. Then we move to a simple portfolio choice problem and construct the efficient frontier. These examples introduce you to our approach of *Tidy Finance*.
 
 ## Working with Stock Market Data
 
-At the start of each session, we load the required R packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the convenient `tidyquant` package [@tidyquant] to download price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse`.\index{tidyverse}
-Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
+At the start of each session, we load the required R packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the `tidyfinance` package to download stock price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse` and our book.\index{tidyverse} Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
 
-You typically have to install a package once before you can load it. In case you have not done this yet, call `install.packages("tidyquant")`. \index{tidyquant} If you have trouble using `tidyquant`, check out the corresponding [documentation.](https://cran.r-project.org/web/packages/tidyquant/vignettes/TQ00-introduction-to-tidyquant.html)
+You typically have to install a package once before you can load it. In case you have not done this yet, call `install.packages("tidyfinance")`. \index{tidyfinance}
 
 ```{r}
 #| message: false
 library(tidyverse)
-library(tidyquant)
+library(tidyfinance)
 library(scales)
 ```
 
-We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo!Finance. To download the data, you can use the command `tq_get`. If you do not know how to use it, make sure you read the help file by calling `?tq_get`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
+We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo Finance. To download the data, you can use the function `download_data`. If you do not know how to use it, make sure you read the help file by calling `?download_data`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
 
 ```{r}
 #| cache: true
-prices <- tq_get(
-  x = "AAPL",
-  get = "stock.prices",
-  from = "2000-01-01",
-  to = "2023-12-31"
+prices <- download_data(
+  type = "stock_prices",
+  symbols = "AAPL",
+  start_date = "2000-01-01",
+  end_date = "2023-12-31"
 )
 prices
 ```
 
-\index{Data!YahooFinance} `tq_get` downloads stock market data from Yahoo!Finance if you do not specify another data source. The function returns a tibble with eight quite self-explanatory columns: `symbol`, `date`, the market prices at the `open`, `high`, `low`, and `close`, the daily `volume` (in the number of traded shares), and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
+\index{Data!Yahoo Finance} `download_data(type = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a tibble with eight quite self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
 Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
@@ -49,7 +48,7 @@ Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of ad
 #| fig-cap: "Prices are in USD, adjusted for dividend payments and stock splits."
 #| fig-alt: "Title: Apple stock prices between the beginning of 2000 and the end of 2023. The figure shows that the stock price of Apple increased dramatically from about 1 USD to around 125 USD."
 prices |>
-  ggplot(aes(x = date, y = adjusted)) +
+  ggplot(aes(x = date, y = adjusted_close)) +
   geom_line() +
   labs(
     x = NULL,
@@ -63,7 +62,7 @@ prices |>
 ```{r}
 returns <- prices |>
   arrange(date) |>
-  mutate(ret = adjusted / lag(adjusted) - 1) |>
+  mutate(ret = adjusted_close / lag(adjusted_close) - 1) |>
   select(symbol, date, ret)
 returns
 ```
@@ -144,24 +143,24 @@ This is where the `tidyverse` magic starts: tidy data makes it extremely easy to
 
 ```{r}
 #| message: false
-symbols <- tq_index("DOW") |> 
-  filter(company != "US DOLLAR")
+symbols <- download_data(type = "constituents", index = "Dow Jones Industrial Average") 
 symbols
 ```
 
-Conveniently, `tidyquant` provides a function to get all stocks in a stock index with a single call (similarly, `tq_exchange("NASDAQ")` delivers all stocks currently listed on the NASDAQ exchange). \index{Exchange!NASDAQ}
+Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index with a single call. \index{Exchange!NASDAQ}
 
 ```{r}
 #| cache: true
-prices_daily <- tq_get(
-  x = symbols,
-  get = "stock.prices",
-  from = "2000-01-01",
-  to = "2023-12-31"
+#| output: false
+prices_daily <- download_data(
+  type = "stock_prices",
+  symbols = symbols$symbol,
+  start_date = "2000-01-01",
+  end_date = "2023-12-31"
 )
 ```
 
-The resulting tibble contains `r nrow(prices_daily)` daily observations for `r prices_daily |> count(company) |> nrow()` different corporations. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting tibble contains `r nrow(prices_daily)` daily observations for `r unique(prices_daily$symbol)` different stocks. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow Jones index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ```{r}
 #| label: fig-103
@@ -170,7 +169,7 @@ The resulting tibble contains `r nrow(prices_daily)` daily observations for `r p
 prices_daily |>
   ggplot(aes(
     x = date,
-    y = adjusted,
+    y = adjusted_close,
     color = symbol
   )) +
   geom_line() +
@@ -183,14 +182,14 @@ prices_daily |>
   theme(legend.position = "none")
 ```
 
-Do you notice the small differences relative to the code we used before? `tq_get(symbols)` returns a tibble for several symbols as well. All we need to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
+Do you notice the small differences relative to the code we used before? All we need to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
 
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.
 
 ```{r}
 returns_daily <- prices_daily |>
   group_by(symbol) |>
-  mutate(ret = adjusted / lag(adjusted) - 1) |>
+  mutate(ret = adjusted_close / lag(adjusted_close) - 1) |>
   select(symbol, date, ret) |>
   drop_na(ret)
 
@@ -211,7 +210,7 @@ returns_daily |>
 
 \index{Summary statistics}
 
-Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- tq_index("SP500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
+Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- download_data(type = "constituents", index = "S&P 500")`, which provides you with a tibble that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
 ## Other Forms of Data Aggregation
 
@@ -223,7 +222,7 @@ Of course, aggregation across variables other than `symbol` can also make sense.
 #| fig-alt: "Title: Aggregate daily trading volume. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2023, with a maximum of more than 100."
 trading_volume <- prices_daily |>
   group_by(date) |>
-  summarize(trading_volume = sum(volume * adjusted))
+  summarize(trading_volume = sum(volume * adjusted_close))
 
 trading_volume |>
   ggplot(aes(x = date, y = trading_volume)) +
@@ -276,7 +275,7 @@ prices_daily <- prices_daily |>
 returns_monthly <- prices_daily |>
   mutate(date = floor_date(date, "month")) |>
   group_by(symbol, date) |>
-  summarize(price = last(adjusted), .groups = "drop_last") |>
+  summarize(price = last(adjusted_close), .groups = "drop_last") |>
   mutate(ret = price / lag(price) - 1) |>
   drop_na(ret) |>
   select(-price)
@@ -382,7 +381,7 @@ The line in @fig-106 indicates the efficient frontier: the set of portfolios a m
 
 ## Exercises
 
-1. Download daily prices for another stock market symbol of your choice from Yahoo!Finance with `tq_get()` from the `tidyquant` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain the differences.
+1. Download daily prices for another stock market symbol of your choice from Yahoo Finance with `download_data()` from the `tidyfinance` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain the differences.
 1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
 1. Take your code from before and generalize it such that you can perform all the computations for an arbitrary vector of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
 1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.

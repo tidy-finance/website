@@ -13,13 +13,14 @@ You are reading **Tidy Finance with R**. You can find the equivalent chapter for
 
 In this chapter, we suggest a way to organize your financial data. Everybody who has experience with data is also familiar with storing data in various formats like CSV, XLS, XLSX, or other delimited value storage. Reading and saving data can become very cumbersome in the case of using different data formats, both across different projects and across different programming languages. Moreover, storing data in delimited files often leads to problems with respect to column type consistency. For instance, date-type columns frequently lead to inconsistencies across different data formats and programming languages.
 
-This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo!Finance, a downloaded standard CSV file, an XLSX file stored in a public Google Drive repository, and other macroeconomic time series.\index{API} We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
+This chapter shows how to import different open source data sets. Specifically, our data comes from the application programming interface (API) of Yahoo Finance, a downloaded standard CSV file, an XLSX file stored in a public Google Drive repository, and other macroeconomic time series that can be scraped directly from a website.\index{API}\index{Web scraping} We show how to process these raw data, as well as how to take a shortcut using the `tidyfinance` package, which provides a consistent interface to tidy financial data. We store all the data in a *single* database, which serves as the only source of data in subsequent chapters. We conclude the chapter by providing some tips on managing databases.\index{Database}
 
 First, we load the global R packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them.
 
 ```{r}
 #| message: false
 library(tidyverse)
+library(tidyfinance)
 library(scales)
 ```
 
@@ -103,7 +104,25 @@ industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
   rename_with(str_to_lower)
 ```
 
-It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`. For an alternative to download Fama-French data, check out the `FFdownload` package by [Sebastian Stöckl](https://github.com/sstoeckl/ffdownload).
+It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`. 
+
+To automatically download and process Fama-French data, you can also use the `tidyfinance` package with `type = "factors_ff_3_monthly"` or similar, e.g.:
+
+```{r}
+#| output: false
+download_data(
+  type = "factors_ff_3_monthly", 
+  start_date = start_date, 
+  end_date = end_date
+)
+```
+
+The `tidyfinance` package implements the processing steps as above and returns the same cleaned data frame. The list of supported Fama-French data types can be called as follows:
+
+```{r}
+#| output: false
+list_supported_types(domain = "Fama-French")
+```
 
 ## q-Factors
 
@@ -118,40 +137,40 @@ factors_q_monthly_link <-
 
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(date = ymd(str_c(year, month, "01", sep = "-"))) |>
-  select(-R_F, -R_MKT, -year) |>
-  rename_with(~ str_remove(., "R_")) |>
-  rename_with(~ str_to_lower(.)) |>
-  mutate(across(-date, ~ . / 100)) |>
+  rename_with(~str_remove(., "R_")) |>
+  rename_with(str_to_lower) |>
+  mutate(across(-date, ~. / 100)) |>
+  select(date, risk_free = f, mkt_excess = mkt, everything()) |>
   filter(date >= start_date & date <= end_date)
+```
+
+Again, you can use the `tidyfinance` package for a shortcut:
+
+```{r}
+#| output: false
+download_data(
+  type = "factors_q5_monthly", 
+  start_date = start_date, 
+  end_date = end_date
+)
 ```
 
 ## Macroeconomic Predictors
 
-Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2022 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) Since the data is an XLSX-file stored on a public Google drive location, we need to first download the data to access the data directly from our R session. Therefore, we load `readxl` to read the XLSX-file [@readxl].\index{Data!Macro predictors}
-
-```{r}
-#| message: false
-library(readxl)
-```
-
-We use the basic `download.file()` function to download the XLSX-file.^[Note that the `mode = "wb"` argument is used to ensure that the file is written in binary mode, which is important for non-text files like XLSX.]
+Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2022 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) The data is an XLSX-file stored on a public Google drive location and we directly export a CSV file.\index{Data!Macro predictors}
 
 ```{r}
 #| message: false
 sheet_id <- "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
-macro_predictors_link <- paste0(
-  "https://docs.google.com/spreadsheets/d/", sheet_id, 
-  "/export?format=xlsx"
+sheet_name <- "Monthly"
+macro_predictors_url <- paste0(
+  "https://docs.google.com/spreadsheets/d/", sheet_id,
+  "/gviz/tq?tqx=out:csv&sheet=", sheet_name
 )
-
-download.file(
-  url = macro_predictors_link, 
-  destfile = "macro_predictors.xlsx", 
-  mode = "wb"
-)
+macro_predictors_raw <- read_csv(macro_predictors_url)
 ```
 
-Next, we read in the new data and transform the columns into the variables that we later use:
+Next, we transform the columns into the variables that we later use:
 
 1.  The dividend price ratio (`dp`), the difference between the log of dividends and the log of prices, where dividends are 12-month moving sums of dividends paid on the S&P 500 index, and prices are monthly averages of daily closing prices [@Campbell1988; @Campbell2006].
 2.  Dividend yield (`dy`), the difference between the log of dividends and the log of lagged prices [@Ball1978].
@@ -170,10 +189,7 @@ Next, we read in the new data and transform the columns into the variables that 
 For variable definitions and the required data transformations, you can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145).
 
 ```{r}
-macro_predictors <- read_xlsx(
-  "macro_predictors.xlsx",
-  sheet = "Monthly"
-) |>
+macro_predictors <- macro_predictors_raw |>
   mutate(date = ym(yyyymm)) |>
   mutate(across(where(is.character), as.numeric)) |>
   mutate(
@@ -197,36 +213,68 @@ macro_predictors <- read_xlsx(
   drop_na()
 ```
 
-Finally, after reading in the macro predictors to our memory, we remove the raw data file from our temporary storage.
+To get the equivalent data through `tidyfinance`, you can call:
 
 ```{r}
-#| message: false
 #| output: false
-file.remove("macro_predictors.xlsx")
+download_data(
+  type = "macro_predictors_monthly",
+  start_date = start_date,
+  end_date = end_date
+)
 ```
 
 ## Other Macroeconomic Data
 
-The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `tidyquant` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
+The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. The data can be downloaded directly from FRED by constructing the appropriate URL. For instance, let us consider the consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS):\index{Data!FRED}\index{Data!CPI}
+
+```{r}
+series <- "CPIAUCNS"
+cpi_url <- paste0("https://fred.stlouisfed.org/series/", series, "/downloaddata/", series, ".csv")
+```
+
+We can then use the `httr2` [@httr2] package to request the CSV, extract the data from the response body, and convert the columns to a tidy format:
 
 ```{r}
 #| message: false
-library(tidyquant)
+library(httr2)
 
-cpi_monthly <- tq_get(
-  x = "CPIAUCNS",
-  get = "economic.data",
-  from = start_date,
-  to = end_date
-) |>
+cpi_daily <- request(cpi_url) |>
+  req_perform() |> 
+  resp_body_string() |> 
+  read_csv() |> 
   mutate(
-    date = floor_date(date, "month"),
-    cpi = price / price[date == max(date)],
+    date = as.Date(DATE),
+    value = as.numeric(VALUE),
+    series = series,
     .keep = "none"
   )
 ```
 
-To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. The `tidyquant` package provides access to around 10,000 time series of the FRED database. If your desired time series is not included, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
+We convert the daily CPI data to monthly because we use the latter in later chapters. 
+
+```{r}
+cpi_monthly <- cpi_daily |>
+  mutate(
+    date = floor_date(date, "month"),
+    cpi = value / value[date == max(date)],
+    .keep = "none"
+  )
+```
+
+The `tidyfinance` package can, of course, also fetch the same daily data and many more data series:
+
+```{r}
+#| message: false
+download_data(
+  type = "fred",
+  series = "CPIAUCNS",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through `tidyfinance`, we recommend working with the `fredr` package [@fredr]. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
 
 ## Setting Up a Database
 
