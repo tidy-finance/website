@@ -1029,28 +1029,29 @@ Figure&nbsp;4: Market capitalization is measured in billion USD, adjusted for co
 <h2 class="anchored" data-anchor-id="merging-crsp-with-compustat">Merging CRSP with Compustat</h2>
 <p>Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses <code>permno</code> for stocks, while Compustat uses <code>gvkey</code> to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the <em>CRSP-Compustat Merged</em> table (provided by CRSP).</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>ccmxpf_linktable_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.ccmxpf_linktable"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>ccm_linking_table_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.ccmxpf_lnkhist"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in <span class="citation" data-cites="BaliEngleMurray2016">Bali, Engle, and Murray (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. Note also that currently active links have no end date, so we just enter the current date via <code>today()</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>ccmxpf_linktable <span class="ot">&lt;-</span> ccmxpf_linktable_db <span class="sc">|&gt;</span></span>
-<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(linktype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"LU"</span>, <span class="st">"LC"</span>) <span class="sc">&amp;</span></span>
-<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    linkprim <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"P"</span>, <span class="st">"C"</span>) <span class="sc">&amp;</span></span>
-<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    usedflag <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
-<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">permno =</span> lpermno, gvkey, linkdt, linkenddt) <span class="sc">|&gt;</span></span>
-<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
-<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">linkenddt =</span> <span class="fu">replace_na</span>(linkenddt, <span class="fu">today</span>()))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>ccm_linking_table <span class="ot">&lt;-</span> ccm_linking_table_db <span class="sc">|&gt;</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    linktype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"LU"</span>, <span class="st">"LC"</span>) <span class="sc">&amp;</span></span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    linkprim <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"P"</span>, <span class="st">"C"</span>)</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="at">permno =</span> lpermno, gvkey, linkdt, linkenddt) <span class="sc">|&gt;</span></span>
+<span id="cb32-7"><a href="#cb32-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span></span>
+<span id="cb32-8"><a href="#cb32-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">linkenddt =</span> <span class="fu">replace_na</span>(linkenddt, <span class="fu">today</span>()))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat <code>gvkey</code> to our monthly stock data.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>ccm_links <span class="ot">&lt;-</span> crsp_monthly <span class="sc">|&gt;</span></span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(ccmxpf_linktable, </span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(ccm_linking_table, </span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>             <span class="fu">join_by</span>(permno), <span class="at">relationship =</span> <span class="st">"many-to-many"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(gvkey) <span class="sc">&amp;</span> </span>
 <span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>           (date <span class="sc">&gt;=</span> linkdt <span class="sc">&amp;</span> date <span class="sc">&lt;=</span> linkenddt)) <span class="sc">|&gt;</span></span>
 <span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, gvkey, date)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>To fetch the linktable via <code>tidyfinance</code>, you can call:</p>
+<p>To fetch these links via <code>tidyfinance</code>, you can call:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>ccm_links <span class="ot">&lt;-</span> <span class="fu">download_data</span>(<span class="at">type =</span> <span class="st">"wrds_ccm_links"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
@@ -1615,7 +1616,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
     </div>
   </div>
 </footer>
-<script>var lightboxQuarto = GLightbox({"selector":".lightbox","loop":false,"descPosition":"bottom","closeEffect":"zoom","openEffect":"zoom"});
+<script>var lightboxQuarto = GLightbox({"descPosition":"bottom","closeEffect":"zoom","selector":".lightbox","loop":false,"openEffect":"zoom"});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
