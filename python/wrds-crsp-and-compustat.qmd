@@ -545,17 +545,16 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!CRSP-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table} The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via the SQL verb `CURRENT_DATE`.
 
 ```{python}
-ccmxpf_linktable_query = (
+ccm_linking_table_query = (
   "SELECT lpermno AS permno, gvkey, linkdt, "
          "COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "
     "FROM crsp.ccmxpf_linktable "
     "WHERE linktype IN ('LU', 'LC') "
-          "AND linkprim IN ('P', 'C') "
-          "AND usedflag = 1"
+          "AND linkprim IN ('P', 'C')"
 )
 
-ccmxpf_linktable = pd.read_sql_query(
-  sql=ccmxpf_linktable_query,
+ccm_linking_table = pd.read_sql_query(
+  sql=ccm_linking_table_query,
   con=wrds,
   dtype={"permno": int, "gvkey": str},
   parse_dates={"linkdt", "linkenddt"}
@@ -566,7 +565,7 @@ We use these links to create a new table with a mapping between stock identifier
 
 ```{python}
 ccm_links = (crsp_monthly
-  .merge(ccmxpf_linktable, how="inner", on="permno")
+  .merge(ccm_linking_table, how="inner", on="permno")
   .query("~gvkey.isnull() & (date >= linkdt) & (date <= linkenddt)")
   .get(["permno", "gvkey", "date"])
 )

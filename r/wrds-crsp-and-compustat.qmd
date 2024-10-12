@@ -539,16 +539,17 @@ compustat <- download_data(
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table}
 
 ```{r}
-ccmxpf_linktable_db <- tbl(wrds, I("crsp.ccmxpf_linktable"))
+ccm_linking_table_db <- tbl(wrds, I("crsp.ccmxpf_lnkhist"))
 ```
 
 The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via `today()`.
 
 ```{r}
-ccmxpf_linktable <- ccmxpf_linktable_db |>
-  filter(linktype %in% c("LU", "LC") &
-    linkprim %in% c("P", "C") &
-    usedflag == 1) |>
+ccm_linking_table <- ccm_linking_table_db |>
+  filter(
+    linktype %in% c("LU", "LC") &
+    linkprim %in% c("P", "C")
+  ) |>
   select(permno = lpermno, gvkey, linkdt, linkenddt) |>
   collect() |>
   mutate(linkenddt = replace_na(linkenddt, today()))
@@ -558,14 +559,14 @@ We use these links to create a new table with a mapping between stock identifier
 
 ```{r}
 ccm_links <- crsp_monthly |>
-  inner_join(ccmxpf_linktable, 
+  inner_join(ccm_linking_table, 
              join_by(permno), relationship = "many-to-many") |>
   filter(!is.na(gvkey) & 
            (date >= linkdt & date <= linkenddt)) |>
   select(permno, gvkey, date)
 ```
 
-To fetch the linktable via `tidyfinance`, you can call:
+To fetch these links via `tidyfinance`, you can call:
 
 ```{r}
 #| eval: false
