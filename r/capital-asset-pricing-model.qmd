@@ -1,0 +1,523 @@
+---
+title: The Capital Asset Pricing Model
+metadata:
+  pagetitle: The CAPM with R
+  description-meta: Learn how to use the programming language R for estimating the CAPM for asset evaluation.
+---
+
+Key questions: 
+
+- What is the expected return of an asset?
+- Which portfolios should investors hold?
+
+CAPM is an **equilibrium model**
+
+- Extends MPT by including **systematic risk**
+- Adds simplifying assumptions to model **rational investors**
+- Developed by: [Sharpe (1964)](https://onlinelibrary.wiley.com/doi/10.1111/j.1540-6261.1964.tb02865.x), [Lintner (1965)](https://www.jstor.org/stable/1924119?origin=crossref) & [Mossin (1966)](https://www.jstor.org/stable/1910098?origin=crossref)
+
+The CAPM in a nutshell: investors demand a **compensation for risk**
+
+- Expected Return = Risk-Free Rate + Compensation for Market Risk
+- **Risk-Free Rate**: return on an investment without risk
+- **Market Risk**: how much asset returns co-move with the overall market
+
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(tidyfinance)
+library(scales)
+library(ggrepel)
+```
+
+## Asset Returns & Volatilities
+
+```{r}
+#| output: false
+symbols <- download_data(
+  type = "constituents",
+  index = "Dow Jones Industrial Average"
+)
+
+prices_daily <- download_data(
+    type = "stock_prices", symbol = symbols$symbol,
+    start_date = "2019-10-01", end_date = "2024-09-30"
+) |> 
+  select(symbol, date,  price = adjusted_close)
+```
+
+Calculate *daily* returns
+
+```{r}
+returns_daily <- prices_daily |>
+  group_by(symbol) |> 
+  mutate(ret = price / lag(price) - 1) |>
+  ungroup() |> 
+  select(symbol, date, ret) |> 
+  drop_na(ret) |> 
+  arrange(symbol, date)
+```
+
+Plot risk & return 
+
+```{r}
+assets <- returns_daily |> 
+  group_by(symbol) |> 
+  summarize(mu = mean(ret), sigma = sd(ret))
+
+fig_vola_return <- assets |> 
+  ggplot(aes(x = sigma, y = mu)) +
+  geom_point() + 
+  geom_label_repel(data = assets |> filter(symbol %in% c("BA", "NVDA")),
+                   aes(label = symbol)) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) + 
+  labs(x = "Volatility", y = "Average return",
+       title = "Average returns and volatilities of DOW index constituents") 
+fig_vola_return
+```
+
+Does high risk bring high returns?
+
+Boeing (BA) vs Nvidia (NVDA)
+
+- Company-specific events might affect stock prices
+- Examples: CEO resignation, product launch, earnings report
+- Idiosyncratic events don't impact the overall market
+- This asset-specific risk can be eliminated through diversification
+
+Focus on **systematic risk** that affects all assets in the market
+
+Systematic vs idiosyncratic risk: Investors **dislike risk**
+
+Different sources of risk
+
+- **Systematic risk**: all assets are exposed to it, cannot be diversified away
+- **Idiosyncratic risk**: unique to particular asset, can be diversified away
+
+## Portfolio Return & Variance
+
+$\text{Expected Portfolio Return} = \omega'\mu$
+
+  -	$\omega$: vector of asset weights
+  - $\mu$: vector of expected return of assets
+
+$\text{Portfolio Variance} = \omega' \Sigma \omega$
+
+  - $\Sigma$: variance-covariance matrix
+
+Introducing the risk-free asset: Allocate capital between risk-free asset & risky portfolio
+
+$$\mu_c = c \omega'\mu + (1-c)r_f$$
+
+- $\mu_{c}$: combined portfolio return
+- $r_f$: return of risk-free asset (e.g. government bond)
+- $c$ fraction of capital in risky portfolio
+
+Risk-free asset has 0 volatility.
+
+- Portfolio risk $\sigma_c$ is measured by volatility of risky asset
+- $\sigma_c= c\sqrt{\omega' \Sigma \omega}$ $\Rightarrow$ $c = \frac{\sigma_c}{\sqrt{\omega' \Sigma \omega}}$
+
+Allows us to derive a **Capital Allocation Line** (CAL) 
+
+$$\mu_c = r_f +\sigma_c \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
+
+Slope of CAL is called **Sharpe ratio**
+
+$$\text{Sharpe ratio} = \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
+
+- Measures **excess return per unit of risk**
+- Higher ratio indicates more attractive **risk-adjusted return**
+
+Calculate the risk-free rate: 13-week T-bill rate (^IRX) is quoted in annualized percentage yields. Convert annualized to daily rates (252 trading days). Note: this approach has a 99% correlation with Fama-French risk free rate.
+
+```{r}
+risk_free_daily <- download_data(
+  type = "stock_prices", symbol = "^IRX", 
+  start_date = "2019-10-01", end_date = "2024-09-30"
+) |> 
+  mutate(
+    risk_free = (1 + adjusted_close / 100)^(1 / 252) - 1
+  ) |> 
+  select(date, risk_free) |> 
+  drop_na()
+```
+
+Create example portfolios
+
+```{r}
+mu <- assets$mu
+sigma <- returns_daily |> 
+  pivot_wider(names_from = symbol, values_from = ret)  |> 
+  select(-date) |> 
+  cov()
+```
+
+Portfolio with equal weights
+```{r}
+number_of_assets <- nrow(assets)
+omega_ew <- rep(1 / number_of_assets, number_of_assets)
+
+summary_ew <- tibble(
+  mu = as.numeric(t(omega_ew) %*% mu),
+  sigma = as.numeric(sqrt(t(omega_ew) %*% sigma %*% omega_ew)),
+  type = "Equal-Weighted Portfolio"
+)
+```
+
+Portfolio with random weights
+```{r}
+set.seed(1234)
+omega_random <- runif(number_of_assets, -1, 1)
+omega_random <- omega_random / sum(omega_random)
+
+summary_random <- tibble(
+  mu = as.numeric(t(omega_random) %*% mu),
+  sigma = as.numeric(sqrt(t(omega_random) %*% sigma %*% omega_random)),
+  type = "Randomly-Weighted Portfolio"
+)
+```
+
+Risk-free asset 
+```{r}
+summary_risk_free <- tibble(
+  mu =  mean(risk_free_daily$risk_free),
+  sigma = 0,
+  type = "Risk-Free Asset"
+)
+
+summaries <- bind_rows(assets, summary_ew, summary_random, summary_risk_free)
+```
+
+
+Plot CALs. First introduce helper function to calculate Sharpe Ratio. 
+
+```{r}
+calculate_sharpe_ratio <- function(mu, sigma, risk_free) {
+  as.numeric(mu - risk_free) / sigma 
+}
+
+summaries <- summaries |> 
+  mutate(
+    sharpe_ratio = if_else(
+      str_detect(type, "Portfolio"), 
+      calculate_sharpe_ratio(mu, sigma, risk_free = summary_risk_free$mu),
+      NA
+    ),
+    risk_free = summary_risk_free$mu
+  )
+```
+
+
+```{r}
+#| warning: false
+fig_cal <- summaries |> 
+  ggplot(aes(x = sigma, y = mu)) +
+  geom_abline(aes(intercept = risk_free, slope = sharpe_ratio, color = type),
+              linetype = "dashed", linewidth = 1) +
+  geom_point(data = summaries |> filter(is.na(type))) +
+  geom_point(data = summaries |> filter(!is.na(type)), shape = 4, size = 4) + 
+  ggrepel::geom_label_repel(aes(label = type)) + 
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) + 
+  labs(
+    x = "Volatility", y = "Average return",
+    title = "Average returns and volatilities of DOW index constituents with capital allocation lines",
+    subtitle = "Points correspond to individual assets, crosses to portfolios"
+  ) +
+  theme(legend.position = "none")
+fig_cal
+```
+
+## The Tangency Portfolio
+
+The portfolio that **maximizes Sharpe ratio**
+
+$$\max_w \frac{\omega' \mu - r_f}{\sqrt{\omega' \Sigma \omega}}$$
+while staying **fully invested**
+
+$$ \omega'\iota = 1$$
+
+is called the **tangency portfolio**
+
+Calculate the tangency portfolio
+
+**Analytic solution** for tangency portfolio (see [here](https://bookdown.org/compfinezbook/introcompfinr/Efficient-portfolios-of.html#computing-the-tangency-portfolio-using-matrix-algebra))
+
+$$\omega_{tan}=\frac{\Sigma^{-1}(\mu-r_f)}{\iota'\Sigma^{-1}(\mu-r_f)}$$
+
+```{r}
+omega_tangency <- solve(sigma) %*% (mu - summary_risk_free$mu)
+omega_tangency <- as.vector(omega_tangency / sum(omega_tangency))
+
+summary_tangency <- tibble(
+  mu = as.numeric(t(omega_tangency) %*% mu),
+  sigma = as.numeric(sqrt(t(omega_tangency) %*% sigma %*% omega_tangency)),
+  type = "Tangency Portfolio",
+  sharpe_ratio = calculate_sharpe_ratio(mu, sigma, risk_free = summary_risk_free$mu),
+  risk_free = summary_risk_free$mu
+)
+```
+
+## The Capital Market Line 
+
+Combination of risk-free asset & the tangency portfolio $\omega_{tan}$
+
+$$\mu_{c} = r_f +\sigma_c \frac{\omega_{tan}'\mu-r_f}{\sqrt{\omega_{tan}' \Sigma \omega_{tan}}}$$
+
+is called the **Capital Market Line** (CML)
+
+<br>
+
+CML describes **best risk-return trade-off** for portfolios that contain risk-free asset & tangency portfolio
+
+Plot the CML
+
+```{r}
+#| warning: false
+summaries <- bind_rows(summaries, summary_tangency)
+
+fig_cml <- summaries |> 
+  ggplot(aes(x = sigma, y = mu)) +
+  geom_abline(aes(intercept = risk_free, slope = sharpe_ratio, color = type),
+              linetype = "dashed", linewidth = 1) +
+  geom_point(data = summaries |> filter(is.na(type))) +
+  geom_point(data = summaries |> filter(!is.na(type)), shape = 4, size = 4) + 
+  ggrepel::geom_label_repel(aes(label = type)) + 
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) + 
+  labs(x = "Volatility", y = "Average return",
+       title = "Average returns and volatilities of DOW index constituents",
+       subtitle = "Points correspond to individual assets, crosses to portfolios") +
+  theme(legend.position = "none")
+fig_cml
+```
+
+Portfolios vs individual assets. In the CAPM model:
+
+- Investors prefer to hold any portfolio on the CML over individual assets or any other portfolio
+- All rational investors hold the tangency portfolio
+- Return of an individual asset can be compared to efficient tangency weight
+- Risk of an asset is proportional to covariance with tangency portfolio weight
+
+Expected excess returns vs tangency weights. **Expected excess return of asset** $i$ is
+
+$$\mu_i - r_f = \beta_i \cdot (\omega_{tan}'\mu - r_f)$$
+
+where
+
+$$\beta_i = \frac{\text{Cov}(r_i, \omega_{tan}r)}{\omega_{tan}' \Sigma \omega_{tan}}$$
+
+is called the **asset beta**
+
+Calculate excess returns
+
+```{r}
+tangency_weights <- tibble(
+  symbol = assets$symbol, 
+  omega_tangency = omega_tangency
+)
+
+returns_tangency_daily <- returns_daily |> 
+  left_join(tangency_weights, join_by(symbol)) |> 
+  group_by(date) |> 
+  summarize(mkt_ret = weighted.mean(ret, omega_tangency))
+
+returns_excess_daily <- returns_daily |> 
+  left_join(returns_tangency_daily, join_by(date)) |> 
+  left_join(risk_free_daily, join_by(date)) |> 
+  mutate(ret_excess = ret - risk_free,
+         mkt_excess = mkt_ret - risk_free) |> 
+  select(symbol, date, ret_excess, mkt_excess)
+```
+
+Estimate Asset Betas
+
+```{r}
+estimate_beta <- function(data) {
+  fit <- lm("ret_excess ~ mkt_excess - 1", data = data)
+  coefficients(fit)
+}
+  
+beta_results <- returns_excess_daily |> 
+  nest(data = -symbol) |> 
+  mutate(beta = map_dbl(data, estimate_beta))
+```
+
+Plot asset betas
+
+```{r}
+fig_betas <- beta_results |> 
+  ggplot(aes(x = beta, y = fct_reorder(symbol, beta))) +
+  geom_col() +
+  labs(
+    x = "Estimated asset beta", y = NULL, 
+    title = "Estimated asset betas based on the tangency portfolio for DOW Index constituents"
+  )
+fig_betas
+```
+
+Asset returns vs systematic risk: the assets all fall onto the 45 degree line, as they should according to CAPM. 
+
+```{r}
+assets <- assets |> 
+  mutate(mu_excess = mu - summary_risk_free$mu) |> 
+  left_join(beta_results, join_by(symbol))
+  
+fig_betas_returns <- assets |> 
+  ggplot(aes(x = beta, y = mu_excess)) + 
+  geom_abline(intercept = 0, 
+              slope = summary_tangency$mu - summary_risk_free$mu) + 
+  geom_point() +
+  ggrepel::geom_label_repel(data = assets |> filter(symbol %in% c("BA", "NVDA")),
+                            aes(label = symbol)) + 
+  scale_y_continuous(labels = percent) + 
+  labs(x = "Estimated asset beta", y = "Average return", 
+       title = "Estimated CAPM-betas and average returns for Dow Industrial Average constituents")
+fig_betas_returns
+```
+
+## CAPM in Practice
+
+How to estimate betas in practice?
+
+Calculating the **tangency portfolio** can be **cumbersome**
+
+- What is the correct asset universe?
+- How to estimate $\mu$ and $\Sigma$ for many assets?
+
+In the CAPM: **market portfolio = tangency portfolio**
+
+- Skip calculation of tangency portfolio weights
+- Use portfolios weighted by market capitalization 
+
+Key assumptions behind CAPM:
+
+- Equilibrium model in a single-period economy
+-	No transaction costs or taxes
+-	Risk-free borrowing and lending are available to all investors
+-	Investors share homogeneous expectations
+-	Investors maximize returns for limited level of risk
+
+
+CAPM is a **foundation for other models** because of its simplicity
+
+The Security Market Line (SML). **Expected return of asset** $i$ is
+
+$$\mu_i =  r_f + \beta_i \cdot (\mu_m - r_f)$$
+
+where
+
+$$\beta_i = \frac{\sigma_{im}}{\sigma_m^2}$$
+
+- $\mu_m$: expected market returns
+- $\sigma_{im}$: covariance of asset $i$ with market
+- $\sigma_m$: market volatility
+
+Evaluate asset performance with the SML: **Alpha** is difference between actual excess return & expected return
+
+$$\mu_i - r_f = \alpha_i + \beta_i \cdot (\mu_m - r_f)$$
+
+Alpha is **performance adjusted for market risk**
+
+- **Positive alpha**: outperformance relative to market
+- **Negative alpha**: underperformance relative to market
+
+Estimate Asset Alphas & Beta. Regression model:
+
+$$r_{i,t}  - r_{f,t}  = \hat{\alpha}_i + \hat{\beta}_i \cdot (r_{m,t} - r_{f,t} ) + \hat{\varepsilon}_{i,t} $$
+
+- $r_{i,t}$: actual returns of asset $i$ on day $t$
+- $r_{m,t}$: actual market returns on day $t$
+
+Download excess market returns
+
+```{r}
+factors <- download_data(
+  type = "factors_ff_5_2x3_daily", 
+  start_date = "2019-10-01", end_date = "2024-09-30"
+) |> 
+  select(date, mkt_excess, risk_free)
+```
+
+Estimate alphas & betas
+
+```{r}
+returns_excess_daily <- returns_daily |> 
+  left_join(factors, join_by(date)) |> 
+  mutate(ret_excess = ret - risk_free) |> 
+  select(symbol, date, ret_excess, mkt_excess)
+
+estimate_capm <- function(data) {
+  fit <- lm("ret_excess ~ mkt_excess", data = data)
+  tibble(
+    coefficient = c("alpha", "beta"),
+    estimate = coefficients(fit),
+    t_statistic = summary(fit)$coefficients[, "t value"]
+  )
+}
+  
+capm_results <- returns_excess_daily |> 
+  nest(data = -symbol) |> 
+  mutate(capm = map(data, estimate_capm)) |> 
+  unnest(capm) |> 
+  select(symbol, coefficient, estimate, t_statistic)
+```
+
+Plot asset alphas
+
+```{r}
+fig_alpha <- capm_results |> 
+  filter(coefficient == "alpha") |> 
+  mutate(is_significant = abs(t_statistic) >= 1.96) |> 
+  ggplot(aes(x = estimate, y = fct_reorder(symbol, estimate), 
+             fill = is_significant)) +
+  geom_col() +
+  scale_x_continuous(labels = percent) + 
+  labs(
+    x = "Estimated asset alphas", y = NULL, fill = "Significant at 95%?",
+    title = "Estimated CAPM alphas for Dow Industrial Average constituents"
+  )
+fig_alpha
+```
+
+## Shortcomings & Extensions
+
+Popular shortcomings of CAPM
+
+- Impossible to create **universal measure for market**
+  - Market definition might depend on context (e.g. S&P 500, DAX, TOPIX)
+- **Beta** might **not be stable **over time
+  - Company operations, leverage or competitive environment might change beta
+- **Systematic risk** might not be the **only factor**
+  - Poor empirical performance in explaining small-cap or high-growth returns
+- Many more: behavioral biases, heterogeneous preferences, liquidity, etc.
+
+Alternatives & extensions.
+
+[Fama-French 3-Factor model](https://en.wikipedia.org/wiki/Fama%E2%80%93French_three-factor_model) extends CAPM
+
+- Outperformance of small vs big companies (see [tidy-finance.org](https://www.tidy-finance.org/r/size-sorts-and-p-hacking.html))
+- Outperformance of high vs low value companies (see [tidy-finance.org](https://www.tidy-finance.org/r/value-and-bivariate-sorts.html))
+  
+Fama-French 5-Factor model extends 3-factor model (see [tidy-finance.org](https://www.tidy-finance.org/r/replicating-fama-and-french-factors.html))
+
+- Outperformance of companies with robust vs weak operating profitability
+- Outperformance of companies with conservative vs aggressive investment
+
+Many more: [consumption CAPM](https://en.wikipedia.org/wiki/Consumption-based_capital_asset_pricing_model), [conditional CAPM](https://www.jstor.org/stable/2329301), [Carhart Four-Factor Model](https://en.wikipedia.org/wiki/Carhart_four-factor_model), [Q-Factor Model & ivnestment CAPM](https://global-q.org/index.html)
+
+## Key takeways
+
+- CAPM is an **equilibrium model** in a **frictionless** economy
+- Investors hold mix of **market portfolio & risk-free asset**
+- **Expected return** of a stock is a linear function of its **beta**
+- Beta is the **sensitivity** of a stock to **market movements**
+- Beta estimation via **linear regression** using historical data
+
+## Exercises
+
+1. ...
