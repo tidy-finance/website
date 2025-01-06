@@ -1,0 +1,411 @@
+---
+title: Financial Ratios
+metadata:
+  pagetitle: Financial Ratios with R
+  description-meta: Learn how to use the programming language R to analyze companies using financial ratios.
+---
+
+Financial statements are key source of information
+
+- Standardized way for investors, creditors, analysts to assess companies
+- Companies are legally required to file financial statements
+- Public companies required to have independent audits of statements
+- US Security Exchange Commission requires quarterly & annual filings
+
+Financial ratios help understand companies
+
+- Comparison across companies (benchmarking)
+- Comparison across periods for specific company (trend analysis)
+- Firm quality in portfolio selection (e.g., ratio-based filters)
+- Factor models in asset pricing (e.g., Fama-French factors, Q-factors)
+- Capital structure research & risk management
+
+```{r}
+library(tidyverse)
+library(tidyfinance)
+library(scales)
+library(ggrepel)
+library(fmpapi)
+```
+
+## Balance Sheet Statements
+
+![](assets/img/balance-sheet.svg){style="display: block; margin: 0 auto;"}
+
+Assets breakdown
+ 
+![](assets/img/assets.svg){style="display: block; margin: 0 auto;"}
+
+Liabilities breakdown
+
+![](assets/img/liabilities.svg){style="display: block; margin: 0 auto;"} 
+
+Equity breakdown
+
+![](assets/img/equity.svg){style="display: block; margin: 0 auto;"}
+
+Example balance sheet from Microsoft in 2023
+
+![](assets/img/balance-sheet-msft.png){style="display: block; margin: 0 auto;"}
+
+Use `fmpapi` package to download financial statements
+
+- SEC provides interface to [search filings](https://www.sec.gov/search-filings)
+- [Financial Modeling Prep (FMP) API](https://site.financialmodelingprep.com/developer/docs) provides programming interface
+- Free tier: 250 calls / day, 5 year historical fundamental data
+- R package: [tidy-finance/r-fmpapi](https://github.com/tidy-finance/r-fmpapi)
+- Install via `install.packages("fmpapi")`
+
+```{r}
+fmp_get(
+  resource = "balance-sheet-statement", 
+  symbol = "MSFT", 
+  params = list(period = "annual", limit = 5)
+)
+```
+
+## Income Statements
+
+![](assets/img/income-statements.svg){style="display: block; margin: 0 auto;"}
+
+Example income statements of Microsoft 2023
+
+![](assets/img/income-statements-msft.png){style="display: block; margin: 0 auto;"}
+
+Download income statements data
+
+```{r}
+#| cache: true 
+fmp_get(
+  resource = "income-statement", 
+  symbol = "MSFT", 
+  params = list(period = "annual", limit = 5)
+)
+```
+
+## Cash Flow Statements
+
+![](assets/img/cash-flow-statements.svg){style="display: block; margin: 0 auto;"}
+
+Example cash flow statements of Microsoft 2023
+
+![](assets/img/cash-flow-statements-msft.png){style="display: block; margin: 0 auto;"}
+
+Download cash flow statements data
+
+```{r}
+#| cache: true 
+fmp_get(
+  resource = "cash-flow-statement", 
+  symbol = "MSFT", 
+  params = list(period = "annual", limit = 5)
+)
+```
+
+## Download Financial Statements
+
+```{r}
+#| cache: true 
+constituents <- download_data_constituents("Dow Jones Industrial Average") |> 
+  pull(symbol)
+
+params <- list(period = "annual", limit = 5)
+
+balance_sheet_statements <- constituents |> 
+  map_df(
+    \(x) fmp_get(resource = "balance-sheet-statement", symbol = x, params = params)
+  )
+
+income_statements <- constituents |> 
+  map_df(
+    \(x) fmp_get(resource = "income-statement", symbol = x, params = params)
+  )
+
+cash_flow_statements <- constituents |> 
+  map_df(
+    \(x) fmp_get(resource = "cash-flow-statement", symbol = x, params = params)
+  )
+```
+
+## Liquidity Ratios
+
+- Current Ratio: Current Assets / Total Assets 	
+- Quick Ratio: (Current Assets - Liabilities) / Current Liabilities 	
+- Cash Ratio: Cash and Cash Equivalents / Current Liabilities 	
+
+```{r}
+selected_symbols <- c("MSFT", "AAPL", "AMZN")
+
+balance_sheets_statements <- balance_sheet_statements |> 
+  mutate(
+    current_ratio = total_current_assets / total_assets,
+    quick_ratio = (total_current_assets - total_liabilities) / total_current_liabilities,
+    cash_ratio = cash_and_cash_equivalents / total_current_liabilities,
+    label = if_else(symbol %in% selected_symbols, symbol, NA),
+  )
+```
+
+Comparing liquidity ratios
+
+```{r}
+fig_liquidity_ratios <- balance_sheets_statements |> 
+  filter(calendar_year == 2023 & label != "Other") |> 
+  select(symbol, contains("ratio")) |> 
+  pivot_longer(-symbol) |> 
+  mutate(name = str_to_title(str_replace_all(name, "_", " "))) |> 
+  ggplot(aes(x = value, y = name, fill = symbol)) +
+  geom_col(position = "dodge") +
+  scale_x_continuous(labels = percent) + 
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Liquidity Ratios for Selected Stocks from the Dow Jones Industrial Average for 2023")
+fig_liquidity_ratios
+```
+
+## Leverage Ratios
+
+- Debt-to-Equity = Total Debt / Total Equity
+- Debt-to-Asset = Total Debt / Total Assets 	
+- Interest Coverage = EBIT / Interest Expense 	
+
+```{r}
+balance_sheets_statements <- balance_sheets_statements |> 
+  mutate(
+    debt_to_equity = total_debt / total_equity,
+    debt_to_asset = total_debt / total_assets
+  )
+
+income_statements <- income_statements |> 
+  mutate(
+    interest_coverage = operating_income / interest_expense,
+    label = if_else(symbol %in% selected_symbols, symbol, NA),
+  )
+```
+
+Debt-to-assets over time
+
+```{r}
+fig_debt_to_asset <- balance_sheets_statements |> 
+  filter(symbol %in% selected_symbols) |> 
+  ggplot(aes(x = calendar_year, y = debt_to_asset,
+             color = symbol)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(labels = percent) +
+  labs(x = NULL, y = NULL, color = NULL,
+       title = "Debt-to-Asset Ratio of selected Stocks Between 2020 and 2024") 
+fig_debt_to_asset
+```
+
+Debt-to-asset in the cross-section
+
+```{r}
+selected_colors <- c("#F21A00", "#EBCC2A", "#3B9AB2", "lightgrey")
+
+fig_debt_to_asset_cross_section <-  balance_sheets_statements |> 
+  filter(calendar_year == 2023) |> 
+  ggplot(aes(x = debt_to_asset,
+             y = fct_reorder(symbol, debt_to_asset),
+             fill = label)) +
+  geom_col() +
+  scale_x_continuous(labels = percent) +
+  scale_fill_manual(values = selected_colors) +
+  labs(x = NULL, y = NULL, color = NULL,
+       title = "Debt-to-Asset Ratio of Dow Jones Industrial Average Constituents in 2023") + 
+  theme(legend.position = "none")
+fig_debt_to_asset_cross_section
+```
+
+Debt-to-asset vs interest coverage
+ 
+```{r}
+fig_debt_to_asset_interest_coverage <- income_statements |> 
+  filter(calendar_year == "2023") |> 
+  select(symbol, interest_coverage, calendar_year) |> 
+  left_join(
+    balance_sheets_statements,
+    join_by(symbol, calendar_year)
+  ) |> 
+  ggplot(aes(x = debt_to_asset, y = interest_coverage, color = label)) +
+  geom_point(size = 2) +
+  geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
+  scale_color_manual(values = selected_colors) +
+  labs(
+    x = "Debt-to-Asset", y = "Interest Coverage",
+    title = "Debt-to-Asset Ratio vs Interest Coverage for Dow Jones Industrial Average Constituents"
+  ) +
+  theme(legend.position = "none")
+fig_debt_to_asset_interest_coverage
+```
+
+## Efficiency Ratios
+
+```{r}
+combined_statements <- balance_sheets_statements |> 
+  select(symbol, calendar_year, label, current_ratio, quick_ratio, cash_ratio,
+         debt_to_equity, debt_to_asset, total_assets, total_equity) |> 
+  left_join(
+    income_statements |> 
+      select(symbol, calendar_year, interest_coverage, revenue, cost_of_revenue,
+             selling_general_and_administrative_expenses, interest_expense,
+             gross_profit, net_income),
+    join_by(symbol, calendar_year)
+  ) |> 
+  left_join(
+    cash_flow_statements |> 
+      select(symbol, calendar_year, inventory, accounts_receivables),
+     join_by(symbol, calendar_year)
+  )
+
+combined_statements <- combined_statements |> 
+  mutate(
+    asset_turnover = revenue / total_assets,
+    inventory_turnover = cost_of_revenue / inventory,
+    receivables_turnover = revenue / accounts_receivables
+  )
+```
+
+## Profitability Ratios
+
+- Gross Margin = Gross Profit / Revenue
+- Profit Margin = Net Income / Revenue
+- After-Tax ROE = Net Income / Total Equity
+
+```{r}
+combined_statements <- combined_statements |> 
+  mutate(
+    gross_margin = gross_profit / revenue,
+    profit_margin = net_income / revenue,
+    after_tax_roe = net_income / total_equity
+  )
+```
+
+Gross margin over time
+
+```{r}
+fig_gross_margin <- combined_statements |> 
+  filter(symbol %in% selected_symbols) |> 
+  ggplot(aes(x = calendar_year, y = gross_margin, color = symbol)) +
+  geom_line() +
+  scale_y_continuous(labels = percent) + 
+  labs(x = NULL, y = NULL, color = NULL,
+       title = "Gross Margins for Selected Stocks Between 2019 and 2023")
+fig_gross_margin
+```
+
+Profit margin vs gross margin
+
+```{r}
+fig_gross_margin_profit_margin <- combined_statements |> 
+  filter(calendar_year == "2023") |> 
+  ggplot(aes(x = gross_margin, y = profit_margin, color = label)) +
+  geom_point(size = 2) +
+  geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) + 
+  scale_color_manual(values = selected_colors) + 
+  labs(
+    x = "Gross Margin", y = "Profit Margin",
+    title = "Gross Margin vs Profit Margin for Dow Jones Industrial Average Constituents for 2023"
+  )  +
+  theme(legend.position = "none")
+fig_gross_margin_profit_margin
+```
+
+## Combining Financial Ratios
+
+Ranking companies in different categories
+
+```{r}
+financial_ratios <- combined_statements |> 
+  filter(calendar_year == 2023) |> 
+  select(symbol, 
+         contains(c("ratio", "margin", "roe", "_to_", "turnover", "interest_coverage"))) |> 
+  pivot_longer(cols = -symbol) |> 
+  mutate(
+    type = case_when(
+      name %in% c("current_ratio", "quick_ratio", "cash_ratio") ~ "Liquidity Ratios",
+      name %in% c("debt_to_equity", "debt_to_asset", "interest_coverage") ~ "Leverage Ratios",
+      name %in% c("asset_turnover", "inventory_turnover", "receivables_turnover") ~ "Efficiency Ratios",
+      name %in% c("gross_margin", "profit_margin", "after_tax_roe") ~ "Profitability Ratios"
+    )
+  ) 
+
+fig_ranks <- financial_ratios |> 
+  group_by(type, name) |> 
+  arrange(desc(value)) |> 
+  mutate(rank = row_number()) |> 
+  group_by(symbol, type) |> 
+  summarize(rank = mean(rank), 
+            .groups = "drop") |> 
+  filter(symbol %in% selected_symbols) |> 
+  ggplot(aes(x = rank, y = type, color = symbol)) +
+  geom_point(shape = 17, size = 4) +
+  scale_color_manual(values = selected_colors) + 
+  labs(x = "Average rank", y = NULL, color = NULL,
+       title = "Average Rank Among Dow Jones Industrial Average for Selected Stocks") +
+  coord_cartesian(xlim = c(1, 30))
+fig_ranks
+```
+
+## Financial Ratios in Asset Pricing
+
+- Size = log(Market Cap)
+- Book-to-Market = Market Cap / Book Equity
+- Profitability = (Revenue - COGS - SGA - Interest Expense) / Book Equity
+- Investment: Total Assets / Lagged Total Assets - 1
+
+```{r}
+market_cap <- constituents |> 
+  map_df(
+    \(x) fmp_get(
+      resource = "historical-market-capitalization", x, list(from = "2023-12-29", to = "2023-12-29")
+    )
+  ) 
+
+combined_statements_ff <- combined_statements |> 
+  filter(calendar_year == 2023) |> 
+  left_join(market_cap, join_by(symbol)) |> 
+  left_join(
+    balance_sheets_statements |> 
+      filter(calendar_year == 2022) |> 
+      select(symbol, total_assets_lag = total_assets), 
+    join_by(symbol)
+  ) |> 
+  mutate(
+    size = log(market_cap),
+    book_to_market = market_cap / total_equity,
+    operating_profitability = (revenue - cost_of_revenue - selling_general_and_administrative_expenses - interest_expense) / total_equity,
+    investment = total_assets / total_assets_lag
+  )
+```
+
+```{r}
+fig_rank_ff <- combined_statements_ff |> 
+  select(symbol, Size = size, 
+         `Book-to-Market` = book_to_market, 
+         `Profitability` = operating_profitability,
+         Investment = investment) |> 
+  pivot_longer(-symbol) |> 
+  group_by(name) |> 
+  arrange(desc(value)) |> 
+  mutate(rank = row_number()) |> 
+  ungroup() |> 
+  filter(symbol %in% selected_symbols) |> 
+  ggplot(aes(x = rank, y = name, color = symbol)) +
+  geom_point(shape = 17, size = 4) +
+  scale_color_manual(values = selected_colors) + 
+  labs(
+    x = "Rank", y = NULL, color = NULL,
+    title = "Rank in Fama-French Variables for Selected Stocks from the Dow Jones Industrial Average"
+  ) +
+  coord_cartesian(xlim = c(1, 30))
+fig_rank_ff
+```
+
+## Key Takeaways
+
+- Financial statements provide **standardized, legally required insights** into a company’s financial position
+- Ratios allow **benchmarking** & **trend analysis** across liquidity, leverage, efficiency & profitability dimensions
+- `fmpapi` enables **easy access** to financial data for ratio calculations & peer comparisons
+
