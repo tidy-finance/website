@@ -32,6 +32,7 @@ scale_colour_continuous <- function(...) {
     ...
   )
 }
+
 scale_colour_discrete <- function(...) {
   discrete_scale("colour",
                  scale_name = "pal",
@@ -45,6 +46,7 @@ scale_fill_continuous <- function(...) {
     ...
   )
 }
+
 scale_fill_discrete <- function(...) {
   discrete_scale("fill",
                  scale_name = "pal",
