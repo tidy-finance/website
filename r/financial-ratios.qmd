@@ -3,6 +3,7 @@ title: Financial Ratios
 metadata:
   pagetitle: Financial Ratios with R
   description-meta: Learn how to use the programming language R to analyze companies using financial ratios.
+cache: true
 ---
 
 Financial statements are key source of information
@@ -21,6 +22,8 @@ Financial ratios help understand companies
 - Capital structure research & risk management
 
 ```{r}
+#| message: false
+#| warning: false
 library(tidyverse)
 library(tidyfinance)
 library(scales)
@@ -30,23 +33,25 @@ library(fmpapi)
 
 ## Balance Sheet Statements
 
-![](assets/img/balance-sheet.svg){style="display: block; margin: 0 auto;"}
+@fig-400 shows a stylized balance sheet
 
-Assets breakdown
+![A stylized representation of a balance sheet statement.](../assets/img/balance-sheet.svg){#fig-400 alt="A stylized representation of a balance sheet statement."}
+
+@fig-401 shows Assets breakdown
  
-![](assets/img/assets.svg){style="display: block; margin: 0 auto;"}
+![A stylized representation of a breakdown of assets on a balance sheet.](../assets/img/assets.svg){#fig-401 alt="A stylized representation of a breakdown of assets on a balance sheet."}
 
-Liabilities breakdown
+@fig-402 shows liabilities breakdown
 
-![](assets/img/liabilities.svg){style="display: block; margin: 0 auto;"} 
+![A stylized representation of a breakdown of liabilities on a balance sheet.](../assets/img/liabilities.svg){#fig-402 alt="A stylized representation of a breakdown of liabilities on a balance sheet."}
 
-Equity breakdown
+@fig-403 shows equity breakdown
 
-![](assets/img/equity.svg){style="display: block; margin: 0 auto;"}
+![A stylized representation of a breakdown of equity on a balance sheet.](../assets/img/equity.svg){#fig-403 alt="A stylized representation of a breakdown of equity on a balance sheet."}
 
-Example balance sheet from Microsoft in 2023
+@fig-404 shows an example balance sheet from Microsoft in 2023
 
-![](assets/img/balance-sheet-msft.png){style="display: block; margin: 0 auto;"}
+![A screenshot of the balance sheet statement of Microsoft in 2023.](../assets/img/balance-sheet-msft.png){#fig-404 alt="A screenshot of the balance sheet statement of Microsoft in 2023."}
 
 Use `fmpapi` package to download financial statements
 
@@ -57,6 +62,7 @@ Use `fmpapi` package to download financial statements
 - Install via `install.packages("fmpapi")`
 
 ```{r}
+#| cache: true 
 fmp_get(
   resource = "balance-sheet-statement", 
   symbol = "MSFT", 
@@ -66,11 +72,13 @@ fmp_get(
 
 ## Income Statements
 
-![](assets/img/income-statements.svg){style="display: block; margin: 0 auto;"}
+@fig-405 shows stylized income statements
 
-Example income statements of Microsoft 2023
+![A stylized representation of an income statement.](../assets/img/income-statements.svg){#fig-405 alt="A stylized representation of an income statement."}
 
-![](assets/img/income-statements-msft.png){style="display: block; margin: 0 auto;"}
+@fig-406 shows an example income statements of Microsoft 2023
+
+![A screenshot of the income statement of Microsoft in 2023.](../assets/img/income-statements-msft.png){#fig-406 alt="A screenshot of the income statement of Microsoft in 2023."}
 
 Download income statements data
 
@@ -85,11 +93,13 @@ fmp_get(
 
 ## Cash Flow Statements
 
-![](assets/img/cash-flow-statements.svg){style="display: block; margin: 0 auto;"}
+@fig-407 shows stylized cash flow statements
 
-Example cash flow statements of Microsoft 2023
+![A stylized representation of a cash flow statement.](../assets/img/cash-flow-statements.svg){#fig-407 alt="A stylized representation of a cash flow statement."}
 
-![](assets/img/cash-flow-statements-msft.png){style="display: block; margin: 0 auto;"}
+@fig-408 shows example cash flow statements of Microsoft 2023
+
+![A screenshot of the cash flow statement of Microsoft in 2023.](../assets/img/cash-flow-statements-msft.png){#fig-408 alt="A screenshot of the cash flow statement of Microsoft in 2023."}
 
 Download cash flow statements data
 
@@ -145,19 +155,24 @@ balance_sheets_statements <- balance_sheet_statements |>
   )
 ```
 
-Comparing liquidity ratios
+Comparing liquidity ratios @fig-409 shows
 
 ```{r}
+#| label: fig-409
+#| fig-cap: "Liquidity ratios are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Liquidity ratios for selected stocks for 2023. The figure shows a bar chart liquidity ratios on the vertical and corresponding values on the horizontal axis."
 fig_liquidity_ratios <- balance_sheets_statements |> 
-  filter(calendar_year == 2023 & label != "Other") |> 
+  filter(calendar_year == 2023 & !is.na(label)) |> 
   select(symbol, contains("ratio")) |> 
   pivot_longer(-symbol) |> 
   mutate(name = str_to_title(str_replace_all(name, "_", " "))) |> 
   ggplot(aes(x = value, y = name, fill = symbol)) +
   geom_col(position = "dodge") +
   scale_x_continuous(labels = percent) + 
-  labs(x = NULL, y = NULL, fill = NULL,
-       title = "Liquidity Ratios for Selected Stocks from the Dow Index for 2023")
+  labs(
+    x = NULL, y = NULL, fill = NULL,
+    title = "Liquidity ratios for selected stocks from the Dow index for 2023"
+  )
 fig_liquidity_ratios
 ```
 
@@ -181,9 +196,12 @@ income_statements <- income_statements |>
   )
 ```
 
-Debt-to-assets over time
+Debt-to-assets over time @fig-410 shows
 
 ```{r}
+#| label: fig-410
+#| fig-cap: "Debt-to-asset ratios are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Debt-to-asset ratios of selected stocks between 2020 and 2024. The figure shows a line chart with years on the horizontal axis and debt-to-asset ratios on the vertical axis."
 fig_debt_to_asset <- balance_sheets_statements |> 
   filter(symbol %in% selected_symbols) |> 
   ggplot(aes(x = calendar_year, y = debt_to_asset,
@@ -191,13 +209,16 @@ fig_debt_to_asset <- balance_sheets_statements |>
   geom_line(linewidth = 1) +
   scale_y_continuous(labels = percent) +
   labs(x = NULL, y = NULL, color = NULL,
-       title = "Debt-to-Asset Ratio of selected Stocks Between 2020 and 2024") 
+       title = "Debt-to-asset ratios of selected stocks between 2020 and 2024") 
 fig_debt_to_asset
 ```
 
-Debt-to-asset in the cross-section
+Debt-to-asset in the cross-section @fig-411 shows
 
 ```{r}
+#| label: fig-411
+#| fig-cap: "Debt-to-asset ratios are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Debt-to-asset ratios of Dow index constituents in 2023. The figure shows a bar chart with debt-to-asset ratios on the horizontal and corresponding symbols on the vertical axis."
 selected_colors <- c("#F21A00", "#EBCC2A", "#3B9AB2", "lightgrey")
 
 fig_debt_to_asset_cross_section <-  balance_sheets_statements |> 
@@ -209,16 +230,19 @@ fig_debt_to_asset_cross_section <-  balance_sheets_statements |>
   scale_x_continuous(labels = percent) +
   scale_fill_manual(values = selected_colors) +
   labs(x = NULL, y = NULL, color = NULL,
-       title = "Debt-to-Asset Ratio of Dow Index Constituents in 2023") + 
+       title = "Debt-to-asset ratios of Dow index constituents in 2023") + 
   theme(legend.position = "none")
 fig_debt_to_asset_cross_section
 ```
 
-Debt-to-asset vs interest coverage
+Debt-to-asset vs interest coverage @fig-412 shows
  
 ```{r}
+#| label: fig-412
+#| fig-cap: "Debt-to-asset ratios and interest coverages are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Debt-to-asset ratios and interest coverages for Dow index constituents. The figure shows a scatter plot with debt-to-asset on the horizontal and interest coverage on the vertical axis."
 fig_debt_to_asset_interest_coverage <- income_statements |> 
-  filter(calendar_year == "2023") |> 
+  filter(calendar_year == 2023) |> 
   select(symbol, interest_coverage, calendar_year) |> 
   left_join(
     balance_sheets_statements,
@@ -232,7 +256,7 @@ fig_debt_to_asset_interest_coverage <- income_statements |>
   scale_color_manual(values = selected_colors) +
   labs(
     x = "Debt-to-Asset", y = "Interest Coverage",
-    title = "Debt-to-Asset Ratio vs Interest Coverage for Index Constituents"
+    title = "Debt-to-asset ratios and interest coverages for Dow index constituents"
   ) +
   theme(legend.position = "none")
 fig_debt_to_asset_interest_coverage
@@ -280,24 +304,30 @@ combined_statements <- combined_statements |>
   )
 ```
 
-Gross margin over time
+Gross margin over time @fig-413 shows
 
 ```{r}
+#| label: fig-413
+#| fig-cap: "Gross margins are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Gross margins for selected stocks between 2019 and 2023. The figure shows a line chart with years on the horizontal axis and gross margins on the vertical axis."
 fig_gross_margin <- combined_statements |> 
   filter(symbol %in% selected_symbols) |> 
   ggplot(aes(x = calendar_year, y = gross_margin, color = symbol)) +
   geom_line() +
   scale_y_continuous(labels = percent) + 
   labs(x = NULL, y = NULL, color = NULL,
-       title = "Gross Margins for Selected Stocks Between 2019 and 2023")
+       title = "Gross margins for selected stocks between 2019 and 2023")
 fig_gross_margin
 ```
 
-Profit margin vs gross margin
+Profit margin vs gross margin @fig-414 shows
 
 ```{r}
+#| label: fig-414
+#| fig-cap: "Gross and profit margins are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Gross and profit margins for Dow index constituents for 2023. The figure shows a scatter plot with gross margins on the horizontal and profit margins on the vertical axis."
 fig_gross_margin_profit_margin <- combined_statements |> 
-  filter(calendar_year == "2023") |> 
+  filter(calendar_year == 2023) |> 
   ggplot(aes(x = gross_margin, y = profit_margin, color = label)) +
   geom_point(size = 2) +
   geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
@@ -305,8 +335,8 @@ fig_gross_margin_profit_margin <- combined_statements |>
   scale_y_continuous(labels = percent) + 
   scale_color_manual(values = selected_colors) + 
   labs(
-    x = "Gross Margin", y = "Profit Margin",
-    title = "Gross Margin vs Profit Margin for Dow Index Constituents for 2023"
+    x = "Gross margin", y = "Profit margin",
+    title = "Gross and profit margins for Dow index constituents for 2023"
   )  +
   theme(legend.position = "none")
 fig_gross_margin_profit_margin
@@ -316,7 +346,12 @@ fig_gross_margin_profit_margin
 
 Ranking companies in different categories
 
+@fig-415 shows
+
 ```{r}
+#| label: fig-415
+#| fig-cap: "Ranks are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Rank in financial ratio categories for selected stocks from the Dow index. The figure shows a scatter plot with ranks for selected stocks on the horizontal and categories of financial ratios on the vertical axis."
 financial_ratios <- combined_statements |> 
   filter(calendar_year == 2023) |> 
   select(symbol, 
@@ -343,7 +378,7 @@ fig_ranks <- financial_ratios |>
   geom_point(shape = 17, size = 4) +
   scale_color_manual(values = selected_colors) + 
   labs(x = "Average rank", y = NULL, color = NULL,
-       title = "Average Rank Among Dow Index Constituents for Selected Stocks") +
+       title = "Average rank among Dow index constituents for selected stocks") +
   coord_cartesian(xlim = c(1, 30))
 fig_ranks
 ```
@@ -359,7 +394,9 @@ fig_ranks
 market_cap <- constituents |> 
   map_df(
     \(x) fmp_get(
-      resource = "historical-market-capitalization", x, list(from = "2023-12-29", to = "2023-12-29")
+      resource = "historical-market-capitalization", 
+      x, 
+      list(from = "2023-12-29", to = "2023-12-29")
     )
   ) 
 
@@ -380,7 +417,12 @@ combined_statements_ff <- combined_statements |>
   )
 ```
 
+@fig-416 shows
+
 ```{r}
+#| label: fig-416
+#| fig-cap: "Ranks are based on financial statements and historical market capitalization as provided through the FMP API." 
+#| fig-alt: "Title: Rank in Fama-French variables for selected stocks from the Dow index. The figure shows a scatter plot with ranks for selected stocks on the horizontal and Fama-French variables on the vertical axis."
 fig_rank_ff <- combined_statements_ff |> 
   select(symbol, Size = size, 
          `Book-to-Market` = book_to_market, 
@@ -397,7 +439,7 @@ fig_rank_ff <- combined_statements_ff |>
   scale_color_manual(values = selected_colors) + 
   labs(
     x = "Rank", y = NULL, color = NULL,
-    title = "Rank in Fama-French Variables for Selected Stocks from the Dow Index"
+    title = "Rank in Fama-French variables for selected stocks from the Dow index"
   ) +
   coord_cartesian(xlim = c(1, 30))
 fig_rank_ff
@@ -405,7 +447,11 @@ fig_rank_ff
 
 ## Key Takeaways
 
-- Financial statements provide **standardized, legally required insights** into a company’s financial position
-- Ratios allow **benchmarking** & **trend analysis** across liquidity, leverage, efficiency & profitability dimensions
-- `fmpapi` enables **easy access** to financial data for ratio calculations & peer comparisons
+- Financial statements provide standardized, legally required insights into a company’s financial position
+- Ratios allow benchmarking & trend analysis across liquidity, leverage, efficiency & profitability dimensions
+- `fmpapi` enables easy access to financial data for ratio calculations & peer comparisons
+
+## Exercises
+
+1. ...
 

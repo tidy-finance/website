@@ -1,0 +1,399 @@
+---
+title: Discounted Cash Flow Analysis
+metadata:
+  pagetitle: DCF with R
+  description-meta: Learn how to use the programming language R to value companies using discounted cash flow analysis.
+---
+
+What is the value of a company?
+
+Company valuation helps determine the economic value of a business for purposes like investment, mergers, acquisitions or financial reporting
+
+Common valuation methods:
+
+-   Market-based: compare to similar companies (e.g., P/E multiples)
+-   Asset-based: focus on net asset value (e.g., book value)
+-   Income-based: value based on expected future earnings (e.g., DCF)
+
+Focus on discounted cash flow (DCF) analysis
+
+-   Accounts for the time value of money & company-specific factors
+-   Focuses on future cash flows, not just historical data
+-   Applicable across industries & company sizes
+-   Can also be used to value projects
+-   Foundation for long-term strategic decision making
+
+Key components of DCF
+
+Forecasted free cash flows
+
+-   Represents expected future earnings & their timing
+-   Includes adjustments for taxes, investments & working capital
+
+Continuation / terminal value
+
+-   Captures the value of the business beyond the explicit forecast period
+-   Common methods: perpetuity growth model & exit multiple approach
+
+Discount rate
+
+-   Reflects the riskiness of the cash flows & the required rate of return
+-   Typically uses the Weighted Average Cost of Capital (WACC)
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(tidyfinance)
+library(scales)
+library(fmpapi)
+```
+
+## Prepare Data
+
+- Import data using [Financial Modeling Prep (FMP) API](https://site.financialmodelingprep.com/developer/docs)
+- R package: [tidy-finance/r-fmpapi](https://github.com/tidy-finance/r-fmpapi)
+
+```{r}
+#| cache: true
+symbol <- "MSFT"
+
+income_statements <- fmp_get("income-statement", symbol, list(period = "annual", limit = 5))
+cash_flow_statements <- fmp_get("cash-flow-statement", symbol, list(period = "annual", limit = 5))
+```
+
+Free cash flow (FCF): Cash that a company generates after accounting for outflows to support operatings & maintain capital assets
+
+$$\text{FCF} = \text{EBIT} + \text{Depreciation & Amortization} - \text{Taxes} + \Delta \text{Working Capital} - \text{CAPEX}$$
+
+Alternative ways to define free cash flow: [investopedia.com](https://www.investopedia.com/terms/f/freecashflow.asp)
+
+Calculate FCF
+
+```{r}
+dcf_data <- income_statements |> 
+  mutate(
+    ebit = net_income + income_tax_expense - interest_expense - interest_income
+  ) |> 
+  select(
+    year = calendar_year, 
+    ebit, revenue, depreciation_and_amortization, taxes = income_tax_expense
+  ) |> 
+  left_join(
+    cash_flow_statements |> 
+      select(year = calendar_year, 
+             delta_working_capital = change_in_working_capital,
+             capex = capital_expenditure), join_by(year)
+  ) |> 
+  mutate(
+    fcf = ebit + depreciation_and_amortization - taxes + delta_working_capital - capex
+  ) |> 
+  arrange(year) 
+```
+
+## Forecast Free-Cash-Flow
+
+Typical financial analyst approach:
+
+-   Balance data-driven analysis with informed judgement to forecast FCF
+-   Express components of FCF as financial ratios relative to revenue
+-   Make subjective guess for future dynamics of ratios based on company analysis
+-   Forecast revenue growth (e.g., based on macroeconomic outlooks)
+
+```{r}
+#| label: fig-500
+#| fig-cap: "Ratios are based on financial statements as provided through the FMP API." 
+#| fig-alt: "Title: Key financial ratios of Microsoft between 2020 and 2024. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
+dcf_data <- dcf_data |> 
+  mutate(
+    revenue_growth = revenue / lag(revenue) - 1,
+    operating_margin = ebit / revenue,
+    da_margin = depreciation_and_amortization / revenue,
+    taxes_to_revenue = taxes / revenue,
+    delta_working_capital_to_revenue =  delta_working_capital / revenue,
+    capex_to_revenue = capex / revenue
+  )
+
+fig_financial_ratios <- dcf_data |> 
+  pivot_longer(cols = c(operating_margin:capex_to_revenue)) |>
+  ggplot(aes(x = year, y = value, color = name)) +
+  geom_line() +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = NULL, y = NULL, color = NULL,
+    title = "Key financial ratios of Microsoft between 2020 and 2024"
+  )
+fig_financial_ratios
+```
+
+Define ratio dynamics @fig-501
+
+```{r}
+#| label: fig-501
+#| fig-cap: "Realized ratios are based on financial statements as provided through the FMP API, while forecasts are manually defined." 
+#| fig-alt: "Title: Key financial ratios and ad-hoc forecasts of Microsoft between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and financial ratios and their forecasts on the vertical axis."
+dcf_data_forecast_ratios <- tribble(
+  ~year, ~operating_margin, ~da_margin, ~taxes_to_revenue, ~delta_working_capital_to_revenue, ~capex_to_revenue,
+  2025, 0.41, 0.09, 0.08, 0.001, -0.2,
+  2026, 0.42, 0.09, 0.07, 0.001, -0.22,
+  2027, 0.43, 0.09, 0.06, 0.001, -0.2,
+  2028, 0.44, 0.09, 0.06, 0.001, -0.18,
+  2029, 0.45, 0.09, 0.06, 0.001, -0.16
+) |> 
+  mutate(type = "Forecast")
+
+dcf_data <- dcf_data |> 
+  mutate(type = "Realized") |> 
+  bind_rows(dcf_data_forecast_ratios)
+
+fig_financial_ratios_forecast <- dcf_data |> 
+  pivot_longer(cols = c(operating_margin:capex_to_revenue)) |> 
+  ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
+  geom_line() +
+    scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Key financial ratios and ad-hoc forecasts of Microsoft between 2020 and 2029"
+  )
+fig_financial_ratios_forecast
+```
+
+## Forecast Revenue Growth
+
+-   Get current [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) data for US
+-   IMF publishes analyses of global economy, including trends & forecasts
+-   Last forecast update: October 2024
+-   Simple approach: model revenue growth as a linear function of GDP growth
+
+Alternative: look up consensus analyst forecasts (typically proprietary)
+
+Create forecasts using IMF WEO
+
+```{r}
+gdp_growth <- tibble(
+  year = 2020:2029,
+  gdp_growth = c(-0.02163, 0.06055,	0.02512, 0.02887, 0.02765, 0.02153, 0.02028, 0.02120, 0.02122, 0.02122)
+)
+
+dcf_data <- dcf_data |> 
+  left_join(gdp_growth, join_by(year)) 
+
+revenue_growth_model <- dcf_data |> 
+  lm(revenue_growth ~ gdp_growth, data = _) |> 
+  coefficients()
+ 
+dcf_data <- dcf_data |> 
+  mutate(
+    revenue_growth_modeled = revenue_growth_model[1] + revenue_growth_model[2] * gdp_growth,
+    revenue_growth = if_else(type == "Forecast", revenue_growth_modeled, revenue_growth)  
+  ) 
+```
+
+
+```{r}
+#| label: fig-502
+#| fig-cap: "Realized revue growth rates are based on financial statements as provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
+#| fig-alt: "Title: GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and gdp growth, revenue growth and their forecasts on the vertical axis."
+fig_growth <- dcf_data |> 
+  filter(year >= 2021) |> 
+  pivot_longer(cols = c(revenue_growth, gdp_growth)) |> 
+  ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
+  geom_line() +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029"
+  )
+fig_growth
+```
+
+## Calculate FCF Forecasts
+
+```{r}
+dcf_data$revenue_growth[1] <- 0
+dcf_data$revenue <- dcf_data$revenue[1] * cumprod(1 + dcf_data$revenue_growth)
+
+dcf_data <- dcf_data |> 
+  mutate(
+    ebit = operating_margin * revenue,
+    depreciation_and_amortization = da_margin * revenue,
+    taxes = taxes_to_revenue * revenue,
+    delta_working_capital = delta_working_capital_to_revenue * revenue,
+    capex = capex_to_revenue * revenue,
+    fcf = ebit + depreciation_and_amortization - taxes + delta_working_capital - capex
+  )
+```
+
+Visualize FCF
+
+```{r}
+#| label: fig-503
+#| fig-cap: "Realized growth rates are based on financial statements as provided through the FMP API, while forecasts are manually defined." 
+#| fig-alt: "Title: GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and gdp growth, revenue growth and their forecasts on the vertical axis."
+fig_fcf <- dcf_data |>
+  ggplot(aes(x = year, y = fcf / 1e9)) +
+  geom_col(aes(fill = type)) +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(labels = comma) + 
+  labs(
+    x = NULL, y = "Free Cash Flow (in B USD)", fill = NULL,
+    title = "Actual and predicted free cash flow for Microsoft from 2020 to 2029"
+  )
+fig_fcf
+```
+
+## Continuation Value
+
+Perpetuity growth model: cash flows grow at a constant rate indefinitely
+
+$$TV_{T} = \frac{{FCF_{T+1}}}{{r - g}}$$
+
+-   $r$ is the discount rate
+-   $g$ is the perpetual growth rate
+
+Alternative: estimate continuation value based on multiple of EBITDA ([exit multiple approach](https://corporatefinanceinstitute.com/resources/valuation/exit-multiple/))
+
+Continuation value with perpetuity growth
+
+```{r}
+compute_terminal_value <- function(last_fcf, growth_rate, discount_rate){
+  last_fcf * (1 + growth_rate) / (discount_rate - growth_rate)
+}
+
+last_fcf <- tail(dcf_data$fcf, 1)
+terminal_value <- compute_terminal_value(last_fcf, 0.04, 0.08)
+terminal_value / 1e9
+```
+
+## Discount Rates
+
+WACC represents the average rate of return required by all investors (equity & debt holders)
+
+$$WACC = \frac{E}{D+E} \cdot r^E + \frac{D}{D+E} \cdot r^D \cdot (1 - \tau)$$
+
+-   $E$ is equity with return $r^E$
+-   $D$ is debt with pre-tax return $r^D$
+-   $\tau$ is the tax rate
+
+f you want to estimate WACC yourself
+
+- E is often measured by subtracting net debt from enterprise value
+- D is often measured by book value
+- $r^E$ estimated via [CAPM](https://talks.tidy-finance.org/#r-consortium-webinar-evaluate-performance-using-the-capital-asset-pricing-model)
+- $r^D$ estimatation via:
+    - Calculate [effective interest](https://finbox.com/NASDAQGS:MSFT/explorer/interest_rate_effective/) (interest expense / total debt)
+    - Get bond spreads for rating group of company (best rating for Microsoft)
+
+Download WACC for Computer Services
+
+Useful data source: [Aswath Damodaran](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html)
+
+-   Extensive database with estimated discount rates, cash flows, growth rates, multiples, etc. for regions & industries
+
+```{r}
+#| cache: true
+library(readxl)
+
+file <- tempfile(fileext = "xls")
+
+url <- "https://pages.stern.nyu.edu/~adamodar/pc/datasets/wacc.xls"
+download.file(url, file)
+wacc_raw <- read_xls(file, sheet = 2, skip = 18)
+unlink(file)
+
+wacc <- wacc_raw |> 
+  filter(`Industry Name` == "Computer Services") |> 
+  pull(`Cost of Capital`)
+```
+
+## Compute DCF Value
+
+$$
+\text{Total DCF Value} = \sum_{t=1}^{\text{T}} \frac{\text{FCF}_t}{(1 + \text{WACC})^t} + \frac{\text{TV}_{T}}{(1 + \text{WACC})^{\text{T}}}
+$$
+
+
+```{r}
+forecasted_years <- 5
+
+compute_dcf <- function(wacc, growth_rate, years = 5) {
+  free_cash_flow <- dcf_data$fcf
+  last_fcf <- tail(free_cash_flow, 1)
+  terminal_value <- compute_terminal_value(last_fcf, growth_rate, wacc)
+  
+  present_value_fcf <- free_cash_flow / (1 + wacc)^(1:years)
+  present_value_tv <- terminal_value / (1 + wacc)^years
+  total_dcf_value <- sum(present_value_fcf) + present_value_tv
+  total_dcf_value
+}
+
+compute_dcf(wacc, 0.03) / 1e9
+```
+
+## Sensitvity Analysis
+
+DCF is full of assumptions:
+
+- Forecast ratios
+- Short-term revenue growth forecasts
+- Perpetual growth rate
+- WACC estimation
+
+Check how sensitive valuations are due to different assumptions
+
+WACC & growth scenarios
+
+```{r}
+#| label: fig-504
+#| fig-cap: "DCF value combines data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts." 
+#| fig-alt: "Title: DCF value of Microsoft for different WACC and growth scenarios. The figure shows a tile chart different values of WACC on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions."
+wacc_range <- seq(0.06, 0.08, by = 0.01)
+growth_rate_range <- seq(0.02, 0.04, by = 0.01)
+
+sensitivity <- expand_grid(
+  wacc = wacc_range,
+  growth_rate = growth_rate_range
+) |>
+  mutate(value = pmap_dbl(list(wacc, growth_rate), compute_dcf))
+
+fig_sensitivity <- sensitivity |> 
+  mutate(value = round(value / 1e9, 0)) |> 
+  ggplot(aes(x = wacc, y = growth_rate, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = comma(value)), color = "white") +
+  scale_x_continuous(labels = percent) + 
+  scale_y_continuous(labels = percent) +
+  scale_fill_continuous(labels = comma) + 
+  labs(
+    title = "DCF value of Microsoft for different WACC and growth scenarios",
+    x = "WACC",
+    y = "Perpetual growth rate",
+    fill = "Company value"
+  ) + 
+  guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
+fig_sensitivity
+```
+
+## From DCF to Equity Value
+
+DCF model provides an estimate for value of operations
+
+$$\text{Equity Value} = \text{DCF Value} + \text{Non-Operating Assets} - \text{Value of Debt}$$
+
+- Non-Operating Assets: not essential to operations, but generate income (e.g., marketable securities, vacant land, idle equipment)
+- Value of Debt: in theory market value of total debt, in practice book debt
+
+## Key takeaways
+
+- DCF delivers a structured approach for informed decisions
+- DCF values companies or projects based on projected cash flows
+- Core elements: free cash flow, continuation value, WACC
+- Validate assumptions: financial rations, revenue growth, WACC matter
+
+## Exercises
+
+1. ...
+
