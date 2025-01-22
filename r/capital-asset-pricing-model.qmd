@@ -5,22 +5,9 @@ metadata:
   description-meta: Learn how to use the programming language R for estimating the CAPM for asset evaluation.
 ---
 
-Key questions: 
+The Capital Asset Pricing Model (CAPM) is one of the most influential theories in finance and builds on the foundation laid by [Modern Portfolio Theory](modern-portfolio-theory.qmd) (MPT). It was simultaneously developed by @Sharpe1964, @Lintner1965, and @Mossin1966. While MPT shows how to construct optimal portfolios, the CAPM extends this framework to explain how assets should be priced in equilibrium when all investors follow MPT principles. The CAPM is the simplest model that aims to explain equilibrium asset prices and hence the cornerstone for a myriad of extensions. It is also used in industry applications, in particular for performance evaluation, as it provides a simple measure for market risk of an asset or portfolio. This chapter shows how to implementm the CAPM. We download stock market data, estimate betas using regression analysis, and evaluate asset performance.
 
-- What is the expected return of an asset?
-- Which portfolios should investors hold?
-
-CAPM is an **equilibrium model**
-
-- Extends MPT by including **systematic risk**
-- Adds simplifying assumptions to model **rational investors**
-- Developed by: [Sharpe (1964)](https://onlinelibrary.wiley.com/doi/10.1111/j.1540-6261.1964.tb02865.x), [Lintner (1965)](https://www.jstor.org/stable/1924119?origin=crossref) & [Mossin (1966)](https://www.jstor.org/stable/1910098?origin=crossref)
-
-The CAPM in a nutshell: investors demand a **compensation for risk**
-
-- Expected Return = Risk-Free Rate + Compensation for Market Risk
-- **Risk-Free Rate**: return on an investment without risk
-- **Market Risk**: how much asset returns co-move with the overall market
+We use the following packages throughout this chapter:
 
 
 ```{r}
@@ -34,6 +21,8 @@ library(ggrepel)
 
 ## Asset Returns & Volatilities
 
+Building on our analysis from the previous chapter on [Modern Portfolio Theory](modern-portfolio-theory.qmd), we again examine the Dow Jones Industrial Average constituents. However, our focus shifts from portfolio optimization to understanding how these assets are priced in equilibrium. Let's start by downloading and preparing our daily return data:
+
 ```{r}
 #| output: false
 symbols <- download_data(
@@ -46,11 +35,7 @@ prices_daily <- download_data(
     start_date = "2019-10-01", end_date = "2024-09-30"
 ) |> 
   select(symbol, date,  price = adjusted_close)
-```
 
-Calculate *daily* returns
-
-```{r}
 returns_daily <- prices_daily |>
   group_by(symbol) |> 
   mutate(ret = price / lag(price) - 1) |>
@@ -60,7 +45,7 @@ returns_daily <- prices_daily |>
   arrange(symbol, date)
 ```
 
-Plot risk & return @fig-300
+The relationship between risk and return is central to the CAPM. Figure @fig-300 plots average returns against volatilities for our sample of stocks, highlighting two particularly interesting cases: Boeing (BA) and Nvidia (NVDA). This visualization raises an important question: why don't we observe a clear positive relationship between risk and return?
 
 ```{r}
 #| label: fig-300
@@ -82,60 +67,45 @@ fig_vola_return <- assets |>
 fig_vola_return
 ```
 
-Does high risk bring high returns?
+This apparent puzzle - that higher volatility doesn't necessarily lead to higher returns - motivates one of CAPM's key insights: not all risks are rewarded in equilibrium. To understand this, we need to distinguish between systematic and idiosyncratic risk.
 
-Boeing (BA) vs Nvidia (NVDA)
-
-- Company-specific events might affect stock prices
-- Examples: CEO resignation, product launch, earnings report
-- Idiosyncratic events don't impact the overall market
-- This asset-specific risk can be eliminated through diversification
-
-Focus on **systematic risk** that affects all assets in the market
-
-Systematic vs idiosyncratic risk: Investors **dislike risk**
-
-Different sources of risk
-
-- **Systematic risk**: all assets are exposed to it, cannot be diversified away
-- **Idiosyncratic risk**: unique to particular asset, can be diversified away
+Company-specific events might affect individual stock prices, e.g., CEO resignations, product launches, earnings reports. These idiosyncratic events don't necessarily impact the overall market and this asset-specific risk can be eliminated through diversification. Therefore, we call this risk idiosyncratic. Systematic risk, on the other hand, affects all assets in the market at the same time and investors really dislike it because it cannot be diversified aways. 
 
 ## Portfolio Return & Variance
 
-$\text{Expected Portfolio Return} = \omega'\mu$
+While we covered portfolio mathematics in detail in the previous chapter, CAPM introduces a crucial new element: the risk-free asset. This addition fundamentally changes the investment opportunity set and leads to powerful conclusions about optimal portfolio choice.
 
-  -	$\omega$: vector of asset weights
-  - $\mu$: vector of expected return of assets
+To recap, we use the notion of expected portfolio return:
 
-$\text{Portfolio Variance} = \omega' \Sigma \omega$
+$$\text{Expected Portfolio Return} = \omega'\mu,$$
 
-  - $\Sigma$: variance-covariance matrix
+where $\omega$ is the vector of asset weights and $\mu$ is vector of expected return of assets. 
 
-Introducing the risk-free asset: Allocate capital between risk-free asset & risky portfolio
+Portfolio variance is given by:
 
-$$\mu_c = c \omega'\mu + (1-c)r_f$$
+$$\text{Portfolio Variance} = \omega' \Sigma \omega$$
+where $\Sigma$ is the variance-covariance matrix.
 
-- $\mu_{c}$: combined portfolio return
-- $r_f$: return of risk-free asset (e.g. government bond)
-- $c$ fraction of capital in risky portfolio
+The introduction of a risk-free asset transforms the investment problem. Instead of choosing only between risky assets, investors can now combine a risky portfolio with risk-free lending or borrowing. Let  $r_f$ be the return of the risk-free asset (e.g., a short-term government bond), then we can describe the combined portfolio return
 
-Risk-free asset has 0 volatility.
+$$\mu_c = c \omega'\mu + (1-c)r_f,$$
+where $c$ is the fraction of capital in the risky portfolio. 
 
-- Portfolio risk $\sigma_c$ is measured by volatility of risky asset
-- $\sigma_c= c\sqrt{\omega' \Sigma \omega}$ $\Rightarrow$ $c = \frac{\sigma_c}{\sqrt{\omega' \Sigma \omega}}$
+By assumption, the risk-free asset has zero volatility. The risk of the combined portfolio is thus only measured by the volatility of the risk assets:
 
-Allows us to derive a **Capital Allocation Line** (CAL) 
+$$\sigma_c= c\sqrt{\omega' \Sigma \omega}$ $\Rightarrow$ $c = \frac{\sigma_c}{\sqrt{\omega' \Sigma \omega}}$$
+
+This equation allows us to derive a **Capital Allocation Line** (CAL): 
 
 $$\mu_c = r_f +\sigma_c \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
 
-Slope of CAL is called **Sharpe ratio**
+Importantly, the slope of CAL is called **Sharpe ratio**:
 
 $$\text{Sharpe ratio} = \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
 
-- Measures **excess return per unit of risk**
-- Higher ratio indicates more attractive **risk-adjusted return**
+The Sharpre ratio measures the *excess return per unit of risk*. A higher ratio hence indicates a more attractive *risk-adjusted return*. 
 
-Calculate the risk-free rate: 13-week T-bill rate (^IRX) is quoted in annualized percentage yields. Convert annualized to daily rates (252 trading days). Note: this approach has a 99% correlation with Fama-French risk free rate.
+Let's illustrate the Sharpe ratios and CALs using a few example portfolios. To construct combined portfolios, we need a measure for the risk-free rate. One way to calculate risk-free rates is to use the 13-week T-bill rate (with symbol ^IRX). Since the prices are quoted in annualized percentage yields, we have to divide them by 100 and convert them to daily rates using 252 trading days.^[Note that the resulting returns have a 99% correlation with Fama-French risk free rate.] 
 
 ```{r}
 risk_free_daily <- download_data(
@@ -149,7 +119,7 @@ risk_free_daily <- download_data(
   drop_na()
 ```
 
-Create example portfolios
+We also prepare the vector of expected returns and calculate the variance-covariance matrix. 
 
 ```{r}
 mu <- assets$mu
@@ -159,7 +129,8 @@ sigma <- returns_daily |>
   cov()
 ```
 
-Portfolio with equal weights
+As a first example portfolio, we construct a portfolio of equal weights across the risky-assets. 
+
 ```{r}
 number_of_assets <- nrow(assets)
 omega_ew <- rep(1 / number_of_assets, number_of_assets)
@@ -171,7 +142,8 @@ summary_ew <- tibble(
 )
 ```
 
-Portfolio with random weights
+As another example, we construct a portfolio using random weights in the risky-assets. 
+
 ```{r}
 set.seed(1234)
 omega_random <- runif(number_of_assets, -1, 1)
@@ -184,24 +156,24 @@ summary_random <- tibble(
 )
 ```
 
-Risk-free asset 
+The last porfolio is invested only in the risk-free asset. 
+
 ```{r}
 summary_risk_free <- tibble(
   mu =  mean(risk_free_daily$risk_free),
   sigma = 0,
   type = "Risk-Free Asset"
 )
-
-summaries <- bind_rows(assets, summary_ew, summary_random, summary_risk_free)
 ```
 
-
-Plot CALs. First introduce helper function to calculate Sharpe Ratio. 
+By combining this risk-free portfolio with the other two risky portfolios, we can draw CALs. To facilitate the computation, we introduce a helper function that calculates the slope of the CALs - the Sharpe ratios. 
 
 ```{r}
 calculate_sharpe_ratio <- function(mu, sigma, risk_free) {
   as.numeric(mu - risk_free) / sigma 
 }
+
+summaries <- bind_rows(assets, summary_ew, summary_random, summary_risk_free)
 
 summaries <- summaries |> 
   mutate(
@@ -214,7 +186,7 @@ summaries <- summaries |>
   )
 ```
 
-See @fig-301
+@fig-301 now plots the CALs that connect the risk-free asset to the equal-weighted and randomly-weighted portfolio, respectively. We can see that the CALs look very similar although both portfolios have different risk-return profiles. 
 
 ```{r}
 #| label: fig-301
@@ -240,20 +212,17 @@ fig_cal
 
 ## The Tangency Portfolio
 
-The portfolio that **maximizes Sharpe ratio**
+So far we have only chosen arbitrary portfolios. Now, we want to look for an optimal portfolio. In particular, we look for the portfolio that maximizes the Sharpe ratio;
 
-$$\max_w \frac{\omega' \mu - r_f}{\sqrt{\omega' \Sigma \omega}}$$
+$$\max_w \frac{\omega' \mu - r_f}{\sqrt{\omega' \Sigma \omega}},$$
 while staying **fully invested**
 
-$$ \omega'\iota = 1$$
+$$ \omega'\iota = 1.$$
 
-is called the **tangency portfolio**
-
-Calculate the tangency portfolio
-
-**Analytic solution** for tangency portfolio (see [here](https://bookdown.org/compfinezbook/introcompfinr/Efficient-portfolios-of.html#computing-the-tangency-portfolio-using-matrix-algebra))
+The resulting optimal portfolio is called the *tangency portfolio* (and you see in a minute why). We can calculate the tangengy portfolio using the following **analytic solution** ^[See [this online resource](https://bookdown.org/compfinezbook/introcompfinr/Efficient-portfolios-of.html#computing-the-tangency-portfolio-using-matrix-algebra)) provided by @Zivot2026 for details on the derivation.]
 
 $$\omega_{tan}=\frac{\Sigma^{-1}(\mu-r_f)}{\iota'\Sigma^{-1}(\mu-r_f)}$$
+The next code chunk implements the analytic solution.
 
 ```{r}
 omega_tangency <- solve(sigma) %*% (mu - summary_risk_free$mu)
@@ -270,17 +239,11 @@ summary_tangency <- tibble(
 
 ## The Capital Market Line 
 
-Combination of risk-free asset & the tangency portfolio $\omega_{tan}$
+Now that we have the tangency portfolio, we want to derive the CAL by combining it with the risk-free asset. This combination is called the *Capital Market Line* (CML):
 
 $$\mu_{c} = r_f +\sigma_c \frac{\omega_{tan}'\mu-r_f}{\sqrt{\omega_{tan}' \Sigma \omega_{tan}}}$$
 
-is called the **Capital Market Line** (CML)
-
-<br>
-
-CML describes **best risk-return trade-off** for portfolios that contain risk-free asset & tangency portfolio
-
-Plot the CML
+The CML describes *best risk-return trade-off* for portfolios that contain the risk-free asset and the tangency portfolio. We can plot the CML by recycling the code from above:
 
 ```{r}
 #| label: fig-302
@@ -304,24 +267,26 @@ fig_cml <- summaries |>
 fig_cml
 ```
 
-Portfolios vs individual assets. In the CAPM model:
+## Individual Assets and the Market Portfolio
 
-- Investors prefer to hold any portfolio on the CML over individual assets or any other portfolio
-- All rational investors hold the tangency portfolio
-- Return of an individual asset can be compared to efficient tangency weight
-- Risk of an asset is proportional to covariance with tangency portfolio weight
+While our previous analysis focused on portfolios, the CAPM's real power lies in explaining the pricing of individual assets. The model provides two key insights:
 
-Expected excess returns vs tangency weights. **Expected excess return of asset** $i$ is
+1. All rational investors prefer portfolios on the CML to individual assets or any other portfolios.
+1. The tangency portfolio serves as the optimal risky portfolio for all investors.
 
-$$\mu_i - r_f = \beta_i \cdot (\omega_{tan}'\mu - r_f)$$
+This leads to a powerful conclusion: in equilibrium, all investors hold some combination of the risk-free asset and the tangency portfolio, regardless of their risk preferences. Their only choice is how much to allocate to each.
+
+Let's examine how individual assets relate to this optimal portfolio. We can calculate each asset $i$'s expected excess return (return above the risk-free rate) and compare it to its relationship with the tangency portfolio:
+
+$$\mu_i - r_f = \beta_i \cdot (\omega_{tan}'\mu - r_f),$$
 
 where
 
 $$\beta_i = \frac{\text{Cov}(r_i, \omega_{tan}r)}{\omega_{tan}' \Sigma \omega_{tan}}$$
 
-is called the **asset beta**
+is called the **asset beta**. The mathematics of CAPM thus shows that an asset's expected excess return must be proportional to its risk contribution to the tangency portfolio.
 
-Calculate excess returns
+We can calculate these excess returns as follows:
 
 ```{r}
 tangency_weights <- tibble(
@@ -342,7 +307,7 @@ returns_excess_daily <- returns_daily |>
   select(symbol, date, ret_excess, mkt_excess)
 ```
 
-Estimate Asset Betas
+For beta estimation, we employ regression analysis through a custom function. The `estimate_beta()` function runs a regression without an intercept (note the -1 in the formula) to directly capture the relationship between asset excess returns and market excess returns. We leverage `tidyverse`'s nested dataframes to efficiently run these regressions for all assets simultaneously. The `map_dbl()` function applies our regression to each nested dataset and extracts the beta coefficient, giving us a clean data frame of assets and their corresponding betas.
 
 ```{r}
 estimate_beta <- function(data) {
@@ -355,7 +320,7 @@ beta_results <- returns_excess_daily |>
   mutate(beta = map_dbl(data, estimate_beta))
 ```
 
-Plot asset betas
+Figure @fig-303 presents these estimated betas. By ordering assets according to their beta values, we create a clear ranking of market sensitivity across our sample of stocks. This visualization makes it easy to identify which stocks are more defensive (beta < 1) versus aggressive (beta > 1) in their relationship with market movements.
 
 ```{r}
 #| label: fig-303
@@ -371,7 +336,7 @@ fig_betas <- beta_results |>
 fig_betas
 ```
 
-Asset returns vs systematic risk: the assets all fall onto the 45 degree line, as they should according to CAPM @fig-304
+Figure @fig-304 brings together theory and empirics by plotting the SML. We first calculate excess returns for the assets and combine this with our beta estimates. The plot includes a 45-degree line representing the theoretical CAPM relationship, where an asset's excess return should exactly equal its beta times the market excess return. By overlaying the actual data points and highlighting specific stocks (BA and NVDA), we can visually assess how well CAPM explains the cross-section of returns in our sample. This plot effectively demonstrates both the strengths and potential limitations of CAPM as an asset pricing model.
 
 ```{r}
 #| label: fig-304
@@ -398,57 +363,42 @@ fig_betas_returns
 
 ## CAPM in Practice
 
-How to estimate betas in practice?
+While our previous analysis used the tangency portfolio to derive CAPM's key insights, implementing this approach in practice presents several challenges. Computing the tangency portfolio requires estimating expected returns and the variance-covariance matrix for potentially thousands of assets. This raises difficult questions: Which assets should we include in our universe? How can we reliably estimate these parameters, especially when the number of assets is large?
 
-Calculating the **tangency portfolio** can be **cumbersome**
+Fortunately, the CAPM provides an elegant solution. The model implies that in equilibrium, the market portfolio must equal the tangency portfolio. This theoretical insight leads to a practical simplification: instead of calculating complex tangency portfolio weights, we can use market capitalization-weighted portfolios as our benchmark. This approach aligns with the theoretical framework while being much simpler to implement.
 
-- What is the correct asset universe?
-- How to estimate $\mu$ and $\Sigma$ for many assets?
+It's worth noting that this simplification relies on several key assumptions underlying the CAPM:
 
-In the CAPM: **market portfolio = tangency portfolio**
+- The model describes equilibrium in a single-period economy.
+- Markets are frictionless, with no transaction costs or taxes.
+- All investors can borrow and lend at the risk-free rate.
+- Investors share the same expectations about returns and risks.
+- Investors are rational, seeking to maximize returns for a given level of risk.
 
-- Skip calculation of tangency portfolio weights
-- Use portfolios weighted by market capitalization 
+Despite these stringent assumptions (or rather because of them), the CAPM has become a cornerstone of modern finance. Its simplicity makes it an excellent foundation for more sophisticated models and a useful starting point for practical applications.
 
-Key assumptions behind CAPM:
+The model's practical implementation centers on SML. An asset's expected return is given by:
 
-- Equilibrium model in a single-period economy
--	No transaction costs or taxes
--	Risk-free borrowing and lending are available to all investors
--	Investors share homogeneous expectations
--	Investors maximize returns for limited level of risk
+$$\mu_i =  r_f + \beta_i \cdot (\mu_m - r_f),$$
 
-CAPM is a **foundation for other models** because of its simplicity
+where beta measures the asset's systematic risk:
 
-The Security Market Line (SML). **Expected return of asset** $i$ is
+$$\beta_i = \frac{\sigma_{im}}{\sigma_m^2}.$$
 
-$$\mu_i =  r_f + \beta_i \cdot (\mu_m - r_f)$$
+Here, $\mu_m$ represents the expected market return, $\sigma_{im}$ is the covariance between the asset and market returns, and $\sigma_m^2$ is the market variance. This formulation is particularly useful for performance evaluation.
 
-where
-
-$$\beta_i = \frac{\sigma_{im}}{\sigma_m^2}$$
-
-- $\mu_m$: expected market returns
-- $\sigma_{im}$: covariance of asset $i$ with market
-- $\sigma_m$: market volatility
-
-Evaluate asset performance with the SML: **Alpha** is difference between actual excess return & expected return
+To assess an asset's performance, we introduce alpha ($\alpha_i$), which measures the difference between actual and expected returns:
 
 $$\mu_i - r_f = \alpha_i + \beta_i \cdot (\mu_m - r_f)$$
 
-Alpha is **performance adjusted for market risk**
+Alpha provides a risk-adjusted performance measure. A positive alpha indicates that the asset outperformed its risk-adjusted benchmark, while a negative alpha suggests underperformance. This makes alpha a valuable tool for investment managers and analysts.
 
-- **Positive alpha**: outperformance relative to market
-- **Negative alpha**: underperformance relative to market
+In practice, we estimate both alpha and beta using regression analysis. The empirical model is:
 
-Estimate Asset Alphas & Beta. Regression model:
+$$r_{i,t}  - r_{f,t}  = \hat{\alpha}_i + \hat{\beta}_i \cdot (r_{m,t} - r_{f,t} ) + \varepsilon_{i,t}, $$
+where $r_{i,t}$ and $r_{m,t}$ are the realized returns of the asset and market portfolio on day $t$, respectively. The error term $\varepsilon_{i,t}$ captures the asset's idiosyncratic risk – the portion of returns unexplained by market movements.
 
-$$r_{i,t}  - r_{f,t}  = \hat{\alpha}_i + \hat{\beta}_i \cdot (r_{m,t} - r_{f,t} ) + \hat{\varepsilon}_{i,t} $$
-
-- $r_{i,t}$: actual returns of asset $i$ on day $t$
-- $r_{m,t}$: actual market returns on day $t$
-
-Download excess market returns
+Let's turn to estimating CAPM parameters using real market data. Instead of using our previously constructed tangency portfolio, we employ the Fama-French market returns, which provide a widely-accepted proxy for the market portfolio. These returns are already adjusted to represent excess returns over the risk-free rate, simplifying our analysis.
 
 ```{r}
 factors <- download_data(
@@ -458,7 +408,7 @@ factors <- download_data(
   select(date, mkt_excess, risk_free)
 ```
 
-Estimate alphas & betas
+For our regression analysis, we first prepare the data by calculating excess returns for each stock. We join our daily returns with the Fama-French factors and subtract the risk-free rate to obtain excess returns. The `estimate_capm()` function then implements the regression equation we previously discussed:
 
 ```{r}
 returns_excess_daily <- returns_daily |> 
@@ -482,7 +432,7 @@ capm_results <- returns_excess_daily |>
   select(symbol, coefficient, estimate, t_statistic)
 ```
 
-Plot asset alphas
+The results are particularly interesting when we visualize the alphas across our sample of Dow Jones constituents. @fig-305 reveals the cross-sectional distribution of risk-adjusted performance, with positive values indicating outperformance and negative values indicating underperformance relative to what CAPM would predict. Statistical significance is indicated through color coding, showing which alphas are reliably different from zero at the 95% confidence level.
 
 ```{r}
 #| label: fig-305
@@ -502,40 +452,45 @@ fig_alpha <- capm_results |>
 fig_alpha
 ```
 
+Most notably, our analysis shows that only NVIDIA (NVDA) exhibits a statistically significant positive alpha during our sample period. This finding aligns with the exceptional performance of technology stocks, particularly those involved in AI and chip manufacturing, but suggests that most Dow components' returns can be explained by their market exposure alone.
+
 ## Shortcomings & Extensions
 
-Popular shortcomings of CAPM
+While the CAPM's elegance and simplicity have made it a cornerstone of modern finance, the model faces several important challenges in practice. Understanding these limitations is crucial for both academic research and practical applications.
 
-- Impossible to create **universal measure for market**
-  - Market definition might depend on context (e.g. S&P 500, DAX, TOPIX)
-- **Beta** might **not be stable **over time
-  - Company operations, leverage or competitive environment might change beta
-- **Systematic risk** might not be the **only factor**
-  - Poor empirical performance in explaining small-cap or high-growth returns
-- Many more: behavioral biases, heterogeneous preferences, liquidity, etc.
+A fundamental challenge lies in the identification of the market portfolio. The CAPM theory requires a truly universal market portfolio that includes all investable assets – not just stocks, but also real estate, private businesses, human capital, and even intangible assets. In practice, we must rely on proxies like the S&P 500, DAX, or TOPIX. The choice of market proxy can significantly impact our estimates and may need to be tailored to specific contexts. For instance, a U.S.-focused investor might use the S&P 500, while a Japanese investor might prefer the TOPIX.
 
-Alternatives & extensions.
+Another crucial limitation concerns the stability of beta over time. The model assumes that an asset's systematic risk remains constant, but this rarely holds in practice. Companies undergo significant changes that can affect their market sensitivity: they may alter their capital structure, enter new markets, face new competitors, or transform their business models. Consider how tech companies' betas might change as they mature from growth startups to established enterprises, or how a retailer's beta might shift as it expands its online presence.
 
-[Fama-French 3-Factor model](https://en.wikipedia.org/wiki/Fama%E2%80%93French_three-factor_model) extends CAPM
+Perhaps most importantly, empirical evidence suggests that systematic risk alone cannot fully explain asset returns. Numerous studies have documented patterns in stock returns that CAPM cannot explain. Small-cap stocks tend to outperform large-cap stocks, and value stocks (those with high book-to-market ratios) tend to outperform growth stocks, even after adjusting for market risk. These "anomalies" suggest that investors may care about multiple dimensions of risk beyond market sensitivity.
 
-- Outperformance of small vs big companies (see [tidy-finance.org](size-sorts-and-p-hacking.qmd))
-- Outperformance of high vs low value companies (see [tidy-finance.org](value-and-bivariate-sorts.qmd))
+These limitations have spawned a rich literature of alternative and extended models. The Fama-French three-factor model represents a seminal extension, adding two factors to capture the size and value effects:
+
+- The SMB (Small Minus Big) factor captures the tendency of small stocks to outperform large stocks, as we discuss in our chapter [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).
+- The HML (High Minus Low) factor captures the tendency of value stocks to outperform growth stocks, as we show in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd).
   
-Fama-French 5-Factor model extends 3-factor model (see [tidy-finance.org](replicating-fama-and-french-factors.qmd))
+Building on this framework, the Fama-French five-factor model adds two more dimensions, which we later discuss in [Replicating Fama-French Factors](replicating-fama-and-french-factors.qmd):
 
-- Outperformance of companies with robust vs weak operating profitability
-- Outperformance of companies with conservative vs aggressive investment
+- The RMW (Robust Minus Weak) factor captures the outperformance of companies with strong operating profitability
+- The CMA (Conservative Minus Aggressive) factor reflects the tendency of companies with conservative investment policies to outperform those with aggressive investment policies
 
-Many more: [consumption CAPM](https://en.wikipedia.org/wiki/Consumption-based_capital_asset_pricing_model), [conditional CAPM](https://www.jstor.org/stable/2329301), [Carhart Four-Factor Model](https://en.wikipedia.org/wiki/Carhart_four-factor_model), [Q-Factor Model & ivnestment CAPM](https://global-q.org/index.html)
+The field continues to evolve with various theoretical and empirical innovations. The Consumption CAPM links asset prices to macroeconomic risks through aggregate consumption. The Conditional CAPM allows risk premiums and betas to vary with the business cycle. The Carhart four-factor model adds momentum to the three-factor framework, while the Q-factor model and investment CAPM provide alternative theoretical foundations rooted in corporate finance.
+
+Despite its limitations, the CAPM remains valuable as a conceptual framework and practical tool. Its core insight – that only systematic risk should be priced in equilibrium – continues to influence how we think about risk and return. Understanding both its strengths and weaknesses helps us apply it more effectively and appreciate the contributions of newer models that build upon its foundation.
 
 ## Key takeways
 
-- CAPM is an **equilibrium model** in a **frictionless** economy
-- Investors hold mix of **market portfolio & risk-free asset**
-- **Expected return** of a stock is a linear function of its **beta**
-- Beta is the **sensitivity** of a stock to **market movements**
-- Beta estimation via **linear regression** using historical data
+The CAPM provides a fundamental framework for understanding asset pricing and risk-return relationships. The key insights from this chapter are:
+
+- The CAPM is an equilibrium model that assumes a frictionless economy where investors can freely trade without costs and borrow or lend at the risk-free rate
+- In equilibrium, all investors hold some combination of the market portfolio and the risk-free asset, with their risk preferences determining only the proportion of each
+- Expected returns follow a linear relationship with systematic risk: assets with higher market sensitivity (beta) should earn higher returns to compensate investors for bearing undiversifiable risk
+- Beta measures an asset's sensitivity to market movements and can be estimated through linear regression of asset excess returns on market excess returns
+- While the model has limitations, its insights about systematic versus idiosyncratic risk continue to influence both academic research and practical investment decisions
 
 ## Exercises
 
-1. ...
+1. Download daily returns for a German stock of your choice and the S&P 500 index for the past five years. Calculate the stock's beta and interpret its meaning. How does your estimate change if you use monthly instead of daily returns?
+1. Compare the betas of stocks estimated using different market proxies (e.g., S&P 500, Russell 3000, MSCI World). How do the differences in market definition affect your conclusions about systematic risk?
+1. Select a mutual fund and estimate its alpha and beta relative to its benchmark index. Is the fund's performance statistically significant after accounting for market risk? How do your conclusions change if you use a different benchmark?
+1. Compare betas of multinational companies using both local and global market indices. How do the estimates differ? What might explain these differences?
