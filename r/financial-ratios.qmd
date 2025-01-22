@@ -6,17 +6,13 @@ metadata:
 cache: true
 ---
 
-In this chapter, we explore the role of financial statements and financial ratios in analyzing companies. Financial statements are essential because they serve as a standardized source of information, providing a consistent framework that enables investors, creditors, and analysts to assess a company’s financial health and performance. All companies are legally required to file financial statements, which adds a layer of accountability and reliability to the information they disclose. Public companies, in particular, are subject to even more rigorous standards: they must have their financial statements independently audited, which helps ensure accuracy and integrity in reporting. Additionally, in the United States, public companies are required by the Securities and Exchange Commission, or SEC, to file their financials quarterly and annually. This requirement ensures that investors and analysts have timely information, allowing them to make informed decisions throughout the year.
+Financial statements and ratios are fundamental tools for understanding and evaluating companies. While the previous chapter on the [Capital Asset Pricing Model](capital-asset-pricing-model.qmd) focused on how assets are priced in equilibrium, this chapter examines how investors and analysts assess individual companies using accounting information. Financial statements serve as the primary source of standardized information about a company's operations, financial position, and performance. Their standardization and legal requirements make them particularly valuable: all companies must file financial statements, and public companies face additional scrutiny through mandatory independent audits and regular filings with the Securities and Exchange Commission (SEC).
 
-Financial ratios are tools for understanding a company’s financial health and performance. They facilitate:
+Building on this foundation of standardized financial information, financial ratios transform raw accounting data into meaningful metrics that facilitate analysis across companies and over time. These ratios serve multiple purposes in both academic research and practical applications. They enable investors to benchmark companies against their peers, identify industry trends, and screen for investment opportunities. In academic finance, ratios play a crucial role in asset pricing models - from the book-to-market ratio in the Fama-French three-factor model discussed in Value and Bivariate Sorts to the investment and profitability ratios underlying the Q-factor model. Moreover, ratios help assess a company's financial health, capital structure decisions, and potential distress risk.
 
-- Benchmarking: By comparing ratios across different companies, investors and analysts can assess how a company stands relative to its peers within the same industry.
--	Trend Analysis: Evaluating a company’s financial ratios over multiple periods reveals trends and patterns, offering insights into its financial trajectory and operational effectiveness.
--	Portfolio Selection: Investors often use financial ratios to screen and select high-quality firms for their portfolios. 
--	Asset Pricing Models: Financial ratios are integral to factor models in asset pricing, such as the Fama-French three-factor model or Q-factors)
--	Capital Structure and Risk Management: Ratios aid in assessing its risk profile and predicting potential financial distress. 
+This chapter demonstrates how to access, process, and analyze financial statements using R. We show how to calculate key financial ratios, implement common screening strategies, and evaluate companies' financial health. Our analysis combines theoretical frameworks with practical implementation, providing tools for both academic research and investment practice.
 
-This chapter is based on the following packages: 
+We use the following packages throughout this chapter:
 
 ```{r}
 #| message: false
@@ -30,37 +26,61 @@ library(fmpapi)
 
 ## Balance Sheet Statements
 
-The balance sheet provides a snapshot of a company's financial standing at a specific point in time. It shows the company’s assets, liabilities, and shareholders’ equity, according to the fundamental accounting equation: 
+The balance sheet is one of the three primary financial statements, alongside the income statement and cash flow statement. It captures a company's financial position at a specific moment in time, much like a financial photograph. The statement is built on the fundamental accounting equation:
 
 $$\text{Assets} = \text{Liabilities} + \text{Shareholders’ Equity}$$
 
-Assets are the resources owned by the company that are expected to provide future economic benefits, liabilities are obligations the company owes to external parties, and shareholders’ equity is the residual interest in the assets of the company after deducting liabilities. @fig-400 shows a stylized balance sheet with these components.
+This equation reflects a core principle of accounting: a company's resources (assets) must equal its sources of funding, whether from creditors (liabilities) or investors (shareholders' equity). Assets represent resources that the company controls and expects to generate future economic benefits, such as cash, inventory, or equipment. Liabilities encompass all obligations to external parties, from short-term payables to long-term debt. Shareholders' equity, sometimes called net worth or book value, represents the residual claim on assets after accounting for all liabilities.
+
+@fig-400 provides a stylized representation of a balance sheet's structure. The visualization highlights how assets on the left side must equal the combined claims of creditors and shareholders on the right side. This balance illustrates the dual nature of corporate finance: every asset must be financed either through debt (liabilities) or equity.
 
 ![A stylized representation of a balance sheet statement.](../assets/img/balance-sheet.svg){#fig-400 alt="A stylized representation of a balance sheet statement."}
 
-Let us dive deeper into the asset side which typically comprises of the following parts: current assets that are expected to be converted into cash or used up within one year, such as cash, accounts receivable (=money owed to a business for goods or services), and inventory, non-current assets, which are long-term investments and property, plant, and equipment (PP&E) that are not expected to be liquidated within a year, and intangible assets, which are non-physical asset such as a patent, brand, trademark, or copyright. @fig-401 shows a stylized breakdown of the asset side. 
+The asset side of the balance sheet typically comprises three main categories, each serving different roles in the company's operations:
+
+1. Current Assets: These are assets expected to be converted into cash or used within one operating cycle (typically one year). They include: cash and cash equivalents, short-term investments, accounts receivable (money owed by customers), inventory (raw materials, work in progress, and finished goods).
+1. Non-Current Assets: These long-term assets support the company's operations beyond one year: Property, Plant, and Equipment (PP&E), long-term investments, other long-term assets.
+1. Intangible Assets: These non-physical assets often represent significant value in modern companies: patents and intellectual property, trademarks and brands, goodwill from acquisitions, Software and development costs.
+
+@fig-401 illustrates this hierarchical breakdown of assets, showing how companies classify their resources based on liquidity and nature.
  
 ![A stylized representation of a breakdown of assets on a balance sheet.](../assets/img/assets.svg){#fig-401 alt="A stylized representation of a breakdown of assets on a balance sheet."}
 
-Liabilities are typically split into current liabilities, which are debts or obligations due within one year, including accounts payable and short-term loans, and non-current liabilities, which are long-term debts and obligations due beyond one year, such as long-term debt or deferred taxes. @fig-402 illustrates this breakdown in liabilities. 
+The liability side similarly follows a temporal classification, dividing obligations based on when they come due:
+
+1. Current Liabilities: Obligations due within one year such as accounts payable, short-term debt, current portion of long-term debt, accrued expenses.
+1. Non-Current Liabilities: Long-term obligations such as long-term debt, bonds payable, deferred tax liabilities, pension obligations.
+
+@fig-402 shows this breakdown, highlighting how companies structure their debt obligations.
 
 ![A stylized representation of a breakdown of liabilities on a balance sheet.](../assets/img/liabilities.svg){#fig-402 alt="A stylized representation of a breakdown of liabilities on a balance sheet."}
 
-Lastly, equity is typically divided into retained earnings, which are accumulated profits that have been reinvested in the business rather than distributed as dividends, common stock, which is capital contributed by shareholders, and preferred stock, which is a different type of equity that represents ownership of a company and the right to claim income from the company’s operations, but with limited voting rights. @fig-403 shows the corresponding equity breakdown.
+Lastly, the equity section represents ownership claims and typically consists of:
+
+- Retained Earnings: Accumulated profits reinvested in the business. 
+- Common Stock: Par value and additional paid-in capital from share issuance
+- Preferred Stock: Hybrid securities with characteristics of both debt and equity
+
+@fig-403 depicts this equity structure, showing how companies track different forms of ownership claims.
 
 ![A stylized representation of a breakdown of equity on a balance sheet.](../assets/img/equity.svg){#fig-403 alt="A stylized representation of a breakdown of equity on a balance sheet."}
 
-@fig-404 shows an example balance sheet from Microsoft in 2023. 
+To illustrate these concepts in practice, @fig-404 presents Microsoft's balance sheet from 2023. This real-world example demonstrates how one of the world's largest technology companies structures its financial position, reflecting both traditional elements like PP&E and modern aspects like significant intangible assets.
 
 ![A screenshot of the balance sheet statement of Microsoft in 2023.](../assets/img/balance-sheet-msft.png){#fig-404 alt="A screenshot of the balance sheet statement of Microsoft in 2023."}
 
-We can use the `fmpapi` package to download financial statements:
+Microsoft's balance sheet exemplifies several key trends in modern corporate finance: the growing importance of intangible assets in technology companies, the strategic use of cash and investments, and the complex interplay between different forms of financing. In subsequent sections, we'll explore how to analyze such statements using financial ratios, particularly focusing on measures of liquidity, solvency, and efficiency.
 
-- SEC provides interface to [search filings](https://www.sec.gov/search-filings)
-- [Financial Modeling Prep (FMP) API](https://site.financialmodelingprep.com/developer/docs) provides programming interface
-- Free tier: 250 calls / day, 5 year historical fundamental data
-- R package: [tidy-finance/r-fmpapi](https://github.com/tidy-finance/r-fmpapi)
-- Install via `install.packages("fmpapi")`
+While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analysis. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package fmpapi.
+
+The FMP API's free tier provides access to:
+
+- 250 API calls per day
+- 5 years of historical fundamental data
+- Real-time and historical stock prices
+- Key financial ratios and metrics
+
+Let's examine Microsoft's balance sheet statements using the `fmp_get()` function. This function requires three main arguments: The type of financial data to retrieve (`resource`), the stock ticker symbol (`symbol`), and additional parameters like periodicity and number of periods (`params`).
 
 ```{r}
 #| cache: true 
@@ -71,9 +91,11 @@ fmp_get(
 )
 ```
 
+The function returns a data frame containing detailed balance sheet information, with each row representing a different reporting period. This structured format makes it easy to analyze trends over time and calculate financial ratios. We can see how the data aligns with the balance sheet components we discussed earlier, from current assets like cash and receivables to long-term assets and various forms of liabilities and equity.
+
 ## Income Statements
 
-Income statements show a company’s financial performance over a quarter or year by detailing revenue, costs, and profits. It's main components are:
+While the balance sheet provides a snapshot of a company's financial position at a point in time, the income statement (also called profit and loss statement) measures financial performance over a period, typically a quarter or year. It follows a hierarchical structure that progressively captures different levels of profitability:
 
 - Revenue (Sales): the total income generated from goods or services sold.
 - Cost of Goods Sold (COGS): direct costs associated with producing the goods or services (raw materials, labor, etc.).
@@ -82,15 +104,15 @@ Income statements show a company’s financial performance over a quarter or yea
 - Operating Income (EBIT): earnings before interest and taxes (measures profitability from core operations before financing and tax costs).
 - Net Income: The “bottom line”—total profit after all expenses, taxes, and interest are subtracted from revenue.
 
-@fig-405 provides a stylized representation of these components. Income statements are key in analyizing profitability, operational efficiency, and cost management of a company.
+@fig-405 illustrates this progression from total revenue to net income, showing how various costs and expenses are subtracted to arrive at different profitability measures.
 
 ![A stylized representation of an income statement.](../assets/img/income-statements.svg){#fig-405 alt="A stylized representation of an income statement."}
 
-@fig-406 shows an example income statements of Microsoft 2023.
+Consider Microsoft's 2023 income statement in @fig-406, which exemplifies how a leading technology company reports its financial performance:
 
 ![A screenshot of the income statement of Microsoft in 2023.](../assets/img/income-statements-msft.png){#fig-406 alt="A screenshot of the income statement of Microsoft in 2023."}
 
-Download income statements data:
+We can also access this data programmatically using the FMP API:
 
 ```{r}
 #| cache: true 
@@ -101,23 +123,25 @@ fmp_get(
 )
 ```
 
+The structured format of this data enables systematic analysis of profitability trends and operational efficiency. In later sections, we'll use these figures to calculate important profitability ratios and examine how they compare across companies and industries. The income statement's focus on performance complements the balance sheet's position snapshot, providing a more complete picture of a company's financial health.
+
 ## Cash Flow Statements
 
-Cash flow statements provide details about the flow of cash in and out of the business during a quarter or year, categorized into operating, investing, and financing activities. Overall, they show a company’s ability to generate cash to fund operations and growth.
+The cash flow statement complements the balance sheet and income statement by tracking the actual movement of cash through the business. While the income statement shows profitability and the balance sheet shows financial position, the cash flow statement reveals a company's ability to generate and manage cash - a crucial aspect of financial health. The statement is divided into three main categories:
 
 - Operating Activities: cash generated from a company’s core business activities (Net Income adjusted for non-cash items like depreciation, and changes in working capital).
 - Financing Activities: cash flows related to borrowing, repaying debt, issuing equity, or paying dividends.
 - Investing Activities: cash spent on or received from long-term investments, such as purchasing or selling property, equipment, or securities.
 
-@fig-407 shows a stylized cash flow statement. 
+@fig-407 illustrates how these three categories combine to show the overall change in a company's cash position.
 
 ![A stylized representation of a cash flow statement.](../assets/img/cash-flow-statements.svg){#fig-407 alt="A stylized representation of a cash flow statement."}
 
-@fig-408 shows example cash flow statements of Microsoft 2023.
+The statement reconciles accrual-based accounting (used in the income statement) with actual cash movements. This reconciliation is crucial because profitable companies can still face cash shortages, and unprofitable companies might maintain positive cash flow. Microsoft's 2023 cash flow statement in @fig-408 demonstrates how a large technology company manages its cash flows:
 
 ![A screenshot of the cash flow statement of Microsoft in 2023.](../assets/img/cash-flow-statements-msft.png){#fig-408 alt="A screenshot of the cash flow statement of Microsoft in 2023."}
 
-Download cash flow statements data for Microsoft:
+Of course, we can access this data systematically through the FMP API:
 
 ```{r}
 #| cache: true 
@@ -128,7 +152,11 @@ fmp_get(
 )
 ```
 
+In subsequent sections, we'll use this data to calculate important cash flow ratios that help assess a company's liquidity, capital allocation efficiency, and overall financial sustainability. The combination of all three financial statements - balance sheet, income statement, and cash flow statement - provides a comprehensive view of a company's financial health and performance.
+
 ## Download Financial Statements
+
+We now turn to downloading and processing statements for multiple companies systematically. The next code chunk demonstrates how to retrieve financial data for all constituents of the Dow Jones Industrial Average, similar to our approach in the CAPM chapter.
 
 ```{r}
 #| cache: true 
@@ -153,18 +181,29 @@ cash_flow_statements <- constituents |>
   )
 ```
 
+The resulting datasets provide a foundation for cross-sectional analysis of financial ratios and trends across major U.S. companies. In the following sections, we'll use these datasets to calculate various financial ratios and analyze patterns in corporate financial performance.
+
 ## Liquidity Ratios
 
-We start with ratios that aim to assess a company's liquidity using items from balance sheet statements. The Current Ratio measures a company's ability to pay off its short-term liabilities with its short-term assets. A ratio above 1 indicates that the company has more current assets than current liabilities, suggesting good short-term financial health. 
+Liquidity ratios assess a company's ability to meet its short-term obligations and are typically calculated using balance sheet items. These ratios are particularly important for creditors and investors concerned about a company's short-term financial health and ability to cover immediate obligations.
+
+The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:
 
 $$\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Total Assets}}$$
 
-The next ratio is the Quick Ratio, which measures a company's ability to meet its short-term obligations without relying on the sale of inventory. A ratio above 1 here indicates that the company can cover its short-term liabilities with its most liquid assets. 
+A ratio above 1 indicates that the company has enough current assets to cover its current liabilities. 
 
-$$\text{Quick Ratio} = \frac{\text{Current Assets - Liabilities}}{\text{Current Liabilities}}$$
-Lastly, the Cash Ratio measures a company's ability to pay off its short-term liabilities with its cash and cash equivalents. A ratio of 1 or higher indicates a strong liquidity position. 
+However, not all current assets are equally liquid, leading to the Quick Ratio:
+
+$$\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}$$
+The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. A ratio above 1 suggests strong short-term solvency without relying on inventory sales.
+
+The most conservative liquidity measure is the Cash Ratio:
 
 $$\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}$$
+
+This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of 1 indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets.
+Let's calculate these ratios for Dow Jones constituents, focusing on three major technology companies:
 
 ```{r}
 selected_symbols <- c("MSFT", "AAPL", "AMZN")
@@ -172,13 +211,13 @@ selected_symbols <- c("MSFT", "AAPL", "AMZN")
 balance_sheets_statements <- balance_sheet_statements |> 
   mutate(
     current_ratio = total_current_assets / total_assets,
-    quick_ratio = (total_current_assets - total_liabilities) / total_current_liabilities,
+    quick_ratio = (total_current_assets - inventory) / total_current_liabilities,
     cash_ratio = cash_and_cash_equivalents / total_current_liabilities,
     label = if_else(symbol %in% selected_symbols, symbol, NA),
   )
 ```
 
-Comparing liquidity ratios @fig-409 shows...
+@fig-409 compares these liquidity ratios across Microsoft, Apple, and Amazon for 2023:
 
 ```{r}
 #| label: fig-409
@@ -199,21 +238,25 @@ fig_liquidity_ratios <- balance_sheets_statements |>
 fig_liquidity_ratios
 ```
 
+The liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns in how these technology giants manage their short-term financial positions. Microsoft demonstrates the most conservative approach with the highest quick ratio of around 160%, significantly above Amazon's 100% and Apple's 90%, indicating strong ability to cover short-term obligations without relying on inventory. However, all three companies maintain relatively modest current ratios between 30-50%, which might appear concerning but is typical for technology companies with strong cash flows and limited inventory needs. Their cash ratios also show interesting variation, with Amazon leading at 45%, followed by Microsoft at 40%, and Apple maintaining a more conservative cash position at 20%. These patterns reflect the technology sector's characteristics of minimal inventory requirements and strategic cash management, while also highlighting company-specific differences in financial management approaches, with Microsoft generally maintaining the most conservative liquidity position overall.
+
 ## Leverage Ratios
 
-The debt-to-equity ratio measures the proportion of debt financing relative to equity financing. A higher ratio indicates more leverage and potentially higher financial risk. 
+Leverage ratios assess a company's capital structure and its ability to meet financial obligations. These metrics are crucial for understanding financial risk and long-term solvency. We examine three key leverage measures:
+
+The debt-to-equity ratio indicates how much a company is financing its operations through debt versus shareholders' equity:
 
 $$\text{Debt-to-Equity} = \frac{\text{Total Debt}}{\text{Total Equity}}$$
 
-The debt-to-asset ratio indicates the percentage of a company’s assets that are financed by debt. A higher ratio also suggests more leverage. 
+The debt-to-asset ratio shows the percentage of assets financed through debt:
 
 $$\text{Debt-to-Asset} = \frac{\text{Total Debt}}{\text{Total Assets}}$$
 
-Interest Coverage assesses a company’s ability to pay interest on its debt. Here, a higher ratio indicates better capability to meet interest obligations, and hence less financial risk. 
+Interest coverage measures a company's ability to meet interest payments:
 
 $$\text{Interest Coverage} = \frac{\text{EBIT}}{\text{Interest Expense}}$$
 
-We can easily calculate these ratios using our balance sheet and income statements data:
+Let's calculate these ratios for our sample of companies:
 
 ```{r}
 balance_sheets_statements <- balance_sheets_statements |> 
@@ -229,7 +272,7 @@ income_statements <- income_statements |>
   )
 ```
 
-@fig-410 shows the debt-to-assets over time.
+@fig-410 tracks the evolution of debt-to-asset ratios for Microsoft, Apple, and Amazon over time:
 
 ```{r}
 #| label: fig-410
