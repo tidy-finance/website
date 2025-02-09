@@ -5,11 +5,11 @@ metadata:
   description-meta: Learn how to use the programming language R for implementing the Markowitz model for portfolio optimization.
 ---
 
-In the previous chapter, we show how to download stock market data and analyze them with graphs and summary statistics. Now, we move to a typical question in finance: how should wealth be allocated across assets with varying returns, risks, and correlations to optimize a portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by [@Markowitz1952], revolutionized the way how we think about such investments by formalizing the trade-off between risk and return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
+In the previous chapter, we show how to download stock market data and analyze them with graphs and summary statistics. Now, we move to a typical question in finance: How should an investor allocate her wealth across assets with varying returns, risks, and correlations to optimize her portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by [@Markowitz1952], revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
 
-Markowitz demonstrates that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: combining assets with low or negative correlations reduces overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
+Markowitz demonstrates that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: combining assets with low or negative correlations reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
 
-At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk. By balancing these two factors, investors can construct portfolios that either maximize return for a given level of risk or minimize risk for a desired level of return. We'll implement this mean-variance approach in R in this chapter.
+At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk. By balancing these two factors, investors can construct portfolios that either maximize their expected return for a given level of risk or minimize their taken risk for a desired level of return. In this chapter we'll implement this mean-variance approach in R.
 
 We use the following packages throughout this chapter: 
 
@@ -62,7 +62,7 @@ returns_daily <- prices_daily |>
   arrange(symbol, date)
 ```
 
-We can use the tidy return data to quickly calculate the estimated expected return of each asset in the Dow Jones Industrial Average as sample averages.
+We can use the tidy return data to quickly calculate the sample average of each asset in the Dow Jones Industrial Average that we can use as the estimated expected return.
 
 ```{r}
 assets <- returns_daily |> 
@@ -90,7 +90,7 @@ fig_mu
 
 ## Estimate the Variance-Covariance Matrix
 
-Individual asset risk in MPT is typically quantified using variance ($\sigma^2$) or volatilities ($\sigma$).^[Alternative approaches include Value at Risk (VaR), Expected Shortfall, or higher-order moments such as skewness and kurtosis.] The latter can be estimated as the sample standard deviation:
+Individual asset risk in MPT is typically quantified using variance ($\sigma^2$) or volatilities ($\sigma$).^[Alternative approaches include Value-at-Risk (VaR), Expected Shortfall, or higher-order moments such as skewness and kurtosis.] The latter can be estimated as the sample standard deviation:
 
 $$\hat{\sigma}_i = \sqrt{\frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \hat{\mu}_i)^2}$$
 
@@ -105,7 +105,7 @@ assets <- assets |>
   left_join(volatilities, join_by(symbol))
 ```
 
-Figure @fig-202 shows the corresponding invidiual stock volatitilies. 
+Figure @fig-202 shows the corresponding individual stock volatilities. 
 
 ```{r}
 #| label: fig-202
@@ -124,9 +124,9 @@ As highlighted above, a key innovation of MPT is to consider interactions betwee
 
 $$\hat{\sigma}_{ij} = \frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \hat{\mu}_i)(r_{jt} - \hat{\mu}_j)$$
 
-The interpretation is straight-forward: a positive covariance indicates that assets move in the same direction, potentially increasing portfolio risk if these assets are combined; negative covariance indicates that assets move in opposite directions, which can reduce overall risk through diversification. 
+The interpretation is straightforward: While a positive covariance indicates that assets tend to move in the same direction, a negative covariance indicates that assets move in opposite directions. Since the overall portfolio volatility is a function of the individual covariances, the lower the covariance values the higher the reduction in overall risk through diversification. 
 
-Since individual asset variances are just a special case of the covariance formula above with $i=j$, we can denote the estimated variance covariance matrix as:
+Since individual asset variances are just a special case of the covariance formula above with $i=j$, we can denote the estimated variance-covariance matrix as:
 
 $$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ 
 
@@ -141,7 +141,7 @@ vcov <- returns_wide |>
   cov()
 ```
 
-Figure @fig-203 provides an illustration of the resulting variance-covariance matrix. 
+Figure @fig-203 illustrates the resulting variance-covariance matrix. 
 
 ```{r}
 #| label: fig-203
@@ -166,15 +166,15 @@ fig_vcov
 The expected asset returns and variance-covariance matrix allow us to formally define portfolio returns:
 
 $$\text{Expected Portfolio Return} = \sum_{i=1}^N \omega_i \hat{\mu}_i,$$
-where $\omega_i$ is the weight of asset $i$ in the portfolio and $\hat{\mu}_i$ is the estimated expected return of asset $i$. For simplicity, we assume that portfolio weights are contant over time for the current application. 
+where $\omega_i$ is the weight of asset $i$ in the portfolio and $\hat{\mu}_i$ is the estimated expected return of asset $i$. For simplicity, we assume that portfolio weights are constant over time for now. 
 
-Portfolio variance is further calculated as
+The portfolio variance is further calculated as
 
 $$\text{Portfolio Variance} =\sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \hat{\sigma}_{ij},$$
 
 where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\hat{\sigma}_{ij}$ is the estimated covariance between returns of assets $i$ and $j$.
 
-The optimization problem of the mean-variance approach aims to minimize this portfolio variance
+Let us begin by finding the portfolio with the minimum risk as a reference point. The optimization problem of the mean-variance approach only aiming to minimize the portfolio variance is given by
 
 $$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \hat{\sigma}_{ij},$$
 
@@ -182,11 +182,11 @@ while staying fully invested across all available assets $N$:
 
 $$\sum_{i=1}^{N} \omega_i = 1$$
 
-Solving this problem analytically is easier in matrix notation, so we transform the problem: 
+Solving this problem analytically is easier in matrix notation, so we transform the problem to 
 
-$$\min_{\omega} \omega' \hat{\Sigma} \omega \text{ s.t. } \omega'\iota = 1$$
+$$\min_{\omega} \omega' \hat{\Sigma} \omega \text{ s.t. } \omega'\iota = 1,$$
 
-The solution for the minimum-variance portfolio can then be described as
+where $\hat{\Sigma}$ is the $(N\times N)$ variance-covariance matrix and $\omega=\left(\omega_1,\ldots,\omega_N\right)'$ is the $(N\times1)$ vector of given portfolio weights. The solution for the minimum-variance portfolio can then be described as
 
 $$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota},$$
 where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum variance portfolio using this formula:
@@ -241,7 +241,7 @@ while staying fully invested *and* earning a **minimum expected return** $\bar{\
 $$ \omega'\iota = 1$$
 $$\omega'\hat{\mu} = \bar{\mu}$$
 
-To illustrate the difference between the minimum-variance and efficient portfolio, we use the Nasdaq 100 index:
+To illustrate the difference between the minimum-variance and efficient portfolio, we now use the Nasdaq 100 index:
 
 ```{r}
 nasdaq <- download_data(
@@ -292,12 +292,12 @@ summary_efp <- tibble(
 )
 ```
 
-Figure @fig-205 now shows the average return and volatility of the the minimum-variance and efficient portfolio relative to the index constituents. We can see that the efficient portfolio dominates the minimum-variance portfolio in both dimensions. 
+Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. We can see that the efficient portfolio dominates the minimum-variance portfolio in both dimensions. 
 
 ```{r}
 #| label: fig-205
 #| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers the expected return of the Nasdaq 100, respectively. The small dots indicate the location of the individual constituents." 
-#| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each Dow index constituent."
+#| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each Nasdaq index constituent."
 #| warning: false
 summaries <- bind_rows(
   assets, summary_mvp, summary_efp
@@ -316,14 +316,14 @@ fig_summaries <- summaries |>
   scale_y_continuous(labels = percent) + 
   labs(
     x = "Volatility", y = "Average return",
-    title = "Efficient & minimum-variance portfolios for Dow index constituents"
+    title = "Efficient & minimum-variance portfolios for Nasdaq 100 index constituents"
     ) 
 fig_summaries
 ```
 
 ## The Efficient Frontier
 
-\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfies the condition that no other portfolio exists with a higher expected return but with the same volatility, e.g., @Merton1972.\index{Return volatility} \index{Separation theorem} The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{efp}$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} 
+\index{Efficient frontier} An essential tool to evaluate portfolios in the mean-variance context is the *efficient frontier*, the set of portfolios which satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility, e.g., @Merton1972.\index{Return volatility} \index{Separation theorem} The [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\text{efp}$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} 
 
 The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
 
@@ -345,7 +345,7 @@ Finally, it is simple to visualize the efficient frontier alongside the two effi
 ```{r}
 #| label: fig-206
 #| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers 3 times the expected return of the minimum variance portfolio, respectively. The small dots indicate the location of the individual constituents."
-#| fig-alt: "Title: Efficient frontier for Dow index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
+#| fig-alt: "Title: Efficient frontier for Nasdaq 100 index constituents. The figure shows Nasdaq 100 index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
 #| warning: false
 summaries <- bind_rows(
     summaries, efficient_frontier
@@ -370,9 +370,9 @@ fig_efficient_frontier
 
 ## Extending the Markowitz Model
 
-There are many ways to extend the Markowitz framework. We want to point interested readers to the the `PortfolioAnalytics` package, which provides a consistent interface to many popular extensions. 
+There are many ways to extend the Markowitz framework. We want to point interested readers to the `PortfolioAnalytics` package, which provides a consistent interface to many popular extensions. 
 
-To illustrate the `PortfolioAnalytics` package, we replicate our analytic solutions from above. We additionaly use the `CVXR` package for a flexible suite of numerical optimizers. 
+To illustrate the `PortfolioAnalytics` package, we replicate our analytic solutions from above. We additionally use the `CVXR` package for a flexible suite of numerical optimizers. 
 
 ```{r}
 #| message: false
@@ -399,7 +399,7 @@ solution_mvp <- optimize.portfolio(
 all.equal(omega_mvp, as.vector(solution_mvp$weights))
 ```
 
-Similarily, we can calculate the efficient portfolio by adding the return target constraint to the problem from above. Again, our 
+Similarly, we can calculate the efficient portfolio by adding the return target constraint to the problem from above. Again, our 
 
 ```{r}
 problem_efp <- problem_mvp |> 
@@ -418,12 +418,12 @@ You can easily extend this, e.g., by adding short-sale constraints (`add.constra
 
 The mean-variance framework is a cornerstone of modern finance, emphasizing the trade-off between risk and return. The key insights from this chapter are:
 
-- Mean-variance optimization balances expected returns against portfolio risk.
+- Mean-variance optimization balances expected returns against expected portfolio risk.
 - Portfolio risk depends on both volatilities and correlations between assets.
-- Minimum-variance portfolio achieves lowest possible risk for given set of assets.
+- Minimum-variance portfolio achieves the lowest possible risk for a given set of assets.
 - Efficient portfolios maximize expected return for each level of risk.
-- Analytical solutions exist for simple constraints but numerical optimization needed for complex problems.
-- `PortfolioAnalytics` provides a robust interface for extending the mean-variance framework with additional constraints or alternative objectives.
+- Analytical solutions exist for simple constraints but numerical optimization is needed for complex problems.
+- The `PortfolioAnalytics` package provides a robust interface for extending the mean-variance framework with additional constraints or alternative objectives.
 
 ## Exercises
 

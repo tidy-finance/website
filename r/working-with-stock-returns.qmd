@@ -14,9 +14,9 @@ You are reading **Tidy Finance with R**. You can find the equivalent chapter for
 
 The main aim of this chapter is to familiarize yourself with the `tidyverse` for working with stock market data. We focus on downloading and visualizing stock data from data provider Yahoo Finance.\index{tidyverse}
 
-At the start of each session, we load the required R packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019]. In this chapter, we also load the `tidyfinance` package to download stock price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse` and our book. Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
+At the start of each session, we load the required R packages. Throughout the entire book, we always use the `tidyverse` [@Wickham2019] package. In this chapter, we also load the `tidyfinance` package to download stock price data. This package provides a convenient wrapper for various quantitative functions compatible with the `tidyverse` and our book. Finally, the package `scales` [@scales] provides useful scale functions for visualizations.
 
-You typically have to install a package once before you can load it. In case you have not done this yet, call, for instance, `install.packages("tidyfinance")`. \index{tidyfinance}
+You typically have to install a package once before you can load it into your active R session. In case you have not done this yet, call, for instance, `install.packages("tidyfinance")`. \index{tidyfinance}
 
 ```{r}
 #| message: false
@@ -25,7 +25,7 @@ library(tidyfinance)
 library(scales)
 ```
 
-We first download daily prices for one stock symbol, e.g., the Apple stock, *AAPL*, directly from the data provider Yahoo Finance. To download the data, you can use the function `download_data`. If you do not know how to use it, make sure you read the help file by calling `?download_data`. We especially recommend taking a look at the examples section of the documentation. We request daily data for a period of more than 20 years.\index{Stock prices}
+We first download daily prices for one stock symbol, e.g., the Apple stock (*AAPL*) directly from the data provider Yahoo Finance. To download the data, you can use the function `download_data`. If you do not know how to use it, make sure you read the help file by calling `?download_data`. We especially recommend taking a look at the examples section of the documentation. We request daily data from the beginning of 2000 to the end of the last year; a period of more than 20 years.\index{Stock prices}
 
 ```{r}
 #| cache: true
@@ -33,14 +33,14 @@ prices <- download_data(
   type = "stock_prices",
   symbols = "AAPL",
   start_date = "2000-01-01",
-  end_date = "2023-12-31"
+  end_date = "2024-12-31"
 )
 prices
 ```
 
-\index{Data!Yahoo Finance} `download_data(type = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a tibble with eight quite self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
+\index{Data!Yahoo Finance} `download_data(type = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a [tibble](https://tibble.tidyverse.org/) with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
-Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices in @fig-100 . This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
+Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices in @fig-100. This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
 ```{r}
 #| label: fig-100 
@@ -56,7 +56,7 @@ prices |>
   )
 ```
 
-Instead of analyzing prices, we compute daily net returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted day $t$ price.\index{Returns} In that context, the function `lag()` is helpful, which returns the previous value in a vector.
+Instead of analyzing prices, we compute daily net returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted price at the end of day $t$.\index{Returns} In that context, the function `lag()` is helpful by returning the previous value in a vector.
 
 ```{r}
 returns <- prices |>
@@ -66,16 +66,16 @@ returns <- prices |>
 returns
 ```
 
-The resulting tibble contains three columns, where the last contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NA`) because there is no previous price.\index{Missing value} Obviously, the use of `lag()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The command `arrange()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use `arrange(desc(date))`.
+The resulting tibble has three columns, in which the last one contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NA`) because there is no previous price.\index{Missing value} Obviously, the use of `lag()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The command `arrange()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use `arrange(desc(date))`.
 
-For the upcoming examples, we remove missing values as these would require separate treatment when computing, e.g., sample averages. In general, however, make sure you understand why `NA` values occur and carefully examine if you can really simply get rid of these observations.
+For the upcoming examples, we remove missing values as these would require separate treatment when computing. For example, missing values can affect sums and averages by reducing the number of valid data points, leading to underestimation in sums and potentially skewed averages if not properly accounted for. In general, always make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
 
 ```{r}
 returns <- returns |>
   drop_na(ret)
 ```
 
-Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we add a dashed line that indicates the 5 percent quantile of the daily returns to the histogram, which is a crude proxy for the worst return of the stock with a probability of at most 5 percent. The 5 percent quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. \index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to stylized facts of returns.
+Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we draw a dashed line that indicates the five percent quantile of the daily returns to the histogram, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators.\index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to the stylized facts of financial returns.
 
 ```{r} 
 #| label: fig-101 
@@ -96,7 +96,7 @@ returns |>
   scale_x_continuous(labels = percent)
 ```
 
-Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the 5 percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute summary statistics for the main variables of interest.
+Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the five percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute and analzye the summary statistics for the main variables of interest.
 
 ```{r}
 returns |>
@@ -112,7 +112,7 @@ returns |>
 ```
 
 We see that the maximum *daily* return was `r returns |> pull(ret) |> max() * 100` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
-You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
+You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
 
 ```{r}
 returns |>
@@ -132,13 +132,13 @@ returns |>
 
 \index{Summary statistics}
 
-In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The `print()` function simply controls the output options for the R console.
+In case you wonder: the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. It acts as a placeholder that gets replaced by the name of the function being applied (e.g., mean, sd, min, max) when creating new column names. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The `print()` function simply controls the output options for the R console.
 
 ## Scaling Up the Analysis
 
-As a next step, we generalize the code from before such that all the computations can handle an arbitrary vector of symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
+As a next step, we generalize the code from before such that all computations can handle an arbitrary vector of symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
 
-This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets as you like. The following code takes any vector of symbols, e.g., `symbol <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for an arbitrary number of assets. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
+This is where the `tidyverse` magic starts: tidy data makes it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any vector of symbols, e.g., `symbol <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once. We perform the analysis with data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average) \index{Data!Dow Jones Index}
 
 ```{r}
 #| message: false
@@ -149,7 +149,7 @@ symbols <- download_data(
 symbols
 ```
 
-Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index with a single call. \index{Exchange!NASDAQ}
+Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index for a specific point in time with a single call. \index{Exchange!NASDAQ}
 
 ```{r}
 #| cache: true
@@ -162,7 +162,7 @@ prices_daily <- download_data(
 )
 ```
 
-The resulting tibble contains `r nrow(prices_daily)` daily observations for `r unique(prices_daily$symbol)` different stocks. @fig-103 illustrates the time series of downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting tibble contains `r nrow(prices_daily)` daily observations for `r unique(prices_daily$symbol)` different stocks. @fig-103 illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ```{r}
 #| label: fig-103
@@ -185,7 +185,7 @@ fig_prices <- prices_daily |>
 fig_prices
 ```
 
-Do you notice the small differences relative to the code we used before? All we need to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates the point well.
+Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrage number of subjects quite well.
 
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.\index{Summary statistics}
 
@@ -215,7 +215,7 @@ Note that you are now also equipped with all tools to download price data for *e
 
 ## Other Forms of Data Aggregation
 
-Of course, aggregation across variables other than `symbol` can also make sense. For instance, suppose you are interested in answering the question: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume} Thus, we multiply the trading volume with the daily closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e-9` (R can handle scientific notation) denotes daily trading volume in billion USD.
+Of course, aggregation across variables other than `symbol` can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume} Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e-9` (R can handle scientific notation) denotes daily trading volume in billion USD.
 
 ```{r}
 #| label: fig-104
@@ -258,7 +258,7 @@ fig_persistence <- trading_volume |>
 fig_persistence
 ```
 
-Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.\index{Error message}
+Do you understand where the warning `## Warning: Removed 1 rows containing missing values (geom_point).` comes from and what it means?\index{Error message} Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
 
 ## Key Takeaways
 
@@ -266,10 +266,10 @@ In this chapter, you learned how to effectively use R to download, analyze, and 
 
 - Tidy data principles enable efficient analysis of financial data. 
 - Adjusted prices account for corporate actions like splits and dividends.
-- Summary statistics help identify key patterns in financial data
-- Visualization techniques reveal trends and distributions in returns
-- Data manipulation with tidyverse scales easily to multiple assets
-- Consistent workflows form foundation for advanced financial analysis
+- Summary statistics help identify key patterns in financial data.
+- Visualization techniques reveal trends and distributions in returns.
+- Data manipulation with tidyverse scales easily to multiple assets.
+- Consistent workflows form the foundation for advanced financial analysis.
 
 ## Exercises
 
