@@ -72,14 +72,19 @@ assets <- returns_daily |>
   summarize(mu = mean(ret))
 ```
 
-Figure @fig-201 shows the corresponding average daily returns of the constituents of our example portfolio. 
+Figure @fig-201 shows the corresponding annualized average returns of the constituents of our example portfolio. 
 
 ```{r}
 #| label: fig-201
-#| fig-cap: "Average daily returns based on prices adjusted for dividend payments and stock splits." 
-#| fig-alt: "Title: Average daily stock returns of Dow index constituents. The figure shows 30 bars with average daily returns."
+#| fig-cap: "Annualized average returns based on prices adjusted for dividend payments and stock splits." 
+#| fig-alt: "Title: Annualized average stock returns of Dow index constituents. The figure shows 30 bars with average daily returns."
+
+annualize_return <- function(ret, trading_days = 252) {
+  (1 + ret)^252 - 1
+}
+
 fig_mu <- assets |> 
-  ggplot(aes(x = mu, y = fct_reorder(symbol, mu), fill = mu > 0)) +
+  ggplot(aes(x = annualize_return(mu), y = fct_reorder(symbol, mu), fill = mu > 0)) +
   geom_col() +
   scale_x_continuous(labels = percent) + 
   labs(
@@ -107,18 +112,23 @@ assets <- assets |>
   left_join(volatilities, join_by(symbol))
 ```
 
-Figure @fig-202 shows the corresponding individual stock volatilities. 
+Figure @fig-202 shows the corresponding individual annualized stock volatilities. 
 
 ```{r}
 #| label: fig-202
-#| fig-cap: "Daily volatilities based on prices adjusted for dividend payments and stock splits." 
-#| fig-alt: "Title: Daily volatilities of DOW index constituents. The figure shows 30 bars with daily volatilities."
+#| fig-cap: "Annualiezed volatilities based on prices adjusted for dividend payments and stock splits." 
+#| fig-alt: "Title: Annualized volatilities of DOW index constituents. The figure shows 30 bars with daily volatilities."
+
+annualize_volatility <- function(volatility, trading_days = 252) {
+  volatility * sqrt(trading_days)
+}
+
 fig_sigma <- assets |> 
-  ggplot(aes(x = sigma, y = fct_reorder(symbol, sigma))) +
+  ggplot(aes(x = annualize_volatility(sigma), y = fct_reorder(symbol, sigma))) +
   geom_col() +
   scale_x_continuous(labels = percent) + 
   labs(x = NULL, y = NULL,
-       title = "Daily volatilities of Dow index constituents")
+       title = "Annualized volatilities of Dow index constituents")
 fig_sigma
 ```
 
@@ -147,17 +157,22 @@ Figure @fig-203 illustrates the resulting variance-covariance matrix.
 
 ```{r}
 #| label: fig-203
-#| fig-cap: "Variances and covariances based on prices adjusted for dividend payments and stock splits." 
+#| fig-cap: "Annualized variances and covariances based on prices adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Variance-covariance matrix of DOW index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
+annualize_covariance <- function(covariance, trading_days = 252) {
+  covariance * trading_days
+}
+
 fig_vcov <- vcov |> 
   as_tibble(rownames = "symbol_a") |> 
   pivot_longer(-symbol_a, names_to = "symbol_b") |> 
-  ggplot(aes(x = symbol_a, y = fct_rev(symbol_b), fill = value)) +
+  ggplot(aes(x = symbol_a, y = fct_rev(symbol_b), fill = annualize_covariance(value))) +
   geom_tile() +
   labs(
     x = NULL, y = NULL, fill = "(Co-)Variance",
     title = "Variance-covariance matrix of Dow index constituents"
   ) + 
+  scale_fill_continuous(labels = percent)  +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
 fig_vcov
@@ -226,7 +241,7 @@ Before we move on to other portfolios, we collect the return and risk of the min
 mu <- assets$mu
 
 summary_mvp <- tibble(
-  mu = t(omega_mvp) %*% mu,
+  mu = as.numeric(t(omega_mvp) %*% mu),
   sigma = as.numeric(sqrt(t(omega_mvp) %*% vcov %*% omega_mvp)),
   type = "Minimum-Variance Portfolio"
 )
@@ -255,14 +270,6 @@ nasdaq <- download_data(
   arrange(date) |> 
   mutate(adjusted_close = adjusted_close / first(adjusted_close),
           ret = adjusted_close / lag(adjusted_close) - 1)
-
-nasdaq |> 
-  ggplot(aes(x = date, y = adjusted_close, color = symbol)) +
-  geom_line() +
-  scale_y_continuous(labels = percent) + 
-  labs(x = NULL, y = NULL, color = NULL,
-       title = "Performance of Dow (^DJI) vs Nasdaq 100 (^NDX)",
-       subtitle = "Both indexes start at 100%") 
 ```
 
 We choose the minimum expected return such that we achieve the average Nasdaq 100 return:
@@ -289,7 +296,7 @@ lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
 omega_efp <- as.vector(omega_mvp + lambda_tilde / 2 * (vcov_inv %*% mu - D * omega_mvp))
 
 summary_efp <- tibble(
-  mu = t(omega_efp) %*% mu,
+  mu = as.numeric(t(omega_efp) %*% mu),
   sigma = as.numeric(sqrt(t(omega_efp) %*% vcov %*% omega_efp)),
   type = "Efficient Portfolio"
 )
@@ -307,7 +314,7 @@ summaries <- bind_rows(
 ) 
 
 fig_summaries <- summaries |> 
-  ggplot(aes(x = sigma, y = mu)) +
+  ggplot(aes(x = annualize_volatility(sigma), y = annualize_return(mu))) +
   geom_point(
     data = summaries |> filter(is.na(type))
   ) +
@@ -318,7 +325,7 @@ fig_summaries <- summaries |>
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) + 
   labs(
-    x = "Volatility", y = "Average return",
+    x = "Volatility", y = "Annualized return",
     title = "Efficient & minimum-variance portfolios for Nasdaq 100 index constituents"
     ) 
 fig_summaries
@@ -355,7 +362,7 @@ summaries <- bind_rows(
   )
 
 fig_efficient_frontier <- summaries |> 
-  ggplot(aes(x = sigma, y = mu)) +
+  ggplot(aes(x = annualize_volatility(sigma), y = annualize_return(mu))) +
   geom_point(
     data = summaries |> filter(is.na(type))
   ) +
@@ -365,7 +372,7 @@ fig_efficient_frontier <- summaries |>
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) + 
-  labs(x = "Volatility", y = "Average return",
+  labs(x = "Volatility", y = "Annualized return",
        title = "Efficient frontier for Dow index constituents") + 
   theme(legend.position = "none")
 fig_efficient_frontier
