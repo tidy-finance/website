@@ -5,10 +5,10 @@ metadata:
   description-meta: Learn how to use the programming language R for estimating the CAPM for asset evaluation.
 ---
 
-The Capital Asset Pricing Model (CAPM) is one of the most influential theories in finance and builds on the foundation laid by [Modern Portfolio Theory](modern-portfolio-theory.qmd) (MPT). It was simultaneously developed by @Sharpe1964, @Lintner1965, and @Mossin1966. While MPT shows how to construct optimal portfolios, the CAPM extends this framework to explain how assets should be priced in equilibrium when all investors follow MPT principles. The CAPM is the simplest model that aims to explain equilibrium asset prices and hence the cornerstone for a myriad of extensions. It is also used in industry applications, in particular for performance evaluation, as it provides a simple measure for market risk of an asset or portfolio. This chapter shows how to estimate the CAPM. We download stock market data, estimate betas using regression analysis, and evaluate asset performance.
+The Capital Asset Pricing Model (CAPM) is one of the most influential theories in finance and builds on the foundation laid by [Modern Portfolio Theory](modern-portfolio-theory.qmd) (MPT). It was simultaneously developed by @Sharpe1964, @Lintner1965, and @Mossin1966. 
+While MPT shows how to construct efficient portfolios, the CAPM extends this framework to explain how assets should be priced in equilibrium when all investors invest in efficient portfolios. The CAPM is the simplest model that aims to explain equilibrium asset prices and hence the cornerstone for a myriad of extensions. It is also used in industry applications, in particular for performance evaluation, as it provides a simple measure for market risk of an asset or portfolio. In this chapter, we derive the CAPM, discuss its empirical predictions and show how to estimate the core coefficients of the CAPM. We download stock market data, estimate betas using regression analysis, and evaluate asset performance.
 
 We use the following packages throughout this chapter:
-
 
 ```{r}
 #| message: false
@@ -21,7 +21,7 @@ library(ggrepel)
 
 ## Asset Returns & Volatilities
 
-Building on our analysis from the previous chapter on [Modern Portfolio Theory](modern-portfolio-theory.qmd), we again examine the Dow Jones Industrial Average constituents. However, our focus shifts from portfolio optimization to understanding how these assets are priced in equilibrium. Let's start by downloading and preparing our daily return data:
+Building on our analysis from the previous chapter on [Modern Portfolio Theory](modern-portfolio-theory.qmd), we again examine the Dow Jones Industrial Average constituents. We download and prepare our daily return data:
 
 ```{r}
 #| output: false
@@ -44,68 +44,32 @@ returns_daily <- prices_daily |>
   drop_na(ret) |> 
   arrange(symbol, date)
 ```
-
-The relationship between risk and return is central to the CAPM. Figure @fig-300 plots average returns against volatilities for our sample of stocks, highlighting two particularly interesting cases: Boeing (BA) and Nvidia (NVDA). This visualization raises an important question: why don't we observe a clear positive relationship between risk and return?
-
-```{r}
-#| label: fig-300
-#| fig-cap: "Average returns and volatilities are based on returns adjusted for dividend payments and stock splits." 
-#| fig-alt: "Title: Average returns and volatilities of Dow index constituents. The figure shows a scatter plot with volatities on the horizontal axis and average returns on the vertical axis. The stocks Nvidia and Boeing are highlighted because they exhibit the highest and lower average returns, respectively."
-assets <- returns_daily |> 
-  group_by(symbol) |> 
-  summarize(mu = mean(ret), sigma = sd(ret))
-
-fig_vola_return <- assets |> 
-  ggplot(aes(x = sigma, y = mu)) +
-  geom_point() + 
-  geom_label_repel(data = assets |> filter(symbol %in% c("BA", "NVDA")),
-                   aes(label = symbol)) +
-  scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) + 
-  labs(x = "Volatility", y = "Average return",
-       title = "Average returns and volatilities of Dow index constituents") 
-fig_vola_return
-```
-
-This apparent puzzle - that higher volatility doesn't necessarily lead to higher returns - motivates one of CAPM's key insights: not all risks are rewarded in equilibrium. To understand this, we need to distinguish between systematic and idiosyncratic risk.
-
-Company-specific events might affect individual stock prices, e.g., CEO resignations, product launches, earnings reports. These idiosyncratic events don't necessarily impact the overall market and this asset-specific risk can be eliminated through diversification. Therefore, we call this risk idiosyncratic. Systematic risk, on the other hand, affects all assets in the market at the same time and investors really dislike it because it cannot be diversified aways. 
+The relationship between risk and return is central to the CAPM. 
 
 ## Portfolio Return & Variance
 
 While we covered portfolio mathematics in detail in the previous chapter, CAPM introduces a crucial new element: the risk-free asset. This addition fundamentally changes the investment opportunity set and leads to powerful conclusions about optimal portfolio choice.
 
-To recap, we use the notion of expected portfolio return:
+To recap, we considered a portfolio weight vector $\omega\in\mathbb{R}^N$ which invests into the available $N$ risky assets. Now, we will assume that the remainder, $1-\iota'\omega$, is invested in an available risk-free asset which pays $r_f$. The expected portfolio return is 
+$$\mu_\omega = \omega'\mu + (1-\iota'\omega)r_f = r_f + \omega'\underbrace{(\mu-r_f)}_{\tilde\mu}$$
+where $\mu$ is the the vector of expected return of assets and $r_f$ is the risk-free rate. In what follows, we often refer to $\tilde\mu$ as the vector of expected excess returns. 
+The volatility of the portfolio is given by
+$$\sigma_\omega = \sqrt{\omega'\Sigma\omega}$$
+where $\Sigma$ is the variance-covariance matrix of the returns. Restating the optimal decision problem of an investor who wants to earn a desired level of expected portfolio (excess) returns ($\bar\mu-r_f$) with the lowest possible variance leads to the Lagrangian
+$$\min_\omega Z(\omega) = \min_\omega \omega'\Sigma\omega - \lambda \left(\omega'\tilde\mu-\bar\mu\right).$$
+The first-order conditions for this optimization problem yield:
+$$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu = 0 \\\Leftrightarrow \omega^* = \frac{\lambda}{2}\Sigma^{-1}\tilde\mu$$
+The constraint $\omega'\tilde\mu_\omega\geq \bar\mu$ delivers 
+$$\bar\mu = \tilde\mu'\omega^* = \frac{\lambda}{2}\tilde\mu'\Sigma^{-1}\tilde\mu \\
+\Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu'\Sigma^{-1}\tilde\mu} \\
+\Rightarrow \omega^* = \frac{\bar\mu}{\tilde\mu'\Sigma^{-1}\tilde\mu}\Sigma^{-1}\tilde\mu.$$
 
-$$\text{Expected Portfolio Return} = \omega'\mu,$$
+Note that $\omega^*$ does not sum up to one as, mechanically, the remainder $1-\iota'\omega^*$ is invested in the risk-free asset. 
+Note, however, that scaling $\omega^*$ delivers the portfolio of risky assets such that $$\omega_\text{tan} := \frac{\omega^*}{\iota'\omega^*}= \frac{\Sigma^{-1}(\mu-r_f)}{\iota'\Sigma^{-1}(\mu-r_f)}.$$
+Importantly, $\omega^\text{tan}$ is independent from $\bar\mu$! Thus, irrespective of the desired level of expected returns (or the investors risk aversion), everybody chooses the same portfolio of risky assets. The only variation arises from the amount of wealth invested into the risk-free asset. Some investors may even choose to lever their risky position by borrowing at the risk-free rate.
+The portfolio $\omega_{tan}=\frac{\Sigma^{-1}\tilde\mu}{\iota'\Sigma^{-1}\tilde\mu}$ is typically called the efficient tangency portfolio.
 
-where $\omega$ is the vector of asset weights and $\mu$ is vector of expected return of assets. 
-
-Portfolio variance is given by:
-
-$$\text{Portfolio Variance} = \omega' \Sigma \omega$$
-where $\Sigma$ is the variance-covariance matrix.
-
-The introduction of a risk-free asset transforms the investment problem. Instead of choosing only between risky assets, investors can now combine a risky portfolio with risk-free lending or borrowing. Let  $r_f$ be the return of the risk-free asset (e.g., a short-term government bond), then we can describe the combined portfolio return
-
-$$\mu_c = c \omega'\mu + (1-c)r_f = r_f + c (\omega'\mu - r_f),$$
-where $c$ is the fraction of capital in the risky portfolio. 
-
-By assumption, the risk-free asset has zero volatility. The risk of the combined portfolio is thus only measured by the volatility of the risk assets:
-
-$$\sigma_c= c\sqrt{\omega' \Sigma \omega} \Rightarrow c = \frac{\sigma_c}{\sqrt{\omega' \Sigma \omega}}$$
-
-This equation allows us to derive a **Capital Allocation Line** (CAL): 
-
-$$\mu_c = r_f +\sigma_c \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
-
-Importantly, the slope of CAL is called **Sharpe ratio**:
-
-$$\text{Sharpe ratio} = \frac{\omega'\mu-r_f}{\sqrt{\omega' \Sigma \omega}}$$
-
-The Sharpe ratio measures the *excess return per unit of risk*. A higher ratio hence indicates a more attractive *risk-adjusted return*. 
-
-Let's illustrate the Sharpe ratios and CALs using a few example portfolios. To construct combined portfolios, we need a measure for the risk-free rate. One way to calculate risk-free rates is to use the 13-week T-bill rate (with symbol ^IRX). Since the prices are quoted in annualized percentage yields, we have to divide them by 100 and convert them to daily rates using 252 trading days.^[Note that the resulting returns have a 99% correlation with Fama-French risk free rate.] 
+Empirically, we take off from the visualization in the previous Chapter. To get some reasonably proxy for the risk free rate, we use the average 13-week T-bill rate (with symbol ^IRX). Since the prices are quoted in annualized percentage yields, we have to divide them by 100 and convert them to daily rates using 252 trading days.^[Note that the resulting returns have a 99% correlation with Fama-French risk free rate.] 
 
 ```{r}
 risk_free_daily <- download_data(
@@ -117,155 +81,78 @@ risk_free_daily <- download_data(
   ) |> 
   select(date, risk_free) |> 
   drop_na()
+
 ```
 
-We also prepare the vector of expected returns and calculate the variance-covariance matrix. 
-
 ```{r}
-mu <- assets$mu
+assets <- returns_daily |> 
+  group_by(symbol) |> 
+  summarise(mu = 250 * mean(ret), 
+            sigma = sqrt(250 * var(ret)))
+
 sigma <- returns_daily |> 
   pivot_wider(names_from = symbol, values_from = ret)  |> 
   select(-date) |> 
   cov()
+
+mu <- returns_daily |>
+  group_by(symbol) |>
+  summarise(mu = mean(ret)) |>
+  pull(mu)
+
+rf <- risk_free_daily |> pull(risk_free) |> mean()
+
+w_tan <- solve(sigma) %*% (mu - rf)
+w_tan <- w_tan / sum(w_tan)
+
+efficient_portfolios <- tribble(
+  ~symbol,    ~mu,                                ~sigma,
+  "omega^tan", 250 * t(w_tan) %*% mu,      sqrt(250 * t(w_tan) %*% sigma %*% w_tan),
+  "r_f",       250 * rf,                           0)
+
+sharpe_ratio <- sqrt(250) * t(w_tan) %*% (mu - rf) / sqrt(t(w_tan) %*% sigma %*% w_tan)
 ```
 
-As a first example portfolio, we construct a portfolio of equal weights across the risky-assets. 
-
 ```{r}
-number_of_assets <- nrow(assets)
-omega_ew <- rep(1 / number_of_assets, number_of_assets)
+#| label: fig-300
+#| fig-cap: "Average returns and volatilities are based on returns adjusted for dividend payments and stock splits." 
+#| fig-alt: "Title: Average returns and volatilities of Dow index constituents. The figure shows a scatter plot with volatities on the horizontal axis and average returns on the vertical axis. The stocks Nvidia and Boeing are highlighted because they exhibit the highest and lower average returns, respectively."
 
-summary_ew <- tibble(
-  mu = as.numeric(t(omega_ew) %*% mu),
-  sigma = as.numeric(sqrt(t(omega_ew) %*% sigma %*% omega_ew)),
-  type = "Equal-Weighted Portfolio"
-)
-```
-
-As another example, we construct a portfolio using random weights in the risky-assets. 
-
-```{r}
-set.seed(1234)
-omega_random <- runif(number_of_assets, -1, 1)
-omega_random <- omega_random / sum(omega_random)
-
-summary_random <- tibble(
-  mu = as.numeric(t(omega_random) %*% mu),
-  sigma = as.numeric(sqrt(t(omega_random) %*% sigma %*% omega_random)),
-  type = "Randomly-Weighted Portfolio"
-)
-```
-
-The last portfolio is invested only in the risk-free asset. 
-
-```{r}
-summary_risk_free <- tibble(
-  mu =  mean(risk_free_daily$risk_free),
-  sigma = 0,
-  type = "Risk-Free Asset"
-)
-```
-
-By combining this risk-free portfolio with the other two risky portfolios, we can draw CALs. To facilitate the computation, we introduce a helper function that calculates the slope of the CALs - the Sharpe ratios. 
-
-```{r}
-calculate_sharpe_ratio <- function(mu, sigma, risk_free) {
-  as.numeric(mu - risk_free) / sigma 
-}
-
-summaries <- bind_rows(assets, summary_ew, summary_random, summary_risk_free)
-
-summaries <- summaries |> 
-  mutate(
-    sharpe_ratio = if_else(
-      str_detect(type, "Portfolio"), 
-      calculate_sharpe_ratio(mu, sigma, risk_free = summary_risk_free$mu),
-      NA
-    ),
-    risk_free = summary_risk_free$mu
-  )
-```
-
-@fig-301 now plots the CALs that connect the risk-free asset to the equal-weighted and randomly-weighted portfolio, respectively. We can see that the CALs look very similar although both portfolios have different risk-return profiles. 
-
-```{r}
-#| label: fig-301
-#| fig-cap: "Points correspond to individual assets, crosses to portfolios." 
-#| fig-alt: "Title: Average returns and volatilities of Dow index constituents with capital allocation lines. he figure shows a scatter plot with volatities on the horizontal axis and average returns on the vertical axis. In addition, the figure shows capital allocation lines that connect the risk-free asset to the equal-weighted and randomly-weighted portfolio, respectively."
-#| warning: false
-fig_cal <- summaries |> 
+fig_capm <- assets |> 
   ggplot(aes(x = sigma, y = mu)) +
-  geom_abline(aes(intercept = risk_free, slope = sharpe_ratio, color = type),
-              linetype = "dashed", linewidth = 1) +
-  geom_point(data = summaries |> filter(is.na(type))) +
-  geom_point(data = summaries |> filter(!is.na(type)), shape = 4, size = 4) + 
-  geom_label_repel(aes(label = type)) + 
-  scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) + 
-  labs(
-    x = "Volatility", y = "Average return",
-    title = "Average returns and volatilities of Dow index constituents with capital allocation lines"
-  ) +
-  theme(legend.position = "none")
-fig_cal
-```
-
-## The Tangency Portfolio
-
-So far we have only chosen arbitrary portfolios. Now, we want to look for an optimal portfolio. In particular, we look for the portfolio that maximizes the Sharpe ratio;
-
-$$\max_w \frac{\omega' \mu - r_f}{\sqrt{\omega' \Sigma \omega}},$$
-while staying **fully invested**
-
-$$ \omega'\iota = 1.$$
-
-The resulting optimal portfolio is called the *tangency portfolio* (and you see in a minute why). We can calculate the tangency portfolio using the following **analytic solution** ^[See [this online resource](https://bookdown.org/compfinezbook/introcompfinr/Efficient-portfolios-of.html#computing-the-tangency-portfolio-using-matrix-algebra)) provided by @Zivot2026 for details on the derivation.]
-
-$$\omega_{tan}=\frac{\Sigma^{-1}(\mu-r_f)}{\iota'\Sigma^{-1}(\mu-r_f)}$$
-The next code chunk implements the analytic solution.
-
-```{r}
-omega_tangency <- solve(sigma) %*% (mu - summary_risk_free$mu)
-omega_tangency <- as.vector(omega_tangency / sum(omega_tangency))
-
-summary_tangency <- tibble(
-  mu = as.numeric(t(omega_tangency) %*% mu),
-  sigma = as.numeric(sqrt(t(omega_tangency) %*% sigma %*% omega_tangency)),
-  type = "Tangency Portfolio",
-  sharpe_ratio = calculate_sharpe_ratio(mu, sigma, risk_free = summary_risk_free$mu),
-  risk_free = summary_risk_free$mu
-)
-```
-
-## The Capital Market Line 
-
-Now that we have the tangency portfolio, we want to derive the CAL by combining it with the risk-free asset. This combination is called the *Capital Market Line* (CML):
-
-$$\mu_{c} = r_f +\sigma_c \frac{\omega_{tan}'\mu-r_f}{\sqrt{\omega_{tan}' \Sigma \omega_{tan}}}$$
-
-The CML describes *best risk-return trade-off* for portfolios that contain the risk-free asset and the tangency portfolio. We can plot the CML by recycling the code from above:
-
-```{r}
-#| label: fig-302
-#| fig-cap: "Points correspond to individual assets, crosses to portfolios." 
-#| fig-alt: "Title: Average returns and volatilities of Dow index constituents with capital allocation lines. he figure shows a scatter plot with volatities on the horizontal axis and average returns on the vertical axis. In addition, the figure shows capital allocation lines that connect the risk-free asset to the equal-weighted, randomly-weighted, and tangency portfolio, respectively."
-#| warning: false
-summaries <- bind_rows(summaries, summary_tangency)
-
-fig_cml <- summaries |> 
-  ggplot(aes(x = sigma, y = mu)) +
-  geom_abline(aes(intercept = risk_free, slope = sharpe_ratio, color = type),
-              linetype = "dashed", linewidth = 1) +
-  geom_point(data = summaries |> filter(is.na(type))) +
-  geom_point(data = summaries |> filter(!is.na(type)), shape = 4, size = 4) + 
-  ggrepel::geom_label_repel(aes(label = type)) + 
+  geom_point() + 
+  geom_point(data = efficient_portfolios, color = "blue") +
+  geom_label_repel(data = efficient_portfolios,
+                   aes(label = symbol), parse = TRUE) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) + 
   labs(x = "Volatility", y = "Average return",
-       title = "Average returns and volatilities of Dow index constituents with the capital market line") +
-  theme(legend.position = "none")
-fig_cml
+       title = "Annualized returns and volatilities of Dow index constituents") +
+  geom_abline(intercept = 250 * rf, 
+              slope = sharpe_ratio,
+              linetype = "dotted")
+fig_capm
 ```
+
+
+The slope of the line is, clearly, $\frac{\mu'\omega^* - r_f}{\omega^*\Sigma\omega^*}$. This slope is typically called the *Sharpe ratio*.
+
+## The Capital Market Line
+
+Taking a second look at the efficient tangency portfolio reveals that expected asset (excess) returns cannot be arbitrary large or small. From the first order condition of the optimization problem above we get via simple rearranging
+
+$$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda (\mu-r_f) \overbrace{=}^{!}0 \\\Leftrightarrow \tilde\mu = \frac{2}{\lambda}\Sigma\omega^* \\
+= \frac{2}{\lambda}\iota'\omega^*\Sigma\omega^\text{tan} \\ = \iota'\Sigma^{-1}\tilde\mu\Sigma\omega^\text{tan}$$
+
+Now, note the following:
+$$E(r^\text{tan}) = \omega^\text{tan}' \tilde\mu = 
+\frac{\tilde\mu'\Sigma^{-1}\tilde\mu}{\iota'\Sigma^{-1}\tilde\mu}$$
+and 
+$$Var(r^\text{tan}) = \omega^\text{tan}' \Sigma \omega^\text{tan} = \frac{\tilde\mu'\Sigma^{-1}\tilde\mu}{\iota'\Sigma^{-1}\tilde\mu ^2}$$
+It follows that $E(r^\text{tan}-r_f)/Var = \iota'\Sigma^{-1}\tilde\mu$ so we get that 
+$$\tilde\mu_i = Cov(r_i,r^\text{tan})E()/Var$$
+
+
 
 ## Individual Assets and the Market Portfolio
 
