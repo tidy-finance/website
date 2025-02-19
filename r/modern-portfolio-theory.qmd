@@ -5,7 +5,7 @@ metadata:
   description-meta: Learn how to use the programming language R for implementing the Markowitz model for portfolio optimization.
 ---
 
-In the previous chapter, we show how to download stock market data and analyze them with graphs and summary statistics. Now, we move to a typical question in finance: How should an investor allocate her wealth across assets with varying returns, risks, and correlations to optimize her portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by [@Markowitz1952], revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
+In the previous chapter, we show how to download stock market data and analyze them with graphs and summary statistics. Now, we move to a typical question in finance: How should an investor allocate her wealth across assets with varying returns, risks, and correlations to optimize her portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by @Markowitz1952, revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
 
 Markowitz demonstrates that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: combining assets with low or negative correlations reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
 
@@ -24,13 +24,15 @@ library(ggrepel)
 
 We introduce the @ggrepel package for adding text labels to the figures in this chapter [@ggrepel].
 
-## Estimate Expected Returns
+## Expected Returns
 
-Expected returns, denoted as $\mu_i$, represent the anticipated profit from holding an asset $i$ with $i=1,..., N$. They are typically estimated using historical data by computing the average of past returns:
+According to @Markowitz1952, portfolio selection involves two stages: first, forming expectations about future security performance based on observations and experience; second, using these expectations to choose a portfolio. In this chapter, we focus on the latter and assume that there is no uncertainty in asset parameters.
 
-$$\hat{\mu}_i = \frac{1}{T} \sum_{t=1}^{T} r_{it},$$
+Expected returns, denoted as $\mu_i$, represent the anticipated profit from holding an asset $i$ with $i=1,..., N$. They are typically measured by computing the average of past returns:
 
-where $r_{it}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods. Note that the hat in $\hat{\mu}_i$ indicates that it is the estimated counterpart of the theoretical entity $\mu_i$. While past performance does not guarantee future results, the typical assumption is that it is at least indicative of future performance and hence a sensible estimator.
+$$\mu_i = \frac{1}{T} \sum_{t=1}^{T} r_{it},$$
+
+where $r_{it}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods.
 
 Leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio, as well as their daily adjusted close prices:
 
@@ -62,7 +64,7 @@ returns_daily <- prices_daily |>
   arrange(symbol, date)
 ```
 
-We can use the tidy return data to quickly calculate the sample average of each asset in the Dow Jones Industrial Average that we can use as the estimated expected return.
+We can use the tidy return data to quickly calculate the sample average of each asset in the Dow Jones Industrial Average that we can use as the expected return.
 
 ```{r}
 assets <- returns_daily |> 
@@ -88,13 +90,13 @@ fig_mu <- assets |>
 fig_mu
 ```
 
-## Estimate the Variance-Covariance Matrix
+## The Variance-Covariance Matrix
 
-Individual asset risk in MPT is typically quantified using variance ($\sigma^2$) or volatilities ($\sigma$).^[Alternative approaches include Value-at-Risk (VaR), Expected Shortfall, or higher-order moments such as skewness and kurtosis.] The latter can be estimated as the sample standard deviation:
+Individual asset risk in MPT is typically quantified using variance ($\sigma^2$) or volatilities ($\sigma$).^[Alternative approaches include Value-at-Risk (VaR), Expected Shortfall, or higher-order moments such as skewness and kurtosis.] The latter can be calculated as the sample standard deviation:
 
-$$\hat{\sigma}_i = \sqrt{\frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \hat{\mu}_i)^2}$$
+$$\sigma_i = \sqrt{\frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \mu_i)^2}$$
 
-We can estimate the volatilities for each asset by simply using the `sd()` function.
+We can get the volatilities for each asset by simply using the `sd()` function.
 
 ```{r}
 volatilities <- returns_daily |> 
@@ -120,17 +122,17 @@ fig_sigma <- assets |>
 fig_sigma
 ```
 
-As highlighted above, a key innovation of MPT is to consider interactions between assets. *Covariance* provides a measure for these interactions and can be estimated as follows: \index{Covariance}
+As highlighted above, a key innovation of MPT is to consider interactions between assets. *Covariance* provides a measure for these interactions and can be calculated as follows: \index{Covariance}
 
-$$\hat{\sigma}_{ij} = \frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \hat{\mu}_i)(r_{jt} - \hat{\mu}_j)$$
+$$\sigma_{ij} = \frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \mu_i)(r_{jt} - \mu_j)$$
 
 The interpretation is straightforward: While a positive covariance indicates that assets tend to move in the same direction, a negative covariance indicates that assets move in opposite directions. Since the overall portfolio volatility is a function of the individual covariances, the lower the covariance values the higher the reduction in overall risk through diversification. 
 
-Since individual asset variances are just a special case of the covariance formula above with $i=j$, we can denote the estimated variance-covariance matrix as:
+Since individual asset variances are just a special case of the covariance formula above with $i=j$, we can denote the variance-covariance matrix as:
 
-$$\hat\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \hat\mu)(r_t - \hat\mu)'.$$ 
+$$\Sigma = \frac{1}{T-1}\sum\limits_{t=1}^T (r_t - \mu)(r_t - \mu)'.$$ 
 
-To estimate this variance-covariance matrix, we can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
+To calculate this variance-covariance matrix, we can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
 
 ```{r}
 returns_wide <- returns_daily |> 
@@ -165,18 +167,19 @@ fig_vcov
 
 The expected asset returns and variance-covariance matrix allow us to formally define portfolio returns:
 
-$$\text{Expected Portfolio Return} = \sum_{i=1}^N \omega_i \hat{\mu}_i,$$
-where $\omega_i$ is the weight of asset $i$ in the portfolio and $\hat{\mu}_i$ is the estimated expected return of asset $i$. For simplicity, we assume that portfolio weights are constant over time for now. 
+$$\text{Expected Portfolio Return} = \sum_{i=1}^N \omega_i \mu_i,$$
+
+where $\omega_i$ is the weight of asset $i$ in the portfolio and $\mu_i$ is the expected return of asset $i$. For simplicity, we assume that portfolio weights are constant over time. 
 
 The portfolio variance is further calculated as
 
-$$\text{Portfolio Variance} =\sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \hat{\sigma}_{ij},$$
+$$\text{Portfolio Variance} =\sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \sigma_{ij},$$
 
-where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\hat{\sigma}_{ij}$ is the estimated covariance between returns of assets $i$ and $j$.
+where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\sigma}_{ij$ is the covariance between returns of assets $i$ and $j$.
 
 Let us begin by finding the portfolio with the minimum risk as a reference point. The optimization problem of the mean-variance approach only aiming to minimize the portfolio variance is given by
 
-$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \hat{\sigma}_{ij},$$
+$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \sigma_{ij},$$
 
 while staying fully invested across all available assets $N$:
 
@@ -184,9 +187,9 @@ $$\sum_{i=1}^{N} \omega_i = 1$$
 
 Solving this problem analytically is easier in matrix notation, so we transform the problem to 
 
-$$\min_{\omega} \omega' \hat{\Sigma} \omega \text{ s.t. } \omega'\iota = 1,$$
+$$\min_{\omega} \omega' \Sigma \omega \text{ s.t. } \omega'\iota = 1,$$
 
-where $\hat{\Sigma}$ is the $(N\times N)$ variance-covariance matrix and $\omega=\left(\omega_1,\ldots,\omega_N\right)'$ is the $(N\times1)$ vector of given portfolio weights. The solution for the minimum-variance portfolio can then be described as
+where $\Sigma$ is the $(N\times N)$ variance-covariance matrix and $\omega=\left(\omega_1,\ldots,\omega_N\right)'$ is the $(N\times1)$ vector of given portfolio weights. The solution for the minimum-variance portfolio can then be described as
 
 $$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota},$$
 where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum variance portfolio using this formula:
@@ -234,12 +237,12 @@ summary_mvp
 
 Next, we introduce the concept of efficient portfolios. Again, we aim to minimize portfolio variance 
 
-$$\min_{\omega} \omega' \hat{\Sigma} \omega,$$
+$$\min_{\omega} \omega' \Sigma \omega,$$
 
 while staying fully invested *and* earning a **minimum expected return** $\bar{\mu}$
 
 $$ \omega'\iota = 1$$
-$$\omega'\hat{\mu} = \bar{\mu}$$
+$$\omega'\mu} = \bar{\mu}$$
 
 To illustrate the difference between the minimum-variance and efficient portfolio, we now use the Nasdaq 100 index:
 
@@ -268,7 +271,7 @@ We choose the minimum expected return such that we achieve the average Nasdaq 10
 mu_bar <- mean(nasdaq$ret, na.rm = TRUE)
 ```
 
-Note that $\bar\mu$ needs to be higher than $\hat\mu_{mvp}$.
+Note that $\bar\mu$ needs to be higher than $\mu_{mvp}$.
 
 The analytic solution for the efficient portfolio can be derived as:
 
