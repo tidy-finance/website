@@ -25,7 +25,7 @@ library(tidyfinance)
 library(scales)
 ```
 
-We first download daily prices for one stock symbol, e.g., the Apple stock (*AAPL*) directly from the data provider Yahoo Finance. To download the data, you can use the function `download_data`. If you do not know how to use it, make sure you read the help file by calling `?download_data`. We especially recommend taking a look at the examples section of the documentation. We request daily data from the beginning of 2000 to the end of the last year; a period of more than 20 years.\index{Stock prices}
+We first download daily prices for one stock symbol, e.g., the Apple stock (*AAPL*) directly from the data provider Yahoo Finance. To download the data, you can use the function `download_data`. In case this is the first time you use the package `tidyfinance`, you may be asked once to install some additional packages in the process of downloading the data. If you do not know how to use it, make sure you read the help file by calling `?download_data`. We especially recommend taking a look at the examples section of the documentation. We request daily data from the beginning of 2000 to the end of the last year; a period of more than 20 years.\index{Stock prices}
 
 ```{r}
 #| cache: true
@@ -52,7 +52,7 @@ prices |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Apple stock prices between beginning of 2000 and end of 2023"
+    title = "Apple stock prices between beginning of 2000 and end of 2024"
   )
 ```
 
@@ -66,16 +66,16 @@ returns <- prices |>
 returns
 ```
 
-The resulting data frame has three columns, in which the last one contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NA`) because there is no previous price.\index{Missing value} Obviously, the use of `lag()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The command `arrange()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use `arrange(desc(date))`.
+The resulting data frame has three columns, in which the last one contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NA`) because there is no previous price.\index{Missing value} Obviously, the use of `lag()` would be meaningless if the time series is not ordered by ascending dates.\index{Lag observations} The command `arrange()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending values, you could, for instance, use `arrange(desc(ret))`.
 
-For the upcoming examples, we remove missing values as these would require separate treatment when computing. For example, missing values can affect sums and averages by reducing the number of valid data points, leading to underestimation in sums and potentially skewed averages if not properly accounted for. In general, always make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
+For the upcoming examples, we remove missing values as these would require separate treatment for many applications. For example, missing values can affect sums and averages by reducing the number of valid data points if not properly accounted for. In general, always make sure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
 
 ```{r}
 returns <- returns |>
   drop_na(ret)
 ```
 
-Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we draw a dashed line that indicates the five percent quantile of the daily returns to the histogram, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators.\index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to the stylized facts of financial returns.
+Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we draw a dashed line that indicates the historical five percent quantile of the daily returns to the histogram, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators.\index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to the stylized facts of financial returns.
 
 ```{r} 
 #| label: fig-101 
@@ -96,7 +96,7 @@ returns |>
   scale_x_continuous(labels = percent)
 ```
 
-Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the five percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute and analzye the summary statistics for the main variables of interest.
+Here, `bins = 100` determines the number of bins used in the illustration and hence implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the historical five percent quantile of the daily returns. A typical task before proceeding with *any* data is to compute and analyze the summary statistics for the main variables of interest.
 
 ```{r}
 returns |>
@@ -111,7 +111,8 @@ returns |>
   ))
 ```
 
-We see that the maximum *daily* return was `r returns |> pull(ret) |> max() * 100` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.\
+We see that the maximum *daily* return was `r returns |> pull(ret) |> max() * 100` percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
+
 You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
 
 ```{r}
@@ -215,7 +216,7 @@ Note that you are now also equipped with all tools to download price data for *e
 
 ## Other Forms of Data Aggregation
 
-Of course, aggregation across variables other than `symbol` can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume} Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e-9` (R can handle scientific notation) denotes daily trading volume in billion USD.
+Of course, aggregation across variables other than `symbol` or `date` can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume} Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e-9` (R can handle scientific notation) denotes daily trading volume in billion USD.
 
 ```{r}
 #| label: fig-104
