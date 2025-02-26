@@ -214,6 +214,140 @@ returns_daily |>
 
 Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- download_data(type = "constituents", index = "S&P 500")`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500.\index{Data!SP 500} However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
+## Annualization and Working with Different Frequencies
+
+Financial data often exists at different frequencies due to varying reporting schedules, trading calendars, and economic data releases. For example, stock prices are typically recorded daily, while macroeconomic indicators such as GDP or inflation are reported monthly or quarterly. Additionally, some datasets are recorded only when transactions occur, resulting in irregular timestamps. To compare data meaningfully, we must align different frequencies appropriately. For example, to compare returns across different frequencies, we use annualization techniques.
+
+### Converting Between Return Frequencies
+
+So far, we've worked with daily returns, but we can easily convert our data to other frequencies. Let's create monthly returns from our daily data:
+
+```{r}
+# Create monthly returns using base R functions instead of floor_date()
+returns_monthly <- returns_daily |>
+  mutate(month = format(date, "%Y-%m")) |>
+  group_by(symbol, month) |>
+  summarize(
+    ret = prod(1 + ret) - 1,
+    .groups = "drop"
+  ) |>
+  rename(date = month) |>
+  mutate(date = as.Date(paste0(date, "-01")))
+```
+
+In this code, we first group the data by symbol and month and then compute monthly returns by compounding the daily returns: $(1+r_1)\cdots(1+r_2)\ldots(1+r_n)-1$. To visualize how return characteristics change across different frequencies, we can compare histograms:
+
+```{r}
+# Compare return distributions across frequencies for a single stock
+apple_returns <- bind_rows(
+  returns_daily |> 
+    filter(symbol == "AAPL") |> 
+    mutate(frequency = "Daily"),
+  returns_monthly |> 
+    filter(symbol == "AAPL") |> 
+    mutate(frequency = "Monthly")
+)
+
+# Plot histogram of returns by frequency
+apple_returns |>
+  ggplot(aes(x = ret, fill = frequency)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 50) +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "Distribution of Apple returns across different frequencies",
+    subtitle = "Note how the distribution changes with the time horizon"
+  ) +
+  scale_x_continuous(labels = percent) +
+  theme_minimal() +
+  facet_wrap(~frequency, scales = "free")
+```
+
+### Annualizing Returns
+
+When comparing investments over different time horizons, we typically annualize returns and risk metrics. The proper annualization depends on the return calculation method and assumptions about return distributions. A straightforward method for annualizing returns is to compute the total return over one year directly. If the dataset contains at least one full year of returns, the annualized return can be obtained similarly as above by dividing the price at time $t$ by the price of the same stock exactly a year ago and subtracting 1. This is done in the following block:
+
+```{r}
+returns_yearly <- prices_daily |>
+  group_by(symbol) |>
+  mutate(date_1y_ago = date - years(1)) |>
+  left_join(prices_daily, by = c("symbol", "date_1y_ago" = "date"), suffix = c("", "_lag")) |>
+  mutate(ret = adjusted_close / adjusted_close_lag - 1) |>
+  select(symbol, date, ret) |>
+  drop_na(ret)
+```
+
+While we could use these yearly returns for analysis, this method of annualization may not always be useful or even feasible. Suppose you do not have access to daily return data spanning several years but only have data for a few recent months—for example, from a newly launched hedge fund. In that case, calculating the total return for a full year may be impossible, or you may have only a limited number of annual returns available, making statistical analysis challenging.
+
+To address this, an alternative approach to annualizing returns involves either simple scaling (for arithmetic returns) or compounding (for geometric returns), using what is known as an annualization factor.
+
+```{r}
+# Compute annualized returns by symbol
+annual_metrics <- returns_daily |>
+  group_by(symbol) |>
+  summarize(
+    arithmetic_annual_ret = mean(ret) * 252,
+    geometric_annual_ret = (prod(1 + ret)^(252/n()) - 1),
+    annual_sd = sd(ret) * sqrt(252),
+    sharpe_ratio = arithmetic_annual_ret / annual_sd,
+    annual_var = quantile(ret, probs = 0.05) * sqrt(252),
+    n_obs = n()
+  )
+```
+
+The key elements in this annualization are:
+
+1. Arithmetic annualization: Simply multiply the average daily return by the number of trading days (typically 252 for stock equities)
+2. Geometric annualization: Calculate $(1+r)^{(252/n)} - 1$, where $r$ is the compound return over the period and $n$ is the number of days
+3. Volatility and Value-at-Risk annualization: Multiply the standard deviation/VaR by the square root of the number of periods per year ($sqrt{252}$ for daily data)
+
+Commonly used scaling factors to annualize are 252 trading days for daily data, 52 for weekly data, 12 for monthly data, and 4 for quarterly data. So let's compare the impact of the different annualization methods by looking at the Apple stock for the daily, monthly, and yearly returns:
+
+```{r}
+# Compare return distributions across frequencies for a single stock
+apple_returns <- bind_rows(
+  returns_daily |> 
+    filter(symbol == "AAPL") |> 
+    mutate(frequency = "Daily"),
+  returns_monthly |> 
+    filter(symbol == "AAPL") |> 
+    mutate(frequency = "Monthly"),
+  returns_yearly |> 
+    filter(symbol == "AAPL") |> 
+    mutate(frequency = "Yearly")
+)
+
+# Define the mapping of frequency to the annualization factor
+annual_factors <- c("Daily" = 252, "Monthly" = 12, "Yearly" = 1)
+
+# Compute annual metrics dynamically for each frequency
+annual_metrics <- apple_returns |>
+  group_by(symbol, frequency) |>
+  summarize(
+    annual_factor = annual_factors[unique(frequency)],  # Assign appropriate AF
+    arithmetic_annual_ret = mean(ret) * annual_factor,
+    geometric_annual_ret = (prod(1 + ret)^(annual_factor / n()) - 1),
+    annual_sd = sd(ret) * sqrt(annual_factor),
+    sharpe_ratio = arithmetic_annual_ret / annual_sd,
+    annual_var = quantile(ret, probs = 0.05) * sqrt(annual_factor),
+    n_obs = n(),
+    .groups = "drop"
+  )
+annual_metrics
+```
+
+We can see that the annualization technique can have quite an impact on the results. We find the greatest difference in the annualized standard deviation (volatility) of the returns and also in the Value-at-Risk. Also, note that 
+
+- The geometric mean is always lower than or equal to the arithmetic mean due to compounding effects.
+- When estimating future returns, the arithmetic mean tends to overestimate real growth, while the geometric mean provides a more conservative estimate.
+- The difference between these two measures grows with return volatility.
+
+
+In the code above, we calculated an annualized Sharpe Ratio by using the annualized arithmetic mean and annualized standard deviation. From this, we could deduct the annualization factor scaling for the Sharpe ratio when using daily returns:
+$$
+\text{SR}_{\text{yearly}}=\frac{\mu_{\text{yearly}}}{\sigma_{\text{yearly}}}=\frac{\mu_{\text{daily}}\cdot 252}{\sigma_{\text{daily}} \cdot\sqrt{252}}=\frac{\mu_{\text{daily}}}{\sigma_{\text{daily}}}\cdot\sqrt{252}=\text{SR}_{\text{daily}}\cdot\sqrt{252}
+$$
+
 ## Other Forms of Data Aggregation
 
 Of course, aggregation across variables other than `symbol` or `date` can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares.\index{Trading volume} Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e-9` (R can handle scientific notation) denotes daily trading volume in billion USD.
@@ -277,4 +411,6 @@ In this chapter, you learned how to effectively use R to download, analyze, and 
 1. Download daily prices for another stock market symbol of your choice from Yahoo Finance using `download_data()` from the `tidyfinance` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain any visible differences.
 1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
 1. Take your code from the previous exercises and generalize it such that you can perform all the computations for an arbitrary number of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+1. To facilitate the computation of the annualization factor, write a function that takes a vector of return dates as input and determines the frequency before returning the appropriate annualization factor.
 1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.
+
