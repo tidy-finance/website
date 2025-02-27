@@ -5,7 +5,7 @@ metadata:
   description-meta: Learn how to use the programming language R for implementing the Markowitz model for portfolio optimization.
 ---
 
-In the previous chapter, we show how to download stock market data and analyze them with graphs and summary statistics. Now, we move to a typical question in finance: How should an investor allocate her wealth across assets that differ in expected returns, variance, and correlations to optimize her portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by @Markowitz1952, revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
+In the previous chapter, we show how to download stock market data and analyze them with figures and summary statistics. Now, we move to a typical question in finance: How should an investor allocate her wealth across assets that differ in expected returns, variance, and correlations to optimize her portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by @Markowitz1952, revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz’s framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
 
 MPT relies on the fact that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: combining assets with low or negative correlations with a given portfolio reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
 
@@ -26,14 +26,13 @@ We introduce the @ggrepel package for adding text labels to the figures in this 
 
 ## The Asset Universe
 
-Suppose, that $N$ different risky assets are available to the investor. Each asset $i$ delivers expected returns $\mu_i$, representing the anticipated profit from holding the asset for one period. The investor can allocate her wealth across these assets by choosing the portfolio weights $\omega_i$ for each asset $i$. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option such as keeping your money under a madras. 
-The overarching question of this chapter is: How should the investor allocate her wealth across these assets to optimize her portfolio’s performance?
+Suppose, that $N$ different risky assets are available to the investor. Each asset $i$ delivers expected returns $\mu_i$, representing the anticipated profit from holding the asset for one period. The investor can allocate her wealth across these assets by choosing the portfolio weights $\omega_i$ for each asset $i$. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option such as keeping your money under a mattress. The overarching question of this chapter is: How should the investor allocate her wealth across these assets to optimize her portfolio’s performance?
 
-According to @Markowitz1952, portfolio selection involves two stages: first, forming expectations about future security performance based on observations and experience; second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated: You need historical data or other considerations to generate estimates of the distribution of future returns. Only then it is possible to proceed to optimal decision making *conditional* on your estimation. 
+According to @Markowitz1952, portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience; second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated: You need historical data or other considerations to generate estimates of the distribution of future returns. Only then it is possible to proceed to optimal decision making *conditional* on your estimation. 
 
 To keep things conceptually simple, we focus on the latter part for now and assume that the actual distribution of the asset returns is known. In later chapters we discuss the issue arise once we take estimation uncertainty into account but for simplicity. To provide some meaningful illustrations, we rely on historical data to compute reasonable proxies for the expected returns and the variance-covariance of the assets returns, but we will work under the assumption, that these are the true parameters of the return distribution.  
 
-Thus, leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio, as well as their daily adjusted close prices. We compute the sample average returns as $\mu_i = \frac{1}{T} \sum_{t=1}^{T} r_{it},$ where $r_{it}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods and treat the vector $\mu = (\mu_1, ...,\mu_N)'$ as the true expected return of the assets.
+Thus, leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio, as well as their daily adjusted close prices. 
 
 ```{r}
 #| output: false
@@ -43,60 +42,80 @@ symbols <- download_data(
 )
 
 prices_daily <- download_data(
-    type = "stock_prices", 
-    symbol = symbols$symbol,
-    start_date = "2019-08-01", 
-    end_date = "2024-07-31"
+  type = "stock_prices", 
+  symbol = symbols$symbol,
+  start_date = "2000-01-01",
+  end_date = "2024-12-31"
 )
-
-returns_daily <- prices_daily |>
-  group_by(symbol) |>
-  mutate(ret = adjusted_close / lag(adjusted_close) - 1) |>
-  ungroup() |>
-  select(symbol, date, ret) |>
-  drop_na(ret)
 ```
 
-We can use the tidy return data to quickly calculate the sample average of each asset in the Dow Jones Industrial Average that we can use as the expected return.
+To have a stable stock universe and to keep the analysis simple, we ensure that all stocks where traded over the whole sample period:
+
+```{r}
+prices_daily <- prices_daily |>
+  group_by(symbol) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n == max(n)) |>
+  select(-n)
+```
+
+We compute the sample average returns as $\mu_i = \frac{1}{T} \sum_{t=1}^{T} r_{it},$ where $r_{it}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods and treat the vector $\mu = (\mu_1, ...,\mu_N)'$ as the true expected return of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
+
+```{r}
+returns_monthly <- prices_daily |>
+  mutate(date = floor_date(date, "month")) |>
+  group_by(symbol, date) |>
+  summarize(price = last(adjusted_close), .groups = "drop_last") |>
+  mutate(ret = price / lag(price) - 1) |>
+  drop_na(ret) |>
+  select(-price)
+```
+
+We can use the return data to quickly calculate the sample average of each asset in the Dow Jones Industrial Average that we can use as the expected return.
 
 Individual asset risk in MPT is typically quantified using variance ($\sigma^2$) or volatilities ($\sigma$).^[Alternative approaches include Value-at-Risk (VaR), Expected Shortfall, or higher-order moments such as skewness and kurtosis.] We suppose that the true volatities of the assets are given by the sample standard deviation $\sigma_i = \sqrt{\frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \mu_i)^2}.$
 
 We compute the sample standard deviation for each asset by simply using the `sd()` function.
 
 ```{r}
-assets <- returns_daily |> 
+assets <- returns_monthly |> 
   group_by(symbol) |> 
-  summarize(mu = mean(ret),
-            sigma = sd(ret))
+  summarize(
+    mu = mean(ret),
+    sigma = sd(ret)
+  )
 ```
 
-We can conveniently illustrate the resulting distribution of the asset returns in a diagram, showing the volatility on the x-axis and the expected return on the y-axis.
+We can illustrate the resulting distribution of the asset returns in @fig-201, showing the volatility on the horizontal axis and the expected return on the vertical axis.
 
 ```{r}
 #| label: fig-201
-#| fig-cap: "Expected returns and volatilities based on prices adjusted for dividend payments and stock splits."
-
+#| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Expected returns and volatilities of Dow index constituents. The figure a scatter plot with volatilities on the horizontal and expected returns on the vertical axis."
 fig_assets <- assets |> 
   ggplot(aes(x = sigma, y = mu, label = symbol)) +
   geom_point() +
   geom_text_repel() +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
   labs(
     x = "Volatility", y = "Expected return",
     title = "Expected returns and volatilities of Dow index constituents"
   )
 fig_assets 
-
 ```
 
-As highlighted above, a key innovation of MPT is to consider interactions between assets. The *Variance-Covariance matrix* collects this information. We suppose that the variance-covariance matrix $\Sigma$ of the returns is given by the sample estimator: \index{Covariance}
+As highlighted above, a key innovation of MPT is to consider interactions between assets. The *Variance-Covariance matrix* collects this information. We assume that the variance-covariance matrix $\Sigma$ of the returns is given by the sample covariance: \index{Covariance}
 
 $$\sigma_{ij} = \frac{1}{T-1} \sum_{t=1}^{T} (r_{it} - \mu_i)(r_{jt} - \mu_j)$$
 
 The interpretation is straightforward: While a positive covariance between assets indicates that these assets tend to move in the same direction, a negative covariance indicates that the assets move in opposite directions. 
-We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a tidy data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
+
+We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
 
 ```{r}
-returns_wide <- returns_daily |> 
+returns_wide <- returns_monthly |> 
   pivot_wider(names_from = symbol, values_from = ret) 
 
 sigma <- returns_wide |> 
@@ -108,9 +127,8 @@ Figure @fig-203 illustrates the resulting variance-covariance matrix.
 
 ```{r}
 #| label: fig-203
-#| fig-cap: "Annualized variances and covariances based on prices adjusted for dividend payments and stock splits." 
+#| fig-cap: "Variances and covariances based on monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Variance-covariance matrix of DOW index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
-
 fig_sigma <- sigma |> 
   as_tibble(rownames = "symbol_a") |> 
   pivot_longer(-symbol_a, names_to = "symbol_b") |> 
@@ -128,17 +146,16 @@ fig_sigma
 
 ## The Minimum-Variance Framework
 
-Suppose now allocation your wealth in a portfolio given by the weight vector $\omega$. The resulting portfolio returns $\omega'r$ have an expected return $\mu_\omega = \omega'\mu = \sum_{i=1}^N \omega_i \mu_i$. 
-
-The variance of the portfolio returns is $\sigma^2_\omega = \omega'\Sigma\omega = \sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \sigma_{ij}$ where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\sigma}_{ij$ is the covariance between returns of assets $i$ and $j$.
+Suppose now you allocate your wealth in a portfolio given by the weight vector $\omega$. The resulting portfolio returns $\omega'r$ have an expected return $\mu_\omega = \omega'\mu = \sum_{i=1}^N \omega_i \mu_i$.The variance of the portfolio returns is $\sigma^2_\omega = \omega'\Sigma\omega = \sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \sigma_{ij}$ where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\sigma}_{ij$ is the covariance between returns of assets $i$ and $j$.
 
 We first consider an investor who wants to invest into a portfolio which delivers the lowest possible variance as a reference point. Thus, the optimization problem of the minimum-variance investor is given by
 
-$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \sigma_{ij} = \min_\omega \omega'\Sigma\omega$$
+$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \sigma_{ij} = \min_\omega \omega'\Sigma\omega,$$
 
-while staying fully invested across all available assets $N$, $\sum_{i=1}^{N} \omega_i = 1$.
-The analytical solution for the minimum-variance portfolio is
+while staying fully invested across all available assets $N$, $\sum_{i=1}^{N} \omega_i = 1$. The analytical solution for the minimum-variance portfolio is
+
 $$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota},$$
+
 where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum variance portfolio:
 
 ```{r}
@@ -152,7 +169,7 @@ Figure @fig-204 shows the resulting portfolio weights.
 
 ```{r}
 #| label: fig-204
-#| fig-cap: "Weights are based on returns adjusted for dividend payments and stock splits." 
+#| fig-cap: "Weights are based on monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each DOW index constituent."
 assets <- bind_cols(assets, omega_mvp = omega_mvp)
 
@@ -184,14 +201,16 @@ summary_mvp
 
 In many instances, earning the lowest possible variance may not be desired outcome. Instead, we generalize the concept of efficient portfolios, where, in additional to minimizing portfolio variance the investor aims to earn a **minimum expected return** $\omega'\mu \geq \bar{\mu}.$ In other words, when $\bar\mu\geq \omega_\text{mvp}'\mu$, the investor is willing to accept a higher portfolio variance in return for earning a higher expected return. 
 
-Suppose, for instance, the investor wants to earn at least the historical average return of the asset which delivered the highest average returns in the past.
+Suppose, for instance, the investor wants to earn at least the historical average return of the asset which delivered the highest average returns in the past:
 
 ```{r}
-mu_bar <- assets|>arrange(desc(mu))|>head(1) |> pull(mu)
+mu_bar <- max(assets$mu)
 ```
 
 Formally, the optimization problem is given by 
+
 $$\min_\omega \omega'\Sigma\omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu\geq\bar\mu.$$
+
 The analytic solution for the efficient portfolio can be derived as:
 
 $$\omega_{efp} = \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$ 
@@ -214,12 +233,12 @@ summary_efp <- tibble(
 )
 ```
 
-Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, that the efficient portfolio has a higher annualized return at the cost of higher volatility compared to the minimum-variance portfolio. 
+Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, that the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio. 
 
 ```{r}
 #| label: fig-205
-#| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers the expected return of the Nasdaq 100, respectively. The small dots indicate the location of the individual constituents." 
-#| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each Nasdaq index constituent."
+#| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents." 
+#| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows a bar chart with portfolio weights for each Dow Jones index constituent."
 #| warning: false
 summaries <- bind_rows(
   assets, summary_mvp, summary_efp
@@ -237,20 +256,20 @@ fig_summaries <- summaries |>
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) + 
   labs(
-    x = "Volatility", y = "Annualized return",
+    x = "Volatility", y = "Expected return",
     title = "Efficient & minimum-variance portfolios"
-    ) 
+  ) 
 fig_summaries
 ```
 
 The figure illustrates the substantial diversification benefits: Instead of allocating all wealth into one asset which delivered a high average return in the past (at a substantial volatility), the efficient portfolio promises exactly the same expected returns but at a much lower volatility. 
 
-It should be noted, that the level of desired returns $\bar\mu$ reflect the risk-aversion of the investor. Less risk averse investors may require a higher level of desired returns, while more risk averse investors may only choose $\bar\mu$ closer to the expected return of the minimum variance portfolio. Very often, the mean-variance framework is instead derived as the optimal decision framework of an investor with mean-variance utility function with a coefficient of relative risk aversion $\gamma$. In the Appendix we show, that there is a one-to-one mapping from $\gamma$ to the desired level of expected returns $\bar\mu$, which implies that the resulting efficient portfolios are equivalent and do not depend on the way the optimization problem is formulated. 
+It should be noted, that the level of desired returns $\bar\mu$ reflect the risk-aversion of the investor. Less risk averse investors may require a higher level of desired returns, while more risk averse investors may only choose $\bar\mu$ closer to the expected return of the minimum variance portfolio. Very often, the mean-variance framework is instead derived as the optimal decision framework of an investor with mean-variance utility function with a coefficient of relative risk aversion $\gamma$. In the [Proofs](proofs.qmd) in the Appendix, we show, that there is a one-to-one mapping from $\gamma$ to the desired level of expected returns $\bar\mu$, which implies that the resulting efficient portfolios are equivalent and do not depend on the way the optimization problem is formulated. 
 
 ## The Efficient Frontier
 
-\index{Efficient frontier} The set of portfolios which satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility is called the *efficient frontier*, e.g., @Merton1972.\index{Return volatility} \index{Separation theorem}. To derive the portfolios which span the efficient frontier, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) proofs very helpful. In short, the theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\bar\mu$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} 
-In other words, the efficient frontier can be characterized by the following equation:
+\index{Efficient frontier} The set of portfolios which satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility is called the *efficient frontier*, e.g., @Merton1972.\index{Return volatility} \index{Separation theorem}. To derive the portfolios, which span the efficient frontier, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) proofs very helpful. In short, the theorem states that as soon as we have two efficient portfolios (such as the minimum variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\bar\mu$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} In other words, the efficient frontier can be characterized by the following equation:
+
 $$\omega_{a\mu_1 + (1-a)\mu_2} = a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2}$$
 
 where $a$ is a scalar between 0 and 1, $\omega_\mu_i$ is an efficient portfolio that delivers the expected return $\mu_i$. It is straightforward to proof the Theorem. Consider the analytical solution for the efficient portfolio which delivers expected returns $\mu_i$ which implies: 
@@ -263,7 +282,7 @@ The code below implements the construction of this efficient frontier, which cha
 
 ```{r}
 efficient_frontier <- tibble(
-  a = seq(from = -1, to = 4, by = 0.01),
+  a = seq(from = -1, to = 2, by = 0.01),
 ) |> 
   mutate(
     omega = map(a, ~ .x * omega_efp + (1 - .x) * omega_mvp),
@@ -277,7 +296,7 @@ Finally, it is simple to visualize the efficient frontier alongside the two effi
 ```{r}
 #| label: fig-206
 #| fig-cap: "The big dots indicate the location of the minimum variance and the efficient portfolio that delivers 3 times the expected return of the minimum variance portfolio, respectively. The small dots indicate the location of the individual constituents."
-#| fig-alt: "Title: Efficient frontier for Nasdaq 100 index constituents. The figure shows Nasdaq 100 index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
+#| fig-alt: "Title: Efficient frontier for Dow index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
 #| warning: false
 summaries <- bind_rows(
     summaries, efficient_frontier
@@ -294,7 +313,7 @@ fig_efficient_frontier <- summaries |>
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) + 
-  labs(x = "Volatility", y = "Annualized return",
+  labs(x = "Volatility", y = "Expected return",
        title = "Efficient frontier for Dow index constituents") + 
   theme(legend.position = "none")
 fig_efficient_frontier
@@ -308,7 +327,6 @@ The mean-variance framework is a cornerstone of modern finance, emphasizing the 
 - Portfolio risk depends on both volatilities and correlations between assets.
 - Minimum-variance portfolio achieves the lowest possible risk for a given set of assets.
 - Efficient portfolios maximize expected return for each level of risk.
-- Analytical solutions exist for simple constraints but numerical optimization is needed for complex problems.
 
 ## Exercises
 
