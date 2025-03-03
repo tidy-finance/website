@@ -65,12 +65,12 @@ Each component of this formula serves a specific purpose in capturing the compan
 - Changes in Working Capital capture cash tied up in operations
 - Capital Expenditures (CAPEX) represent investments in long-term assets
 
-We can implement this calculation by combining and transforming our financial statement data:
+We can implement this calculation by combining and transforming our financial statement data. Note that we also arrange by year, which is important for some of the following code chunks.
 
 ```{r}
 dcf_data <- income_statements |> 
   mutate(
-    ebit = net_income + income_tax_expense - interest_expense - interest_income
+    ebit = net_income + income_tax_expense + interest_expense - interest_income
   ) |> 
   select(
     year = calendar_year, 
@@ -90,16 +90,16 @@ dcf_data <- income_statements |>
   arrange(year) 
 ```
 
-## Forecast Free-Cash-Flow
+## Forecasting Free Cash Flow
 
-After calculating historical FCF, we need to project it into the future. While historical data provides a foundation, forecasting requires both quantitative analysis and qualitative judgment. We use a ratio-based approach that links all FCF components to revenue growth, making our forecasts more tractable.\index{Free Cash Flow!Forecasting}
+After calculating historical FCF, we need to project it into the future. While historical data provides a foundation, forecasting requires both quantitative analysis and qualitative judgment. We use a ratio-based approach that links all FCF components to revenue growth, making our forecasts more tractable.\index{Free Cash Flow!Forecasting} This is another crucial assumption for our exposition that will not hold in reality. Thus, you must put more thought into these forecast ratios and their dynamics over time.
 
 First, we express each FCF component as a ratio relative to revenue. This standardization helps identify trends and makes forecasting more systematic. @fig-500 shows the historical evolution of these key financial ratios.
 
 ```{r}
 #| label: fig-500
-#| fig-cap: "Ratios are based on financial statements as provided through the FMP API." 
-#| fig-alt: "Title: Key financial ratios of Microsoft between 2020 and 2024. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
+#| fig-cap: "Ratios are based on financial statements provided through the FMP API." 
+#| fig-alt: "Title: Key forecast ratios of Microsoft between 2020 and 2024. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
 dcf_data <- dcf_data |> 
   mutate(
     revenue_growth = revenue / lag(revenue) - 1,
@@ -110,7 +110,7 @@ dcf_data <- dcf_data |>
     capex_to_revenue = capex / revenue
   )
 
-fig_financial_ratios <- dcf_data |> 
+dcf_data |> 
   pivot_longer(cols = c(operating_margin:capex_to_revenue)) |>
   ggplot(aes(x = year, y = value, color = name)) +
   geom_line() +
@@ -120,19 +120,20 @@ fig_financial_ratios <- dcf_data |>
     x = NULL, y = NULL, color = NULL,
     title = "Key financial ratios of Microsoft between 2020 and 2024"
   )
-fig_financial_ratios
 ```
 
 The operating margin, for instance, represents how much of each revenue dollar translates into operating profit (EBIT), while the CAPEX-to-revenue ratio indicates the company's investment intensity.\index{Financial ratios}
 
-For our DCF analysis, we need to project these ratios into the future. These projections should reflect both historical patterns and forward-looking considerations such as: Industry trends and competitive dynamics, company-specific growth initiatives, expected operational efficiency improvements, planned capital investments, or working capital management strategies.
+For our DCF analysis, we need to project these ratios into the future. These projections should reflect both historical patterns and forward-looking considerations such as: Industry trends and competitive dynamics, company-specific growth initiatives, expected operational efficiency improvements, planned capital investments, or working capital management strategies. Overall, there is a lot to consider in practice. However, forecast ratios make this process tractable.
 
-We demonstrate this forecasting approach in @fig-501. Note that our forecasted ratio dynamics just serve as an example and are not grounded in any economic analysis.
+Another crucial question is the length of the forecast period. We use five years below ad-hoc, but you want to make detailed projections for each year when the company undergoes significant changes. As long as forecast ratios change, you need to make explicit forecasts. Once the company reaches a steady state, you can switch to computing the continuation value discussed later.
+
+We demonstrate this forecasting approach in @fig-501. Note that our forecast ratio dynamics just serve as an example and are not grounded in deeper economic analysis.
 
 ```{r}
 #| label: fig-501
-#| fig-cap: "Realized ratios are based on financial statements as provided through the FMP API, while forecasts are manually defined." 
-#| fig-alt: "Title: Key financial ratios and ad-hoc forecasts of Microsoft between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and financial ratios and their forecasts on the vertical axis."
+#| fig-cap: "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined." 
+#| fig-alt: "Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis."
 dcf_data_forecast_ratios <- tribble(
   ~year, ~operating_margin, ~da_margin, ~taxes_to_revenue, ~delta_working_capital_to_revenue, ~capex_to_revenue,
   2025, 0.41, 0.09, 0.08, 0.001, -0.2,
@@ -147,7 +148,7 @@ dcf_data <- dcf_data |>
   mutate(type = "Realized") |> 
   bind_rows(dcf_data_forecast_ratios)
 
-fig_financial_ratios_forecast <- dcf_data |> 
+dcf_data |> 
   pivot_longer(cols = c(operating_margin:capex_to_revenue)) |> 
   ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
   geom_line() +
@@ -157,12 +158,11 @@ fig_financial_ratios_forecast <- dcf_data |>
     x = NULL, y = NULL, color = NULL, linetype = NULL,
     title = "Key financial ratios and ad-hoc forecasts of Microsoft between 2020 and 2029"
   )
-fig_financial_ratios_forecast
 ```
 
 The final step in our FCF forecast is projecting revenue growth. While there are multiple approaches to this task, we demonstrate a GDP-based method that links company growth to macroeconomic forecasts.\index{Revenue growth}
 
-We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) database as our baseline. The WEO provides comprehensive economic projections, though it's important to note that these forecasts are periodically revised as new data becomes available.\index{Data!IMF WEO}
+We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) database as our baseline. The WEO provides comprehensive economic projections, though it is important to note that these forecasts are periodically revised as new data becomes available.\index{Data!IMF WEO} We manually collect these forecasts and store them in a tibble.
 
 ```{r}
 gdp_growth <- tibble(
@@ -174,7 +174,7 @@ dcf_data <- dcf_data |>
   left_join(gdp_growth, join_by(year))
 ```
 
-Our approach models revenue growth as a linear function of GDP growth. This relationship captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling}
+Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling} Let us estimate the model with historical data.
 
 ```{r}
 revenue_growth_model <- dcf_data |> 
@@ -188,15 +188,13 @@ dcf_data <- dcf_data |>
   ) 
 ```
 
-The model estimates two parameters: (i) an intercept that captures the company's baseline growth, and (ii) a slope coefficient that measures the company's sensitivity to GDP changes.
-
-We visualize the historical and projected growth rates using this approach in @fig-502:
+The model estimates two parameters: (i) an intercept that captures the company's baseline growth, and (ii) a slope coefficient that measures the company's sensitivity to GDP changes. Then, we can use the model and the growth forecasts to make revenue growth projections. We visualize the historical and projected growth rates using this approach in @fig-502:
 
 ```{r}
 #| label: fig-502
-#| fig-cap: "Realized revue growth rates are based on financial statements as provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
-#| fig-alt: "Title: GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and gdp growth, revenue growth and their forecasts on the vertical axis."
-fig_growth <- dcf_data |> 
+#| fig-cap: "Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
+#| fig-alt: "Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis."
+dcf_data |> 
   filter(year >= 2021) |> 
   pivot_longer(cols = c(revenue_growth, gdp_growth)) |> 
   ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
@@ -205,14 +203,13 @@ fig_growth <- dcf_data |>
   scale_y_continuous(labels = percent) +
   labs(
     x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029"
+    title = "GDP growth and Microsoft's revenue growth and modeled forecasts between 2020 and 2029"
   )
-fig_growth
 ```
 
-While more sophisticated approaches exist, including proprietary analyst forecasts or bottom-up market analysis, this method provides a transparent and data-driven starting point for revenue projections.\index{Forecasting methods}
+While more sophisticated approaches exist (e.g., proprietary analyst forecasts or bottom-up market analyses), this method provides a transparent and data-driven starting point for revenue projections.\index{Forecasting methods}
 
-With all components in place - revenue growth projections and financial ratios - we can now calculate our FCF forecasts. We first need to convert our growth rates into revenue projections and then apply our forecasted ratios to compute each FCF component.\index{Free Cash Flow!Computation}
+With all components in place - revenue growth projections and forecast ratios - we can now calculate our FCF forecasts. We must first convert our growth rates into revenue projections and then apply our forecast ratios to compute each FCF component.\index{Free Cash Flow!Computation}
 
 ```{r}
 dcf_data$revenue_growth[1] <- 0
@@ -229,12 +226,12 @@ dcf_data <- dcf_data |>
   )
 ```
 
-We visualize the resulting FCF projections in @fig-503:
+We visualize the resulting FCF projections in @fig-503.
 
 ```{r}
 #| label: fig-503
-#| fig-cap: "Realized growth rates are based on financial statements as provided through the FMP API, while forecasts are manually defined." 
-#| fig-alt: "Title: GDP growth and Microsoft revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and gdp growth, revenue growth and their forecasts on the vertical axis."
+#| fig-cap: "Realized growth rates are based on financial statements provided through the FMP API, while forecasts are manually defined." 
+#| fig-alt: "Title: Actual and predicted free cash flow for Microsoft from 2020 to 2029. The figure shows a bar chart with years on the horizontal axis and Microsoft's historical and projected free cash flows on the vertical axis."
 fig_fcf <- dcf_data |>
   ggplot(aes(x = year, y = fcf / 1e9)) +
   geom_col(aes(fill = type)) +
@@ -249,16 +246,17 @@ fig_fcf
 
 ## Continuation Value
 
-A key component of DCF analysis is the continuation value (or terminal value), which represents the company's value beyond the explicit forecast period. This value often constitutes the majority of the total valuation, making its estimation particularly important.\index{Continuation value}
-The most common approach is the Perpetuity Growth Model, which assumes FCF grows at a constant rate indefinitely. The formula for this model is:
+A key component of DCF analysis is the continuation value (or terminal value), representing the company's value beyond the explicit forecast period. This value often constitutes the majority of the total valuation, making its estimation particularly important.\index{Continuation value} You can compute the continuation value once the company has reached its steady state.
 
-$$TV_{T} = \frac{FCF_{T+1}}{r - g}$$
+The most common approach is the Perpetuity Growth Model (or Gordon Growth Model), which assumes FCF grows at a constant rate indefinitely.\index{Perpetuity Growth Model}\index{Gordon Growth Model} The formula for this model is:
 
-where $TV_{T}$ is the terminal value at time $T$, $FCF_{T+1}$ is the free cash flow in the first year after our forecast period, $r$ is the discount rate (typically WACC, see below), and $g$ is the perpetual growth rate.
+$$TV_{T} = \frac{FCF_{T+1}}{r - g},$$
 
-The perpetual growth rate $g$ should reflect long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely.\index{Growth rate!Perpetual} For instance, last 20 years GDP growth is a sensible assumption (nominal growth rate is 4% for the US).
+where $TV_{T}$ is the terminal value at time $T$, $FCF_{T+1}$ is the free cash flow in the first year after our forecast period, $r$ is the discount rate (typically WACC, see below), and $g$ is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute $FCF_{T+1}$, which is equal to $FCF_{T}\cdot(1+g)$
 
-Let's implement the perpetuity growth model:
+The perpetual growth rate $g$ should reflect the long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely.\index{Growth rate!Perpetual} Exceeding GDP growth indefinitely also implies that the whole economy eventually consists of one company. For example, the last 20 years of GDP growth is a sensible assumption (the nominal growth rate is 4% for the US).
+
+Let us implement the Perpetuity Growth Model:
 
 ```{r}
 compute_terminal_value <- function(last_fcf, growth_rate, discount_rate){
@@ -273,23 +271,24 @@ terminal_value / 1e9
 Note that while we use the Perpetuity Growth Model here, practitioners often cross-check their estimates with alternative methods like the exit multiple approach, which bases the terminal value on comparable company valuations.^[See (corporatefinanceinstitute.com/)[https://corporatefinanceinstitute.com/resources/valuation/exit-multiple/)] for an intuitive explanation of the exit multiple approach.]
 \index{Valuation methods!Exit multiple}
 
-## Discount Rates
+## Discount Rate
 
-The final component of our DCF analysis involves discounting future cash flows to present value. We typically use the Weighted Average Cost of Capital (WACC) as the discount rate, as it represents the blended cost of financing for all company stakeholders.\index{WACC}
+The final component of our DCF analysis involves discounting future cash flows to present value. We typically use the Weighted Average Cost of Capital (WACC) as the discount rate, representing the blended cost of financing for all company stakeholders.\index{WACC} The WACC is the correct rate to discount cash flows distributed to both debt and equity holders, which is the case in our model as we use free cash flows.
 
 The WACC formula combines the costs of equity and debt financing:
 
 $$WACC = \frac{E}{D+E} \cdot r^E + \frac{D}{D+E} \cdot r^D \cdot (1 - \tau),$$
 
-where $E$ is the market value of the company’s equity with required return $r^E$, $D$ is the market value of the company's debt with pre-tax return $r^D$, and $\tau$ is the tax rate.
+where $E$ is the market value of the company's equity with required return $r^E$, $D$ is the market value of the company's debt with pre-tax return $r^D$, and $\tau$ is the tax rate.
 
-While you can often find estimates of WACC from financial databases or analysts’ reports, sometimes you may need to calculate it yourself. Let’s walk through the practical steps to estimate WACC using real-world data: 
-- $E$ is typically measured as the market value of the company’s equity. One common approach is to calculate it by subtracting net debt (total debt minus cash) from the enterprise value.
-- $D$ is often measured using the book value of the company’s debt. While this might not perfectly reflect market conditions, it’s a practical starting point when market data is unavailable.
-- The Capital Asset Pricing Model (CAPM) is a popular method to estimate the cost of equity $r^E$. It considers the risk-free rate, the equity risk premium, and the company’s beta. For a detailed guide on how to estimate the CAPM, we refer to Chapter [Capital Asset Pricing Model](capital-asset-pricing-model.qmd).
-- The return on debt $r^D$ can also be estimated in different ways. For instance, effective interest rates can be calculated as the ratio of interest expense to total debt from financial statements. This gives you a real-world measure of what the company is currently paying. Alternatively, you can look up corporate bond spreads for companies in the same rating group. For highly rated companies like Microsoft, this would reflect their low-risk profile and correspondingly low borrowing costs.
+While you can often find estimates of WACC from financial databases or analysts' reports, you may need to calculate it yourself. Let us walk through the practical steps to estimate WACC using real-world data: 
 
-If you'd rather not estimate WACC manually, there are excellent resources available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s [database](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html). He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. What makes his database particularly valuable is its level of detail and coverage of multiple industries and regions. For example, if you’re analyzing a company in the Computer Services sector, as we do here, you can look up the industry’s average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:
+- $E$ is typically measured as the market value of the company's equity. One common approach is to use market capitalization from the stock exchange.
+- $D$ is often measured using the book value of the company's debt. While this might not perfectly reflect market conditions, it is a practical starting point when market data is unavailable. Moreover, it is close to correct without default.
+- The Capital Asset Pricing Model (CAPM) is a popular method to estimate the cost of equity $r^E$. It considers the risk-free rate, the equity risk premium, and the company's risk exposure (i.e., beta). For a detailed guide estimating the CAPM, we refer to Chapter [Capital Asset Pricing Model](capital-asset-pricing-model.qmd).
+- The return on debt $r^D$ can also be estimated in different ways. For instance, effective interest rates can be calculated as the ratio of interest expense to total debt from financial statements. This gives you a real-world measure of what the company is currently paying. Alternatively, you can look up corporate bond spreads for companies in the same rating group. 
+
+If you would rather not estimate WACC manually, resources are available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s [database](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html). He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. For example, if you are analyzing a company in the Computer Services sector, as we do here, you can look up the industry's average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:
 
 ```{r}
 #| cache: true
@@ -307,20 +306,20 @@ wacc <- wacc_raw |>
   pull(`Cost of Capital`)
 ```
 
-## Compute DCF Value
+## Computing Enterprise Value
 
-Having established all components, we can now compute the total company value. The DCF value combines two elements:\index{DCF!Computation}
+Having established all components, we can now compute the total company value (given that there are no non-operating activities). The enterprise value combines two elements:\index{DCF!Computation}\index{DCF!Enterprise value}
 
-- The present value of explicit forecast period cash flows
-- The present value of the terminal value
+- The present value of cash flows during the explicit forecast period and
+- The present value of the continuation (or terminal) value.
 
 This is expressed mathematically as:
 
 $$
-\text{Total DCF Value} = \sum_{t=1}^{T} \frac{\text{FCF}t}{(1 + \text{WACC})^t} + \frac{\text{TV}{T}}{(1 + \text{WACC})^T}
+\text{Total DCF Value} = \sum_{t=1}^{T} \frac{\text{FCF}t}{(1 + \text{WACC})^t} + \frac{\text{TV}_{T}}{(1 + \text{WACC})^T},
 $$
 
-where $T$ is the length of our forecast period. Let's implement this calculation:
+where $T$ is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.
 
 ```{r}
 forecasted_years <- 5
@@ -336,26 +335,26 @@ compute_dcf <- function(wacc, growth_rate, years = 5) {
   total_dcf_value
 }
 
-compute_dcf(wacc, 0.03) / 1e9
+compute_dcf(wacc, 0.04) / 1e9
 ```
 
-Note that this valuation represents an enterprise value - the total value of the company's operations. To arrive at an equity value, we would need to subtract net debt (total debt minus cash and equivalents).\index{Enterprise value}
+Note that this valuation represents an enterprise value - the total value of the company's operations. To arrive at the equity value, we need to subtract net debt (total debt minus cash and equivalents).\index{Enterprise value}\index{DCF!Equity value}
 
 ## Sensitvity Analysis
 
-DCF valuation is only as robust as its underlying assumptions. Given the inherent uncertainty in forecasting, it's crucial to understand how changes in key inputs affect our valuation.\index{Sensitivity analysis}
+DCF valuation is only as robust as its underlying assumptions. Given the inherent uncertainty in forecasting, it is crucial to understand how changes in key inputs affect our valuation.\index{Sensitivity analysis}
 
-While we could examine sensitivity to various inputs like operating margins or capital expenditure ratios, we focus on two critical drivers:
+While we could examine sensitivity to various inputs like operating margins or capital expenditure ratios, we focus on two critical drivers for our exposition:
 
-- The perpetual growth rate, which determines long-term value creation
-- The WACC, which affects how we value future cash flows
+- The perpetual growth rate, which determines long-term value creation and
+- The WACC, which affects how we value future cash flows.
 
-Let's implement a sensitivity analysis that varies these parameters:
+Let us implement a sensitivity analysis that varies these two parameters:
 
 ```{r}
 #| label: fig-504
-#| fig-cap: "DCF value combines data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts." 
-#| fig-alt: "Title: DCF value of Microsoft for different WACC and growth scenarios. The figure shows a tile chart different values of WACC on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions."
+#| fig-cap: "The enterprise values combine data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts." 
+#| fig-alt: "Title: Enterprise value of Microsoft for different WACC and growth rate scenarios. The figure shows a tile chart with different WACC values on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions."
 wacc_range <- seq(0.06, 0.08, by = 0.01)
 growth_rate_range <- seq(0.02, 0.04, by = 0.01)
 
@@ -365,7 +364,7 @@ sensitivity <- expand_grid(
 ) |>
   mutate(value = pmap_dbl(list(wacc, growth_rate), compute_dcf))
 
-fig_sensitivity <- sensitivity |> 
+sensitivity |> 
   mutate(value = round(value / 1e9, 0)) |> 
   ggplot(aes(x = wacc, y = growth_rate, fill = value)) +
   geom_tile() +
@@ -374,29 +373,35 @@ fig_sensitivity <- sensitivity |>
   scale_y_continuous(labels = percent) +
   scale_fill_continuous(labels = comma) + 
   labs(
-    title = "DCF value of Microsoft for different WACC and growth scenarios",
+    title = "Enterprise value of Microsoft for different WACC and growth rate scenarios",
     x = "WACC",
     y = "Perpetual growth rate",
-    fill = "Company value"
+    fill = "Enterprise value"
   ) + 
   guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
-fig_sensitivity
 ```
 
-@fig-504 reveals several key insights about our valuation:\index{Visualization!Sensitivity} The valuation is highly sensitive to both WACC and growth assumptions; small changes in either parameter can lead to substantial changes in company value; the relationship between these parameters and company value is non-linear; and the impact of growth rate changes becomes more pronounced at lower WACCs.
+@fig-504 reveals several key insights about our valuation:\index{Visualization!Sensitivity}\index{Visualization!Tile chart} The valuation is highly sensitive to both WACC and growth assumptions, as small changes in either parameter can lead to substantial changes in enterprise value. Moreover, the relation between these parameters and company value is non-linear as the impact of growth rate changes becomes more pronounced at lower WACCs.
 
-## From DCF to Equity Value
+## From Enterprise to Equity Value
 
-Our DCF analysis yields the enterprise value - the value of the company's operations. To arrive at the equity value that belongs to shareholders, we need to make several adjustments:\index{Equity value}
+As we have discussed, our DCF analysis yields the value of the company's operations. We have assumed that there are no non-operating assets. Now, we explicitly consider their existence and show you how to compute the equity value belonging to shareholders.
+
+Non-operating assets are not essential to operations but could, in some cases, generate income (e.g., marketable securities, vacant land, idle equipment). If they exist, you must restate the financial statements to exclude the impact of these non-operating assets. With their effects removed, you can conduct the DCF analysis presented above. Afterwards, you value these non-operating assets and add them to the DCF value to arrive at the company's enterprise value.
+
+Second, we want to discuss equity value. As you saw in the computation of the WACC, free cash flows go to both debt and equity holders. Hence, we must consider the share of the enterprise value that goes to debt. In theory, the value of debt is the market value of total debt, but in practice, typically book debt. This value has to be subtracted from enterprise value.
+
+Combining these adjustments, we can compute the equity value that belongs to shareholders as:\index{Equity value}
 
 $$\text{Equity Value} = \text{DCF Value} + \text{Non-Operating Assets} - \text{Value of Debt}$$
-where non-operating assets are not essential to operations, but generate income (e.g., marketable securities, vacant land, idle equipment) and the value of debt is in theory the market value of total debt, but in practice typically book debt. We leave it as an exercise to calculate the equity value using the DCF value from above. 
+
+We leave it as an exercise to calculate the equity value using the DCF value from above. 
 
 ## Key takeaways
 
 Discounted Cash Flow analysis provides a structured approach to company valuation. In this chapter, you learned to:
 
-- Calculate Free Cash Flow using financial statement data and ratio analysis.
+- Calculate free cash flow using financial statement data and ratio analysis.
 - Project future cash flows by combining company-specific metrics with macroeconomic forecasts.
 - Estimate terminal value using the perpetuity growth method.
 - Apply appropriate discount rates based on industry benchmarks.
@@ -409,4 +414,4 @@ Discounted Cash Flow analysis provides a structured approach to company valuatio
 1. Create a function that automatically generates FCF forecasts using different sets of ratio assumptions. Use it to create alternative scenarios for Microsoft.
 1. Implement an exit multiple approach for terminal value calculation and compare the results with the perpetuity growth method.
 1. Extend the sensitivity analysis to include operating margin assumptions. Create a visualization showing how changes in margins affect the final valuation.
-1. Calculate the equity value of Microsoft by adjusting the CDF value as described above. 
+1. Calculate Microsoft's equity value by adjusting the CDF value as described above. 
