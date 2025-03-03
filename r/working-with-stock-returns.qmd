@@ -77,7 +77,7 @@ returns <- returns |>
 
 Next, we visualize the distribution of daily returns in a histogram in @fig-101. \index{Graph!Histogram} Additionally, we draw a dashed line that indicates the historical five percent quantile of the daily returns to the histogram, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators.\index{Value-at-risk} We refer to @Tsay2010 for a more thorough introduction to the stylized facts of financial returns.
 
-```{r} 
+```{r}
 #| label: fig-101 
 #| fig-alt: "Title: Distribution of daily Apple stock returns in percent. The figure shows a histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed around 0. The vertical line indicates that the historical 5 percent quantile of daily returns was around negative 3 percent."
 #| fig-cap: "The dotted vertical line indicates the historical 5 percent quantile."
@@ -228,7 +228,7 @@ returns_monthly <- returns_daily |>
   )
 ```
 
-In this code, we first group the data by symbol and month and then compute monthly returns by compounding the daily returns: $(1+r_1)\cdots(1+r_2)\ldots(1+r_n)-1$. To visualize how return characteristics change across different frequencies, we can compare histograms as in @fig-103:
+In this code, we first group the data by symbol and month and then compute monthly returns by compounding the daily returns: $(1+r_1)(1+r_2)\ldots(1+r_n)-1$. To visualize how return characteristics change across different frequencies, we can compare histograms as in @fig-103:
 
 ```{r}
 #| label: fig-103
@@ -254,88 +254,9 @@ apple_returns |>
   ) +
   scale_x_continuous(labels = percent) +
   theme_minimal() +
-  facet_wrap(~ frequency, scales = "free")
+  facet_wrap(~ frequency, scales = "free") +
+  theme(legend.position = "none")
 ```
-
-### Annualizing Returns
-
-When comparing investments over different time horizons, we typically annualize returns and risk metrics. The proper annualization depends on the return calculation method and assumptions about return distributions. A straightforward method for annualizing returns is to compute the total return over one year directly. If the dataset contains at least one full year of returns, the annualized return can be obtained similarly as above by dividing the price at time $t$ by the price of the same stock exactly a year ago and subtracting 1. This is done in the following block:
-
-```{r}
-returns_yearly <- prices_daily |>
-  group_by(symbol) |>
-  mutate(date_1y_ago = date - years(1)) |>
-  left_join(prices_daily, by = c("symbol", "date_1y_ago" = "date"), suffix = c("", "_lag")) |>
-  mutate(ret = adjusted_close / adjusted_close_lag - 1) |>
-  select(symbol, date, ret) |>
-  drop_na(ret)
-```
-
-While we could use these yearly returns for analysis, this method of annualization may not always be useful or even feasible. Suppose you do not have access to daily return data spanning several years but only have data for a few recent months—for example, from a newly launched hedge fund. In that case, calculating the total return for a full year may be impossible, or you may have only a limited number of annual returns available, making statistical analysis challenging.
-
-To address this, an alternative approach to annualizing returns involves either simple scaling (for arithmetic returns) or compounding (for geometric returns), using what is known as an annualization factor.
-
-```{r}
-annual_metrics <- returns_daily |>
-  group_by(symbol) |>
-  summarize(
-    arithmetic_annual_ret = mean(ret) * 252,
-    geometric_annual_ret = (prod(1 + ret)^(252 / n()) - 1),
-    annual_sd = sd(ret) * sqrt(252),
-    sharpe_ratio = arithmetic_annual_ret / annual_sd,
-    annual_var = quantile(ret, probs = 0.05) * sqrt(252),
-    n_obs = n()
-  )
-```
-
-The key elements in this annualization are:
-
-1. Arithmetic annualization: Simply multiply the average daily return by the number of trading days (typically 252 for stock equities).
-2. Geometric annualization: Calculate $(1+r)^{(252/n)} - 1$, where $r$ is the compound return over the period and $n$ is the number of days.
-3. Volatility and Value-at-Risk annualization: Multiply the standard deviation/VaR by the square root of the number of periods per year ($sqrt{252}$ for daily data).
-
-Commonly used scaling factors to annualize are 252 trading days for daily data, 52 for weekly data, 12 for monthly data, and 4 for quarterly data. So let's compare the impact of the different annualization methods by looking at the Apple stock for the daily, monthly, and yearly returns:
-
-```{r}
-apple_returns <- bind_rows(
-  returns_daily |> 
-    filter(symbol == "AAPL") |> 
-    mutate(frequency = "Daily"),
-  returns_monthly |> 
-    filter(symbol == "AAPL") |> 
-    mutate(frequency = "Monthly"),
-  returns_yearly |> 
-    filter(symbol == "AAPL") |> 
-    mutate(frequency = "Yearly")
-)
-
-annualization_factors <- c("Daily" = 252, "Monthly" = 12, "Yearly" = 1)
-
-annual_metrics <- apple_returns |>
-  group_by(symbol, frequency) |>
-  summarize(
-    annualization_factor = annualization_factors[unique(frequency)],
-    arithmetic_annual_ret = mean(ret) * annualization_factor,
-    geometric_annual_ret = (prod(1 + ret)^(annualization_factor / n()) - 1),
-    annual_sd = sd(ret) * sqrt(annualization_factor),
-    sharpe_ratio = arithmetic_annual_ret / annual_sd,
-    annual_var = quantile(ret, probs = 0.05) * sqrt(annualization_factor),
-    n_obs = n(),
-    .groups = "drop"
-  )
-annual_metrics
-```
-
-We can see that the annualization technique can have quite an impact on the results. We find the greatest difference in the annualized standard deviation (volatility) of the returns and also in the Value-at-Risk. Also, note that 
-
-- The geometric mean is always lower than or equal to the arithmetic mean due to compounding effects.
-- When estimating future returns, the arithmetic mean tends to overestimate real growth, while the geometric mean provides a more conservative estimate.
-- The difference between these two measures grows with return volatility.
-
-In the code above, we calculated an annualized Sharpe Ratio by using the annualized arithmetic mean and annualized standard deviation. From this, we could deduct the annualization factor scaling for the Sharpe ratio when using daily returns:
-$$
-\text{SR}_{\text{yearly}}=\frac{\mu_{\text{yearly}}}{\sigma_{\text{yearly}}}=\frac{\mu_{\text{daily}}\cdot 252}{\sigma_{\text{daily}} \cdot\sqrt{252}}=\frac{\mu_{\text{daily}}}{\sigma_{\text{daily}}}\cdot\sqrt{252}=\text{SR}_{\text{daily}}\cdot\sqrt{252}
-$$
 
 ## Other Forms of Data Aggregation
 
@@ -388,17 +309,17 @@ Do you understand where the warning `## Warning: Removed 1 rows containing missi
 
 In this chapter, you learned how to effectively use R to download, analyze, and visualize stock market data using tidy principles:
 
-- Tidy data principles enable efficient analysis of financial data. 
-- Adjusted prices account for corporate actions like splits and dividends.
-- Summary statistics help identify key patterns in financial data.
-- Visualization techniques reveal trends and distributions in returns.
-- Data manipulation with tidyverse scales easily to multiple assets.
-- Consistent workflows form the foundation for advanced financial analysis.
+-   Tidy data principles enable efficient analysis of financial data.
+-   Adjusted prices account for corporate actions like splits and dividends.
+-   Summary statistics help identify key patterns in financial data.
+-   Visualization techniques reveal trends and distributions in returns.
+-   Data manipulation with tidyverse scales easily to multiple assets.
+-   Consistent workflows form the foundation for advanced financial analysis.
 
 ## Exercises
 
-1. Download daily prices for another stock market symbol of your choice from Yahoo Finance using `download_data()` from the `tidyfinance` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain any visible differences.
-1. Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
-1. Take your code from the previous exercises and generalize it such that you can perform all the computations for an arbitrary number of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
-1. To facilitate the computation of the annualization factor, write a function that takes a vector of return dates as input and determines the frequency before returning the appropriate annualization factor.
-1. Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.
+1.  Download daily prices for another stock market symbol of your choice from Yahoo Finance using `download_data()` from the `tidyfinance` package. Plot two time series of the symbol’s un-adjusted and adjusted closing prices. Explain any visible differences.
+2.  Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `geom_vline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum and maximum) for the daily returns.
+3.  Take your code from the previous exercises and generalize it such that you can perform all the computations for an arbitrary number of symbols (e.g., `symbol <- c("AAPL", "MMM", "BA")`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+4.  To facilitate the computation of the annualization factor, write a function that takes a vector of return dates as input and determines the frequency before returning the appropriate annualization factor.
+5.  Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.
