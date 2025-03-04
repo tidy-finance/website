@@ -1,6 +1,6 @@
 data_downloads:
 	quarto render r/accessing-and-managing-financial-data.qmd
-	quarto render r/wrds-crsp-and-compustat.qmd 
+	quarto render r/wrds-crsp-and-compustat.qmd
 	quarto render r/trace-and-fisd.qmd
 	quarto render python/accessing-and-managing-financial-data.qmd
 	quarto render python/wrds-crsp-and-compustat.qmd 
@@ -9,7 +9,11 @@ data_downloads:
 other_chapters: other_chapters_r other_chapters_python
 	
 other_chapters_r:
-	quarto render r/introduction-to-tidy-finance.qmd
+	quarto render r/working-with-stock-returns.qmd
+	quarto render r/modern-portfolio-theory.qmd
+	quarto render r/capital-asset-pricing-model.qmd
+	quarto render r/financial-statement-analysis.qmd
+	quarto render r/discounted-cash-flow-analysis.qmd
 	quarto render r/beta-estimation.qmd
 	quarto render r/univariate-portfolio-sorts.qmd
 	quarto render r/size-sorts-and-p-hacking.qmd
