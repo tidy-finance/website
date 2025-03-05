@@ -23,10 +23,16 @@ At the heart of MPT is mean-variance analysis, which evaluates portfolios based 
 We use the following packages throughout this chapter: 
 
 ```{python}
+import pandas as pd
+import numpy as np
+import yfinance as yf
 
+from plotnine import *
+from mizani.formatters import percent_format
+from adjustText import adjust_text
 ```
 
-We introduce the `ggrepel` package for adding text labels to the figures in this chapter [@ggrepel].
+We introduce the `adjustText` package for adding text labels to the figures in this chapter [@adjustText].
 
 ## The Asset Universe
 
@@ -39,27 +45,83 @@ To keep things conceptually simple, we focus on the latter part for now and assu
 Thus, leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio as well as their daily adjusted close prices. 
 
 ```{python}
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
+url = ("https://www.ssga.com/us/en/institutional/etfs/library-content/"
+       "products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx")
+
+symbols = (pd.read_excel(url, skiprows=4, nrows=30)
+  .get("Ticker")
+  .tolist()
+)
+
+ssl._create_default_https_context = ssl.create_default_context
+
+prices_daily = (yf.download(
+    tickers=symbols, 
+    start="2000-01-01", 
+    end="2023-12-31", 
+    progress=False,
+    auto_adjust=False,
+    multi_level_index=False
+  ))
+
+prices_daily = (prices_daily
+  .stack()
+  .reset_index(level=1, drop=False)
+  .reset_index()
+  .rename(columns={
+    "Date": "date",
+    "Ticker": "symbol",
+    "Open": "open",
+    "High": "high",
+    "Low": "low",
+    "Close": "close",
+    "Adj Close": "adjusted",
+    "Volume": "volume"}
+  )
+)
 ```
 
 To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:
 
 ```{python}
-
+prices_daily = (prices_daily
+  .groupby("symbol")
+  .apply(lambda x: x.assign(counts=x["adjusted"].dropna().count()))
+  .reset_index(drop=True)
+  .query("counts == counts.max()")
+)
 ```
 
 We compute the sample average returns as $\mu_i = \frac{1}{T} \sum_{t=1}^{T} r_{i,t},$ where $r_{i,t}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods. As noted above, we treat the vector $\mu = (\mu_1, ...,\mu_N)^\prime$ as the true expected return of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
 
 ```{python}
-
+returns_monthly = (prices_daily
+  .assign(
+    date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
+  )
+  .groupby(["symbol", "date"], as_index=False)
+  .agg(adjusted=("adjusted", "last"))
+  .assign(
+    ret=lambda x: x.groupby("symbol")["adjusted"].pct_change()
+  )
+)
 ```
 
 Individual asset risk in MPT is typically quantified using variance (i.e., $\sigma^2_i$) or volatilities (i.e., $\sigma_i$).^[Alternative approaches include value-at-risk, expected shortfall, or higher-order moments such as skewness and kurtosis.] We suppose that the true volatilities of the assets are given by the sample standard deviation $\sigma_i = \sqrt{\frac{1}{T-1} \sum_{t=1}^{T} (r_{i,t} - \mu_i)^2}.$\index{Variance}\index{Volatility}\index{Sample standard deviation}
 
-We compute the sample standard deviation for each asset by using the `sd()` function.
+We compute the sample standard deviation for each asset by using the `std()` function.
 
 ```{python}
-
+assets = (returns_monthly
+    .groupby("symbol", as_index=False)
+    .agg(
+        mu=("ret", "mean"),
+        sigma=("ret", "std")
+    )
+)
 ```
 
 We can illustrate the resulting distribution of the asset returns in @fig-201, showing the volatility on the horizontal axis and the expected return on the vertical axis.
@@ -68,7 +130,27 @@ We can illustrate the resulting distribution of the asset returns in @fig-201, s
 #| label: fig-201
 #| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
 #| fig-alt: "Title: Expected returns and volatilities of Dow Jones index constituents. The figure is a scatter plot with volatilities on the horizontal and expected returns on the vertical axis."
+# TODO: fix figure
 
+adjust_text_dict = {
+    'expand_points': (1.5, 1.5),
+    'arrowprops': {
+        'arrowstyle': '-'
+    }
+}
+
+assets_figure = (
+  ggplot(assets, aes(x="sigma", y="mu", label="symbol"))
+  + geom_point()
+  + geom_text(adjust_text=adjust_text_dict)
+  + scale_x_continuous(labels=percent_format())
+  + scale_y_continuous(labels=percent_format())
+  + labs(
+    x="Volatility", y="Expected return",
+    title="Expected returns and volatilities of Dow Jones index constituents"
+  )
+)
+assets_figure.draw()
 ```
 
 As highlighted above, a key innovation of MPT is to consider interactions between assets. The *variance-covariance matrix* collects this information. We assume that the variance-covariance matrix $\Sigma$ of the returns is given by the sample covariance: \index{Covariance}
@@ -80,7 +162,15 @@ The interpretation is straightforward: While a positive covariance between asset
 We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
 
 ```{python}
+returns_wide = (returns_monthly
+  .pivot(index="date", columns="symbol", values="ret")
+  .reset_index()
+)
 
+sigma = (returns_wide
+  .drop(columns=["date"])
+  .cov()
+)
 ```
 
 Figure @fig-203 illustrates the resulting variance-covariance matrix. 
@@ -90,6 +180,7 @@ Figure @fig-203 illustrates the resulting variance-covariance matrix.
 #| fig-cap: "Variances and covariances based on monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Variance-covariance matrix of Dow Jones index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
 
+# TODO: add figure
 ```
 
 ## The Minimum-Variance Framework
@@ -107,7 +198,9 @@ $$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},$$
 where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is the inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:
 
 ```{python}
-
+iota = np.ones(sigma.shape[0])
+sigma_inv = np.linalg.inv(sigma.values)
+omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
 ```
 
 Figure @fig-204 shows the resulting portfolio weights. 
@@ -116,13 +209,23 @@ Figure @fig-204 shows the resulting portfolio weights.
 #| label: fig-204
 #| fig-cap: "Weights are based on historical moments of monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each DOW Jones index constituent."
+assets = assets.assign(omega_mvp=omega_mvp)
 
+# TODO: add figure
 ```
 
 Before we move on to other portfolios, we collect the return and volatility of the minimum-variance portfolio in a data frame:
 
 ```{python}
-
+mu = assets["mu"].values
+mu_mvp = omega_mvp @ mu
+sigma_mvp = np.sqrt(omega_mvp @ sigma.values @ omega_mvp)
+summary_mvp = pd.DataFrame({
+    "mu": [mu_mvp],
+    "sigma": [sigma_mvp],
+    "type": ["Minimum-Variance Portfolio"]
+})
+summary_mvp
 ```
 
 ## Efficient Portfolios
@@ -132,7 +235,7 @@ In many instances, earning the lowest possible variance may not be the desired o
 Suppose, for instance, the investor wants to earn at least the historical average return of the asset that delivered the highest average returns in the past:
 
 ```{python}
-
+mu_bar = assets["mu"].max()
 ```
 
 Formally, the optimization problem is given by 
@@ -148,7 +251,19 @@ where $\lambda^* = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$
 The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
 
 ```{python}
+C = iota @ sigma_inv @ iota
+D = iota @ sigma_inv @ mu
+E = mu @ sigma_inv @ mu
+lambda_tilde = 2 * (mu_bar - D / C) / (E - (D ** 2) / C)
+omega_efp = omega_mvp + (lambda_tilde / 2) * (sigma_inv @ mu - D * omega_mvp)
+mu_efp = omega_efp @ mu
+sigma_efp = np.sqrt(omega_efp @ sigma.values @ omega_efp)
 
+summary_efp = pd.DataFrame({
+  "mu": [mu_efp],
+  "sigma": [sigma_efp],
+  "type": ["Efficient Portfolio"]
+})
 ```
 
 Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio. 
@@ -158,7 +273,11 @@ Figure @fig-205 shows the average return and volatility of the minimum-variance 
 #| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents." 
 #| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents."
 #| warning: false
+summaries = pd.concat(
+  [assets, summary_mvp, summary_efp], ignore_index=True
+)
 
+# TODO add figure
 ```
 
 The figure illustrates the substantial diversification benefits: Instead of allocating all wealth into one asset that delivered a high average return in the past (at a substantial volatility), the efficient portfolio promises exactly the same expected returns but at a much lower volatility. 
@@ -180,7 +299,18 @@ which corresponds to the efficient portfolio earning $a\mu_1 + (1-a)\mu_2$ in ex
 The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
 
 ```{python}
-
+efficient_frontier = (
+  pd.DataFrame({
+    "a": np.arange(-1, 2.01, 0.01)
+  })
+  .assign(
+    omega=lambda x: x["a"].map(lambda x: x * omega_efp + (1 - x) * omega_mvp)
+  )
+  .assign(
+    mu=lambda x: x["omega"].map(lambda x: x @ mu),
+    sigma=lambda x: x["omega"].map(lambda x: np.sqrt(x @ sigma @ x))
+  )
+)
 ```
 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios in a figure using `ggplot` (see @fig-206). We also add the individual stocks in the same plot.\index{Graph!Efficient frontier}
@@ -190,7 +320,11 @@ Finally, it is simple to visualize the efficient frontier alongside the two effi
 #| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers three times the expected return of the minimum-variance portfolio, respectively. The small dots indicate the location of the individual constituents."
 #| fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
 #| warning: false
+summaries = pd.concat(
+  [summaries, efficient_frontier], ignore_index=True
+)
 
+# TODO: add figure
 ```
 
 ## Key Takeaways
