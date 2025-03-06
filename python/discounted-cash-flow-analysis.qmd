@@ -35,7 +35,13 @@ We make a few simplifying assumptions due to the diverse nature of businesses, w
 In this chapter, we rely on the following packages to build a simple DCF analysis:
 
 ```{python}
+import pandas as pd
+import numpy as np
+import statsmodels.formula.api as smf
 
+from fmpapi import fmp_get
+from plotnine import *
+from mizani.formatters import percent_format, comma_format
 ```
 
 ::: {.callout-tip}
@@ -47,12 +53,20 @@ The `fmpapi` package is developed by Christoph Scheuch and is not sponsored by o
 Before we can perform a DCF analysis, we need historical financial data to inform our forecasts. We use the Financial Modeling Prep (FMP) API to download financial statements. The `fmpapi` package provides a convenient interface for accessing this data in a tidy format.\index{Data!FMP API}
 
 ```{python}
+symbol = "MSFT"
 
+income_statements = fmp_get(
+  "income-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
+)
+cash_flow_statements = fmp_get(
+  "cash-flow-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
+)
 ```
 
 Our analysis centers on Free Cash Flow (FCF), which represents the cash available to all investors after the company has covered its operational needs and capital investments.\index{Free Cash Flow} We calculate FCF using the following formula:
 
-$$\text{FCF} = \text{EBIT} + \text{Depreciation & Amortization} - \text{Taxes} + \Delta \text{Working Capital} - \text{CAPEX}$$
+$$\text{FCF} = \text{EBIT} + \text{Depreciation \& Amortization} - \text{Taxes} + \Delta \text{Working Capital} - \text{CAPEX}$$
+
 Each component of this formula serves a specific purpose in capturing the company's cash-generating ability:\index{Free Cash Flow components}
 
 - EBIT (Earnings Before Interest and Taxes) measures core operating profit
@@ -64,7 +78,30 @@ Each component of this formula serves a specific purpose in capturing the compan
 We can implement this calculation by combining and transforming our financial statement data. Note that we also arrange by year, which is important for some of the following code chunks.
 
 ```{python}
-
+dcf_data = (income_statements
+  .assign(
+    ebit=lambda x: x["net_income"] + x["income_tax_expense"] + x["interest_expense"] - x["interest_income"]
+  )
+  .get(["calendar_year", "ebit", "revenue", "depreciation_and_amortization", "income_tax_expense"])
+  .rename(columns={
+      "calendar_year": "year",
+      "income_tax_expense": "taxes"
+  })
+  .merge(
+    (cash_flow_statements
+      .get(["calendar_year", "change_in_working_capital", "capital_expenditure"])
+      .rename(columns={
+        "calendar_year": "year",
+        "change_in_working_capital": "delta_working_capital",
+        "capital_expenditure": "capex"
+      })
+    ), on="year", how="left"
+  )
+  .assign(
+    fcf=lambda x: x["ebit"] + x["depreciation_and_amortization"] - x["taxes"] + x["delta_working_capital"] - x["capex"]
+  )
+  .sort_values("year")
+)
 ```
 
 ## Forecasting Free Cash Flow
@@ -77,7 +114,42 @@ First, we express each FCF component as a ratio relative to revenue. This standa
 #| label: fig-500
 #| fig-cap: "Ratios are based on financial statements provided through the FMP API." 
 #| fig-alt: "Title: Key forecast ratios of Microsoft between 2020 and 2024. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
+dcf_data = (dcf_data
+  .assign(
+    revenue_growth=lambda x: x["revenue"] / x["revenue"].shift(1) - 1,
+    operating_margin=lambda x: x["ebit"] / x["revenue"],
+    da_margin=lambda x: x["depreciation_and_amortization"] / x["revenue"],
+    taxes_to_revenue=lambda x: x["taxes"] / x["revenue"],
+    delta_working_capital_to_revenue=lambda x: x["delta_working_capital"] / x["revenue"],
+    capex_to_revenue=lambda x: x["capex"] / x["revenue"]
+  )
+)
 
+dcf_data_long = (dcf_data
+  .melt(
+    id_vars="year",
+    value_vars=[
+      "operating_margin", "da_margin", "taxes_to_revenue",
+      "delta_working_capital_to_revenue", "capex_to_revenue"
+    ],
+    var_name="name",
+    value_name="value"
+  )
+)
+
+financial_ratios_figure = (
+  ggplot(
+    dcf_data_long,
+    aes(x="year", y="value", color="name")
+  )
+  + geom_line()
+  + scale_y_continuous(labels=percent_format())
+  + labs(
+      x="", y="", color="",
+      title="Key financial ratios of Microsoft between 2020 and 2024"
+    )
+)
+financial_ratios_figure.draw
 ```
 
 The operating margin, for instance, represents how much of each revenue dollar translates into operating profit (EBIT), while the CAPEX-to-revenue ratio indicates the company's investment intensity.\index{Financial ratios}
@@ -92,7 +164,49 @@ We demonstrate this forecasting approach in @fig-501. Note that our forecast rat
 #| label: fig-501
 #| fig-cap: "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined." 
 #| fig-alt: "Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis."
+forecast_ratios = pd.DataFrame({
+    "year": [2025, 2026, 2027, 2028, 2029],
+    "operating_margin": [0.41, 0.42, 0.43, 0.44, 0.45],
+    "da_margin": [0.09, 0.09, 0.09, 0.09, 0.09],
+    "taxes_to_revenue": [0.08, 0.07, 0.06, 0.06, 0.06],
+    "delta_working_capital_to_revenue": [0.001, 0.001, 0.001, 0.001, 0.001],
+    "capex_to_revenue": [-0.2, -0.22, -0.2, -0.18, -0.16]
+})
+forecast_ratios["type"] = "Forecast"
 
+dcf_data["type"] = "Realized"
+dcf_data = pd.concat([dcf_data, forecast_ratios], ignore_index=True)
+
+dcf_data_long = (dcf_data
+  .melt(
+    id_vars=["year", "type"],
+    value_vars=[
+      "operating_margin", "da_margin", "taxes_to_revenue",
+      "delta_working_capital_to_revenue", "capex_to_revenue"
+    ],
+    var_name="name",
+    value_name="value"
+  )
+)
+
+dcf_data_long["type"] = pd.Categorical(
+  dcf_data_long["type"], categories=["Realized", "Forecast"]
+)
+
+forecast_ratios_figure = (
+  ggplot(
+    dcf_data_long,
+    aes(x="year", y="value", color="name", linetype="type")
+  )
+  + geom_line()
+  + scale_x_continuous(breaks=range(2020, 2029))
+  + scale_y_continuous(labels=percent_format())
+  + labs(
+      x="", y="", color="", linetype="",
+      title="Key financial ratios and ad-hoc forecasts of Microsoft between 2020 and 2029"
+    )
+)
+forecast_ratios_figure.draw
 ```
 
 The final step in our FCF forecast is projecting revenue growth. While there are multiple approaches to this task, we demonstrate a GDP-based method that links company growth to macroeconomic forecasts.\index{Revenue growth}
@@ -100,13 +214,34 @@ The final step in our FCF forecast is projecting revenue growth. While there are
 We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) database as our baseline. The WEO provides comprehensive economic projections, though it is important to note that these forecasts are periodically revised as new data becomes available.\index{Data!IMF WEO} We manually collect these forecasts and store them in a tibble.
 
 ```{python}
+gdp_growth = pd.DataFrame({
+  "year": list(range(2020, 2030)),
+  "gdp_growth": [
+    -0.02163, 0.06055, 0.02512, 0.02887, 0.02765, 
+    0.02153, 0.02028, 0.02120, 0.02122, 0.02122
+  ]
+})
 
+dcf_data = (dcf_data
+  .merge(gdp_growth, on="year", how="left")
+)
 ```
 
 Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling} Let us estimate the model with historical data.
 
 ```{python}
+revenue_growth_model = smf.ols("revenue_growth ~ gdp_growth", data=dcf_data).fit().params
 
+dcf_data = (dcf_data
+  .assign(
+    revenue_growth_modeled=lambda x: (
+      revenue_growth_model["Intercept"] + revenue_growth_model["gdp_growth"] * x["gdp_growth"]
+    ),
+    revenue_growth=lambda x: (
+      np.where(x["type"] == "Forecast", x["revenue_growth_modeled"], x["revenue_growth"])
+    )
+  )
+)
 ```
 
 The model estimates two parameters: (i) an intercept that captures the company's baseline growth, and (ii) a slope coefficient that measures the company's sensitivity to GDP changes. Then, we can use the model and the growth forecasts to make revenue growth projections. We visualize the historical and projected growth rates using this approach in @fig-502:
@@ -115,8 +250,30 @@ The model estimates two parameters: (i) an intercept that captures the company's
 #| label: fig-502
 #| fig-cap: "Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
 #| fig-alt: "Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2020 and 2029. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis."
-    title = "GDP growth and Microsoft's revenue growth and modeled forecasts between 2020 and 2029"
+revenue_growth = (dcf_data
+  .query("year >= 2021")
+  .melt(
+    id_vars=["year", "type"],
+    value_vars=["revenue_growth", "gdp_growth"], 
+    var_name="name",
+    value_name="value"
+  )
+)
 
+revenue_growth_figure = (
+  ggplot(
+    revenue_growth,
+    aes(x="year", y="value", color="name", linetype="type")
+  )
+  + geom_line()
+  + scale_x_continuous(breaks=range(2020, 2029))
+  + scale_y_continuous(labels=percent_format())
+  + labs(
+      x="", y="", color="", linetype="",
+      title="GDP growth and Microsoft's revenue growth and modeled forecasts between 2020 and 2029"
+   )
+)
+revenue_growth_figure.draw
 ```
 
 While more sophisticated approaches exist (e.g., proprietary analyst forecasts or bottom-up market analyses), this method provides a transparent and data-driven starting point for revenue projections.\index{Forecasting methods}
@@ -124,7 +281,19 @@ While more sophisticated approaches exist (e.g., proprietary analyst forecasts o
 With all components in place - revenue growth projections and forecast ratios - we can now calculate our FCF forecasts. We must first convert our growth rates into revenue projections and then apply our forecast ratios to compute each FCF component.\index{Free Cash Flow!Computation}
 
 ```{python}
+dcf_data.loc[0, "revenue_growth"] = 0
+dcf_data["revenue"] = dcf_data["revenue"].iloc[0] * (1 + dcf_data["revenue_growth"]).cumprod()
 
+dcf_data = (dcf_data
+  .assign(
+    ebit=lambda x: x["operating_margin"] * x["revenue"],
+    depreciation_and_amortization=lambda x: x["da_margin"] * x["revenue"],
+    taxes=lambda x: x["taxes_to_revenue"] * x["revenue"],
+    delta_working_capital=lambda x: x["delta_working_capital_to_revenue"] * x["revenue"],
+    capex=lambda x: x["capex_to_revenue"] * x["revenue"],
+    fcf=lambda x: x["ebit"] + x["depreciation_and_amortization"] - x["taxes"] + x["delta_working_capital"] - x["capex"]
+  )
+)
 ```
 
 We visualize the resulting FCF projections in @fig-503.
@@ -133,7 +302,19 @@ We visualize the resulting FCF projections in @fig-503.
 #| label: fig-503
 #| fig-cap: "Realized growth rates are based on financial statements provided through the FMP API, while forecasts are manually defined." 
 #| fig-alt: "Title: Actual and predicted free cash flow for Microsoft from 2020 to 2029. The figure shows a bar chart with years on the horizontal axis and Microsoft's historical and projected free cash flows on the vertical axis."
-
+free_cash_flow_figure = (
+  ggplot(
+    dcf_data,
+    aes(x="year", y="fcf / 1e9", fill="type")
+  )
+  + geom_col()
+  + scale_x_continuous(breaks=range(2020, 2029))
+  + labs(
+      x="", y="Free Cash Flow (in B USD)", fill="",
+      title="Actual and predicted free cash flow for Microsoft from 2020 to 2029"
+    )
+)
+free_cash_flow_figure.draw
 ```
 
 ## Continuation Value
@@ -151,7 +332,15 @@ The perpetual growth rate $g$ should reflect the long-term economic growth poten
 Let us implement the Perpetuity Growth Model:
 
 ```{python}
+def compute_terminal_value(last_fcf, growth_rate, discount_rate):
+    return last_fcf * (1 + growth_rate) / (discount_rate - growth_rate)
 
+last_fcf = dcf_data['fcf'].iloc[-1]
+terminal_value = compute_terminal_value(
+  last_fcf, growth_rate=0.04, discount_rate=0.08
+)
+
+print(np.round(terminal_value / 1e9))
 ```
 
 Note that while we use the Perpetuity Growth Model here, practitioners often cross-check their estimates with alternative methods like the exit multiple approach, which bases the terminal value on comparable company valuations.^[See (corporatefinanceinstitute.com/)[https://corporatefinanceinstitute.com/resources/valuation/exit-multiple/)] for an intuitive explanation of the exit multiple approach.]
@@ -177,8 +366,27 @@ While you can often find estimates of WACC from financial databases or analysts'
 If you would rather not estimate WACC manually, resources are available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s [database](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html). He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. For example, if you are analyzing a company in the Computer Services sector, as we do here, you can look up the industry's average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:
 
 ```{python}
+import requests
 
+url = "https://pages.stern.nyu.edu/~adamodar/pc/datasets/wacc.xls"
+response = requests.get(url)
+
+with open("wacc.xls", "wb") as file:
+    file.write(response.content)
+    
+wacc_raw = pd.read_excel("wacc.xls", sheet_name=1, skiprows=18)
+
+import os
+os.remove("wacc.xls")
+
+wacc = wacc_raw.loc[
+  wacc_raw["Industry Name"] == "Computer Services", "Cost of Capital"
+].values[0]
 ```
+
+::: {.callout-tip}
+You need the `xlrd` package to use `pd.read_excel()`, so make sure to install it via, e.g., `pip install xlrd`
+:::
 
 ## Computing Enterprise Value
 
@@ -196,7 +404,20 @@ $$
 where $T$ is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.
 
 ```{python}
+def compute_dcf(wacc, growth_rate):
+    free_cash_flow = dcf_data["fcf"].values
+    last_fcf = free_cash_flow[-1]
+    terminal_value = compute_terminal_value(last_fcf, growth_rate, wacc)
+    
+    years = len(free_cash_flow)
+    present_value_fcf = free_cash_flow / ((1 + wacc) ** np.arange(1, years + 1))
+    present_value_tv = terminal_value / ((1 + wacc) ** years)
+    
+    return present_value_fcf.sum() + present_value_tv
 
+dcf_value = compute_dcf(wacc, 0.04)
+
+print(np.round(dcf_value / 1e9))
 ```
 
 Note that this valuation represents an enterprise value - the total value of the company's operations. To arrive at the equity value, we need to subtract net debt (total debt minus cash and equivalents).\index{Enterprise value}\index{DCF!Equity value}
@@ -216,7 +437,38 @@ Let us implement a sensitivity analysis that varies these two parameters:
 #| label: fig-504
 #| fig-cap: "The enterprise values combine data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts." 
 #| fig-alt: "Title: Enterprise value of Microsoft for different WACC and growth rate scenarios. The figure shows a tile chart with different WACC values on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions."
+import itertools
 
+wacc_range = np.arange(0.06, 0.08 + 0.01, 0.01)
+growth_rate_range = np.arange(0.02, 0.04 + 0.01, 0.01)
+
+sensitivity = pd.DataFrame(
+  itertools.product(wacc_range, growth_rate_range),
+  columns=["wacc", "growth_rate"]
+)
+
+sensitivity["value"] = (sensitivity
+  .apply(
+    lambda x: np.round(compute_dcf(x["wacc"], x["growth_rate"]) / 1e9, 0), axis=1
+  )
+)
+
+sensitivity_figure = (
+  ggplot(
+    sensitivity,
+    aes(x="wacc", y="growth_rate", fill="value", label="value")
+  )
+  + geom_tile()
+  + geom_text(color="white")
+  + scale_x_continuous(labels=percent_format()) 
+  + scale_y_continuous(labels=percent_format())
+  + scale_fill_continuous(labels=comma_format())
+  + labs(
+      x="WACC", y="Perpetual growth rate", fill="Enterprise value",
+      title="Enterprise value of Microsoft for different WACC and growth rate scenarios",
+    )
+)
+sensitivity_figure.draw
 ```
 
 @fig-504 reveals several key insights about our valuation:\index{Visualization!Sensitivity}\index{Visualization!Tile chart} The valuation is highly sensitive to both WACC and growth assumptions, as small changes in either parameter can lead to substantial changes in enterprise value. Moreover, the relation between these parameters and company value is non-linear as the impact of growth rate changes becomes more pronounced at lower WACCs.
