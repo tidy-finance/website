@@ -5,6 +5,10 @@ metadata:
   description-meta: Learn how to use the programming language R for estimating the CAPM for asset evaluation.
 ---
 
+::: {.callout-note}
+You are reading **Tidy Finance with R**. You can find the equivalent chapter for the sibling **Tidy Finance with Python** [here](../python/capital-asset-pricing-model.qmd).
+:::
+
 The Capital Asset Pricing Model (CAPM) is one of the most influential theories in finance and builds on the foundation laid by [Modern Portfolio Theory](modern-portfolio-theory.qmd) (MPT). It was simultaneously developed by @Sharpe1964, @Lintner1965, and @Mossin1966. While MPT shows how to construct efficient portfolios, the CAPM extends this framework to explain how assets should be priced in equilibrium when all investors follow MPT principles. The CAPM is the simplest model that aims to explain equilibrium asset prices and hence the cornerstone for a myriad of extensions. In this chapter, we derive the CAPM, illustrate the theoretical underpinnings and show how to estimate the coefficients of the CAPM. For this final purpose, we download stock market data, estimate betas using regression analysis, and evaluate asset performance.
 
 We use the following packages throughout this chapter:
@@ -147,7 +151,7 @@ sigma_w <- as.numeric(sqrt(t(w_tan) %*% sigma %*% w_tan))
 
 efficient_portfolios <- tribble(
   ~symbol,    ~mu,         ~sigma,
-  "omega^tan", mu_w, sigma_w,
+  "omega[tan]", mu_w, sigma_w,
   "r[f]", rf,   0
 )
 
@@ -160,7 +164,7 @@ sharpe_ratio <- (mu_w - rf) / sigma_w
 #| label: fig-300
 #| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: The efficient frontier with a risk-free asset and Dow index constituents. The figure shows a scatter plot with volatities on the horizontal axis and expected returns on the vertical axis."
-fig_capm <- assets |> 
+assets |> 
   ggplot(aes(x = sigma, y = mu)) +
   geom_point() + 
   geom_point(data = efficient_portfolios, color = "blue") +
@@ -168,10 +172,11 @@ fig_capm <- assets |>
                    aes(label = symbol), parse = TRUE) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
-  labs(x = "Volatility", y = "Expected return",
-  title = "The efficient frontier with a risk-free asset and Dow index constituents") +
+  labs(
+    x = "Volatility", y = "Expected return",
+    title = "The efficient frontier with a risk-free asset and Dow index constituents"
+  ) +
   geom_abline(aes(intercept = rf, slope = sharpe_ratio), linetype = "dotted")
-fig_capm
 ```
 
 ## The Capital Market Line
@@ -203,15 +208,16 @@ assets <- assets |>
 
 price_of_risk <- as.numeric(t(w_tan) %*% mu - rf)
 
-security_market_line <- assets |> 
+assets |> 
   ggplot(aes(x = beta, y = mu)) +
   geom_point() +
   geom_abline(intercept = rf, slope = price_of_risk) +
   scale_y_continuous(labels = percent) +
-  labs(x = "Beta", y = "Expected return",
-       title = "Security market line") +
+  labs(
+    x = "Beta", y = "Expected return",
+    title = "Security market line"
+  ) +
   annotate("text", x = 0, y = rf, label = "Risk-free")
-security_market_line 
 ```
 
 The security market line shows the relationship between systematic risk ($\beta_i$) and the expected return of an asset. The slope of the line is the price of risk, which is the expected return of the efficient tangency portfolio. The risk-free asset is represented by the intercept with the vertical axis. The CAPM equation states that an asset's expected return is proportional to its beta, with the efficient tangency portfolio's expected return as the price of risk.
@@ -280,7 +286,7 @@ The results are particularly interesting when we visualize the alphas across our
 #| label: fig-305
 #| fig-cap: "Estimates are based on returns adjusted for dividend payments and stock splits and using the Fama-French market excess returns as a measure for the market." 
 #| fig-alt: "Title: Estimated CAPM alphas for Dow index constituents. The figure shows a bar chart with estimated alphas and indicates whether an estimate is statistically significant at 95%. Only Nvidia exhibits a statistically significant positive alpha."
-fig_alpha <- capm_results |> 
+capm_results |> 
   filter(coefficient == "alpha") |> 
   mutate(is_significant = abs(t_statistic) >= 1.96) |> 
   ggplot(aes(x = estimate, y = fct_reorder(symbol, estimate), 
@@ -291,7 +297,6 @@ fig_alpha <- capm_results |>
     x = "Estimated asset alphas", y = NULL, fill = "Significant at 95%?",
     title = "Estimated CAPM alphas for Dow index constituents"
   )
-fig_alpha
 ```
 
 Most notably, our analysis shows that only very few assets exhibit a statistically significant positive alpha during our sample period. This finding aligns with the exceptional performance of technology stocks, particularly those involved in AI and chip manufacturing, but suggests that most Dow components' returns can be explained by their market exposure alone.
