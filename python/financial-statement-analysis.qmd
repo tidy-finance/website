@@ -3,7 +3,8 @@ title: Financial Statement Analysis
 metadata:
   pagetitle: Financial Statement Analysis with Python
   description-meta: Learn how to use the programming language Python to analyze financial statements using financial ratios.
-cache: true
+execute: 
+  cache: true
 ---
 
 ```{python}
@@ -44,6 +45,11 @@ from fmpapi import fmp_get
 from plotnine import *
 from mizani.formatters import percent_format
 from adjustText import adjust_text
+```
+
+```{python}
+#| echo: false
+exec(open("./render-plotnine-custom.py").read()) 
 ```
 
 ::: {.callout-tip}
@@ -171,6 +177,7 @@ In subsequent sections, we will use cash flow data to calculate important cash f
 We now turn to downloading and processing statements for multiple companies. The next code chunk demonstrates how to retrieve financial data for all constituents of the Dow Jones Industrial Average, similar to our approach in the CAPM chapter.
 
 ```{python}
+#| cache: true
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -562,19 +569,19 @@ While individual financial ratios provide specific insights, combining them offe
 financial_ratios = (combined_statements
   .query("calendar_year == 2023")
   .filter(
-    items=['symbol'] + [
+    items=["symbol"] + [
       col for col in combined_statements.columns 
       if any(x in col for x in ["ratio", "margin", "roe", "_to_", "turnover", "interest_coverage"])
     ]
   )
-  .melt(id_vars=['symbol'], var_name='name', value_name='value')
+  .melt(id_vars=["symbol"], var_name="name", value_name="value")
   .assign(
     type=lambda x: np.select(
         [
-            x['name'].isin(["current_ratio", "quick_ratio", "cash_ratio"]),
-            x['name'].isin(["debt_to_equity", "debt_to_asset", "interest_coverage"]),
-            x['name'].isin(["asset_turnover", "inventory_turnover", "receivables_turnover"]),
-            x['name'].isin(["gross_margin", "profit_margin", "after_tax_roe"]),
+            x["name"].isin(["current_ratio", "quick_ratio", "cash_ratio"]),
+            x["name"].isin(["debt_to_equity", "debt_to_asset", "interest_coverage"]),
+            x["name"].isin(["asset_turnover", "inventory_turnover", "receivables_turnover"]),
+            x["name"].isin(["gross_margin", "profit_margin", "after_tax_roe"]),
         ],
         [
             "Liquidity Ratios",
@@ -587,15 +594,15 @@ financial_ratios = (combined_statements
   )
 )
 
-financial_ratios['rank'] = (financial_ratios
-  .sort_values(['type', 'name', 'value'], ascending=[True, True, False])
-  .groupby(['type', 'name'])
+financial_ratios["rank"] = (financial_ratios
+  .sort_values(["type", "name", "value"], ascending=[True, True, False])
+  .groupby(["type", "name"])
   .cumcount() + 1
 )
 
 final_ranks = (financial_ratios
-  .groupby(['symbol', 'type'], as_index=False)
-  .agg(rank=('rank', 'mean'))
+  .groupby(["symbol", "type"], as_index=False)
+  .agg(rank=("rank", "mean"))
   .query("symbol in @selected_symbols")
 )
 
@@ -628,6 +635,7 @@ The Fama-French five-factor model aims to explain stock returns by incorporating
 We can calculate these factors using the FMP API as follows:
 
 ```{python}
+#| cache: true
 params = {"from": "2023-12-29", "to": "2023-12-29"}
 market_cap = pd.concat(
   [fmp_get(
@@ -642,19 +650,19 @@ combined_statements_ff = (combined_statements
   .merge(
     (balance_sheet_statements
       .query("calendar_year == 2022")
-      .get(['symbol', 'total_assets'])
+      .get(["symbol", "total_assets"])
       .rename(columns={"total_assets": "total_assets_lag"})
     ),
     on="symbol", how="left"
   )
   .assign(
-    size=lambda x: np.log(x['market_cap']),
-    book_to_market=lambda x: x['total_equity'] / x['market_cap'],
+    size=lambda x: np.log(x["market_cap"]),
+    book_to_market=lambda x: x["total_equity"] / x["market_cap"],
     operating_profitability=lambda x: (
-        (x['revenue'] - x['cost_of_revenue'] - x['selling_general_and_administrative_expenses'] - x['interest_expense'])
-        / x['total_equity']
+        (x["revenue"] - x["cost_of_revenue"] - x["selling_general_and_administrative_expenses"] - x["interest_expense"])
+        / x["total_equity"]
     ),
-    investment=lambda x: x['total_assets'] / x['total_assets_lag']
+    investment=lambda x: x["total_assets"] / x["total_assets_lag"]
   )
 )
 ```
@@ -666,18 +674,18 @@ combined_statements_ff = (combined_statements
 #| fig-cap: "Ranks are based on financial statements and historical market capitalization provided through the FMP API." 
 #| fig-alt: "Title: Rank in Fama-French variables for selected stocks from the Dow Jones index. The figure shows a scatter plot with ranks for selected stocks on the horizontal and Fama-French variables on the vertical axis."
 factors_ranks = (combined_statements_ff
-  .get(['symbol', 'size', 'book_to_market', 'operating_profitability', 'investment'])
+  .get(["symbol", "size", "book_to_market", "operating_profitability", "investment"])
   .rename(columns={
-    'size': 'Size',
-    'book_to_market': 'Book-to-Market',
-    'operating_profitability': 'Profitability',
-    'investment': 'Investment'
+    "size": "Size",
+    "book_to_market": "Book-to-Market",
+    "operating_profitability": "Profitability",
+    "investment": "Investment"
   })
-  .melt(id_vars=['symbol'], var_name='name', value_name='value')
+  .melt(id_vars=["symbol"], var_name="name", value_name="value")
   .assign(
     rank=lambda x: (
-      x.sort_values(['name', 'value'], ascending=[True, False])
-      .groupby('name')
+      x.sort_values(["name", "value"], ascending=[True, False])
+      .groupby("name")
       .cumcount() + 1
       )
   )
@@ -692,7 +700,7 @@ factors_ranks = (combined_statements_ff
   + geom_point(shape="^", size=4)
   + scale_color_manual(values=selected_colors) 
   + labs(
-      x="Average rank", y="", color="",
+      x="Rank", y="", color="",
       title="Rank in Fama-French variables for selected stocks from the Dow Jones index"
   )
   + coord_cartesian(xlim=[1, 30])
