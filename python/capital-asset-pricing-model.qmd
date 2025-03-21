@@ -21,7 +21,7 @@ We use the following packages throughout this chapter:
 ```{python}
 import pandas as pd
 import numpy as np
-import yfinance as yf
+import tidyfinance as tf
 
 from plotnine import *
 from mizani.formatters import percent_format
@@ -38,38 +38,21 @@ exec(open("./render-plotnine-custom.py").read())
 Building on our analysis from the previous chapter on [Modern Portfolio Theory](modern-portfolio-theory.qmd), we again examine the Dow Jones Industrial Average constituents as an exemplary asset universe. We download and prepare our monthly return data:
 
 ```{python}
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
-
-url = ("https://www.ssga.com/us/en/institutional/etfs/library-content/"
-       "products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx")
-
-symbols = (pd.read_excel(url, skiprows=4, nrows=30)
-  .get("Ticker")
-  .tolist()
+symbols = tf.download_data(
+  domain="constituents", 
+  index="Dow Jones Industrial Average"
 )
 
-ssl._create_default_https_context = ssl.create_default_context
-
-prices_daily = (yf.download(
-    tickers=symbols, 
-    start="2000-01-01", 
-    end="2023-12-31", 
-    progress=False,
-    auto_adjust=False,
-    multi_level_index=False
-  ))
-
-prices_daily = (prices_daily
-  .stack()
-  .reset_index(level=1, drop=False)
-  .reset_index()
-  .rename(columns={"Ticker": "symbol", "Date": "date", "Adj Close": "adjusted"})
+prices_daily = tf.download_data(
+  domain="stock_prices", 
+  symbols=symbols["symbol"].tolist(),
+  start_date="2000-01-01", 
+  end_date="2023-12-31"
 )
 
 prices_daily = (prices_daily
   .groupby("symbol")
-  .apply(lambda x: x.assign(counts=x["adjusted"].dropna().count()))
+  .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
   .reset_index(drop=True)
   .query("counts == counts.max()")
 )
@@ -79,9 +62,9 @@ returns_monthly = (prices_daily
     date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
   )
   .groupby(["symbol", "date"], as_index=False)
-  .agg(adjusted=("adjusted", "last"))
+  .agg(adjusted_close=("adjusted_close", "last"))
   .assign(
-    ret=lambda x: x.groupby("symbol")["adjusted"].pct_change()
+    ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change()
   )
 )
 ```
@@ -134,13 +117,9 @@ For illustrative purposes, we compute the efficient tangency portfolio for our h
 
 ```{python}
 risk_free_monthly = (
-  yf.download("^IRX", start="2019-10-01", end="2024-09-30", progress=False,
-    auto_adjust=False,
-    multi_level_index=False)
-  .reset_index()
-  .rename(columns={"Date": "date", "Adj Close": "adjusted"})
+  tf.download_data("stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
   .assign(
-    risk_free=lambda x: (1 + x["adjusted"] / 100)**(1/12) - 1
+    risk_free=lambda x: (1 + x["adjusted_close"] / 100)**(1/12) - 1
   )
   .dropna()
 )
