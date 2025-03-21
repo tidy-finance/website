@@ -23,6 +23,7 @@ First, we load the Python packages that we use throughout this chapter. Later on
 ```{python}
 import pandas as pd
 import numpy as np
+import tidyfinance as tf
 ```
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
@@ -40,11 +41,7 @@ We start by downloading some famous Fama-French factors [e.g., @Fama1993] and po
 import pandas_datareader as pdr
 ```
 
-We can use the `pdr.DataReader()` function of the package to download monthly Fama-French factors. 
-The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`rf`). 
-Note that we have to do some manual work to parse all the columns correctly and scale them appropriately, as the raw Fama-French data comes in a unique data format. 
-For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. 
-If you are on the website, check the raw data files to appreciate the time you can save thanks to `pandas_datareader`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
+We can use the `pdr.DataReader()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`rf`). Note that we have to do some manual work to parse all the columns correctly and scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to`pandas_datareader`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
 
 ```{python}
 factors_ff3_monthly_raw = pdr.DataReader(
@@ -116,6 +113,20 @@ industries_ff_monthly = (industries_ff_monthly_raw
 
 It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `pdr.famafrench.get_available_datasets()`.
 
+To automatically download and process Fama-French data, you can also use the `tidyfinance` package with `domain="factors_ff"` and the corresponding dataset, e.g.:
+
+```{python}
+#| output: false
+tf.download_data(
+  domain="factors_ff",
+  dataset="F-F_Research_Data_Factors", 
+  start_date=start_date, 
+  end_date=end_date
+)
+```
+
+The `tidyfinance` package implements the processing steps as above and returns the same cleaned data frame. 
+
 ## q-Factors
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q*-factors can be downloaded directly from the authors' homepage from within `pd.read_csv()`. \index{Data!q-factors}\index{Factor!q-factors}
@@ -129,7 +140,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 factors_q_monthly_link = (
   "https://global-q.org/uploads/1/2/2/6/122679606/"
-  "q5_factors_monthly_2023.csv"
+  "q5_factors_monthly_2024.csv"
 )
 
 factors_q_monthly = (pd.read_csv(factors_q_monthly_link)
@@ -147,6 +158,17 @@ factors_q_monthly = (pd.read_csv(factors_q_monthly_link)
 )
 
 ssl._create_default_https_context = ssl.create_default_context
+```
+
+Again, you can use the `tidyfinance` package for a shortcut:
+
+```{python}
+tf.download_data(
+  domain="factors_q",
+  dataset="q5_factors_monthly", 
+  start_date=start_date, 
+  end_date=end_date
+)
 ```
 
 ## Macroeconomic Predictors
@@ -204,6 +226,18 @@ macro_predictors = (
 ssl._create_default_https_context = ssl.create_default_context
 ```
 
+To get the equivalent data through `tidyfinance`, you can call:
+
+```{python}
+#| output: false
+tf.download_data(
+  domain="macro_predictors",
+  dataset="monthly",
+  start_date=start_date, 
+  end_date=end_date
+)
+```
+
 ## Other Macroeconomic Data
 
 The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `pandas-datareader` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
@@ -217,11 +251,24 @@ cpi_monthly = (pdr.DataReader(
   )
   .reset_index(names="date")
   .rename(columns={"CPIAUCNS": "cpi"})
-  .assign(cpi=lambda x: x["cpi"]/x["cpi"].iloc[-1])
+  .assign(cpi=lambda x: x["cpi"] / x["cpi"].iloc[-1])
 )
 ```
 
 Note that we use the `assign()` in the last line to set the current (latest) price level as the reference inflation level. To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key.
+
+The `tidyfinance` package can, of course, also fetch the same daily data and many more data series:
+
+```{python}
+tf.download_data(
+  domain="fred",
+  series="CPIAUCNS", 
+  start_date=start_date, 
+  end_date=end_date
+)
+```
+
+To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through tidyfinance, we recommend working with the `fredapi` package. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
 
 ## Setting Up a Database
 
