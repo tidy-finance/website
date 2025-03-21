@@ -23,6 +23,7 @@ First, we load the Python packages that we use throughout this chapter. Later on
 ```{python}
 import pandas as pd
 import numpy as np
+import tidyfinance as tf
 import sqlite3
 
 from plotnine import *
@@ -32,7 +33,7 @@ from datetime import datetime
 
 ```{python}
 #| echo: false
-exec(open("./render-plotnine-custom.py").read())
+exec(open("./render-plotnine-custom.py").read()) 
 ```
 
 We use the same date range as in the previous chapter to ensure consistency. However, we have to use the date format that the WRDS database expects.
@@ -67,6 +68,14 @@ connection_string = (
 )
 
 wrds = create_engine(connection_string, pool_pre_ping=True)
+```
+
+You can also use the `tidyfinance` package to set the login credentials and create a connection.
+
+```{python}
+#| eval: false
+tf.set_wrds_credentials()
+wrds = tf.get_wrds_connection()
 ```
 
 The remote connection to WRDS is very useful. Yet, the database itself contains many different tables. You can check the [WRDS homepage](https://wrds-www.wharton.upenn.edu/) to identify the table's name you are looking for (if you go beyond our exposition).
@@ -205,6 +214,18 @@ crsp_monthly = (crsp_monthly
 )
 ```
 
+The `tidyfinance` package provides a shortcut to implement all these processing steps from above:
+
+```{python}
+#| eval: false
+crsp_monthly = tf.download_data(
+  domain="wrds",
+  dataset="crsp_monthly",
+  start_date=start_date,
+  end_date=end_date
+)
+```
+
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization. 
 
 ```{python}
@@ -235,23 +256,21 @@ Before we move on to other data sources, let us look at some descriptive statist
 #| label: fig-211
 #| fig-cap: "The figure shows the monthly number of stocks in the CRSP sample listed at each of the US exchanges."
 #| fig-alt: "Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2023. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."
-#| fig-pos: "htb"
 securities_per_exchange = (crsp_monthly
   .groupby(["exchange", "date"])
   .size()
   .reset_index(name="n")
 )
 
-securities_per_exchange_figure = (
+(
   ggplot(securities_per_exchange, 
-         aes(x="date", y="n", color="exchange", linetype="exchange")) +
-  geom_line() + 
-  labs(x="", y="", color="", linetype="",
-       title="Monthly number of securities by listing exchange") +
-  scale_x_datetime(date_breaks="10 years", date_labels="%Y") +
-  scale_y_continuous(labels=comma_format())
+         aes(x="date", y="n", color="exchange", linetype="exchange"))
+  + geom_line()
+  + labs(x="", y="", color="", linetype="",
+         title="Monthly number of securities by listing exchange")
+  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+  + scale_y_continuous(labels=comma_format())
 )
-securities_per_exchange_figure.draw()
 ```
 
 Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in @fig-212. To ensure that we look at meaningful data that is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange. All values in @fig-212 are in terms of the end of 2023 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
@@ -260,7 +279,6 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 #| label: fig-212
 #| fig-cap: "The figure shows the monthly market capitalization by listing exchange. Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2023."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2023. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2023, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." 
-#| fig-pos: "htb"
 cpi_monthly = pd.read_sql_query(
   sql="SELECT * FROM cpi_monthly",
   con=tidy_finance,
@@ -278,18 +296,17 @@ market_cap_per_exchange = (crsp_monthly
   .reset_index()
 )
 
-market_cap_per_exchange_figure = (
+(
   ggplot(market_cap_per_exchange, 
          aes(x="date", y="mktcap/1000", 
-             color="exchange", linetype="exchange")) +
-  geom_line() +
-  labs(x="", y="", color="", linetype="",
-       title=("Monthly market cap by listing exchange "
-              "in billions of Dec 2023 USD")) + 
-  scale_x_datetime(date_breaks="10 years", date_labels="%Y") +
-  scale_y_continuous(labels=comma_format())
+             color="exchange", linetype="exchange"))
+  + geom_line()
+  + labs(x="", y="", color="", linetype="",
+         title=("Monthly market cap by listing exchange "
+                "in billions of Dec 2023 USD"))
+  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+  + scale_y_continuous(labels=comma_format())
 )
-market_cap_per_exchange_figure.draw()
 ```
 
 Next, we look at the same descriptive statistics by industry. @fig-213 plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
@@ -298,7 +315,6 @@ Next, we look at the same descriptive statistics by industry. @fig-213 plots the
 #| label: fig-213
 #| fig-cap: "The figure shows the monthly number of stocks in the CRSP sample associated with different industries."
 #| fig-alt: "Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2023 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2023, the segment of firms within public administration is the largest in terms of the number of listed stocks."
-#| fig-pos: "htb"
 securities_per_industry = (crsp_monthly
   .groupby(["industry", "date"])
   .size()
@@ -308,19 +324,18 @@ securities_per_industry = (crsp_monthly
 linetypes = ["-", "--", "-.", ":"]
 n_industries = securities_per_industry["industry"].nunique()
 
-securities_per_industry_figure = (
+(
   ggplot(securities_per_industry, 
-         aes(x="date", y="n", color="industry", linetype="industry")) + 
-  geom_line() + 
-  labs(x="", y="", color="", linetype="",
-       title="Monthly number of securities by industry") +
-  scale_x_datetime(date_breaks="10 years", date_labels="%Y") + 
-  scale_y_continuous(labels=comma_format()) +
-  scale_linetype_manual(
-    values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
-  ) 
+         aes(x="date", y="n", color="industry", linetype="industry"))
+  + geom_line()
+  + labs(x="", y="", color="", linetype="",
+         title="Monthly number of securities by industry")
+  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+  + scale_y_continuous(labels=comma_format())
+  + scale_linetype_manual(
+      values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
+    ) 
 )
-securities_per_industry_figure.draw()
 ```
 
 We also compute the market cap of all stocks belonging to the respective industries and show the evolution over time in @fig-214. All values are again in terms of billions of end of 2023 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Toward the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
@@ -329,7 +344,6 @@ We also compute the market cap of all stocks belonging to the respective industr
 #| label: fig-214 
 #| fig-cap: "The figure shows the total Market capitalization in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2023."
 #| fig-alt: "Title: Monthly total market cap by industry in billions as of Dec 2023 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2023 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past."
-#| fig-pos: "htb"
 market_cap_per_industry = (crsp_monthly
   .merge(cpi_monthly, how="left", on="date")
   .groupby(["date", "industry"])
@@ -341,20 +355,19 @@ market_cap_per_industry = (crsp_monthly
   .reset_index()
 )
 
-market_cap_per_industry_figure = (
+(
   ggplot(market_cap_per_industry, 
          aes(x="date", y="mktcap/1000", 
-             color="industry", linetype="industry")) +
-  geom_line() + 
-  labs(x="", y="", color="", linetype="",
-       title="Monthly market cap by industry in billions of Dec 2023 USD") + 
-  scale_x_datetime(date_breaks="10 years", date_labels="%Y") + 
-  scale_y_continuous(labels=comma_format()) +
-  scale_linetype_manual(
-    values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
-  ) 
+             color="industry", linetype="industry"))
+  + geom_line()
+  + labs(x="", y="", color="", linetype="",
+         title="Monthly market cap by industry in billions of Dec 2023 USD")
+  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+  + scale_y_continuous(labels=comma_format())
+  + scale_linetype_manual(
+      values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
+    ) 
 )
-market_cap_per_industry_figure.draw()
 ```
 
 ## Daily CRSP Data
@@ -451,6 +464,20 @@ for j in range(1, batches+1):
 
 Eventually, we end up with more than 71 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
 
+To download the daily CRSP data via the `tidyfinance` package, you can call:
+
+```{r}
+#| eval: false
+crsp_daily = tf.download_data(
+  domain="wrds",
+  dataset="crsp_daily",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend to use loop the function over different date periods and store the results. 
+
 ## Preparing Compustat Data
 
 Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence,](https://www.spglobal.com/marketintelligence/en/) which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
@@ -540,6 +567,18 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 )
 ```
 
+The `tidyfinance` package provides a shortcut for these processing steps as well:
+
+```{python}
+#| eval: false
+compustat = tf.download_data(
+  domain="wrds",
+  dataset="compustat_annual",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
 ## Merging CRSP with Compustat
 
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!CRSP-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table} The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via the SQL verb `CURRENT_DATE`.
@@ -559,6 +598,13 @@ ccm_linking_table = pd.read_sql_query(
   dtype={"permno": int, "gvkey": str},
   parse_dates={"linkdt", "linkenddt"}
 )
+```
+
+To fetch these links via `tidyfinance`, you can call:
+
+```{python}
+#| eval: false
+ccm_links = tf.download_data(domain="wrds", dataset="ccm_links")
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data.
@@ -593,7 +639,6 @@ Before we close this chapter, let us look at an interesting descriptive statisti
 #| label: fig-215 
 #| fig-cap: "The figure shows the end-of-year share of securities with book equity values by listing exchange."
 #| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2023 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
-#| fig-pos: "htb"
 share_with_be = (crsp_monthly
   .assign(year=lambda x: pd.DatetimeIndex(x["date"]).year)
   .sort_values("date")
@@ -610,16 +655,15 @@ share_with_be = (crsp_monthly
   .reset_index()
 )
 
-share_with_be_figure = (
+(
   ggplot(share_with_be, 
-         aes(x="year", y="share", color="exchange", linetype="exchange")) + 
-  geom_line() + 
-  labs(x="", y="", color="", linetype="",
-       title="Share of securities with book equity values by exchange") +
-  scale_y_continuous(labels=percent_format()) + 
-  coord_cartesian(ylim=(0, 1))
+         aes(x="year", y="share", color="exchange", linetype="exchange"))
+  + geom_line()
+  + labs(x="", y="", color="", linetype="",
+         title="Share of securities with book equity values by exchange")
+  + scale_y_continuous(labels=percent_format())
+  + coord_cartesian(ylim=(0, 1))
 )
-share_with_be_figure.draw()
 ```
 
 ## Exercises
