@@ -166,15 +166,17 @@ Our data contains `{python} len(data.columns)-2` columns of regressors with the 
 #| fig-cap: "The box plots show the monthly dispersion of returns for 10 different industries."
 #| fig-alt: "Title: Excess return distributions by industry in percent. The figure shows boxplots that visualize the industry's excess return distribution. All industry returns are centered around zero and exhibit substantial outliers in the magnitude of 20 percent on a monthly basis."
 #| fig-pos: "htb"
-data_plot = (ggplot(data, 
-  aes(x="industry", y="ret_excess")) + 
-  geom_boxplot() + 
-  coord_flip() + 
-  labs(x="", y="", 
-       title="Excess return distributions by industry in percent") + 
-   scale_y_continuous(labels=percent_format())
+data_figure = (
+  ggplot(
+    data, 
+    aes(x="industry", y="ret_excess")
+  )
+  + geom_boxplot() 
+  + coord_flip()
+  + labs(x="", y="", title="Excess return distributions by industry in percent")
+  + scale_y_continuous(labels=percent_format())
 )
-data_plot.draw()
+data_figure.show()
 ```
 
 ## Machine Learning Workflow
@@ -277,25 +279,27 @@ predicted_values = (pd.DataFrame({
   .melt(id_vars="date", var_name="Variable", value_name="return")
 )
 
-predicted_values_plot = (
-  ggplot(predicted_values, 
-         aes(x="date", y="return", 
-             color="Variable", linetype="Variable")) +
-  annotate(
+predicted_values_figure = (
+  ggplot(
+    predicted_values, 
+    aes(x="date", y="return", color="Variable", linetype="Variable")
+  )
+  + annotate(
     "rect",
     xmin=data_manufacturing_training["date"].max(),
     xmax=data_manufacturing["date"].max(),
     ymin=-np.inf, ymax=np.inf,
     alpha=0.25, fill="#808080"
-  ) + 
-  geom_line() +
-  labs(x="", y="", color="", linetype="",
-       title="Monthly realized and fitted manufacturing risk premia") +
-  scale_x_datetime(breaks=date_breaks("5 years"), 
-                   labels=date_format("%Y")) +
-  scale_y_continuous(labels=percent_format())
+  )
+  + geom_line()
+  + labs(
+      x="", y="", color="", linetype="",
+      title="Monthly realized and fitted manufacturing risk premia"
+    )
+  + scale_x_datetime(breaks=date_breaks("5 years"), labels=date_format("%Y"))
+  + scale_y_continuous(labels=percent_format())
 )
-predicted_values_plot.draw()
+predicted_values_figure.show()
 ```
 
 What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample for a grid of different $\lambda$'s. 
@@ -335,16 +339,20 @@ The dataframes `lasso_coefficients` and `ridge_coefficients` contain an entire s
 #| fig-cap: "The figure shows estimated coefficient paths for different penalty factors. The penalty parameters are chosen iteratively to resemble the path from no penalization to a model that excludes all variables."
 #| fig-alt: "Title: Estimated coefficient paths for different penalty factors. The figure shows how estimated lasso and ridge coefficients tend to zero for a higher penalty parameter. Ridge trace is smooth, and Lasso exhibits non-linear behavior."
 #| fig-pos: "htb"
-coefficients_plot = (
-  ggplot(pd.concat([coefficients_lasso, coefficients_ridge]), 
-         aes(x="alpha", y="value", color="variable")) + 
-  geom_line()  +
-  facet_wrap("model") +
-  labs(x="Penalty factor (lambda)", y="",
-       title="Estimated coefficient paths for different penalty factors") +
-  scale_x_log10() +
-  theme(legend_position="none"))
-coefficients_plot.draw()
+coefficients_figure = (
+  ggplot(
+    pd.concat([coefficients_lasso, coefficients_ridge]), 
+    aes(x="alpha", y="value", color="variable")
+  )
+  + geom_line()
+  + facet_wrap("model")
+  + labs(
+      x="Penalty factor (lambda)", y="",
+      title="Estimated coefficient paths for different penalty factors"
+    )
+  + scale_x_log10()
+  + theme(legend_position="none"))
+coefficients_figure.show()
 ```
 
 ### Tune a model
@@ -417,21 +425,26 @@ validation = (pd.DataFrame(finder.cv_results_)
   )
 )
 
-validation_plot = (ggplot(validation, 
-  aes(x="param_regressor__alpha", y="mspe", 
-      color="param_regressor__l1_ratio",
-      shape="param_regressor__l1_ratio",
-      group="param_regressor__l1_ratio")) +
-  geom_point() + 
-  geom_line() +
-  labs(x ="Penalty factor (lambda)", y="Root MSPE", 
-       title="Root MSPE for different penalty factors",
+validation_figure = (
+  ggplot(
+    validation, 
+    aes(x="param_regressor__alpha", y="mspe", 
+        color="param_regressor__l1_ratio",
+        shape="param_regressor__l1_ratio",
+        group="param_regressor__l1_ratio")
+  )
+  + geom_point()
+  + geom_line()
+  + labs(
+      x ="Penalty factor (lambda)", y="Root MSPE", 
+      title="Root MSPE for different penalty factors",
        color="Proportion of Lasso Penalty",
-       shape="Proportion of Lasso Penalty") +
-  scale_x_log10() + 
-  guides(linetype="none")
+       shape="Proportion of Lasso Penalty"
+    )
+  + scale_x_log10()
+  + guides(linetype="none")
 )
-validation_plot.draw()
+validation_figure.show()
 ```
 
 @fig-1404 shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__alpha"]).iloc[0, 0], 4)` and a mixture factor ($\rho$) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__l1_ratio"]).iloc[0, 0], 4)`.
@@ -501,18 +514,18 @@ What has just happened? In principle, exactly the same as before but instead of 
 #| fig-cap: "The figure shows selected variables for different industries. Dark areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero."
 #| fig-alt: "Title: Selected variables for different industries. The figure shows which factors and macroeconomic predictors the Lasso model selected for the different industries. In general, there are not many selected variables. The market excess return is selected across all industries except for utilities."
 #| fig-pos: "htb"
-selected_factors_plot = (
-  ggplot(selected_factors, 
-         aes(x="variable", y="industry")) +
-  geom_tile() +
-  labs(x="", y="", 
-       title="Selected variables for different industries") +
-  coord_flip() +
-  scale_x_discrete(limits=reversed) +
-  theme(axis_text_x=element_text(rotation=70, hjust=1),
-        figure_size=(6.4, 6.4))
+selected_factors_figure = (
+  ggplot(
+    selected_factors, 
+    aes(x="variable", y="industry")
+  )
+  + geom_tile()
+  + labs(x="", y="", title="Selected variables for different industries")
+  + coord_flip()
+  + scale_x_discrete(limits=reversed)
+  + theme(axis_text_x=element_text(rotation=70, hjust=1), figure_size=(6.4, 6.4))
 )
-selected_factors_plot.draw()
+selected_factors_figure.show()
 ```
 
 The heat map in @fig-1405 conveys two main insights: first, we see that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only `factor_ff_mkt_excess` and its interaction with `macro_bm` a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While barely any variable is selected by Lasso for Utilities, many factors are selected for, e.g., Durable and Manufacturing, but the selected factors do not necessarily coincide. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide a factor that consistently provides pricing abilities across industries.
