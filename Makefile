@@ -28,7 +28,11 @@ other_chapters_r:
 	quarto render r/constrained-optimization-and-backtesting.qmd
 	
 other_chapters_python:
-	quarto render python/introduction-to-tidy-finance.qmd
+	quarto render python/working-with-stock-returns.qmd
+	quarto render python/modern-portfolio-theory.qmd
+	quarto render python/capital-asset-pricing-model.qmd
+	quarto render python/financial-statement-analysis.qmd
+	quarto render python/discounted-cash-flow-analysis.qmd
 	quarto render python/beta-estimation.qmd
 	quarto render python/univariate-portfolio-sorts.qmd
 	quarto render python/size-sorts-and-p-hacking.qmd

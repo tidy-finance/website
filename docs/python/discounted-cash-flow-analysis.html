@@ -598,7 +598,7 @@ Note
 </ul>
 <p>We make a few simplifying assumptions due to the diverse nature of businesses, which a simple model cannot cover. After all, there are entire textbooks written just on valuation. In particular, we assume that firms only conduct operating activities (i.e., financial statements do not include non-operating items), implying that firms do not own any assets that do not produce operating cash flows. Otherwise, you must value these non-operating activities separately for many real-world examples.</p>
 <p>In this chapter, we rely on the following packages to build a simple DCF analysis:</p>
-<div id="f59a8c04" class="cell" data-execution_count="2">
+<div id="f59a8c04" class="cell" data-execution_count="3">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
@@ -624,7 +624,7 @@ Tip
 <section id="prepare-data" class="level2">
 <h2 class="anchored" data-anchor-id="prepare-data">Prepare Data</h2>
 <p>Before we can perform a DCF analysis, we need historical financial data to inform our forecasts. We use the Financial Modeling Prep (FMP) API to download financial statements. The <code>fmpapi</code> package provides a convenient interface for accessing this data in a tidy format.</p>
-<div id="9c35df2c" class="cell" data-execution_count="4">
+<div id="9c35df2c" class="cell" data-execution_count="5">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>symbol <span class="op">=</span> <span class="st">"MSFT"</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>income_statements <span class="op">=</span> fmp_get(</span>
@@ -645,7 +645,7 @@ Tip
 <li>Capital Expenditures (CAPEX) represent investments in long-term assets</li>
 </ul>
 <p>We can implement this calculation by combining and transforming our financial statement data. Note that we also arrange by year, which is important for some of the following code chunks.</p>
-<div id="d4343289" class="cell" data-execution_count="5">
+<div id="d4343289" class="cell" data-execution_count="6">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>dcf_data <span class="op">=</span> (income_statements</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    ebit<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"net_income"</span>] <span class="op">+</span> x[<span class="st">"income_tax_expense"</span>] <span class="op">+</span> x[<span class="st">"interest_expense"</span>] <span class="op">-</span> x[<span class="st">"interest_income"</span>]</span>
@@ -676,7 +676,7 @@ Tip
 <h2 class="anchored" data-anchor-id="forecasting-free-cash-flow">Forecasting Free Cash Flow</h2>
 <p>After calculating historical FCF, we need to project it into the future. While historical data provides a foundation, forecasting requires both quantitative analysis and qualitative judgment. We use a ratio-based approach that links all FCF components to revenue growth, making our forecasts more tractable. This is another crucial assumption for our exposition that will not hold in reality. Thus, you must put more thought into these forecast ratios and their dynamics over time.</p>
 <p>First, we express each FCF component as a ratio relative to revenue. This standardization helps identify trends and makes forecasting more systematic. <a href="#fig-500" class="quarto-xref">Figure&nbsp;1</a> shows the historical evolution of these key financial ratios.</p>
-<div id="cell-fig-500" class="cell" data-execution_count="6">
+<div id="cell-fig-500" class="cell" data-execution_count="7">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>dcf_data <span class="op">=</span> (dcf_data</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    revenue_growth<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"revenue"</span>] <span class="op">/</span> x[<span class="st">"revenue"</span>].shift(<span class="dv">1</span>) <span class="op">-</span> <span class="dv">1</span>,</span>
@@ -730,7 +730,7 @@ Figure&nbsp;1: Ratios are based on financial statements provided through the FMP
 <p>For our DCF analysis, we need to project these ratios into the future. These projections should reflect both historical patterns and forward-looking considerations such as: Industry trends and competitive dynamics, company-specific growth initiatives, expected operational efficiency improvements, planned capital investments, or working capital management strategies. Overall, there is a lot to consider in practice. However, forecast ratios make this process tractable.</p>
 <p>Another crucial question is the length of the forecast period. We use five years below ad-hoc, but you want to make detailed projections for each year when the company undergoes significant changes. As long as forecast ratios change, you need to make explicit forecasts. Once the company reaches a steady state, you can switch to computing the continuation value discussed later.</p>
 <p>We demonstrate this forecasting approach in <a href="#fig-501" class="quarto-xref">Figure&nbsp;2</a>. Note that our forecast ratio dynamics just serve as an example and are not grounded in deeper economic analysis.</p>
-<div id="cell-fig-501" class="cell" data-execution_count="7">
+<div id="cell-fig-501" class="cell" data-execution_count="8">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>forecast_ratios <span class="op">=</span> pd.DataFrame({</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"year"</span>: [<span class="dv">2025</span>, <span class="dv">2026</span>, <span class="dv">2027</span>, <span class="dv">2028</span>, <span class="dv">2029</span>],</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"operating_margin"</span>: [<span class="fl">0.41</span>, <span class="fl">0.42</span>, <span class="fl">0.43</span>, <span class="fl">0.44</span>, <span class="fl">0.45</span>],</span>
@@ -789,7 +789,7 @@ Figure&nbsp;2: Historical ratios are based on financial statements provided thro
 </div>
 <p>The final step in our FCF forecast is projecting revenue growth. While there are multiple approaches to this task, we demonstrate a GDP-based method that links company growth to macroeconomic forecasts.</p>
 <p>We use GDP growth forecasts from the <a href="https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&amp;s=NGDP_RPCH,&amp;sy=2020&amp;ey=2029&amp;ssm=0&amp;scsm=1&amp;scc=0&amp;ssd=1&amp;ssc=0&amp;sic=1&amp;sort=country&amp;ds=.&amp;br=1">IMF World Economic Outlook (WEO)</a> database as our baseline. The WEO provides comprehensive economic projections, though it is important to note that these forecasts are periodically revised as new data becomes available. We manually collect these forecasts and store them in a tibble.</p>
-<div id="93d32aa7" class="cell" data-execution_count="8">
+<div id="93d32aa7" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gdp_growth <span class="op">=</span> pd.DataFrame({</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"year"</span>: <span class="bu">list</span>(<span class="bu">range</span>(<span class="dv">2020</span>, <span class="dv">2030</span>)),</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"gdp_growth"</span>: [</span>
@@ -803,7 +803,7 @@ Figure&nbsp;2: Historical ratios are based on financial statements provided thro
 <span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity. Let us estimate the model with historical data.</p>
-<div id="f8dbe88f" class="cell" data-execution_count="9">
+<div id="f8dbe88f" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>revenue_growth_model <span class="op">=</span> smf.ols(<span class="st">"revenue_growth ~ gdp_growth"</span>, data<span class="op">=</span>dcf_data).fit().params</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>dcf_data <span class="op">=</span> (dcf_data</span>
@@ -818,7 +818,7 @@ Figure&nbsp;2: Historical ratios are based on financial statements provided thro
 <span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The model estimates two parameters: (i) an intercept that captures the company’s baseline growth, and (ii) a slope coefficient that measures the company’s sensitivity to GDP changes. Then, we can use the model and the growth forecasts to make revenue growth projections. We visualize the historical and projected growth rates using this approach in <a href="#fig-502" class="quarto-xref">Figure&nbsp;3</a>:</p>
-<div id="cell-fig-502" class="cell" data-execution_count="10">
+<div id="cell-fig-502" class="cell" data-execution_count="11">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>revenue_growth <span class="op">=</span> (dcf_data</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"year &gt;= 2021"</span>)</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  .melt(</span>
@@ -858,7 +858,7 @@ Figure&nbsp;3: Realized revenue growth rates are based on financial statements p
 </div>
 <p>While more sophisticated approaches exist (e.g., proprietary analyst forecasts or bottom-up market analyses), this method provides a transparent and data-driven starting point for revenue projections.</p>
 <p>With all components in place - revenue growth projections and forecast ratios - we can now calculate our FCF forecasts. We must first convert our growth rates into revenue projections and then apply our forecast ratios to compute each FCF component.</p>
-<div id="86228d6c" class="cell" data-execution_count="11">
+<div id="86228d6c" class="cell" data-execution_count="12">
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>dcf_data.loc[<span class="dv">0</span>, <span class="st">"revenue_growth"</span>] <span class="op">=</span> <span class="dv">0</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>dcf_data[<span class="st">"revenue"</span>] <span class="op">=</span> dcf_data[<span class="st">"revenue"</span>].iloc[<span class="dv">0</span>] <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> dcf_data[<span class="st">"revenue_growth"</span>]).cumprod()</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -874,7 +874,7 @@ Figure&nbsp;3: Realized revenue growth rates are based on financial statements p
 <span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>We visualize the resulting FCF projections in <a href="#fig-503" class="quarto-xref">Figure&nbsp;4</a>.</p>
-<div id="cell-fig-503" class="cell" data-execution_count="12">
+<div id="cell-fig-503" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>cash_flows_figure <span class="op">=</span> (</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  ggplot(</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    dcf_data,</span>
@@ -910,7 +910,7 @@ Figure&nbsp;4: Realized growth rates are based on financial statements provided 
 <p>where <span class="math inline">\(TV_{T}\)</span> is the terminal value at time <span class="math inline">\(T\)</span>, <span class="math inline">\(FCF_{T+1}\)</span> is the free cash flow in the first year after our forecast period, <span class="math inline">\(r\)</span> is the discount rate (typically WACC, see below), and <span class="math inline">\(g\)</span> is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute <span class="math inline">\(FCF_{T+1}\)</span>, which is equal to <span class="math inline">\(FCF_{T}\cdot(1+g)\)</span></p>
 <p>The perpetual growth rate <span class="math inline">\(g\)</span> should reflect the long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely. Exceeding GDP growth indefinitely also implies that the whole economy eventually consists of one company. For example, the last 20 years of GDP growth is a sensible assumption (the nominal growth rate is 4% for the US).</p>
 <p>Let us implement the Perpetuity Growth Model:</p>
-<div id="bb60e0e4" class="cell" data-execution_count="13">
+<div id="bb60e0e4" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_terminal_value(last_fcf, growth_rate, discount_rate):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> last_fcf <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> growth_rate) <span class="op">/</span> (discount_rate <span class="op">-</span> growth_rate)</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -940,7 +940,7 @@ Figure&nbsp;4: Realized growth rates are based on financial statements provided 
 <li>The return on debt <span class="math inline">\(r^D\)</span> can also be estimated in different ways. For instance, effective interest rates can be calculated as the ratio of interest expense to total debt from financial statements. This gives you a real-world measure of what the company is currently paying. Alternatively, you can look up corporate bond spreads for companies in the same rating group.</li>
 </ul>
 <p>If you would rather not estimate WACC manually, resources are available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s <a href="https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html">database</a>. He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. For example, if you are analyzing a company in the Computer Services sector, as we do here, you can look up the industry’s average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:</p>
-<div id="d37012a2" class="cell" data-execution_count="14">
+<div id="d37012a2" class="cell" data-execution_count="15">
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> requests</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>url <span class="op">=</span> <span class="st">"https://pages.stern.nyu.edu/~adamodar/pc/datasets/wacc.xls"</span></span>
@@ -984,7 +984,7 @@ Tip
 \text{Total DCF Value} = \sum_{t=1}^{T} \frac{\text{FCF}t}{(1 + \text{WACC})^t} + \frac{\text{TV}_{T}}{(1 + \text{WACC})^T},
 \]</span></p>
 <p>where <span class="math inline">\(T\)</span> is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.</p>
-<div id="adcc3d68" class="cell" data-execution_count="15">
+<div id="adcc3d68" class="cell" data-execution_count="16">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_dcf(wacc, growth_rate):</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    free_cash_flow <span class="op">=</span> dcf_data[<span class="st">"fcf"</span>].values</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    last_fcf <span class="op">=</span> free_cash_flow[<span class="op">-</span><span class="dv">1</span>]</span>
@@ -1014,7 +1014,7 @@ Tip
 <li>The WACC, which affects how we value future cash flows.</li>
 </ul>
 <p>Let us implement a sensitivity analysis that varies these two parameters:</p>
-<div id="cell-fig-504" class="cell" data-execution_count="16">
+<div id="cell-fig-504" class="cell" data-execution_count="17">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>wacc_range <span class="op">=</span> np.arange(<span class="fl">0.06</span>, <span class="fl">0.08</span> <span class="op">+</span> <span class="fl">0.01</span>, <span class="fl">0.01</span>)</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>growth_rate_range <span class="op">=</span> np.arange(<span class="fl">0.02</span>, <span class="fl">0.04</span> <span class="op">+</span> <span class="fl">0.01</span>, <span class="fl">0.01</span>)</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -1071,14 +1071,14 @@ Figure&nbsp;5: The enterprise values combine data from FMP API, ad-hoc forecasts
 </section>
 <section id="key-takeaways" class="level2">
 <h2 class="anchored" data-anchor-id="key-takeaways">Key takeaways</h2>
-<p>Discounted Cash Flow analysis provides a structured approach to company valuation. In this chapter, you learned to:</p>
 <ul>
-<li>Calculate free cash flow using financial statement data and ratio analysis.</li>
-<li>Project future cash flows by combining company-specific metrics with macroeconomic forecasts.</li>
-<li>Estimate terminal value using the perpetuity growth method.</li>
-<li>Apply appropriate discount rates based on industry benchmarks.</li>
-<li>Test the sensitivity of valuations to key assumptions.</li>
-<li>Convert enterprise values to equity values using balance sheet adjustments.</li>
+<li>Free Cash Flow can be calculated by transforming financial statement data into standardized ratios linked to company revenue.</li>
+<li>Forecasting future cash flows requires both historical financial data and macroeconomic projections such as GDP growth rates.</li>
+<li>The terminal value represents long-term company value and can be estimated using the perpetuity growth model.</li>
+<li>The WACC is used as the discount rate and reflects the cost of financing from both equity and debt.</li>
+<li>A DCF model combines present values of projected free cash flows and terminal value to estimate enterprise value.</li>
+<li>Sensitivity analysis reveals how small changes in WACC or growth assumptions can significantly impact company valuation.</li>
+<li>To determine equity value, subtract net debt from enterprise value and adjust for any non-operating assets or liabilities.</li>
 </ul>
 </section>
 <section id="exercises" class="level2">
