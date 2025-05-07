@@ -22,7 +22,7 @@ categories:
   - R
 ---
 
-In this blog post, we show how to obtain and analyze shareholder proposal voting data for publicly listed firms in the US. For context, the SEC allows shareholders to submit proposals a few months before the annual general meeting (AGM), and these proposals end up on the ballot and are voted on (1) if a firm's management does not submit a 'no-action request' accepted by the SEC or (2) management and shareholders do not reach an agreement prior to the AGM. Voting outcomes are non-binding, but management usually experiences pressure from organizations such as the Council of Institutional Investors (CII) if they do not adequately act on a proposal's voting outcome [@bachmetzger2017]. We refer to data provided by Institutional Shareholder Services (ISS), which gained popularity as one of the major US proxy advisors. A proxy advisor provides recommendations to institutional investors on how to vote on proposals at AGMs, and in this context, ISS has used its advantageous position to build an extensive database that collects information on management and shareholder proposals.
+In this blog post, we show how to obtain and analyze shareholder proposal voting data for publicly listed firms in the US. For context, the SEC allows shareholders to submit proposals a few months before the annual general meeting (AGM), and these proposals end up on the ballot and are voted on if (1) a firm's management does not submit a 'no-action request' accepted by the SEC or (2) management and shareholders do not reach an agreement prior to the AGM. Voting outcomes are non-binding, but management usually experiences pressure from organizations such as the Council of Institutional Investors (CII) if they do not adequately act on a proposal's voting outcome [@bachmetzger2017]. We refer to data provided by Institutional Shareholder Services (ISS), which gained popularity as one of the major US proxy advisors. A proxy advisor provides recommendations to institutional investors on how to vote on proposals at AGMs, and in this context, ISS has used its advantageous position to build an extensive database that collects information on management and shareholder proposals.
 
 Our code relies on the following R packages.
 
@@ -39,7 +39,7 @@ library(janitor)
 
 # Data Preparation
 
-We start by establishing a connection to WRDS using the `tidyfinance` package (you can find more information [here](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html#accessing-wrds)) as we query the data directly through their servers. We also load stocks' identifying information to match ISS identifiers (8-digit CUSIP) with CRSP PERMNOs. Finally, we read in an Excel file containing granular ESG-type categorization of proposal types, which is separately provided by ISS.
+We start by establishing a connection to WRDS using the `tidyfinance` package (you can find more information [here](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html#accessing-wrds)) as we query the data directly through their servers. We also load stocks' identifying information to match ISS identifiers (8-digit CUSIPs) with CRSP PERMNOs. Finally, we read in an Excel file containing granular ESG-type categorization of proposal types, which is separately provided by ISS.
 
 ```{r}
 wrds <- get_wrds_connection()
@@ -52,7 +52,7 @@ ISS provides two main datasets that contain shareholder proposals related to pub
 * ISS Voting Analytics - Shareholder Proposals
 * ISS Voting Analytics - Company Vote Results US 
 
-The Shareholder Proposals table contains all shareholder proposals that were submitted to the SEC, regardless of whether they eventually came to a vote at the AGM (sample coverage: 2006 - 2024). The Company Vote Results table, on the other hand, has all proposals that made it to the ballot at AGM and hence also includes management proposals (sample coverage: 2002 - 2024).[^1][^2] We decide to use the Company Vote Results data as we are primarily interested in proposals that shareholders actually voted on and exploit the slightly longer sample period. We extract company names and identifiers, meeting dates, vote shares, and short descriptions of proposal contents.
+The Shareholder Proposals table contains all shareholder proposals that were submitted to the SEC, regardless of whether they eventually came to a vote at the AGM (sample coverage: 2006 - 2024). The Company Vote Results table, on the other hand, has all proposals that made it to the ballot at AGM and hence also includes management proposals (sample coverage: 2002 - 2024).[^1][^2] We use the Company Vote Results data as we are primarily interested in proposals that shareholders actually voted on, and exploit the slightly longer sample period. We extract company names and identifiers, meeting dates, vote shares, and short descriptions of proposal contents.
 
 [^1]: A typical example of a management proposal is the election of new board members.
 [^2]: Upon request, ISS also provides legacy data going back until 1997.
@@ -89,7 +89,7 @@ va_vote_results <- va_vote_results |>
                           .default = NA))
 ```
 
-As pointed out by @cunatetal2020, early studies mainly used a so-called simple majority rule, which translates into dividing votes in favor of the proposals by votes against the proposal. The reason is that earlier versions of the ISS database did not contain specific information on the voting rules defined in corporate charters but only provided votes in favor versus votes against a proposal. To be able to replicate prior results, we add a variable that computes the simple voting rule, which will collapse to the sophisticated voting rule if firms use `votedfor` / `votedagainst` (i.e., `base == "F+A"`). Next, we determine whether a proposal passed by comparing the vote share with the vote requirement.[^3] If the vote share exceeds the vote requirement, we assign a value equal to one and zero otherwise.
+As pointed out by @cunatetal2020, early studies mainly used a so-called simple majority rule, which translates into dividing votes in favor of the proposal by votes against the proposal. The reason is that earlier versions of the ISS database did not contain specific information on the voting rules defined in corporate charters but only provided votes in favor versus votes against a proposal. To be able to replicate prior results, we add a variable that computes the simple voting rule, which will collapse to the sophisticated voting rule if firms use `votedfor` / `votedagainst` (i.e., `base == "F+A"`). Next, we determine whether a proposal passed by comparing the vote share with the vote requirement.[^3] If the vote share exceeds the vote requirement, we assign a value equal to one and zero otherwise.
 
 [^3]: Typically, the vote requirement equals 50\%. Note, however, that there are also exceptions, e.g., when shareholders elect new board members. This is often a pro forma vote with a minuscule threshold.
 
@@ -110,7 +110,7 @@ va_vote_results <- va_vote_results |>
          dist_trhd_simple = abs(voterequirement - vshr_simple))
 ```
 
-To ensure there are no inconsistencies between our computations of vote shares and ISS' assessment of proposal passage, we check whether our pass dummies agree with those of ISS. We conclude that this is the case for all proposals in the sample at hand. We also make sure to exclude proposal for which we are unable to properly compute vote shares and those that have a missing ISS assessment on whether the proposal passed or failed. 
+To ensure there are no inconsistencies between our computations of vote shares and ISS' assessment of proposal passage, we check whether our pass dummies agree with those of ISS. We conclude that this is the case for all proposals in the sample at hand. We also make sure to exclude proposals for which we cannot properly compute vote shares and those with a missing ISS assessment on whether the proposal passed or failed. 
 
 ```{r}
 va_vote_results <- va_vote_results |> 
@@ -143,7 +143,7 @@ va_vote_results <- va_vote_results |>
             by = join_by(issagendaitemid == agenda_code))
 ```
 
-One additional comment on proposal classification is in order. As  @heetal2023 investigate ISS resolution types, they find that not all proposals labeled as SRI (GOV) actually deal with issues related to SRI (GOV). Hence, one should be cautious when using ISS resolution types and `issagendaitemid` without additional checks. In their [online appendix](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/36/12/10.1093_rfs_hhad033/1/hhad033_supplementary_data.pdf?Expires=1747773259&Signature=eeGoXl0oCUzG2XTBwQ9qiQm5om~OD4wbALbhH1X6i87qd62rARIOySXqUaNMxO54ALDS~M836ayI4A5e1~mx~iOrwto-LQDjQYJD3HuuE5rVkk361lg9nevqO4ezbDSWAUuMdF6LD1p4WY8FB99C~ETlQb4RsS6ZRjFP0XPl3T82zcCDgtRFK89lGtScw0CpP9uzOTlYvkV4hSUjlJaOPafemsMLBfnQ0s3aE7Zcq0k1mjh6Lgtkx-oFH1jTgoo1nb7ANUBGlDVN0bi4IUE9UyI0aZUmyflC4DpWFCpuIk83nHjmFZjhy~kPo3V72~HrZ0q8nBxwDRIukoDDaYnmDg__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA), @heetal2023 provide a list of `issagendaitemid` that actually reflects proposal types related to ecological and social issues and that allows us to gain a higher level of confidence in the classification. In the past, researchers have primarily relied on the coarse resolution type classification by ISS [see, e.g., @cunatetal2012, @flammer2015], which introduces a potential source for replication failures when using more sophisticated classification procedures instead.
+One additional comment on proposal classification is in order. As  @heetal2023 investigate ISS resolution types, they find that not all proposals labeled as SRI (GOV) actually deal with issues related to SRI (GOV). Hence, one should be cautious when using ISS resolution types and `issagendaitemid` without additional checks. In their [online appendix](https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/36/12/10.1093_rfs_hhad033/1/hhad033_supplementary_data.pdf?Expires=1747773259&Signature=eeGoXl0oCUzG2XTBwQ9qiQm5om~OD4wbALbhH1X6i87qd62rARIOySXqUaNMxO54ALDS~M836ayI4A5e1~mx~iOrwto-LQDjQYJD3HuuE5rVkk361lg9nevqO4ezbDSWAUuMdF6LD1p4WY8FB99C~ETlQb4RsS6ZRjFP0XPl3T82zcCDgtRFK89lGtScw0CpP9uzOTlYvkV4hSUjlJaOPafemsMLBfnQ0s3aE7Zcq0k1mjh6Lgtkx-oFH1jTgoo1nb7ANUBGlDVN0bi4IUE9UyI0aZUmyflC4DpWFCpuIk83nHjmFZjhy~kPo3V72~HrZ0q8nBxwDRIukoDDaYnmDg__&Key-Pair-Id=APKAIE5G5CRDK6RD3PGA), @heetal2023 provide a list of `issagendaitemid` that actually reflects proposal types related to ecological and social issues, which allows us to gain more confidence in the classification. In the past, researchers have primarily relied on the coarse resolution type classification by ISS [see, e.g., @cunatetal2012, @flammer2015], which introduces a potential source for replication failures when using more sophisticated classification procedures instead.
 
 As the resolution type variable is only available in the Shareholder Proposals table, we now also extract unique pairs of resolution type and `issagendaitemid` from this dataset. We match these to our Vote Results table. Since it is possible that a given `issagendaitemid` refers to both GOV and SRI, we remove `issagendaitemid`s that correspond to both, GOV and SRI. We document that this is only the case for id `S0810` in the dataset at hand.
 
@@ -329,8 +329,8 @@ matched_va_vote_results |>
 ```{r}
 #| echo: false
 #| label: fig-1
-#| fig-cap: "Number of shareholder proposal over time grouped by ESG-types."
-#| fig-alt: "Title: Number of ISS shareholder proposal over time. The figure shows a bar chart with the yearly number of shareholder proposals per ESG-type based on data provided by ISS. The sample covers the years 2003 until 2024."
+#| fig-cap: "Number of shareholder proposals over time grouped by ESG types."
+#| fig-alt: "Title: Number of ISS shareholder proposals over time. The figure shows a bar chart with the yearly number of shareholder proposals per ESG-type based on data provided by ISS. The sample covers the years 2003 until 2024."
 
 plot_data <- matched_va_vote_results |>
   mutate(agenda_esg_type = if_else(is.na(agenda_esg_type) | agenda_esg_type == "n/a",
@@ -358,7 +358,7 @@ plot_data |>
 
 ```
 
-Following the ESG-type classification of ISS, the share of proposals focused on ecological and social issues hardly changes over most parts of the sample period but experiences a spike in recent years (2022 - 2024). This might come as a surprise considering how environmental and sustainability considerations have already shaped the investment industry throughout the last decade. On the other hand, taking into account that governance-type proposals cover "standard topics" such as shareholder rights or issues related to the board of directors, it should be no surprise that this group makes up the largest fraction of proposals throughout.
+Following the ESG-type classification of ISS, the share of proposals focused on ecological and social issues hardly changes over most parts of the sample period but experiences a spike in recent years (2022 - 2024). This might come as a surprise, considering how environmental and sustainability considerations have already shaped the investment industry throughout the last decade. On the other hand, taking into account that governance-type proposals cover "standard topics" such as shareholder rights or issues related to the board of directors, it should be no surprise that this group makes up the largest fraction of proposals throughout.
 
 
 ## Extensions on the Data
