@@ -429,11 +429,11 @@ return(out_of_sample)
 
 oos_predictions <- estimation_periods |>
   pull(oos_year) |>
-  map_dfr(\(x) create_predictions(oos_year))
+  map_dfr(\(x) create_predictions(x))
 ```
 
 ::: {.callout-warning}
-Note that I am calling the fitted model from the first out-of-sample year (1987) in each iteration. In other words, the model parameters do not get updated every year as in the original paper. *If* you estimated the model for each value of $k$ as described above, you can replace the line above to replicate the original procedure. 
+Note that I am calling the fitted model from the first out-of-sample year (1987) in each iteration. In other words, the model parameters do not get updated every year as in the original paper. *If* you estimated the model for each value of $j$ as described above, you can replace the line above to replicate the original procedure. 
 :::
 
 To assign portfolios using the predictions, I use the `assign_portfolio()` from the `tidyfinance` package. 
@@ -454,7 +454,7 @@ ml_portfolios <- oos_predictions |>
     portfolio = assign_portfolio(
       data = pick(everything()),
       sorting_variable = ".pred",
-      n_portfolios = 10
+      breakpoint_options(n_portfolios = 10)
     ),
     portfolio = as.factor(portfolio)
   ) |>
@@ -496,6 +496,6 @@ Obviously, the paper is doing much more. In particular, the debate on "which cov
 Arguably, the dataset used for this application is huge. So is the computational effort to train the ML methods. Even though I have substantial computing power available, I decided to keep the computational burden limited in the interest of simplicity and time. Should you not have a supercomputer available, the following tipps may help:
 
 1. When expanding the characteristics to include all interaction terms by applying the recipe (`bake()`), you do not have to use the entire dataset in memory as I do above. It seems plausible to store the characteristics (e.g., in `parquet` form) and apply `bake()` to each year individually before storing the data year-by-year. The all-in procedure from above requires around 140GB in memory which can be reduced to $\approx 140/60$ when applying the recipe on an annual basis.
-2. In the blog post, I only fit the random forest for one single year (`j = 35`, the final of the 35 out-of-sample periods). It is straightforward to loop over `j`, starting from 1 until 35 and to store the predictions individually for each year.  
+2. In the blog post, I only fit the random forest for one single year (`j = 1`, the first of the 35 out-of-sample periods). It is straightforward to loop over `j`, starting from 1 until 35 and to store the predictions individually for each year.  
 3. Tuning the model for one out-of-sample period like above is still going to be computational heavy, and I am afraid there is no way around that. For the final out-of-sample period 2021, the training set contains more than two million rows with 920 columns as the set of predictors. The only way I can imagine to reduce the computational burden and still retain some (hopefully) useful predictions is to pre-select a well-balanced set of firms from the CRSP sample which differ with respect to some firm characteristics, e.g. by sampling from the well-known size and book-to-market double sort decile groups. 
 :::
