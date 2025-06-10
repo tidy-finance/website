@@ -9,10 +9,10 @@ author:
     url: https://www.wu.ac.at/finance/people/faculty/moritz-rodenkirchen
     affiliations:
       - name: WU Vienna University of Economics and Business
-date: "2025-04-16"
+date: "2025-06-13"
 image: thumbnail.png
 description: Code for preparing ISS Voting Analytics data for further analysis on shareholder proposals
-draft: true
+draft: false
 bibliography: iss_bibliography.bib
 biblio-style: apalike
 link-citations: true
@@ -39,7 +39,7 @@ library(janitor)
 
 ## Data Preparation
 
-We start by establishing a connection to WRDS using the `tidyfinance` package (you can find more information [here](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html#accessing-wrds)) as we query the data directly through their servers. We also load stocks' identifying information to match ISS identifiers (8-digit CUSIPs) with CRSP PERMNOs. Finally, we read in an Excel file containing granular ESG-type categorization of proposal types, which is separately provided by ISS.
+We start by establishing a connection to WRDS using the `tidyfinance` package (you can find more information [here](https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html#accessing-wrds)) to query the data directly through their servers. We also load stocks' identifying information to match ISS identifiers (8-digit CUSIPs) with CRSP PERMNOs. Finally, we read in an Excel file containing granular ESG-type categorization of proposal types, which is separately provided by ISS.
 
 ```{r}
 wrds <- get_wrds_connection()
@@ -49,10 +49,11 @@ wrds <- get_wrds_connection()
 ### Fetching Shareholder Proposals
 
 ISS provides two main datasets that contain shareholder proposals related to publicly listed US firms: 
+
 * ISS Voting Analytics - Shareholder Proposals
 * ISS Voting Analytics - Company Vote Results US 
 
-The Shareholder Proposals table contains all shareholder proposals that were submitted to the SEC, regardless of whether they eventually came to a vote at the AGM (sample coverage: 2006 - 2024). The Company Vote Results table, on the other hand, has all proposals that made it to the ballot at AGM and hence also includes management proposals (sample coverage: 2002 - 2024).[^1][^2] We use the Company Vote Results data as we are primarily interested in proposals that shareholders actually voted on, and exploit the slightly longer sample period. We extract company names and identifiers, meeting dates, vote shares, and short descriptions of proposal contents.
+The Shareholder Proposals table contains all shareholder proposals that were submitted to the SEC, regardless of whether they eventually came to a vote at the AGM (sample coverage: 2006 - 2024). The Company Vote Results table, on the other hand, has all proposals that made it to the ballot at AGM and hence also includes management proposals[^1] (sample coverage: 2002 - 2024).[^2] We use the Company Vote Results data as we are primarily interested in proposals that shareholders actually voted on, and exploit the slightly longer sample period. We extract company names and identifiers, meeting dates, vote shares, and short descriptions of proposal contents.
 
 [^1]: A typical example of a management proposal is the election of new board members.
 [^2]: Upon request, ISS also provides legacy data going back until 1997.
@@ -181,7 +182,7 @@ va_vote_results <- va_vote_results |>
 
 ### Confounding Proposal Identification
 
-Assume that we aim to explore the effect of passing close-vote ecological and social proposals, i.e., those that have passed or failed close to the majority threshold, on expected and realized returns. In this case, @cunatetal2012 and @flammer2015 correctly point out that there are possibly multiple close-vote proposals per AGM. It is straightforward to account for these proposals if they are also related to ecological or social concerns from an econometric point of view. However, if confounding proposals are of type governance, it becomes infeasible to disentangle the effects of close-vote governance versus close-vote ecological and social proposals on expected and realized returns. We decide to construct count variables that inform us about the number of confounding close-vote proposals (at different distances to the threshold: 5\% , 10\%, and 20\%, respectively) that are not ecologically or socially related. Later, this procedure allows us to run robustness checks by excluding AGMs that had close-vote governance proposals in addition to close-vote ecological or social proposals.
+Assume that we aim to explore the effect of passing close-vote ecological and social proposals, i.e., those that have passed or failed close to the majority threshold, on expected and realized returns. In this case, @cunatetal2012 and @flammer2015 correctly point out that there are possibly multiple close-vote proposals per AGM. It is straightforward to account for these proposals if they are also related to ecological or social concerns from an econometric point of view. However, if confounding proposals are of type governance, it becomes infeasible to disentangle the effects of close-vote governance versus close-vote ecological and social proposals on expected and realized returns. We decide to construct count variables that inform us about the number of confounding close-vote proposals (at different distances to the threshold: 5\%, 10\%, and 20\%, respectively) that are not ecologically or socially related. Later, this procedure allows us to run robustness checks by excluding AGMs that had close-vote governance proposals in addition to close-vote ecological or social proposals.
 
 ```{r}
 va_vote_results <- va_vote_results |>
@@ -240,7 +241,7 @@ linking_table <- stksecurityinfohist |>
 
 In the first step, we match ISS CUSIPs with 8- and 6-digit CUSIPs from CRSP. In case there is no appropriate match using CUSIPs, we continue the matching procedure based on standardized company names and tickers. Finally, we check for potential backward-filling in the ISS data by using a forward-looking name/CUSIP/ticker combination. Overall, we can match most shareholder proposals from ISS with CRSP identifying information following our procedure.[^4]
 
-[^4]: Note that we recommend to check unmatched proposals manually and to assign identifying information if available as the total number of unmatched proposal is manageable.
+[^4]: Note that we recommend checking unmatched proposals manually and assigning identifying information if available, as the total number of unmatched proposals is manageable.
 
 ```{r}
 matched_va_vote_results <- bind_rows(
@@ -320,13 +321,13 @@ matched_va_vote_results |>
   nrow()
 ```
 
-In the following plot, we show the number of proposals over time grouped by ESG-type.
+In the following plot, we show the number of proposals over time grouped by ESG type.
 
 ```{r}
 #| echo: false
 #| label: fig-1
 #| fig-cap: "Number of shareholder proposals over time grouped by ESG types."
-#| fig-alt: "Title: Number of ISS shareholder proposals over time. The figure shows a bar chart with the yearly number of shareholder proposals per ESG-type based on data provided by ISS. The sample covers the years 2003 until 2024."
+#| fig-alt: "Title: Number of ISS shareholder proposals over time. The figure shows a bar chart with the yearly number of shareholder proposals per ESG type based on data provided by ISS. The sample covers the years 2003 until 2024."
 
 plot_data <- matched_va_vote_results |>
   mutate(agenda_esg_type = if_else(is.na(agenda_esg_type) | agenda_esg_type == "n/a",
@@ -359,9 +360,9 @@ In the next plot, we take a closer look at the distribution of the vote share ac
 
 ```{r}
 #| echo: false
-#| label: fig-1
+#| label: fig-2
 #| fig-cap: "Vote Share across ESG types."
-#| fig-alt: "Title: Number of ISS shareholder proposals by vote share. The figure shows a bar chart with the total number of shareholder proposals per 5\% vote share buckets and ESG-type based on data provided by ISS. The sample covers the years 2003 until 2024."
+#| fig-alt: "Title: Number of ISS shareholder proposals by vote share. The figure shows a bar chart with the total number of shareholder proposals per 5% vote share buckets and ESG type based on data provided by ISS. The sample covers the years 2003 until 2024."
 
 plot_data <- matched_va_vote_results |>
   mutate(agenda_esg_type = if_else(is.na(agenda_esg_type) | agenda_esg_type == "n/a",
@@ -374,7 +375,7 @@ plot_data <- matched_va_vote_results |>
                             breaks = seq (0, 1, by = 0.05),
                             include.lowest = TRUE,
                             right = FALSE,
-                            labels = paste0 (seq (0, 95, by = 5), "\\% - ", seq (5, 100, by = 5), "\\%"))) |>
+                            labels = paste0 (seq (0, 95, by = 5), "% - ", seq (5, 100, by = 5), "%"))) |>
   group_by(agenda_esg_type) |>
   mutate(total_n = n()) |> 
   group_by(vote_share_bucket, agenda_esg_type) |>
@@ -393,7 +394,7 @@ plot_data <- matched_va_vote_results |>
 #                         .groups = "drop") |> 
 #               mutate(share = n/total_n))
 
-labels <- paste0(seq (0, 95, by = 5), "\\% - ", seq(5, 100, by = 5), "\\%")
+labels <- paste0(seq (0, 95, by = 5), "% - ", seq(5, 100, by = 5), "%")
 labels <- labels[seq(1,length(labels),3)]
 
 plot_data |> 
@@ -436,9 +437,8 @@ plot_data |>
 #   guides(color = "none") +
 #   guides(fill = guide_legend(title = "Type")) +
 #   facet_wrap(~agenda_esg_type)
-
-
 ```
+
 Most proposals related to ecological and social issues fail, and they usually do so by large margins as the majority threshold is commonly set to 50\%. However, for governance proposals, the distribution looks quite different. Their vote shares are way more balanced, and there is no clear tendency for proposal failure. The observed pattern suggests that investors are more skeptical of ecological and social proposals than governance proposals.
 
 
