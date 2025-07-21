@@ -70,18 +70,18 @@ We continue to lag market capitalization and firm size by one month.\index{Marke
 Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet, the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fillna(method="ffill")`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `.groupby()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
 ```{python}
-me = (crsp_monthly
+size = (crsp_monthly
   .assign(sorting_date=lambda x: x["date"]+pd.DateOffset(months=1))
-  .rename(columns={"mktcap": "me"})
-  .get(["permno", "sorting_date", "me"])
+  .rename(columns={"mktcap": "size"})
+  .get(["permno", "sorting_date", "size"])
 )
 
 bm = (book_equity
   .merge(crsp_monthly, how="inner", on=["gvkey", "date"])
   .assign(bm=lambda x: x["be"]/x["mktcap"],
           sorting_date=lambda x: x["date"]+pd.DateOffset(months=6))
-  .assign(comp_date=lambda x: x["sorting_date"])
-  .get(["permno", "gvkey", "sorting_date", "comp_date", "bm"])
+  .assign(accounting_date=lambda x: x["sorting_date"])
+  .get(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
 )
 
 data_for_sorts = (crsp_monthly
@@ -89,12 +89,12 @@ data_for_sorts = (crsp_monthly
          how="left", 
          left_on=["permno", "gvkey", "date"], 
          right_on=["permno", "gvkey", "sorting_date"])
-  .merge(me, 
+  .merge(size, 
          how="left", 
          left_on=["permno", "date"], 
          right_on=["permno", "sorting_date"])
   .get(["permno", "gvkey", "date", "ret_excess", 
-        "mktcap_lag", "me", "bm", "exchange", "comp_date"])
+        "mktcap_lag", "size", "bm", "exchange", "accounting_date"])
 )
 
 data_for_sorts = (data_for_sorts
@@ -102,13 +102,13 @@ data_for_sorts = (data_for_sorts
   .groupby(["permno", "gvkey"])
   .apply(lambda x: x.assign(
       bm=x["bm"].fillna(method="ffill"), 
-      comp_date=x["comp_date"].fillna(method="ffill")
+      accounting_date=x["accounting_date"].fillna(method="ffill")
     )
   )
   .reset_index(drop=True)
   .assign(threshold_date = lambda x: (x["date"]-pd.DateOffset(months=12)))
-  .query("comp_date > threshold_date")
-  .drop(columns=["comp_date", "threshold_date"])
+  .query("accounting_date > threshold_date")
+  .drop(columns=["accounting_date", "threshold_date"])
   .dropna()
 )
 ```
@@ -148,7 +148,7 @@ After these data preparation steps, we present bivariate portfolio sorts on an i
 
 Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms.\index{Value premium} The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.\index{Long-short}
 
-To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_me`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
+To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_size`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{python}
 value_portfolios = (data_for_sorts
@@ -157,13 +157,13 @@ value_portfolios = (data_for_sorts
       portfolio_bm=assign_portfolio(
         data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
       ),
-      portfolio_me=assign_portfolio(
-        data=x, sorting_variable="me", n_portfolios=5, exchanges=["NYSE"]
+      portfolio_size=assign_portfolio(
+        data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
       )
     )
   )
   .reset_index(drop=True)
-  .groupby(["date", "portfolio_bm", "portfolio_me"])
+  .groupby(["date", "portfolio_bm", "portfolio_size"])
   .apply(lambda x: pd.Series({
       "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
     })
@@ -203,13 +203,13 @@ To implement the dependent sorts, we first create the size portfolios by calling
 value_portfolios = (data_for_sorts
   .groupby("date")
   .apply(lambda x: x.assign(
-      portfolio_me=assign_portfolio(
-        data=x, sorting_variable="me", n_portfolios=5, exchanges=["NYSE"]
+      portfolio_size=assign_portfolio(
+        data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
       )
     )
   )
   .reset_index(drop=True)
-  .groupby(["date", "portfolio_me"])
+  .groupby(["date", "portfolio_size"])
   .apply(lambda x: x.assign(
       portfolio_bm=assign_portfolio(
         data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
@@ -217,7 +217,7 @@ value_portfolios = (data_for_sorts
     )
   )
   .reset_index(drop=True)
-  .groupby(["date", "portfolio_bm", "portfolio_me"])
+  .groupby(["date", "portfolio_bm", "portfolio_size"])
   .apply(lambda x: pd.Series({
       "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
     })
