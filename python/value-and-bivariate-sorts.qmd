@@ -80,8 +80,8 @@ bm = (book_equity
   .merge(crsp_monthly, how="inner", on=["gvkey", "date"])
   .assign(bm=lambda x: x["be"]/x["mktcap"],
           sorting_date=lambda x: x["date"]+pd.DateOffset(months=6))
-  .assign(comp_date=lambda x: x["sorting_date"])
-  .get(["permno", "gvkey", "sorting_date", "comp_date", "bm"])
+  .assign(accounting_date=lambda x: x["sorting_date"])
+  .get(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
 )
 
 data_for_sorts = (crsp_monthly
@@ -94,7 +94,7 @@ data_for_sorts = (crsp_monthly
          left_on=["permno", "date"], 
          right_on=["permno", "sorting_date"])
   .get(["permno", "gvkey", "date", "ret_excess", 
-        "mktcap_lag", "me", "bm", "exchange", "comp_date"])
+        "mktcap_lag", "me", "bm", "exchange", "accounting_date"])
 )
 
 data_for_sorts = (data_for_sorts
@@ -102,13 +102,13 @@ data_for_sorts = (data_for_sorts
   .groupby(["permno", "gvkey"])
   .apply(lambda x: x.assign(
       bm=x["bm"].fillna(method="ffill"), 
-      comp_date=x["comp_date"].fillna(method="ffill")
+      accounting_date=x["accounting_date"].fillna(method="ffill")
     )
   )
   .reset_index(drop=True)
   .assign(threshold_date = lambda x: (x["date"]-pd.DateOffset(months=12)))
-  .query("comp_date > threshold_date")
-  .drop(columns=["comp_date", "threshold_date"])
+  .query("accounting_date > threshold_date")
+  .drop(columns=["accounting_date", "threshold_date"])
   .dropna()
 )
 ```
