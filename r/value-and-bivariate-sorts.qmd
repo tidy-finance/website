@@ -62,9 +62,9 @@ We continue to lag market capitalization and firm size by one month.\index{Marke
 Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fill()`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `group_by()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
 ```{r}
-me <- crsp_monthly |>
+size <- crsp_monthly |>
   mutate(sorting_date = date %m+% months(1)) |>
-  select(permno, sorting_date, me = mktcap)
+  select(permno, sorting_date, size = mktcap)
 
 bm <- book_equity |>
   inner_join(crsp_monthly, join_by(gvkey, date)) |>
@@ -80,11 +80,11 @@ data_for_sorts <- crsp_monthly |>
     bm, join_by(permno, gvkey, date == sorting_date)
   ) |>
   left_join(
-    me, join_by(permno, date == sorting_date)
+    size, join_by(permno, date == sorting_date)
   ) |>
   select(
     permno, gvkey, date, ret_excess,
-    mktcap_lag, me, bm, exchange, accounting_date
+    mktcap_lag, size, bm, exchange, accounting_date
   )
 
 data_for_sorts <- data_for_sorts |>
@@ -134,7 +134,7 @@ After these data preparation steps, we present bivariate portfolio sorts on an i
 
 Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms.\index{Value premium} The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
 
-To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_me`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
+To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_size`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{r}
 value_portfolios <- data_for_sorts |>
@@ -146,13 +146,13 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     ),
-    portfolio_me = assign_portfolio(
+    portfolio_size = assign_portfolio(
       data = pick(everything()),
-      sorting_variable = "me",
+      sorting_variable = "size",
       n_portfolios = 5,
       exchanges = c("NYSE")
     )) |>
-  group_by(date, portfolio_bm, portfolio_me) |>
+  group_by(date, portfolio_bm, portfolio_size) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
@@ -180,18 +180,18 @@ The resulting monthly value premium is `{r} round(value_premium$value_premium*10
 
 In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable.\index{Portfolio sorts!Dependent bivariate} In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts ensure an equal amount of stocks within each portfolio.
 
-To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
+To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "size"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{r}
 value_portfolios <- data_for_sorts |>
   group_by(date) |>
-  mutate(portfolio_me = assign_portfolio(
+  mutate(portfolio_size = assign_portfolio(
     data = pick(everything()),
-    sorting_variable = "me",
+    sorting_variable = "size",
     n_portfolios = 5,
     exchanges = c("NYSE")
   )) |>
-  group_by(date, portfolio_me) |>
+  group_by(date, portfolio_size) |>
   mutate(
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
@@ -199,7 +199,7 @@ value_portfolios <- data_for_sorts |>
       n_portfolios = 5,
       exchanges = c("NYSE")
     )) |>
-  group_by(date, portfolio_me, portfolio_bm) |>
+  group_by(date, portfolio_size, portfolio_bm) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
