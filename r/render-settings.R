@@ -1,5 +1,5 @@
 if (Sys.info()["machine"] != "arm64") {
-  Sys.setlocale("LC_TIME", "English") 
+  Sys.setlocale("LC_TIME", "English")
 }
 Sys.setenv(LANG = "en")
 
@@ -34,10 +34,7 @@ scale_colour_continuous <- function(...) {
 }
 
 scale_colour_discrete <- function(...) {
-  discrete_scale("colour",
-                 scale_name = "pal",
-                 palette = pal, ...
-  )
+  discrete_scale("colour", palette = pal, ...)
 }
 
 scale_fill_continuous <- function(...) {
@@ -48,8 +45,5 @@ scale_fill_continuous <- function(...) {
 }
 
 scale_fill_discrete <- function(...) {
-  discrete_scale("fill",
-                 scale_name = "pal",
-                 palette = pal, ...
-  )
+  discrete_scale("fill", palette = pal, ...)
 }
