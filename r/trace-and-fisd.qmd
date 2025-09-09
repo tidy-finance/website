@@ -22,7 +22,7 @@ The current chapter relies on this set of R packages.
 library(tidyverse)
 library(tidyfinance)
 library(dbplyr)
-library(RSQLite)
+library(arrow)
 library(RPostgres)
 ```
 
@@ -41,12 +41,6 @@ wrds <- dbConnect(
   sslmode = "require",
   user = Sys.getenv("WRDS_USER"),
   password = Sys.getenv("WRDS_PASSWORD")
-)
-
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
 )
 ```
 
@@ -160,12 +154,7 @@ download_data("wrds_fisd")
 Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
-dbWriteTable(
-  conn = tidy_finance,
-  name = "fisd",
-  value = fisd,
-  overwrite = TRUE
-)
+fisd |> write_parquet("data/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -203,13 +192,7 @@ for (j in 1:batches) {
     end_date = ymd("2016-11-30")
   )
 
-  dbWriteTable(
-    conn = tidy_finance,
-    name = "trace_enhanced",
-    value = trace_enhanced,
-    overwrite = ifelse(j == 1, TRUE, FALSE),
-    append = ifelse(j != 1, TRUE, FALSE)
-  )
+trace_enhanced |> group_by(batch = j) |> write_dataset("data/trace_enhanced", partitioning = "batch")
   
   message("Batch ", j, " out of ", batches, " done (", 
           round(j / batches, 2) * 100, "%)\n")
@@ -252,7 +235,7 @@ bonds_outstanding <- expand_grid(
 Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
 
 ```{r}
-trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
+trace_enhanced <- open_dataset("data/trace_enhanced") |>
   collect()
 
 bonds_traded <- trace_enhanced |> 

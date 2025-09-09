@@ -22,7 +22,7 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 library(fixest)
 library(broom)
 ```
@@ -32,21 +32,14 @@ library(broom)
 We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-fisd <- tbl(tidy_finance, "fisd") |>
+fisd <- read_parquet("data/fisd.parquet") |>
   select(complete_cusip, maturity, offering_amt, sic_code) |>
-  collect() |> 
   drop_na()
 
-trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
-  select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt)|>
-  collect() |> 
-  drop_na()
+trace_enhanced <- open_dataset("data/trace_enhanced") |>
+  select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt) |>
+  collect() |>
+  drop_na() 
 ```
 
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}

@@ -22,7 +22,7 @@ First, we load the R packages that we use throughout this chapter. Later on, we 
 library(tidyverse)
 library(tidyfinance)
 library(scales)
-library(nanoparquet)
+library(arrow)
 library(dbplyr)
 ```
 
@@ -180,15 +180,8 @@ crsp_monthly <- crsp_monthly |>
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100 percent makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the table `factors_ff3_monthly`.
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(date, rf) |>
-  collect()
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
+  select(date, rf)
 
 crsp_monthly <- crsp_monthly |>
   left_join(factors_ff3_monthly,
@@ -219,15 +212,10 @@ crsp_monthly <- crsp_monthly |>
   drop_na(ret_excess, mktcap, mktcap_lag)
 ```
 
-Finally, we store the monthly CRSP file in our database. 
+Finally, we store the monthly CRSP file in our data folder. 
 
 ```{r}
-dbWriteTable(
-  tidy_finance,
-  "crsp_monthly",
-  value = crsp_monthly,
-  overwrite = TRUE
-)
+crsp_monthly |> write_parquet("data/crsp_monthly.parquet")
 ```
 
 ## First Glimpse of the CRSP Sample
@@ -252,20 +240,20 @@ crsp_monthly |>
   scale_y_continuous(labels = comma)
 ```
 
-Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in @fig-212. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange and plotting it just as if they were in memory. All values in @fig-212 are at the end of `r lubridate::year(end_date)` USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
+Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in @fig-212. To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. All values in @fig-212 are at the end of `r lubridate::year(end_date)` USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
 
 ```{r}
 #| label: fig-212
 #| fig-cap: "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks."
-tbl(tidy_finance, "crsp_monthly") |>
-  left_join(tbl(tidy_finance, "cpi_monthly"), join_by(date)) |>
+cpi_monthly <- read_parquet("data/cpi_monthly.parquet")
+crsp_monthly |>
+  left_join(cpi_monthly, join_by(date)) |>
   group_by(date, exchange) |>
   summarize(
     mktcap = sum(mktcap, na.rm = TRUE) / cpi,
     .groups = "drop"
   ) |>
-  collect() |>
   mutate(date = ymd(date)) |>
   ggplot(aes(
     x = date, y = mktcap / 1000,
@@ -278,13 +266,6 @@ tbl(tidy_finance, "crsp_monthly") |>
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = comma)
-```
-
-Of course, performing the computation in the database is not really meaningful because we can easily pull all the required data into our memory. The code chunk above is slower than performing the same steps on tables that are already in memory. However, we just want to illustrate that you can perform many things in the database before loading the data into your memory. Before we proceed, we load the monthly CPI data.\index{Data!CPI}
-
-```{r}
-cpi_monthly <- tbl(tidy_finance, "cpi_monthly") |>
-  collect()
 ```
 
 Next, we look at the same descriptive statistics by industry. @fig-213 plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
@@ -352,8 +333,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 dsf_db <- tbl(wrds, I("crsp.dsf_v2"))
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 
-factors_ff3_daily <- tbl(tidy_finance, "factors_ff3_daily") |>
-  collect()
+factors_ff3_daily <- read_parquet("data/factors_ff3_daily.parquet")
 
 permnos <- stksecurityinfohist_db |>
   distinct(permno) |> 
@@ -400,14 +380,10 @@ for (j in 1:batches) {
       ) |>
       select(permno, date, ret, ret_excess)
 
-    dbWriteTable(
-      tidy_finance,
-      "crsp_daily",
-      value = crsp_daily_sub,
-      overwrite = ifelse(j == 1, TRUE, FALSE),
-      append = ifelse(j != 1, TRUE, FALSE)
-    )
-  }
+  crsp_daily_sub |> group_by(batch = j) |> 
+    write_dataset(path = "data/crsp_daily", 
+                  partition = "batch") 
+ }
 
   message("Batch ", j, " out of ", batches, " done (", percent(j / batches), ")\n")
 }
@@ -515,12 +491,7 @@ compustat <- compustat |>
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database.
 
 ```{r}
-dbWriteTable(
-  tidy_finance,
-  "compustat",
-  value = compustat,
-  overwrite = TRUE
-)
+compustat |> write_parquet("data/compustat.parquet")
 ```
 
 The `tidyfinance` package provides a shortcut for these processing steps as well:
@@ -579,12 +550,7 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 crsp_monthly <- crsp_monthly |>
   left_join(ccm_links, join_by(permno, date))
 
-dbWriteTable(
-  tidy_finance,
-  "crsp_monthly",
-  value = crsp_monthly,
-  overwrite = TRUE
-)
+crsp_monthly |> write_parquet("data/crsp_monthly.parquet")
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}

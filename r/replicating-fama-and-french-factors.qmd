@@ -23,7 +23,7 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 ```
 
 ## Data Preparation
@@ -31,30 +31,20 @@ library(RSQLite)
 We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
   select(
     permno, gvkey, date, ret_excess,
     mktcap, mktcap_lag, exchange
-  ) |>
-  collect()
+  )
 
-compustat <- tbl(tidy_finance, "compustat") |>
-    select(gvkey, datadate, be, op, inv) |>
-    collect() 
+compustat <- read_parquet("data/compustat.parquet") |>
+    select(gvkey, datadate, be, op, inv)
 
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(date, smb, hml) |>
-  collect()
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
+  select(date, smb, hml)
 
-factors_ff5_monthly <- tbl(tidy_finance, "factors_ff5_monthly") |>
-  select(date, smb, hml, rmw, cma) |>
-  collect()
+factors_ff5_monthly <- read_parquet("data/factors_ff5_monthly.parquet") |>
+  select(date, smb, hml, rmw, cma)
 ```
 
 Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
