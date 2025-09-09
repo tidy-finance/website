@@ -57,8 +57,9 @@ compustat <- tbl(tidy_finance, "compustat") |>
   select(datadate, gvkey, be) |>
   collect()
 
-beta <- tbl(tidy_finance, "beta") |>
-  select(date, permno, beta_monthly) |>
+beta <- tbl(tidy_finance, "beta") |> 
+  filter(return_type == "monthly") |> 
+  select(permno, date, beta) |>
   collect()
 ```
 
@@ -70,10 +71,11 @@ characteristics <- compustat |>
   mutate(date = floor_date(ymd(datadate), "month")) |>
   left_join(crsp_monthly, join_by(gvkey, date)) |>
   left_join(beta, join_by(permno, date)) |>
-  transmute(gvkey,
+  transmute(
+    gvkey,
     bm = be / mktcap,
     log_mktcap = log(mktcap),
-    beta = beta_monthly,
+    beta = beta,
     sorting_date = date %m+% months(6)
   )
 
@@ -170,5 +172,6 @@ estimate_fama_macbeth(
 
 ## Exercises
 
-1. Download a sample of test assets from Kenneth French's homepage and reevaluate the risk premiums for industry portfolios instead of individual stocks.
+1. Estimate stock-specific value and size risk factors to similar to the CAPM-beta using rolling estimation based on Fama-French 3 Factors. Use these estimates instead of the stock characteristics in the Fama-MacBeth regression from above. How do the coefficient estimates differ?
+1. Download the 49 Industry Portfolios from Ken French data library. Use these industry portfolios instead of the stocks to estimate the three rolling risk-factors (beta, value, size). Replicate the Fama-MacBeth regression from above. Are the coefficient estimates similar?
 1. Use individual stocks with weighted-least squares based on a firm's size as suggested by @Hou2020. Then, repeat the Fama-MacBeth regressions without the weighting scheme adjustment but drop the smallest 20 percent of firms each month. Compare the results of the three approaches. 

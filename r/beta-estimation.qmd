@@ -50,179 +50,142 @@ crsp_monthly <- crsp_monthly |>
 ```
 
 To estimate the CAPM regression coefficients  
+
 $$
 r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
 $$
+
 we regress stock excess returns `ret_excess` on excess returns of the market portfolio `mkt_excess`. R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.
 
 ```{r}
-fit <- lm(ret_excess ~ mkt_excess,
+model_fit <- lm(
+  "ret_excess ~ mkt_excess",
   data = crsp_monthly |>
     filter(permno == "14593")
 )
-
-summary(fit)
+coefficients <- summary(model_fit)$coefficients
+coefficients
 ```
 
-`lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns an overview of the estimated parameters. `coefficients(fit)` would return only the estimated coefficients. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$). 
+`lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$). 
 
 ## Rolling-Window Estimation
 
-After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. If the condition is violated, that is, the time series is too short, the function returns a missing value. 
+After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. The function conveniently returns the regression results as a data frame, which ensures that our approach is scalable. If the `min_obs`-condition is violated, that is, the time series is too short, the function returns an empty data frame for consistency. 
 
 ```{r}
 estimate_capm <- function(data, min_obs = 1) {
   if (nrow(data) < min_obs) {
-    beta <- as.numeric(NA)
+    return(tibble())
   } else {
-    fit <- lm(ret_excess ~ mkt_excess, data = data)
-    beta <- as.numeric(coefficients(fit)[2])
+    fit <- lm("ret_excess ~ mkt_excess", data = data)
+    coefficients <- summary(fit)$coefficients
+
+    capm <- tibble(
+      coefficient = rownames(coefficients),
+      estimate = coefficients[, "Estimate"],
+      t_statistic = coefficients[, "t value"]
+    ) |>
+      mutate(
+        coefficient = if_else(coefficient == "(Intercept)", "alpha", coefficient)
+      )
   }
-  return(beta)
+
+  capm
 }
 ```
 
-Note that the `tidyfinance` package provides an `estimate_model()` function that provides more flexibility with respect to the model. 
-
-Next, we define a function that does the rolling estimation. The `slide_period` function is able to handle months in its window input in a straightforward manner. We thus avoid using any time-series package (e.g., `zoo`) and converting the data to fit the package functions, but rather stay in the world of the `tidyverse`.
-
-The following function takes input data and slides across the `date` vector, considering only a total of `months` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding beta estimates. As we demonstrate further below, we can also apply the same function to daily returns data. 
+Next, we define a function that performs the rolling estimation. The `slide_period` function is able to handle months in its window input in a straightforward manner. The following function takes input data and slides across the `date` vector, considering only a total of `look_back` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding parameter estimates. As we demonstrate further below, we can also apply the same function to daily returns data. 
 
 ```{r}
-roll_capm_estimation <- function(data, months, min_obs) {
+roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
   data <- data |>
     arrange(date)
 
-  betas <- slide_period_vec(
+  slide_period_dfr(
     .x = data,
     .i = data$date,
     .period = "month",
-    .f = ~ estimate_capm(., min_obs),
-    .before = months - 1,
+    .f = function(x) {
+      estimate_capm(x, min_obs = min_obs) |>
+        mutate(date = max(x$date))
+    },
+    .before = look_back - 1,
     .complete = FALSE
   )
-
-  return(tibble(
-    date = unique(data$date),
-    beta = betas
-  ))
 }
 ```
 
 Before we attack the whole CRSP sample, let us focus on a couple of examples for well-known firms.
 
 ```{r}
-examples <- tribble(
-  ~permno, ~company,
-  14593, "Apple",
-  10107, "Microsoft",
-  93436, "Tesla",
-  17778, "Berkshire Hathaway"
+examples <- tibble(
+  permno = c(14593, 10107, 93436, 17778),
+  company = c("Apple", "Microsoft", "Tesla", "Berkshire Hathaway")
 )
 ```
 
-If we want to estimate rolling betas for Apple, we can use `mutate()`. We take a total of 5 years of data and require at least 48 months with return data to compute our betas. Check out the Exercises if you want to compute beta for different time periods. 
+The main idea is to apply the function to each stock individually and then combine the results into a single data frame. First, we nest the data by `permno`. Nested data means we now have a list of `permno` with corresponding grouped time series data. We get one row of output for each unique combination of non-nested variables which is only `permno` in this case.\index{Data!Nested}
 
 ```{r}
-beta_example <- crsp_monthly |>
-  filter(permno == examples$permno[1]) |>
-  mutate(roll_capm_estimation(
-    pick(date, ret_excess, mkt_excess), 
-    months = 60, min_obs = 48)
-  ) |>
-  drop_na()
-beta_example
+capm_examples_nested <- crsp_monthly |>
+  filter(permno %in% examples$permno) |>
+  nest(data = c(date, ret_excess, mkt_excess, industry))
+capm_examples_nested
 ```
 
-It is actually quite simple to perform the rolling-window estimation for an arbitrary number of stocks, which we visualize in the following code chunk and the resulting @fig-601. 
+Next, we want to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
+
+```{r}
+capm_examples <- capm_examples_nested |>
+  mutate(capm = map(data, roll_capm_estimation)) |>
+  unnest(capm) |>
+  select(permno, date, coefficient, estimate, t_statistic)
+capm_examples
+```
+
+@fig-601 displays the resulting beta estimates, focusing exclusively on the coefficient fo `"mkt_excess"`.
 
 ```{r}
 #| label: fig-601
 #| fig-cap: "The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library."
 #| fig-alt: "Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock."
-beta_examples <- crsp_monthly |>
-  inner_join(examples, join_by(permno)) |>
-  group_by(permno) |>
-  mutate(roll_capm_estimation(
-    pick(date, ret_excess, mkt_excess), 
-    months = 60, min_obs = 48)
-  ) |>
-  ungroup() |>
-  select(permno, company, date, beta) |>
-  drop_na()
-
+beta_examples <- capm_examples |>
+  left_join(examples, join_by(permno)) |>
+  filter(coefficient == "mkt_excess") 
+  
 beta_examples |>
-  ggplot(aes(
-    x = date, 
-    y = beta, 
-    color = company,
-    linetype = company)) +
+  ggplot(aes(x = date,y = estimate, color = company, linetype = company)) +
   geom_line() +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Monthly beta estimates for example stocks using 5 years of data"
   )
 ```
 
 ## Parallelized Rolling-Window Estimation
 
-Even though we could now just apply the function using `group_by()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine). 
+Even though we could now just apply the function using the approach from above on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine). 
 
-First, we `nest()` the data by `permno`. Nested data means we now have a list of `permno` with corresponding time series data and an `industry` label. We get one row of output for each unique combination of non-nested variables which are `permno` and `industry`.\index{Data!Nested}
-
-```{r}
-crsp_monthly_nested <- crsp_monthly |>
-  nest(data = c(date, ret_excess, mkt_excess))
-crsp_monthly_nested
-```
-
-Alternatively, we could have created the same nested data by *excluding* the variables that we *do not* want to nest, as in the following code chunk. However, for many applications it is desirable to explicitly state the variables that are nested into the `data` list-column, so that the reader can track what ends up in there.
-
-```{r}
-#| eval: false
-crsp_monthly_nested <- crsp_monthly |>
-  nest(data = -c(permno, industry))
-```
-
-Next, we want to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
-
-```{r}
-crsp_monthly_nested |>
-  inner_join(examples, join_by(permno)) |>
-  mutate(beta = map(
-    data,
-    \(x) roll_capm_estimation(x, months = 60, min_obs = 48)
-  )) |>
-  unnest(beta) |>
-  select(permno, date, beta_monthly = beta) |>
-  drop_na()
-```
-
-However, instead, we want to perform the estimations of rolling betas for different stocks in parallel. If you have a Windows or Mac machine, it makes most sense to define `multisession`, which means that separate R processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization in different environments. Note that we use `availableCores()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs. \index{Parallelization}
+If you have a Windows or Mac machine, it makes most sense to define `multisession`, which means that separate R processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization in different environments. Note that we use `availableCores()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with R jobs. \index{Parallelization}
 
 ```{r}
 n_cores = availableCores() - 1
 plan(multisession, workers = n_cores)
 ```
 
-Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Notice the difference in the code below? All you need to do is to replace `map()` with `future_map()`.
+Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Notice the difference in the code below? All you need to do is to replace `map()` with `future_map()`, which uses the `furrr` package in the background to handle the parallelization.
 
 ```{r}
-beta_monthly <- crsp_monthly_nested |>
-  mutate(beta = future_map(
-    data, \(x) roll_capm_estimation(x, months = 60, min_obs = 48)
-  )) |>
-  unnest(c(beta)) |>
-  select(permno, date, beta_monthly = beta) |>
-  drop_na()
-```
-
-If you want to implement the above estimation steps using the `tidyfinance` package, then you can use the `estimate_betas()` function:
-
-```{r}
-#| eval: false
-beta_monthly <- crsp_monthly |>
-  estimate_betas(model = "ret_excess ~ mkt_excess", lookback = months(60), min_obs = 48, use_furrr = TRUE)
+capm_monthly <- crsp_monthly |>
+  nest(data = c(date, ret_excess, mkt_excess, industry)) |>
+  mutate(capm = future_map(data, roll_capm_estimation)) |>
+  unnest(capm) |>
+  select(permno, date, coefficient, estimate, t_statistic)
+capm_monthly
 ```
 
 ## Estimating Beta Using Daily Returns
@@ -241,75 +204,83 @@ We then create a connection to the daily CRSP data in our database, but we don't
 
 ```{r}
 crsp_daily_db <- tbl(tidy_finance, "crsp_daily")
-
-permnos <- crsp_daily_db |>
-  distinct(permno) |> 
-  pull(permno)
 ```
 
-For the daily data, we consider around three months of data, require at least 48 observations, and estimate betas in batches of 500.
+We use the stocks from the monthly CRSP dataset as our reference point and process them in batches of 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
 
 ```{r}
+permnos <- crsp_daily_db |>
+  distinct(permno) |>
+  pull(permno)
+
 batch_size <- 500
 batches <- ceiling(length(permnos) / batch_size)
+min_obs <- 1000
 ```
 
 We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. 
 
 ```{r}
 #| output: false
-beta_daily <- list()
+capm_daily <- list()
+
 for (j in 1:batches) {
-  
   permno_batch <- permnos[
     ((j - 1) * batch_size + 1):min(j * batch_size, length(permnos))
   ]
-  
-  crsp_daily_sub <- crsp_daily_db |> 
-    filter(permno %in% permno_batch) |> 
-    select(permno, date, ret_excess) |> 
-    collect()
-  
-  crsp_daily_sub_nested <- crsp_daily_sub |> 
-    inner_join(factors_ff3_daily, join_by(date)) |> 
-    mutate(date = floor_date(date, "month")) |> 
-    nest(data = c(date, ret_excess, mkt_excess)) 
- 
-  beta_daily[[j]]  <- crsp_daily_sub_nested |> 
-    mutate(beta_daily = future_map(
-      data, \(x) roll_capm_estimation(x, months = 3, min_obs = 48)
-    )) |>
-    unnest(c(beta_daily)) |>
-    select(permno, date, beta_daily = beta) |>
-    drop_na()
- 
-  message("Batch ", j, " out of ", batches, " done (", percent(j / batches), ")\n")
-  
-}
-beta_daily <- bind_rows(beta_daily)
-```
 
-You can also use the `estimate_betas()` function from the `tidyfinance` package to estimate betas based on daily data. Please consult the corresponding documentation and exercise below. 
+  crsp_daily_sub <- crsp_daily_db |>
+    filter(permno %in% permno_batch) |>
+    select(permno, date, ret_excess) |>
+    collect()
+
+  crsp_daily_sub_nested <- crsp_daily_sub |>
+    inner_join(factors_ff3_daily, join_by(date)) |>
+    mutate(date = floor_date(date, "month")) |>
+    nest(data = c(date, ret_excess, mkt_excess))
+
+  capm_daily[[j]] <- crsp_daily_sub_nested |>
+    mutate(capm = future_map(
+      data, \(x) roll_capm_estimation(x, min_obs = min_obs))
+    ) |>
+    unnest(capm) |>
+    select(permno, date, coefficient, estimate, t_statistic)
+
+  message(
+    "Batch ", j, " out of ", batches, " done (", percent(j / batches), ")\n"
+  )
+}
+capm_daily <- bind_rows(capm_daily)
+```
 
 ## Comparing Beta Estimates
 
-What is a typical value for stock betas? To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. @fig-602 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
+What is a typical value for stock betas? First, let us extract the relevant estimates from our CAPM results based on monthly returns.
 
 ```{r}
-#| label: fig-602 
+beta_monthly <- capm_monthly |> 
+  filter(coefficient == "mkt_excess") |> 
+  select(permno, date, beta = estimate) |> 
+  mutate(return_type = "monthly")
+```
+
+To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. @fig-602 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
+
+```{r}
+#| label: fig-602
 #| fig-cap: "The box plots show the average firm-specific beta estimates by industry."
 #| fig.alt: "Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. Firms with the highest average CAPM beta belong to the public administration industry. Firms from the utility sector have the lowest average CAPM beta. The figure indicates very few outliers with negative CAPM betas. The large majority of all stocks has CAPM betas between 0.5 and 1.5."
 crsp_monthly |>
   left_join(beta_monthly, join_by(permno, date)) |>
-  drop_na(beta_monthly) |>
+  drop_na(beta) |>
   group_by(industry, permno) |>
-  summarize(beta = mean(beta_monthly), 
-            .groups = "drop") |>
+  summarize(beta = mean(beta), .groups = "drop") |>
   ggplot(aes(x = reorder(industry, beta, FUN = median), y = beta)) +
   geom_boxplot() +
   coord_flip() +
   labs(
-    x = NULL, y = NULL,
+    x = NULL,
+    y = NULL,
     title = "Firm-specific beta distributions by industry"
   )
 ```
@@ -317,58 +288,68 @@ crsp_monthly |>
 Next, we illustrate the time-variation in the cross-section of estimated betas. @fig-603 shows the monthly deciles of estimated betas (based on monthly data) and indicates an interesting pattern: First, betas seem to vary over time in the sense that during some periods, there is a clear trend across all deciles. Second, the sample exhibits periods where the dispersion across stocks increases in the sense that the lower decile decreases and the upper decile increases, which indicates that for some stocks the correlation with the market increases while for others it decreases. Note also here: stocks with negative betas are a rare exception.
 
 ```{r} 
-#| label: fig-603 
+#| label: fig-603
 #| fig-cap: "Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta."
 #| fig-alt: "Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly."
 beta_monthly |>
-  drop_na(beta_monthly) |>
   group_by(date) |>
   reframe(
-    x = quantile(beta_monthly, seq(0.1, 0.9, 0.1)),
+    x = quantile(beta, seq(0.1, 0.9, 0.1)),
     quantile = 100 * seq(0.1, 0.9, 0.1)
   ) |>
   ggplot(aes(
-    x = date, 
-    y = x, 
+    x = date,
+    y = x,
     color = as_factor(quantile),
     linetype = as_factor(quantile)
-    )) +
+  )) +
   geom_line() +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Monthly deciles of estimated betas",
   )
 ```
 
-To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604. 
+To compare the difference between daily and monthly data, we combine beta estimates to a single table. 
+
+```{r}
+beta_daily <- capm_daily |> 
+  filter(coefficient == "mkt_excess") |> 
+  select(permno, date, beta = estimate) |> 
+  mutate(return_type = "daily")
+
+beta <- bind_rows(beta_monthly, beta_daily)
+```
+
+Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604. 
 
 ```{r} 
-#| label: fig-604 
-#| fig-cap: "CAPM betas are computed using 5 years of monthly or 3 months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks."
-#| fig-alt: "Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus 3 years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency."
-beta <- beta_monthly |>
-  full_join(beta_daily, join_by(permno, date)) |>
-  arrange(permno, date)
-
+#| label: fig-604
+#| fig-cap: "CAPM betas are computed using 5 years of monthly or daily return data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks."
+#| fig-alt: "Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus daily return data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency."
 beta |>
   inner_join(examples, join_by(permno)) |>
-  pivot_longer(cols = c(beta_monthly, beta_daily)) |>
-  drop_na() |>
   ggplot(aes(
-    x = date, 
-    y = value, 
-    color = name, 
-    linetype = name
-    )) +
+    x = date,
+    y = beta,
+    color = return_type,
+    linetype = return_type
+  )) +
   geom_line() +
   facet_wrap(~company, ncol = 1) +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL, 
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Comparison of beta estimates using monthly and daily data"
   )
 ```
 
-The estimates in @fig-604 look as expected. As you can see, it really depends on the estimation window and data frequency how your beta estimates turn out. 
+The estimates in @fig-604 look as expected. As you can see, it really depends on the data frequency how your beta estimates turn out because the estimates based on daily data are much smoother due to the higher number of observations in each regression. 
 
 Finally, we write the estimates to our database such that we can use them in later chapters. 
 
@@ -384,60 +365,60 @@ dbWriteTable(
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. This descriptive helps us discover potential errors in our data preparation or estimation procedure. For instance, suppose there was a gap in our output where we do not have any betas. In this case, we would have to go back and check all previous steps to find out what went wrong. 
 
 ```{r} 
-#| label: fig-605 
-#| fig-cap: "The two lines show the share of securities with beta estimates using 5 years of monthly or 3 months of daily data."
-#| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or 3 months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta."
-beta_long <- crsp_monthly |>
-  left_join(beta, join_by(permno, date)) |>
-  pivot_longer(cols = c(beta_monthly, beta_daily))
+#| label: fig-605
+#| fig-cap: "The two lines show the share of securities with beta estimates using 5 years of monthly or daily return data."
+#| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or daily return data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta."
+beta_coverage <- crossing(
+    crsp_monthly,
+    tibble(return_type = c("monthly", "daily"))
+  ) |> 
+  left_join(beta, join_by(permno, date, return_type)) |> 
+  group_by(date, return_type) |>
+  summarize(share = sum(!is.na(beta)) / n(), .groups = "drop")
 
-beta_long |>
-  group_by(date, name) |>
-  summarize(share = sum(!is.na(value)) / n(), 
-            .groups = "drop") |>
-  ggplot(aes(
-    x = date, 
-    y = share, 
-    color = name,
-    linetype = name
-    )) +
+beta_coverage |>
+  ggplot(
+    aes(x = date, y = share, color = return_type, linetype = return_type)
+  ) +
   geom_line() +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "End-of-month share of securities with beta estimates"
   ) +
   coord_cartesian(ylim = c(0, 1))
 ```
 
-@fig-605 does not indicate any troubles, so let us move on to the next check. 
+@fig-605 shows no issues, as the two coverage lines track each other closely, so we can proceed to the next check.
 
 We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\index{Summary statistics}
 
 ```{r}
-beta_long |>
-  select(name, value) |>
-  drop_na() |>
-  group_by(name) |>
+beta |> 
+  group_by(return_type) |>
   summarize(
-    mean = mean(value),
-    sd = sd(value),
-    min = min(value),
-    q05 = quantile(value, 0.05),
-    q50 = quantile(value, 0.50),
-    q95 = quantile(value, 0.95),
-    max = max(value),
+    mean = mean(beta),
+    sd = sd(beta),
+    min = min(beta),
+    q05 = quantile(beta, 0.05),
+    q50 = quantile(beta, 0.50),
+    q95 = quantile(beta, 0.95),
+    max = max(beta),
     n = n()
   )
 ```
 
-The summary statistics also look plausible for the two estimation procedures. 
+The summary statistics indicate that estimates based on daily returns are, on average, lower and less variable than those derived from monthly returns.
 
-Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different sample periods and frequencies).
+Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different frequencies).
 
 ```{r}
 beta |>
-  select(beta_daily, beta_monthly) |>
+  pivot_wider(names_from = return_type, values_from = beta) |>
+  select(monthly, daily) |> 
   cor(use = "complete.obs")
 ```
 
@@ -448,7 +429,6 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 - CAPM betas can be estimated using rolling-window estimation via the `slider` package and processed in parallel via `furrr`.
 - Both monthly and daily return data can be used to estimate betas with different frequencies and window lengths, depending on the application.
 -  Summary statistics, visualization, and plausibility checks help to validate beta estimates across time and industries.
-- The `tidyfinance` R package provides a user-friendly `estimate_betas()` function that simplifies the full beta estimation pipeline.
 
 ## Exercises
 
@@ -456,9 +436,8 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 1. Compute beta estimates based on monthly data using five years of data and impose different numbers of minimum observations. How does the share of `permno`-`date` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas? 
 1. Instead of using `future_map()`, perform the beta estimation in a loop (using either monthly or daily data) for a subset of 100 permnos of your choice. Verify that you get the same results as with the parallelized code from above.
 1. Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors? 
-1. Compute beta estimates for multi-factor models such as the Fama-French three-factor model. For that purpose, you extend your regression to 
+1. Compute beta estimates for multi-factor models such as the Fama-French three-factor model by extending the `estimate_capm()` function with a `model` parameter. In particular, your regression should support the model
 $$
 r_{i, t} - r_{f, t} = \alpha_i + \sum\limits_{j=1}^k\beta_{i,k}(r_{j, t}-r_{f,t})+\varepsilon_{i, t}
 $${#eq-multi-factor}
 where $r_{i, t}$ are the $k$ factor returns. Thus, you estimate four parameters ($\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors.
-1. Estimate market betas based on daily CRSP using the `estimate_betas()` function from the `tidyfinance` package. Note that a memory-efficient way is to adjust the loop that we use above to handle daily CRSP data. 

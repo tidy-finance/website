@@ -91,17 +91,19 @@ sorting_variables <- size |>
 
 ## Portfolio Sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints to independently form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30- and 70-percentiles. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which takes the sequence of breakpoints as an object specified in the function's call. Specifically, we give `percentiles = c(0, 0.3, 0.7, 1)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints to independently form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30- and 70-percentiles. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which takes the sequence of breakpoints as an object specified in the function's call. Specifically, we give `percentiles = c(0.3, 0.7)` to the function. Additionally, we perform an `inner_join()` with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ```{r}
-assign_portfolio <- function(data, 
-                             sorting_variable, 
-                             percentiles) {
+assign_portfolio <- function(
+  data, 
+  sorting_variable, 
+  percentiles
+) {
   breakpoints <- data |>
     filter(exchange == "NYSE") |>
     pull({{ sorting_variable }}) |>
     quantile(
-      probs = percentiles,
+      probs = c(0, percentiles, 1),
       na.rm = TRUE,
       names = FALSE
     )
@@ -115,7 +117,7 @@ assign_portfolio <- function(data,
     )) |>
     pull(portfolio)
   
-  return(assigned_portfolios)
+  assigned_portfolios
 }
 
 portfolios <- sorting_variables |>
@@ -123,13 +125,13 @@ portfolios <- sorting_variables |>
   mutate(
     portfolio_size = assign_portfolio(
       data = pick(everything()),
-      sorting_variable = size,
-      percentiles = c(0, 0.5, 1)
+      sorting_variable = "size",
+      percentiles = c(0.5)
     ),
     portfolio_bm = assign_portfolio(
       data = pick(everything()),
-      sorting_variable = bm,
-      percentiles = c(0, 0.3, 0.7, 1)
+      sorting_variable = "bm",
+      percentiles = c(0.3, 0.7)
     )
   ) |>
   ungroup() |> 
@@ -229,22 +231,26 @@ portfolios <- sorting_variables |>
   mutate(
     portfolio_size = assign_portfolio(
       data = pick(everything()),
-      sorting_variable = size,
-      percentiles = c(0, 0.5, 1)
+      sorting_variable = "size",
+      percentiles = c(0.5)
     )) |> 
   group_by(sorting_date, portfolio_size) |> 
   mutate(
-    across(c(bm, op, inv), ~assign_portfolio(
-      data = pick(everything()), 
-      sorting_variable = ., 
-      percentiles = c(0, 0.3, 0.7, 1)),
+    across(
+      c(bm, op, inv), 
+      ~assign_portfolio(
+        data = pick(everything()), 
+        sorting_variable = ., 
+        percentiles = c(0.3, 0.7)
+      ),
       .names = "portfolio_{.col}"
     )
   ) |>
   ungroup() |> 
-  select(permno, sorting_date, 
-         portfolio_size, portfolio_bm,
-         portfolio_op, portfolio_inv)
+  select(
+    permno, sorting_date, 
+    portfolio_size, portfolio_bm, portfolio_op, portfolio_inv
+  )
 
 portfolios <- crsp_monthly |>
   mutate(sorting_date = case_when(
@@ -379,5 +385,6 @@ Overall, our approach seems to replicate the Fama-French five-factor models just
 
 ## Exercises
 
+1. Replicate the market factor `mkt_excess` from the `factors_ff3_monthly` data as the value-weight return of all CRSP firms incorporated in the US and listed on the NYSE, AMEX, or NASDAQ that have a CRSP share code of 10 or 11. Assess your replication effort using linear regressions as above. 
 1. @Fama1993 claim that their sample excludes firms until they have appeared in Compustat for two years. Implement this additional filter and compare the improvements of your replication effort. 
-2. On his homepage, [Kenneth French](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) provides instructions on how to construct the most common variables used for portfolio sorts. Try to replicate the univariate portfolio sort return time series for `E/P` (earnings/price) provided on his homepage and evaluate your replication effort using regressions.
+1. On his homepage, [Kenneth French](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) provides instructions on how to construct the most common variables used for portfolio sorts. Try to replicate the univariate portfolio sort return time series for `E/P` (earnings/price) provided on his homepage and evaluate your replication effort using regressions.

@@ -53,7 +53,8 @@ factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
   collect()
 
 beta <- tbl(tidy_finance, "beta") |>
-  select(permno, date, beta_monthly) |>
+  filter(return_type == "monthly") |> 
+  select(permno, date, beta) |>
   collect()
 ```
 
@@ -68,7 +69,7 @@ This procedure, however, does not work correctly if there are non-explicit missi
 ```{r}
 beta_lag <- beta |>
   mutate(date = date %m+% months(1)) |>
-  select(permno, date, beta_lag = beta_monthly) |>
+  select(permno, date, beta_lag = beta) |>
   drop_na()
 
 data_for_sorts <- crsp_monthly |>
@@ -120,10 +121,11 @@ Now we take portfolio sorts to the next level. We want to be able to sort stocks
 In some applications, the variable used for the sorting might be clustered (e.g., at a lower bound of 0). Then, multiple breakpoints may be identical, leading to empty portfolios. Similarly, some portfolios might have a very small number of stocks at the beginning of the sample. Cases where the number of portfolio constituents differs substantially due to the distribution of the characteristics require careful consideration and, depending on the application, might require customized sorting approaches.
 
 ```{r}
-assign_portfolio <- function(data, 
-                             sorting_variable, 
-                             n_portfolios) {
-  # Compute breakpoints
+assign_portfolio <- function(
+  data, 
+  sorting_variable, 
+  n_portfolios
+) {
   breakpoints <- data |>
     pull({{ sorting_variable }}) |>
     quantile(
@@ -132,7 +134,6 @@ assign_portfolio <- function(data,
       names = FALSE
     )
 
-  # Assign portfolios
   assigned_portfolios <- data |>
     mutate(portfolio = findInterval(
       pick(everything()) |>
@@ -142,8 +143,7 @@ assign_portfolio <- function(data,
     )) |>
     pull(portfolio)
   
-  # Output
-  return(assigned_portfolios)
+  assigned_portfolios
 }
 ```
 

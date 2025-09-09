@@ -13,7 +13,7 @@ You are reading **Tidy Finance with R**. You can find the equivalent chapter for
 
 In this chapter, we continue with portfolio sorts in a univariate setting. Yet, we consider firm size as a sorting variable, which gives rise to a well-known return factor: the size premium. The size premium arises from buying small stocks and selling large stocks. Prominently, @Fama1993 include it as a factor in their three-factor model. Apart from that, asset managers commonly include size as a key firm characteristic when making investment decisions.
 
-We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums [see @Hasler2021, @Soebhag2022, and @Walter2022 for more insights into decision nodes and their effect on premiums]. Exploiting these ideas to generate favorable results is called p-hacking.
+We also introduce new choices in the formation of portfolios. In particular, we discuss listing exchanges, industries, weighting regimes, and periods. These choices matter for the portfolio returns and result in different size premiums (see @Hasler2021, @Soebhag2022, and @Walter2022 for more insights into decision nodes and their effect on premiums). Exploiting these ideas to generate favorable results is called p-hacking.
 There is arguably a thin line between p-hacking and conducting robustness tests. Our purpose here is to illustrate the substantial variation that can arise along the evidence-generating process.
 
 The chapter relies on the following set of packages:
@@ -101,7 +101,7 @@ Next, firm sizes also differ across listing exchanges. Stocks' primary listings 
 ```{r}
 #| label: fig-802
 #| fig-cap: "Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis."
-#| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2021, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
+#| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 crsp_monthly |>
   group_by(date, exchange) |>
   summarize(mktcap = sum(mktcap),
@@ -127,7 +127,7 @@ crsp_monthly |>
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `summary()` does not include all statistics we are interested in, which is why we create the function `create_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with `add_row()` with the overall summary statistics.\index{Summary statistics}
 
-The resulting table shows that firms listed on NYSE in December 2021 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
+The resulting table shows that firms listed on NYSE in December 2023 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 ```{r, message = FALSE}
 create_summary <- function(data, column_name) {
@@ -162,10 +162,11 @@ In [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), we construct po
 To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function. The exchange-specific argument then enters in the filter `filter(exchange %in% exchanges)`. For example, if `exchanges = 'NYSE'` is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges = c("NYSE", "NASDAQ", "AMEX")`, which keeps all stocks listed on either of these exchanges. Overall, regular expressions are a powerful tool, and we only touch on a specific case here.
 
 ```{r}
-assign_portfolio <- function(n_portfolios,
-                             exchanges,
-                             data) {
-  # Compute breakpoints
+assign_portfolio <- function(
+  data,
+  n_portfolios,
+  exchanges
+) {
   breakpoints <- data |>
     filter(exchange %in% exchanges) |>
     pull(mktcap_lag) |>
@@ -175,16 +176,17 @@ assign_portfolio <- function(n_portfolios,
       names = FALSE
     )
 
-  # Assign portfolios
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval(mktcap_lag,
-      breakpoints,
-      all.inside = TRUE
-    )) |>
+    mutate(
+      portfolio = findInterval(
+        mktcap_lag,
+        breakpoints,
+        all.inside = TRUE
+      )
+    ) |>
     pull(portfolio)
   
-  # Output
-  return(assigned_portfolios)
+  assigned_portfolios
 }
 ```
 
@@ -197,28 +199,37 @@ Apart from computing breakpoints on different samples, researchers often use dif
 We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd).
 
 ```{r}
-compute_portfolio_returns <- function(n_portfolios = 10,
-                                      exchanges = c("NYSE", "NASDAQ", "AMEX"),
-                                      value_weighted = TRUE,
-                                      data = crsp_monthly) {
-  data |>
+compute_portfolio_returns <- function(
+  n_portfolios = 10,
+  exchanges = c("NYSE", "NASDAQ", "AMEX"),
+  value_weighted = TRUE,
+  data = crsp_monthly
+) {
+  portfolio_returns <- data |>
     group_by(date) |>
-    mutate(portfolio = assign_portfolio(
-      n_portfolios = n_portfolios,
-      exchanges = exchanges,
-      data = pick(everything())
-    )) |>
+    mutate(
+      portfolio = assign_portfolio(
+        data = pick(everything()),
+        n_portfolios = n_portfolios,
+        exchanges = exchanges
+      )
+    ) |>
     group_by(date, portfolio) |>
     summarize(
-      ret = if_else(value_weighted,
+      ret = if_else(
+        value_weighted,
         weighted.mean(ret_excess, mktcap_lag),
         mean(ret_excess)
       ),
       .groups = "drop_last"
     ) |>
-    summarize(size_premium = ret[portfolio == min(portfolio)] -
-      ret[portfolio == max(portfolio)]) |>
+    summarize(
+      size_premium = ret[portfolio == min(portfolio)] -
+        ret[portfolio == max(portfolio)]
+    ) |>
     summarize(size_premium = mean(size_premium))
+  
+  portfolio_returns
 }
 ```
 
