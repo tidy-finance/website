@@ -73,9 +73,9 @@ library(RSQLite)
 library(tidyverse)
 library(tidymodels)
 library(scales)
-library(furrr)
 library(glmnet)
 library(timetk)
+library(mirai)
 ```
 
 In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
@@ -453,11 +453,15 @@ lm_fit <- lm_fit |>
   update_model(lasso_model)
 ```
 
-The following task can be easily parallelized to reduce computing time substantially. We use the parallelization capabilities of `furrr`. Note that we can also just recycle all the steps from above and collect them in a function.
+The following task can be easily parallelized to reduce computing time substantially. We use the parallelization capabilities of `mirai`. Note that we can also just recycle all the steps from above and collect them in a function.
 
 ```{r}
 select_variables <- function(input) {
   # Split into training and testing data
+  library(tidymodels)
+  library(timetk)
+  library(stringr)
+
   split <- initial_time_split(input, prop = 4 / 5)
 
   # Data folds for cross-validation
@@ -495,15 +499,17 @@ select_variables <- function(input) {
 }
 
 # Parallelization
-plan(multisession, workers = availableCores())
+daemons(4)
 
 # Computation by industry
 selected_factors <- data |>
   nest(data = -industry) |>
-  mutate(selected_variables = future_map(
-    data, select_variables,
-    .options = furrr_options(seed = TRUE)
-  ))
+  mutate(selected_variables = map(data, 
+    in_parallel(\(data) select_variables(data), 
+    select_variables=select_variables, lm_fit=lm_fit))
+  )
+
+daemons(0)
 ```
 
 What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible. 
