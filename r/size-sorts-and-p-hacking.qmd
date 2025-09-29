@@ -25,7 +25,6 @@ library(RSQLite)
 library(scales)
 library(sandwich)
 library(lmtest)
-library(furrr)
 library(rlang)
 ```
 
@@ -291,11 +290,12 @@ p_hacking_setup <- expand_grid(
 To speed the computation up we parallelize the (many) different sorting procedures, as in [Beta Estimation](beta-estimation.qmd). Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios. 
 
 ```{r}
-n_cores = availableCores() - 1
-plan(multisession, workers = n_cores)
+
+daemons(0)
 
 p_hacking_setup <- p_hacking_setup |>
-  mutate(size_premium = future_pmap(
+  head(3) |>
+  mutate(size_premium = pmap(
     .l = list(
       n_portfolios,
       exchanges,
@@ -309,6 +309,25 @@ p_hacking_setup <- p_hacking_setup |>
       data = eval_tidy(..4)
     )
   ))
+
+   p_hacking_setup |>
+  mutate(
+    size_premium = pmap(
+      list(n_portfolios, exchanges, value_weighted, data),
+      purrr::in_parallel(
+        function(n_portfolios, exchanges, value_weighted, data) {
+          data_eval <- rlang::eval_tidy(data)
+
+          compute_portfolio_returns(
+            n_portfolios = n_portfolios,
+            exchanges = exchanges,
+            value_weighted = value_weighted,
+            data = data_eval
+          )
+        }
+      )
+    )
+  )
 
 p_hacking_results <- p_hacking_setup |>
   mutate(data = map_chr(data, deparse)) |>
