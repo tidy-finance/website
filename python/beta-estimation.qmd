@@ -21,7 +21,6 @@ We use the following Python packages throughout this chapter:
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 import statsmodels.formula.api as smf
 
 from plotnine import *
@@ -40,22 +39,17 @@ Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmode
 
 ## Estimating Beta Using Monthly Returns
 
-The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
+The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
-crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, date, industry, ret_excess FROM crsp_monthly",
-    con=tidy_finance,
-    parse_dates={"date"})
-  .dropna()
+crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
+    .get(["permno", "date", "industry", "ret_excess"])
+    .dropna()
 )
 
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .get(["date", "mkt_excess"])
 )
 
 crsp_monthly = (crsp_monthly
@@ -190,7 +184,7 @@ beta_figure = (
         linetype="",
         title="Monthly beta estimates for example stocks using 5 years of data",
     )
-    + scale_x_datetime(breaks=date_breaks(width="5 year"), labels=date_format("%Y"))
+    + scale_x_date(breaks=date_breaks(width="5 year"), labels=date_format("%Y"))
 )
 beta_figure.show()
 ```
@@ -232,10 +226,8 @@ Before we provide some descriptive statistics of our beta estimates, we implemen
 First, we load the daily Fama-French market excess returns and extract the vector of dates.
 
 ```{python}
-factors_ff3_daily = pd.read_sql_query(
-  sql="SELECT date, mkt_excess FROM factors_ff3_daily",
-  con=tidy_finance,
-  parse_dates={"date"}
+factors_ff3_daily = pd.read_parquet("data-python/factors_ff3_daily.parquet")
+    .get(["date", "mkt_excess"])
 )
 ```
 

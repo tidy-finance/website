@@ -272,53 +272,33 @@ To download other time series, we just have to look it up on the FRED website an
 
 ## Setting Up a Database
 
-Now that we have downloaded some (freely available) data from the web into the memory of our Python session, let us set up a database to store that information for future use. We will use the data stored in this database throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code. 
+Now that we have downloaded some (freely available) data from the web into the memory of our Python session let store that information for future use. We will use the data stored throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code.
 
-There are many ways to set up and organize a database, depending on the use case. For our purpose, the most efficient way is to use an [SQLite](https://SQLite.org/)-database, which is the C-language library that implements a small, fast, self-contained, high-reliability, full-featured SQL database engine. Note that [SQL](https://en.wikipedia.org/wiki/SQL) (Structured Query Language) is a standard language for accessing and manipulating databases.\index{Database!SQLite}
-
-```{python}
-import sqlite3
-```
-
-An SQLite-database is easily created - the code below is really all there is. You do not need any external software. Otherwise, date columns are stored and retrieved as integers.\index{Database!Creation} We will use the file `tidy_finance_r.sqlite`, located in the data subfolder, to retrieve data for all subsequent chapters. The initial part of the code ensures that the directory is created if it does not already exist.
-
+There are many ways to set up and organize your data, depending on the use case. Storing data as Parquet files creates a universal data format that seamlessly works across different programming languages and platforms. Unlike CSV files that often lose data types when shared between R, Python, Julia, or other languages, Parquet files maintain perfect data integrity regardless of which tool reads them. A dataset saved as Parquet in Python can be opened directly in Python's pandas, or Julia's DataFrames.jl.^[In previous editions of this book, we suggested using SQLite databases. However, Parquet files are more versatile and easier to handle across different programming languages. Should you still prefer using SQLite, you can find the relevant code snippets in a separate blog post.]
 ```{python}
 import os
 
-if not os.path.exists("data"):
-  os.makedirs("data")
-    
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
+if not os.path.exists("data-python"):
+  os.makedirs("data-python")
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. We do so with the `pandas` function `to_sql()`, which copies the data to our SQLite-database.
+Next, we create a remote table with the monthly Fama-French factor data. We do so with the `pandas` function `to_pandas()`, which stores the data to parquet files.
 
 ```{python}
-#| output: false
-(factors_ff3_monthly
-  .to_sql(name="factors_ff3_monthly", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+factors_ff3_monthly.to_parquet("data/factors_ff3_monthly.parquet")
 ```
 
-Now, if we want to have the whole table in memory, we need to call `pd.read_sql_query()` with the corresponding query. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Read}
+Now, if we want to have the whole table in memory, we need to call `pd.read_parquet()` with the corresponding query. You will see that we regularly load the data into the memory in the next chapters.\index{Database!Read}
 
 ```{python}
-pd.read_sql_query(
-  sql="SELECT date, rf FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+pd.read_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
-The last couple of code chunks are really all there is to organizing a simple database! You can also share the SQLite database across devices and programming languages. 
+The last couple of code chunks are really all there is to organizing a simple database! You can also share the parquet files across devices and programming languages. 
 
-Before we move on to the next data source, let us also store the other six tables in our new SQLite database. 
+Before we move on to the next data source, let us also store the other six tables in our new database. 
 
 ```{python}
-#| output: false
 data_dict = {
   "factors_ff5_monthly": factors_ff5_monthly,
   "factors_ff3_daily": factors_ff3_daily,
@@ -329,42 +309,9 @@ data_dict = {
 }
 
 for key, value in data_dict.items():
-    value.to_sql(name=key,
-                 con=tidy_finance, 
-                 if_exists="replace",
-                 index=False)
+    value.to_parquet("data/"+key+".parquet")
 ```
 
-From now on, all you need to do to access data that is stored in the database is to follow two steps: (i) Establish the connection to the SQLite-database and (ii) execute the query to fetch the data. For your convenience, the following steps show all you need in a compact fashion.\index{Database!Connection}
-
-```{python}
-#| results: false
-#| message: false
-import pandas as pd
-import sqlite3
-
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-factors_q_monthly = pd.read_sql_query(
-  sql="SELECT * FROM factors_q_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
-```
-
-## Managing SQLite Databases
-
-Finally, at the end of our data chapter, we revisit the  SQLite database itself. When you drop database objects such as tables or delete data from tables, the database file size remains unchanged because SQLite just marks the deleted objects as free and reserves their space for future uses. As a result, the database file always grows in size.\index{Database!Management}
-
-To optimize the database file, you can run the `VACUUM` command in the database, which rebuilds the database and frees up unused space. You can execute the command in the database using the `execute()` function. 
-
-```{python}
-#| eval: false
-#| output: false
-tidy_finance.execute("VACUUM")
-```
-
-The `VACUUM` command actually performs a couple of additional cleaning steps, which you can read about in [this tutorial.](https://SQLite.org/docs/sql/statements/vacuum.html) \index{Database!Cleaning}
 
 ## Key Takeaways
 

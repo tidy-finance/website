@@ -76,7 +76,6 @@ To get started, we load the required packages and data. The main focus is on the
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 
 from plotnine import * 
 from mizani.formatters import percent_format, date_format
@@ -98,7 +97,7 @@ exec(open("python/render-plotnine-custom.py").read())
 
 ## Data Preparation
 
-In this analysis, we use four different data sources that we load from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
+In this analysis, we use four different data sources that we load from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
 
 - The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993.
 - Monthly q-factor returns from @Hou2015. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor.
@@ -111,35 +110,15 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 In line with many existing papers, we use monthly portfolio returns from ten different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macroeconomic predictors}\index{Data!Industry portfolios}
 
 ```{python, eval = TRUE}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
+factors_ff3_monthly = pd.read_parquet("data/factors_ff3_monthly.parquet").add_prefix("factor_ff_")
 
-factors_ff3_monthly = (pd.read_sql_query(
-     sql="SELECT * FROM factors_ff3_monthly",
-     con=tidy_finance,
-     parse_dates={"date"})
-  .add_prefix("factor_ff_")
-)
+factors_q_monthly = pd.read_parquet("data/factors_q_monthly.parquet").add_prefix("factor_q_")
 
-factors_q_monthly = (pd.read_sql_query(
-    sql="SELECT * FROM factors_q_monthly",
-    con=tidy_finance,
-    parse_dates={"date"})
-  .add_prefix("factor_q_")
-)
+macro_predictors = pd.read_parquet("data/macro_predictors.parquet").add_prefix("macro_")
 
-macro_predictors = (pd.read_sql_query(
-    sql="SELECT * FROM macro_predictors",
-    con=tidy_finance,
-    parse_dates={"date"})
- .add_prefix("macro_")
-)
 
-industries_ff_monthly = (pd.read_sql_query(
-    sql="SELECT * FROM industries_ff_monthly",
-    con=tidy_finance,
-    parse_dates={"date"})
-  .melt(id_vars="date", var_name="industry", value_name="ret")
-)
+industries_ff_monthly = (pd.read_parquet("data/industries_ff_monthly.parquet")
+.melt(id_vars="date", var_name="industry", value_name="ret"))
 ```
 
 We combine all the monthly observations into one dataframe.
