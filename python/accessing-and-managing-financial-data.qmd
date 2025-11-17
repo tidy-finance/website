@@ -23,7 +23,7 @@ First, we load the Python packages that we use throughout this chapter. Later on
 ```{python}
 import pandas as pd
 import numpy as np
-import tidyfinance as tf
+
 ```
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
@@ -35,97 +35,57 @@ end_date = "2024-12-31"
 
 ## Fama-French Data
 
-We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, the `pandas-datareader` package provides a simple interface to read data from Kenneth French's Data Library.\index{Data!Fama-French factors}\index{Kenneth French homepage}
+We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, the `tidy-finance` package provides a simple interface to read data from Kenneth French's Data Library.\index{Data!Fama-French factors}\index{Kenneth French homepage}
 
 ```{python}
-import pandas_datareader as pdr
+import tidyfinance as tf
 ```
 
-We can use the `pdr.DataReader()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`rf`). Note that we have to do some manual work to parse all the columns correctly and scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to`pandas_datareader`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
+We can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
 
 ```{python}
-factors_ff3_monthly_raw = pdr.DataReader(
-  name="F-F_Research_Data_Factors",
-  data_source="famafrench", 
-  start=start_date, 
-  end=end_date)[0]
-
-factors_ff3_monthly = (factors_ff3_monthly_raw
-  .divide(100)
-  .reset_index(names="date")
-  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
-  .rename(str.lower, axis="columns")
-  .rename(columns={"mkt-rf": "mkt_excess"})
+factors_ff3_monthly = tf.download_data(
+  domain="famafrench",
+  dataset="F-F_Research_Data_Factors",
+  start_date=start_date,
+  end_date=end_date,
 )
 ```
 
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability (`rmw`) and investment (`cma`) factors. We demonstrate how the monthly factors are constructed in [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
 
 ```{python}
-factors_ff5_monthly_raw = pdr.DataReader(
-  name="F-F_Research_Data_5_Factors_2x3",
-  data_source="famafrench", 
-  start=start_date, 
-  end=end_date)[0]
-
-factors_ff5_monthly = (factors_ff5_monthly_raw
-  .divide(100)
-  .reset_index(names="date")
-  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
-  .rename(str.lower, axis="columns")
-  .rename(columns={"mkt-rf": "mkt_excess"})
+factors_ff5_monthly = tf.download_data(
+  domain="famafrench",
+  dataset="F-F_Research_Data_5_Factors_2x3",
+  start_date=start_date,
+  end_date=end_date,
 )
 ```
 
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function. 
 
 ```{python}
-factors_ff3_daily_raw = pdr.DataReader(
-  name="F-F_Research_Data_Factors_daily",
-  data_source="famafrench", 
-  start=start_date, 
-  end=end_date)[0]
-
-factors_ff3_daily = (factors_ff3_daily_raw
-  .divide(100)
-  .reset_index(names="date")
-  .rename(str.lower, axis="columns")
-  .rename(columns={"mkt-rf": "mkt_excess"})
+factors_ff3_daily = tf.download_data(
+  domain="famafrench",
+  dataset="F-F_Research_Data_Factors_daily",
+  start_date=start_date,
+  end_date=end_date,
 )
 ```
 
 In a subsequent chapter, we also use the monthly returns from ten industry portfolios, so let us fetch that data, too.\index{Data!Industry portfolios}
 
 ```{python}
-industries_ff_monthly_raw = pdr.DataReader(
-  name="10_Industry_Portfolios",
-  data_source="famafrench", 
-  start=start_date, 
-  end=end_date)[0]
-
-industries_ff_monthly = (industries_ff_monthly_raw
-  .divide(100)
-  .reset_index(names="date")
-  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
-  .rename(str.lower, axis="columns")
+industries_ff_monthly = tf.download_data(
+  domain="famafrench",
+  dataset="10_Industry_Portfolios",
+  start_date=start_date,
+  end_date=end_date,
 )
 ```
 
-It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `pdr.famafrench.get_available_datasets()`.
-
-To automatically download and process Fama-French data, you can also use the `tidyfinance` package with `domain="factors_ff"` and the corresponding dataset, e.g.:
-
-```{python}
-#| output: false
-tf.download_data(
-  domain="factors_ff",
-  dataset="F-F_Research_Data_Factors", 
-  start_date=start_date, 
-  end_date=end_date
-)
-```
-
-The `tidyfinance` package implements the processing steps as above and returns the same cleaned data frame. 
+It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `tf.get_available_famafrench_datasets()`.
 
 ## q-Factors
 
@@ -240,35 +200,22 @@ tf.download_data(
 
 ## Other Macroeconomic Data
 
-The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the already familiar `pandas-datareader` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
+The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the `tidyfinance` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
 
 ```{python}
-cpi_monthly = (pdr.DataReader(
-    name="CPIAUCNS", 
-    data_source="fred", 
-    start=start_date, 
-    end=end_date
+cpi_monthly = (
+  tf.download_data(
+      domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
   )
-  .reset_index(names="date")
+  .pivot(index="date", columns="series", values="value")
+  .rename_axis(columns=None)
   .rename(columns={"CPIAUCNS": "cpi"})
   .assign(cpi=lambda x: x["cpi"] / x["cpi"].iloc[-1])
+  .reset_index(names="date")
 )
 ```
 
-Note that we use the `assign()` in the last line to set the current (latest) price level as the reference inflation level. To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key.
-
-The `tidyfinance` package can, of course, also fetch the same daily data and many more data series:
-
-```{python}
-tf.download_data(
-  domain="fred",
-  series="CPIAUCNS", 
-  start_date=start_date, 
-  end_date=end_date
-)
-```
-
-To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through tidyfinance, we recommend working with the `fredapi` package. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
+Note that we use the `assign()` in the preultimate line to set the current (latest) price level as the reference inflation level. To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through tidyfinance, we recommend working with the `fredapi` package. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
 
 ## Setting Up a Database
 
@@ -375,5 +322,5 @@ The `VACUUM` command actually performs a couple of additional cleaning steps, wh
 
 ## Exercises
 
-1. Download the monthly Fama-French factors manually from [Kenneth French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `pd.read_csv()`. Validate that you get the same data as via the `pandas-datareader` package. 
-1. Download the daily Fama-French 5 factors using the `pdr.DataReader()` package. After the successful download and conversion to the column format that we used above, compare the `rf`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_daily` to `factors_ff5_daily`. Discuss any differences you might find. 
+1. Download the monthly Fama-French factors manually from [Kenneth French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `pd.read_csv()`. Validate that you get the same data as via the `tf.download_data()` package. 
+1. Download the daily Fama-French 5 factors using the `tf.download_data()` function. After the successful download and conversion to the column format that we used above, compare the `risk_free`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_daily` to `factors_ff5_daily`. Discuss any differences you might find. 
