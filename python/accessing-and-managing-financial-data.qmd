@@ -23,7 +23,10 @@ First, we load the Python packages that we use throughout this chapter. Later on
 ```{python}
 import pandas as pd
 import numpy as np
-
+import io
+import re
+import zipfile
+from curl_cffi import requests
 ```
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
@@ -35,13 +38,110 @@ end_date = "2024-12-31"
 
 ## Fama-French Data
 
-We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, the `tidy-finance` package provides a simple interface to read data from Kenneth French's Data Library.\index{Data!Fama-French factors}\index{Kenneth French homepage}
+We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. The data are freely available from Kenneth French’s Data Library, but the raw files come in a rather idiosyncratic format. If you access the data via the website, the manual *raw* workflow looks like this:
+
+1. Go to the website
+1. Find the right dataset
+1. Download a ZIP file
+1. Extract the CSV inside
+1. Select the right data table from the file and import the table into Python
+1. Clean the dates, scale the returns, fix column names, handle missing values, etc.
+
+Doing this once is fine; doing it repeatedly across projects is exactly the type of boilerplate that’s easy to mess up and annoying to maintain. It is therefore natural to automate these steps in Python.
+
+# From manual steps to a download script
+
+A minimal download script mirrors the manual steps one by one. For example, to fetch a Fama–French dataset you first construct the URL:
+
+```{python}
+dataset = "F-F_Research_Data_5_Factors_2x3"
+base_url = "http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
+url = f"{base_url}{dataset}_CSV.zip"
+```
+
+Next, you replace the browser download with an HTTP request and extract the ZIP in memory:
+
+```{python}
+resp = requests.get(url)
+resp.raise_for_status()
+
+with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+    file_name = zf.namelist()[0]  # Ken French ZIPs contain one file
+    raw_text = zf.read(file_name).decode("latin1")
+```
+
+The most important part of this chunk is the `requests.get()` call. This is the moment where we replace all the manual browser work (open the website, click download, save the file) with a single, reproducible line of code. Then, calling `raise_for_status()` ensures we stop immediately if the server returns an error (e.g. HTTP 404 or 500) instead of quietly handling a broken file. Once this succeeds, `resp.content` is guaranteed to contain valid ZIP bytes that we can open in memory.
+
+The raw file contains documentation text followed by the actual data table(s). To emulate *scrolling down until the numbers start*, you can split the file into blocks and keep the long one that contains the table:
+
+```{python}
+chunks = raw_text.split("\r\n\r\n")
+table_text = max(chunks, key=len)  
+```
+
+Within this block, the first CSV header line starts at the first line beginning with a comma. We add a “Date” label for the index and pass everything to `read_csv`:
+
+```{python}
+match = re.search(r"^\s*,", table_text, flags=re.M)
+start = match.start()
+csv_text = "Date" + table_text[start:]
+
+df = pd.read_csv(io.StringIO(csv_text), index_col=0)
+```
+
+At this point, the index still consists of integer date codes with different lengths depending on the frequency. We need a bit of logic to convert them into a proper `DatetimeIndex`:
+
+```{python}
+s = df.index.astype(str)
+
+if (s.str.len() == 8).all():  # daily: YYYYMMDD
+    dt = pd.to_datetime(s, format="%Y%m%d")
+elif (s.str.len() == 6).all():  # monthly: YYYYMM
+    dt = pd.to_datetime(s + "01", format="%Y%m%d")
+elif (s.str.len() == 4).all():  # annual: YYYY
+    dt = pd.to_datetime(s + "0101", format="%Y%m%d")
+    dt = dt.dt.to_period("A-DEC").dt.to_timestamp("end")
+else:
+    raise ValueError("Unknown date format in Fama–French index.")
+
+df = df.set_index(dt)
+df.index.name = "date"
+```
+
+Finally, we still have to clean the data:
+
+- Convert returns from percent to decimal.
+- Standardize column names (e.g., all lower case and Mkt-RF to mkt_excess, RF to risk_free)
+- Replace special missing-value codes (-99.99, -999) with actual missing values
+- Filter the data by a start and end date
+
+This all could look like this:
+
+```{python}
+# start and end dates
+if start_date:
+    df = df[df.index >= pd.to_datetime(start_date)]
+if end_date:
+    df = df[df.index <= pd.to_datetime(end_date)]
+
+df = (
+    df.div(100)
+    .reset_index(names="date")
+    .rename(columns=str.lower)
+    .rename(columns={"mkt-rf": "mkt_excess", "rf": "risk_free"})
+    .replace({"-99.99": pd.NA, -99.99: pd.NA, -999: pd.NA})
+)
+```
+
+All of these steps are doable, but none of them are really about finance - they are just the technical scaffolding required before you can work with the actual factor returns. That’s where a dedicated helper or package becomes invaluable. The `tidyfinance` package performs this entire workflow under the hood: you request a Fama–French dataset and receive a clean, consistently formatted data table from Kenneth French's Data Library.\index{Data!Fama-French factors}\index{Kenneth French homepage}. This avoids repetitive boilerplate, reduces errors, and lets you focus on modeling and analysis rather than on data plumbing.
+
+# Using `tidyfinance` instead of reimplementing the plumbing
 
 ```{python}
 import tidyfinance as tf
 ```
 
-We can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
+For example, we can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
 
 ```{python}
 factors_ff3_monthly = tf.download_data(
