@@ -241,30 +241,28 @@ We can then use the `httr2` [@httr2] package to request the CSV, extract the dat
 #| message: false
 library(httr2)
 
-cpi_daily <- request(cpi_url) |>
-  req_perform() |>
-  resp_body_string() |>
+resp <- request(cpi_url) |> 
+  req_perform()
+resp_csv <- resp |> 
+  resp_body_string() 
+
+cpi_monthly <- resp_csv |> 
   read_csv() |>
   mutate(
     date = as.Date(observation_date),
     value = as.numeric(.data[[series]]),
     series = series,
     .keep = "none"
-  )
-```
-
-We convert the daily CPI data to monthly because we use the latter in later chapters. 
-
-```{r}
-cpi_monthly <- cpi_daily |>
+  ) |>
+  filter(date >= start_date & date <= end_date) |> 
   mutate(
-    date = floor_date(date, "month"),
-    cpi = value / value[date == max(date)],
-    .keep = "none"
+    cpi = value / value[date == max(date)]
   )
 ```
 
-The `tidyfinance` package can, of course, also fetch the same daily data and many more data series:
+The last line sets the current (latest) price level as the reference price level.
+
+The `tidyfinance` package can, of course, also fetch the same index data and many more data series:
 
 ```{r}
 #| message: false
