@@ -18,18 +18,15 @@ To generate the dummy database, we use the following packages:
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 ```
 
-Let us initialize a SQLite database (`tidy_finance_r.sqlite`) or connect to your existing one. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
+We store the data in the folder `data-r`. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
 
 ```{r}
-#| eval: false
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
+if (!dir.exists("data-r")) {
+  dir.create("data-r")
+}
 ```
 
 Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over ten years that we then use to create yearly, monthly, and daily data, respectively. 
@@ -145,12 +142,7 @@ beta_dummy <- stock_panel_monthly |>
     beta_daily = beta_monthly + rnorm(n()) / 100
   )
 
-dbWriteTable(
-  tidy_finance,
-  "beta", 
-  beta_dummy, 
-  overwrite = TRUE
-)
+beta_dummy |> write_parquet("data-r/beta.parquet")
 ```
 
 ### Dummy `compustat` table
@@ -178,12 +170,7 @@ compustat_dummy <- stock_panel_yearly |>
     !!!commands
   )
 
-dbWriteTable(
-  tidy_finance, 
-  "compustat", 
-  compustat_dummy,
-  overwrite = TRUE
-)
+compustat_dummy |> write_parquet("data-r/compustat.parquet")
 ```
 
 ### Dummy `crsp_monthly` table
@@ -205,12 +192,7 @@ crsp_monthly_dummy <- stock_panel_monthly |>
   mutate(mktcap_lag = lag(mktcap)) |> 
   ungroup()
 
-dbWriteTable(
-  tidy_finance, 
-  "crsp_monthly",
-  crsp_monthly_dummy,
-  overwrite = TRUE
-)
+crsp_monthly_dummy |> write_parquet("data-r/crsp_monthly.parquet")
 ```
 
 ### Dummy `crsp_daily` table
@@ -224,12 +206,7 @@ crsp_daily_dummy <- stock_panel_daily |>
     ret_excess = pmax(rnorm(n()), -1)
   )
 
-dbWriteTable(
-  tidy_finance,
-  "crsp_daily",
-  crsp_daily_dummy, 
-  overwrite = TRUE
-)
+crsp_daily_dummy |> write_parquet("data-r/crsp_daily.parquet")
 ```
 
 ## Create Bond Dummy Data
@@ -270,12 +247,7 @@ fisd_dummy <- 1:number_of_bonds |>
     sic_code = as.character(sample(seq(1:9)*1000, n(), replace = TRUE))
   )
   
-dbWriteTable(
-  tidy_finance, 
-  "fisd", 
-  fisd_dummy, 
-  overwrite = TRUE
-)
+fisd_dummy |> write_parquet("data-r/fisd.parquet")
 ```
 
 ### Dummy `trace_enhanced` data
@@ -312,12 +284,7 @@ trace_enhanced_dummy <- bind_rows(
     cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
   ) 
   
-dbWriteTable(
-  tidy_finance, 
-  "trace_enhanced", 
-  trace_enhanced_dummy, 
-  overwrite = TRUE
-)
+trace_enhanced_dummy |> write_parquet("data-r/trace_enhanced.parquet")
 ```
 
 As stated in the introduction, the data does *not* contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout this book.
