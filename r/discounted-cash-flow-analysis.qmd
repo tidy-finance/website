@@ -51,10 +51,15 @@ Before we can perform a DCF analysis, we need historical financial data to infor
 symbol <- "MSFT"
 
 income_statements <- fmp_get(
-  "income-statement", symbol, list(period = "annual", limit = 5)
+  "income-statement",
+  symbol,
+  list(period = "annual", limit = 5)
 )
+
 cash_flow_statements <- fmp_get(
-  "cash-flow-statement", symbol, list(period = "annual", limit = 5)
+  "cash-flow-statement",
+  symbol,
+  list(period = "annual", limit = 5)
 )
 ```
 
@@ -73,26 +78,38 @@ Each component of this formula serves a specific purpose in capturing the compan
 We can implement this calculation by combining and transforming our financial statement data. Note that we also arrange by year, which is important for some of the following code chunks.
 
 ```{r}
-dcf_data <- income_statements |> 
+dcf_data <- income_statements |>
   mutate(
+    fiscal_year = as.integer(fiscal_year),
     ebit = net_income + income_tax_expense + interest_expense - interest_income
-  ) |> 
+  ) |>
   select(
-    year = calendar_year, 
-    ebit, revenue, depreciation_and_amortization, taxes = income_tax_expense
-  ) |> 
+    year = fiscal_year,
+    ebit,
+    revenue,
+    depreciation_and_amortization,
+    taxes = income_tax_expense
+  ) |>
   left_join(
-    cash_flow_statements |> 
+    cash_flow_statements |>
+      mutate(
+        fiscal_year = as.integer(fiscal_year)
+      ) |>
       select(
-        year = calendar_year, 
+        year = fiscal_year,
         delta_working_capital = change_in_working_capital,
         capex = capital_expenditure
-      ), join_by(year)
-  ) |> 
+      ),
+    join_by(year)
+  ) |>
   mutate(
-    fcf = ebit + depreciation_and_amortization - taxes + delta_working_capital - capex
-  ) |> 
-  arrange(year) 
+    fcf = ebit +
+      depreciation_and_amortization -
+      taxes +
+      delta_working_capital -
+      capex
+  ) |>
+  arrange(year)
 ```
 
 ## Forecasting Free Cash Flow
@@ -103,26 +120,28 @@ First, we express each FCF component as a ratio relative to revenue. This standa
 
 ```{r}
 #| label: fig-500
-#| fig-cap: "Ratios are based on financial statements provided through the FMP API." 
+#| fig-cap: "Ratios are based on financial statements provided through the FMP API."
 #| fig-alt: "Title: Key forecast ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
-dcf_data <- dcf_data |> 
+dcf_data <- dcf_data |>
   mutate(
     revenue_growth = revenue / lag(revenue) - 1,
     operating_margin = ebit / revenue,
     da_margin = depreciation_and_amortization / revenue,
     taxes_to_revenue = taxes / revenue,
-    delta_working_capital_to_revenue =  delta_working_capital / revenue,
+    delta_working_capital_to_revenue = delta_working_capital / revenue,
     capex_to_revenue = capex / revenue
   )
 
-dcf_data |> 
+dcf_data |>
   pivot_longer(cols = c(operating_margin:capex_to_revenue)) |>
   ggplot(aes(x = year, y = value, color = name)) +
   geom_line() +
   scale_x_continuous(breaks = pretty_breaks()) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, color = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
     title = "Key financial ratios of Microsoft between 2021 and 2025"
   )
 ```
@@ -137,7 +156,7 @@ We demonstrate this forecasting approach in @fig-501. Note that our forecast rat
 
 ```{r}
 #| label: fig-501
-#| fig-cap: "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined." 
+#| fig-cap: "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined."
 #| fig-alt: "Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis."
 dcf_data_forecast_ratios <- tribble(
   ~year, ~operating_margin, ~da_margin, ~taxes_to_revenue, ~delta_working_capital_to_revenue, ~capex_to_revenue,
@@ -149,20 +168,25 @@ dcf_data_forecast_ratios <- tribble(
 ) |> 
   mutate(type = "Forecast")
 
-dcf_data <- dcf_data |> 
-  mutate(type = "Realized") |> 
-  bind_rows(dcf_data_forecast_ratios)
+dcf_data <- dcf_data |>
+  mutate(type = "Realized") |>
+  bind_rows(dcf_data_forecast_ratios) |>
+  mutate(type = factor(type, levels = c("Realized", "Forecast")))
 
-dcf_data |> 
-  pivot_longer(cols = c(operating_margin:capex_to_revenue)) |> 
-  ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
+dcf_data |>
+  pivot_longer(cols = c(operating_margin:capex_to_revenue)) |>
+  ggplot(aes(x = year, y = value, color = name, linetype = type)) +
   geom_line() +
-    scale_x_continuous(breaks = pretty_breaks()) +
+  scale_x_continuous(breaks = pretty_breaks()) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Key financial ratios and ad-hoc forecasts of Microsoft between 2021 and 2030"
-  )
+  ) +
+  theme(legend.position = "right")
 ```
 
 The final step in our FCF forecast is projecting revenue growth. While there are multiple approaches to this task, we demonstrate a GDP-based method that links company growth to macroeconomic forecasts.\index{Revenue growth}
@@ -172,44 +196,64 @@ We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://
 ```{r}
 gdp_growth <- tibble(
   year = 2021:2030,
-  gdp_growth = c(0.06055,	0.02512, 0.02887, 0.02765, 0.02153, 0.02028, 0.02120, 0.02122, 0.02122, 0.02122)
+  gdp_growth = c(
+    0.06055,
+    0.02512,
+    0.02887,
+    0.02765,
+    0.02153,
+    0.02028,
+    0.02120,
+    0.02122,
+    0.02122,
+    0.02122
+  )
 )
 
-dcf_data <- dcf_data |> 
+dcf_data <- dcf_data |>
   left_join(gdp_growth, join_by(year))
 ```
 
 Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling} Let us estimate the model with historical data.
 
 ```{r}
-revenue_growth_model <- dcf_data |> 
-  lm(revenue_growth ~ gdp_growth, data = _) |> 
+revenue_growth_model <- dcf_data |>
+  lm(revenue_growth ~ gdp_growth, data = _) |>
   coefficients()
- 
-dcf_data <- dcf_data |> 
+
+dcf_data <- dcf_data |>
   mutate(
-    revenue_growth_modeled = revenue_growth_model[1] + revenue_growth_model[2] * gdp_growth,
-    revenue_growth = if_else(type == "Forecast", revenue_growth_modeled, revenue_growth)  
-  ) 
+    revenue_growth_modeled = revenue_growth_model[1] +
+      revenue_growth_model[2] * gdp_growth,
+    revenue_growth = if_else(
+      type == "Forecast",
+      revenue_growth_modeled,
+      revenue_growth
+    )
+  )
 ```
 
 The model estimates two parameters: (i) an intercept that captures the company's baseline growth, and (ii) a slope coefficient that measures the company's sensitivity to GDP changes. Then, we can use the model and the growth forecasts to make revenue growth projections. We visualize the historical and projected growth rates using this approach in @fig-502:
 
 ```{r}
 #| label: fig-502
-#| fig-cap: "Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
+#| fig-cap: "Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts."
 #| fig-alt: "Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis."
-dcf_data |> 
-  filter(year >= 2021) |> 
-  pivot_longer(cols = c(revenue_growth, gdp_growth)) |> 
-  ggplot(aes(x = year, y = value, color = name, linetype = rev(type))) +
+dcf_data |>
+  filter(year >= 2021) |>
+  pivot_longer(cols = c(revenue_growth, gdp_growth)) |>
+  ggplot(aes(x = year, y = value, color = name, linetype = type)) +
   geom_line() +
   scale_x_continuous(breaks = pretty_breaks()) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
-    title = "GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030"
-  )
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
+    title = "GDP growth and Microsoft's revenue growth and forecasts between 2021 and 2030"
+  ) +
+  theme(legend.position = "right")
 ```
 
 While more sophisticated approaches exist (e.g., proprietary analyst forecasts or bottom-up market analyses), this method provides a transparent and data-driven starting point for revenue projections.\index{Forecasting methods}
@@ -220,14 +264,18 @@ With all components in place - revenue growth projections and forecast ratios - 
 dcf_data$revenue_growth[1] <- 0
 dcf_data$revenue <- dcf_data$revenue[1] * cumprod(1 + dcf_data$revenue_growth)
 
-dcf_data <- dcf_data |> 
+dcf_data <- dcf_data |>
   mutate(
     ebit = operating_margin * revenue,
     depreciation_and_amortization = da_margin * revenue,
     taxes = taxes_to_revenue * revenue,
     delta_working_capital = delta_working_capital_to_revenue * revenue,
     capex = capex_to_revenue * revenue,
-    fcf = ebit + depreciation_and_amortization - taxes + delta_working_capital - capex
+    fcf = ebit +
+      depreciation_and_amortization -
+      taxes +
+      delta_working_capital -
+      capex
   )
 ```
 
@@ -235,14 +283,16 @@ We visualize the resulting FCF projections in @fig-503.
 
 ```{r}
 #| label: fig-503
-#| fig-cap: "Realized growth rates are based on financial statements provided through the FMP API, while forecasts are manually defined." 
+#| fig-cap: "Realized growth rates are based on financial statements provided through the FMP API, while forecasts are manually defined."
 #| fig-alt: "Title: Actual and predicted free cash flow for Microsoft from 2021 to 2030. The figure shows a bar chart with years on the horizontal axis and Microsoft's historical and projected free cash flows on the vertical axis."
 dcf_data |>
   ggplot(aes(x = year, y = fcf / 1e9)) +
   geom_col(aes(fill = type)) +
   scale_x_continuous(breaks = pretty_breaks()) +
   labs(
-    x = NULL, y = "Free Cash Flow (in B USD)", fill = NULL,
+    x = NULL,
+    y = "Free Cash Flow (in B USD)",
+    fill = NULL,
     title = "Actual and predicted free cash flow for Microsoft from 2021 to 2030"
   )
 ```
@@ -262,7 +312,7 @@ The perpetual growth rate $g$ should reflect the long-term economic growth poten
 Let us implement the Perpetuity Growth Model:
 
 ```{r}
-compute_terminal_value <- function(last_fcf, growth_rate, discount_rate){
+compute_terminal_value <- function(last_fcf, growth_rate, discount_rate) {
   last_fcf * (1 + growth_rate) / (discount_rate - growth_rate)
 }
 
@@ -304,8 +354,8 @@ download.file(url, file)
 wacc_raw <- read_xls(file, sheet = 2, skip = 18)
 unlink(file)
 
-wacc <- wacc_raw |> 
-  filter(`Industry Name` == "Computer Services") |> 
+wacc <- wacc_raw |>
+  filter(`Industry Name` == "Computer Services") |>
   pull(`Cost of Capital`)
 ```
 
@@ -329,7 +379,7 @@ compute_dcf <- function(wacc, growth_rate) {
   free_cash_flow <- dcf_data$fcf
   last_fcf <- tail(free_cash_flow, 1)
   terminal_value <- compute_terminal_value(last_fcf, growth_rate, wacc)
-  
+
   years <- length(free_cash_flow)
   present_value_fcf <- free_cash_flow / (1 + wacc)^(1:years)
   present_value_tv <- terminal_value / (1 + wacc)^years
@@ -355,7 +405,7 @@ Let us implement a sensitivity analysis that varies these two parameters:
 
 ```{r}
 #| label: fig-504
-#| fig-cap: "The enterprise values combine data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts." 
+#| fig-cap: "The enterprise values combine data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts."
 #| fig-alt: "Title: Enterprise value of Microsoft for different WACC and growth rate scenarios. The figure shows a tile chart with different WACC values on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions."
 wacc_range <- seq(0.06, 0.08, by = 0.01)
 growth_rate_range <- seq(0.02, 0.04, by = 0.01)
@@ -366,18 +416,20 @@ sensitivity <- expand_grid(
 ) |>
   mutate(value = pmap_dbl(list(wacc, growth_rate), compute_dcf))
 
-sensitivity |> 
-  mutate(value = round(value / 1e9, 0)) |> 
+sensitivity |>
+  mutate(value = round(value / 1e9, 0)) |>
   ggplot(aes(x = wacc, y = growth_rate, fill = value)) +
   geom_tile() +
   geom_text(aes(label = comma(value)), color = "white") +
-  scale_x_continuous(labels = percent) + 
+  scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
-  scale_fill_continuous(labels = comma) + 
+  scale_fill_continuous(labels = comma) +
   labs(
-    x = "WACC", y = "Perpetual growth rate", fill = "Enterprise value",
+    x = "WACC",
+    y = "Perpetual growth rate",
+    fill = "Enterprise value",
     title = "Enterprise value of Microsoft for different WACC and growth rate scenarios"
-  ) + 
+  ) +
   guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
 ```
 

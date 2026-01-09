@@ -3,8 +3,7 @@ title: Financial Statement Analysis
 metadata:
   pagetitle: Financial Statement Analysis with Python
   description-meta: Learn how to use the programming language Python to analyze financial statements using financial ratios.
-execute: 
-  cache: true
+cache: true
 ---
 
 ```{python}
@@ -174,43 +173,35 @@ In subsequent sections, we will use cash flow data to calculate important cash f
 
 ## Download Financial Statements
 
-We now turn to downloading and processing statements for multiple companies. The next code chunk demonstrates how to retrieve financial data for all constituents of the Dow Jones Industrial Average, similar to our approach in the CAPM chapter.
+We now turn to downloading and processing statements for multiple companies. The next code chunk demonstrates how to retrieve financial data for selected stocks that are supported in the free tier of FMP.
 
 ```{python}
-#| cache: true
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
-
-url = ("https://www.ssga.com/us/en/institutional/etfs/library-content/"
-       "products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx")
-
-constituents = (pd.read_excel(url, skiprows=4, nrows=30)
-  .get("Ticker")
-  .tolist()
-)
-
-ssl._create_default_https_context = ssl.create_default_context
+sample = [
+  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "DIS", "NKE",
+  "WMT", "KO", "JPM", "BAC", "V", "XOM", "CVX", "JNJ", "PFE", "INTC",
+  "AMD", "SBUX", "BABA", "UBER", "CSCO"
+]
 
 params = {"period": "annual", "limit": 5}
 
 balance_sheet_statements = pd.concat(
   [fmp_get(
       resource="balance-sheet-statement", symbol=x, params=params, to_pandas=True
-    ) for x in constituents],
+    ) for x in sample],
   ignore_index=True
 )
 
 income_statements = pd.concat(
   [fmp_get(
       resource="income-statement", symbol=x, params=params, to_pandas=True
-    ) for x in constituents],
+    ) for x in sample],
   ignore_index=True
 )
 
 cash_flow_statements = pd.concat(
   [fmp_get(
       resource="cash-flow-statement", symbol=x, params=params, to_pandas=True
-    ) for x in constituents],
+    ) for x in sample],
   ignore_index=True
 )
 ```
@@ -238,13 +229,14 @@ $$\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liab
 
 This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. Afterall, all that cash could also be distributed to equity or pay down costly debt.
 
-Next, we calculate these ratios for Dow Jones constituents, focusing on three major technology companies:
+Next, we calculate these ratios for all stocks, focusing on three major technology companies:
 
 ```{python}
-selected_symbols = ["MSFT", "AAPL", "AMZN"]
+selected_symbols = ["MSFT", "AAPL", "AMZN", "NVDA"]
 
 balance_sheet_statements = (balance_sheet_statements
   .assign(
+    fiscal_year=lambda x: x["fiscal_year"].astype(int),
     current_ratio=lambda x: x["total_current_assets"] / x["total_assets"],
     quick_ratio=lambda x: (x["total_current_assets"] - x["inventory"]) / x["total_current_liabilities"],
     cash_ratio=lambda x: x["cash_and_cash_equivalents"] / x["total_current_liabilities"],
@@ -260,7 +252,7 @@ balance_sheet_statements = (balance_sheet_statements
 #| fig-cap: "Liquidity ratios are based on financial statements provided through the FMP API." 
 #| fig-alt: "Title: Liquidity ratios for selected stocks for 2023. The figure shows a bar chart of liquidity ratios for three companies."
 liquidity_ratios = (balance_sheet_statements
-  .query("calendar_year == 2023 & label.notna()")
+  .query("fiscal_year == 2023 & label.notna()")
   .get(["symbol", "current_ratio", "quick_ratio", "cash_ratio"])
   .melt(id_vars=["symbol"], var_name="name", value_name="value")
   .assign(
@@ -278,7 +270,7 @@ liquidity_ratios_figure = (
   + scale_y_continuous(labels=percent_format())
   + labs(
       x="", y="", fill="",
-      title="Liquidity ratios for selected stocks from the Dow Jones index for 2023"
+      title="Liquidity ratios for selected stocks for 2023"
     )
 )
 liquidity_ratios_figure.show()
@@ -311,6 +303,7 @@ balance_sheet_statements = balance_sheet_statements.assign(
 )
 
 income_statements = income_statements.assign(
+  fiscal_year=lambda x: x["fiscal_year"].astype(int),
   interest_coverage=lambda x: x["operating_income"] / x["interest_expense"],
   label=lambda x: np.where(x["symbol"].isin(selected_symbols), x["symbol"], np.nan)
 )
@@ -329,7 +322,7 @@ debt_to_asset = (balance_sheet_statements
 debt_to_asset_figure = (
   ggplot(
     debt_to_asset,
-    aes(x="calendar_year", y="debt_to_asset", color="symbol")
+    aes(x="fiscal_year", y="debt_to_asset", color="symbol")
   )
   + geom_line(size=1)
   + scale_y_continuous(labels=percent_format())
@@ -343,16 +336,16 @@ debt_to_asset_figure.show()
 
 The evolution of debt-to-asset ratios among these major technology companies reveals distinct capital structure strategies and their changes over time. While Apple and Microsoft reduced leverage over time, Amazon has maintained its leverage level.
 
-@fig-411 provides a cross-sectional view of debt-to-asset ratios across Dow Jones constituents in 2023. 
+@fig-411 provides a cross-sectional view of debt-to-asset ratios across all stocks in 2023. 
 
 ```{python}
 #| label: fig-411
 #| fig-cap: "Debt-to-asset ratios are based on financial statements provided through the FMP API." 
-#| fig-alt: "Title: Debt-to-asset ratios of Dow Jones index constituents in 2023. The figure shows a bar chart with debt-to-asset ratios on the horizontal and corresponding symbols on the vertical axis."
-selected_colors = ["#F21A00", "#EBCC2A", "#3B9AB2", "lightgrey"]
+#| fig-alt: "Title: Debt-to-asset ratios of selected stocks in 2023. The figure shows a bar chart with debt-to-asset ratios on the horizontal and corresponding symbols on the vertical axis."
+selected_colors = ["#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey"]
 
 debt_to_asset_comparison = (balance_sheet_statements
-  .query("calendar_year == 2023")
+  .query("fiscal_year == 2023")
 )
 
 debt_to_asset_comparison["symbol"] = pd.Categorical(
@@ -372,25 +365,23 @@ debt_to_asset_comparison_figure = (
   + scale_fill_manual(selected_colors) 
   + labs(
       x="", y="", fill="",
-      title="Debt-to-asset ratios of Dow Jones index constituents in 2023"
+      title="Debt-to-asset ratios of selected stocks in 2023"
     ) 
   + theme(legend_position="none")
 )
 debt_to_asset_comparison_figure.show()
 ```
 
-McDonald's (MCD) shows the highest leverage with a debt-to-asset ratio approaching 90%, followed by Home Depot (HD) and Amgen (AMGN) at around 75%. At the other end of the spectrum, Travelers (TRV) and Cisco (CSCO) maintain the lowest leverage ratios at approximately 15%. Overall, this illustrates the large variation in leverage choices by companies.
-
 @fig-412 reveals the relationship between companies' debt levels and their ability to service that debt.
  
 ```{python}
 #| label: fig-412
 #| fig-cap: "Debt-to-asset ratios and interest coverages are based on financial statements provided through the FMP API." 
-#| fig-alt: "Title: Debt-to-asset ratios and interest coverages for Dow Jones index constituents. The figure shows a scatter plot with debt-to-asset on the horizontal and interest coverage on the vertical axis."
+#| fig-alt: "Title: Debt-to-asset ratios and interest coverages for selected stocks. The figure shows a scatter plot with debt-to-asset on the horizontal and interest coverage on the vertical axis."
 interest_coverage = (income_statements
-  .query("calendar_year == 2023")
-  .get(["symbol", "calendar_year", "interest_coverage"])
-  .merge(balance_sheet_statements, on=["symbol", "calendar_year"], how="left")
+  .query("fiscal_year == 2023")
+  .get(["symbol", "fiscal_year", "interest_coverage"])
+  .merge(balance_sheet_statements, on=["symbol", "fiscal_year"], how="left")
 )
 
 interest_coverage_figure = (
@@ -405,7 +396,7 @@ interest_coverage_figure = (
   + scale_color_manual(values=selected_colors)
   + labs(
       x="Debt-to-Asset", y="Interest Coverage",
-      title="Debt-to-asset ratios and interest coverages for Dow Jones index constituents"
+      title="Debt-to-asset ratios and interest coverages for selected stocks"
     )
   + theme(legend_position="none")
 )
@@ -435,29 +426,30 @@ Receivables turnover measures how effectively a company collects payments from c
 $$\text{Receivables Turnover} = \frac{\text{Revenue}}{\text{Accounts Receivable}}$$
 A higher ratio indicates more efficient credit and collection processes, though this must be balanced against the potential impact on sales from overly restrictive credit policies.
 
-Here is how we can calculate these efficiency metrics across our sample of Dow Jones companies:
+Here is how we can calculate these efficiency metrics across our sample of selected stocks:
 
 ```{python}
 combined_statements = (balance_sheet_statements
   .get(
-    ["symbol", "calendar_year", "label", "current_ratio", "quick_ratio", 
+    ["symbol", "fiscal_year", "label", "current_ratio", "quick_ratio", 
      "cash_ratio", "debt_to_equity", "debt_to_asset", "total_assets", 
      "total_equity"]
   )
   .merge(
     (income_statements
-      .get(["symbol", "calendar_year", "interest_coverage", "revenue", 
+      .get(["symbol", "fiscal_year", "interest_coverage", "revenue", 
             "cost_of_revenue", "selling_general_and_administrative_expenses", 
             "interest_expense","gross_profit", "net_income"])
     ),
-    on=["symbol", "calendar_year"],
+    on=["symbol", "fiscal_year"],
     how="left"
   )
   .merge(
     (cash_flow_statements
-      .get(["symbol", "calendar_year", "inventory", "accounts_receivables"])
+      .assign(fiscal_year=lambda x: x["fiscal_year"].astype(int))
+      .get(["symbol", "fiscal_year", "inventory", "accounts_receivables"])
     ),
-    on=["symbol", "calendar_year"],
+    on=["symbol", "fiscal_year"],
     how="left"
   )
 )
@@ -516,7 +508,7 @@ gross_margins = (combined_statements
 gross_margins_figure = (
   ggplot(
     gross_margins,
-    aes(x="calendar_year", y="gross_margin", color="symbol")
+    aes(x="fiscal_year", y="gross_margin", color="symbol")
   )
   + geom_line()
   + scale_y_continuous(labels=percent_format())
@@ -530,14 +522,14 @@ gross_margins_figure.show()
 
 Microsoft maintains the highest margins at 65-70%, reflecting its low-cost software business model, while Apple and Amazon show lower but improving margins from around 40% to 45-47%. This divergence highlights fundamental business model differences.
 
-@fig-414 illustrates the relationship between gross margins and profit margins across Dow Jones constituents in 2023
+@fig-414 illustrates the relationship between gross margins and profit margins across all stocks. 
 
 ```{python}
 #| label: fig-414
 #| fig-cap: "Gross and profit margins are based on financial statements provided through the FMP API." 
-#| fig-alt: "Title: Gross and profit margins for Dow Jones index constituents for 2023. The figure shows a scatter plot with gross margins on the horizontal and profit margins on the vertical axis."
+#| fig-alt: "Title: Gross and profit margins for selected stocks for 2023. The figure shows a scatter plot with gross margins on the horizontal and profit margins on the vertical axis."
 profit_margins = (combined_statements
-  .query("calendar_year == 2023")
+  .query("fiscal_year == 2023")
 )
 
 profit_margins_figure = (
@@ -555,7 +547,7 @@ profit_margins_figure = (
   + scale_color_manual(values=selected_colors) 
   + labs(
       x="Gross margin", y="Profit margin",
-      title="Gross and profit margins for Dow Jones index constituents for 2023"
+      title="Gross and profit margins for selected stocks for 2023"
     )
   + theme(legend_position = "none")
 )
@@ -566,14 +558,14 @@ profit_margins_figure.show()
 
 While individual financial ratios provide specific insights, combining them offers a more comprehensive view of company performance. By examining how companies rank across different ratio categories, we can better understand their overall financial position and identify potential strengths and weaknesses in their operations.
 
-@fig-415 compares Microsoft, Apple, and Amazon's rankings across four key financial ratio categories among Dow Jones constituents. Rankings closer to 1 indicate better performance within each category. 
+@fig-415 compares Microsoft, Apple, and Amazon's rankings across four key financial ratio categories among all stocks. Rankings closer to 1 indicate better performance within each category. 
 
 ```{python}
 #| label: fig-415
 #| fig-cap: "Ranks are based on financial statements provided through the FMP API." 
-#| fig-alt: "Title: Rank in financial ratio categories for selected stocks from the Dow Jones index. The figure shows a scatter plot with ranks for selected stocks on the horizontal and categories of financial ratios on the vertical axis."
+#| fig-alt: "Title: Rank in financial ratio categories for selected stocks. The figure shows a scatter plot with ranks for selected stocks on the horizontal and categories of financial ratios on the vertical axis."
 financial_ratios = (combined_statements
-  .query("calendar_year == 2023")
+  .query("fiscal_year == 2023")
   .filter(
     items=["symbol"] + [
       col for col in combined_statements.columns 
@@ -621,7 +613,7 @@ final_ranks_figure = (
   + scale_color_manual(values=selected_colors) 
   + labs(
       x="Average rank", y="", color="",
-      title="Average rank among Dow Jones index constituents for selected stocks"
+      title="Average rank among selected stocks"
   )
   + coord_cartesian(xlim=[1, 30])
 )
@@ -639,24 +631,25 @@ The Fama-French five-factor model aims to explain stock returns by incorporating
 - Profitability: Measured as the ratio of operating profit to book equity, where operating profit is calculated as revenue minus cost of goods sold (COGS), selling, general, and administrative expenses (SG&A), and interest expense. This factor assesses a company’s efficiency in generating profits from its equity base.
 - Investment: Calculated as the percentage change in total assets from the previous period. This factor reflects the company’s growth strategy, indicating whether it is investing aggressively or conservatively.
 
-We can calculate these factors using the FMP API as follows:
+We can calculate these factors using the FMP API as follows. Since the free tier only supports historical data for the last couple of months, we use the earliest available data that is returned by default:
 
 ```{python}
-#| cache: true
-params = {"from": "2023-12-29", "to": "2023-12-29"}
 market_cap = pd.concat(
   [fmp_get(
-      resource="historical-market-capitalization", symbol=x, params=params, to_pandas=True
-    ) for x in constituents],
+      resource="historical-market-capitalization", symbol=x, to_pandas=True
+    ) for x in sample],
   ignore_index=True
 )
 
+min_date = market_cap["date"].min()
+market_cap = market_cap.loc[market_cap["date"] == min_date]
+
 combined_statements_ff = (combined_statements
-  .query("calendar_year == 2023")
+  .query("fiscal_year == 2023")
   .merge(market_cap, on="symbol", how="left")
   .merge(
     (balance_sheet_statements
-      .query("calendar_year == 2022")
+      .query("fiscal_year == 2022")
       .get(["symbol", "total_assets"])
       .rename(columns={"total_assets": "total_assets_lag"})
     ),
@@ -679,7 +672,7 @@ combined_statements_ff = (combined_statements
 ```{python}
 #| label: fig-416
 #| fig-cap: "Ranks are based on financial statements and historical market capitalization provided through the FMP API." 
-#| fig-alt: "Title: Rank in Fama-French variables for selected stocks from the Dow Jones index. The figure shows a scatter plot with ranks for selected stocks on the horizontal and Fama-French variables on the vertical axis."
+#| fig-alt: "Title: Rank in Fama-French variables for selected stocks. The figure shows a scatter plot with ranks for selected stocks on the horizontal and Fama-French variables on the vertical axis."
 factors_ranks = (combined_statements_ff
   .get(["symbol", "size", "book_to_market", "operating_profitability", "investment"])
   .rename(columns={
@@ -708,14 +701,14 @@ factors_ranks_figure = (
   + scale_color_manual(values=selected_colors) 
   + labs(
       x="Rank", y="", color="",
-      title="Rank in Fama-French variables for selected stocks from the Dow Jones index"
+      title="Rank in Fama-French variables for selected stocks"
   )
   + coord_cartesian(xlim=[1, 30])
 )
 factors_ranks_figure.show()
 ```
 
-As expected, all three tech giants rank among the largest firms by size. Apple shows the highest profitability among the three tech giants according to the new measure, while Microsoft ranks only in the middle. In terms of investment, however, Apple ranks in the lower third of the distribution. All three stocks exhibit relatively low book-to-market ratios—typical of growth stocks—but only when compared to other stocks in the Dow Jones Industrial Average.
+As expected, all three tech giants rank among the largest firms by size. Apple shows the highest profitability among the three tech giants according to the new measure, while Microsoft ranks only in the middle. In terms of investment, however, Apple ranks in the lower third of the distribution. All three stocks exhibit relatively low book-to-market ratios—typical of growth stocks—but only when compared to other stocks in our sample.
 
 ## Key Takeaways
 
@@ -729,6 +722,6 @@ As expected, all three tech giants rank among the largest firms by size. Apple s
 ## Exercises
 
 1. Download the financial statements for Netflix (NFLX) using the FMP API. Calculate its current ratio, quick ratio, and cash ratio for the past three years. Create a line plot showing how these liquidity ratios have evolved over time. How do Netflix's liquidity ratios compare to those of the technology companies discussed in this chapter?
-1. Select three companies from different industries in the Dow Jones Industrial Average. Calculate their debt-to-equity ratios, debt-to-asset ratios, and interest coverage ratios. Create a visualization comparing these leverage metrics across the companies. Write a brief analysis explaining how and why leverage patterns differ across industries.
-1. For all Dow Jones constituents, calculate asset turnover, inventory turnover, and receivables turnover. Create a scatter plot showing the relationship between asset turnover and profitability. Identify any outliers and explain potential reasons for their unusual performance. Which industries tend to show higher efficiency ratios? Why might this be the case?
-1. Revist the scatter plot of debt-to-asset ratios and interest coverages by adding a regression line and quantifying the relationship between the two variables. How can you describe their relationship?
+1. Select three companies from different industries. Calculate their debt-to-equity ratios, debt-to-asset ratios, and interest coverage ratios. Create a visualization comparing these leverage metrics across the companies. Write a brief analysis explaining how and why leverage patterns differ across industries.
+1. For all stocks in the sample above, calculate asset turnover, inventory turnover, and receivables turnover. Create a scatter plot showing the relationship between asset turnover and profitability. Identify any outliers and explain potential reasons for their unusual performance. Which industries tend to show higher efficiency ratios? Why might this be the case?
+1. Revisit the scatter plot of debt-to-asset ratios and interest coverages by adding a regression line and quantifying the relationship between the two variables. How can you describe their relationship?

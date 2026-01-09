@@ -66,6 +66,7 @@ symbol = "MSFT"
 income_statements = fmp_get(
   "income-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
 )
+
 cash_flow_statements = fmp_get(
   "cash-flow-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
 )
@@ -88,18 +89,20 @@ We can implement this calculation by combining and transforming our financial st
 ```{python}
 dcf_data = (income_statements
   .assign(
+    fiscal_year=lambda x: x["fiscal_year"].astype(int),
     ebit=lambda x: x["net_income"] + x["income_tax_expense"] + x["interest_expense"] - x["interest_income"]
   )
-  .get(["calendar_year", "ebit", "revenue", "depreciation_and_amortization", "income_tax_expense"])
+  .get(["fiscal_year", "ebit", "revenue", "depreciation_and_amortization", "income_tax_expense"])
   .rename(columns={
-      "calendar_year": "year",
+      "fiscal_year": "year",
       "income_tax_expense": "taxes"
   })
   .merge(
     (cash_flow_statements
-      .get(["calendar_year", "change_in_working_capital", "capital_expenditure"])
+      .get(["fiscal_year", "change_in_working_capital", "capital_expenditure"])
+      .assign(fiscal_year=lambda x: x["fiscal_year"].astype(int))
       .rename(columns={
-        "calendar_year": "year",
+        "fiscal_year": "year",
         "change_in_working_capital": "delta_working_capital",
         "capital_expenditure": "capex"
       })
@@ -213,6 +216,7 @@ ratios_forecast_figure = (
       x="", y="", color="", linetype="",
       title="Key financial ratios and ad-hoc forecasts of Microsoft between 2021 and 2030"
     )
+  + theme(legend_position="right")
 )
 ratios_forecast_figure.show()
 ```
@@ -268,6 +272,10 @@ revenue_growth = (dcf_data
   )
 )
 
+revenue_growth["type"] = pd.Categorical(
+  revenue_growth["type"], categories=["Realized", "Forecast"]
+)
+
 revenue_growth_figure = (
   ggplot(
     revenue_growth,
@@ -278,8 +286,9 @@ revenue_growth_figure = (
   + scale_y_continuous(labels=percent_format())
   + labs(
       x="", y="", color="", linetype="",
-      title="GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030"
+      title="GDP growth and Microsoft's revenue growth and forecasts between 2021 and 2030"
     )
+  + theme(legend_position="right")
 )
 revenue_growth_figure.show()
 ```

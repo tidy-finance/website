@@ -28,6 +28,7 @@ from mizani.breaks import date_breaks
 from mizani.formatters import percent_format, date_format
 from joblib import Parallel, delayed, cpu_count
 from itertools import product
+from dateutil.relativedelta import relativedelta
 ```
 
 ```{python}
@@ -104,7 +105,7 @@ def estimate_capm(data, min_obs=1):
     return capm
 ```
 
-Next, we define a function that does the rolling estimation. We use a simple for-loop to implement the sliding window estimation in a straightforward manner. The following function takes input data and slides across the `date` vector, considering only a total of `look_back` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding parameter estimates. As we demonstrate further below, we can also apply the same function to daily returns data.
+Next, we define a function that does the rolling estimation. We use a simple for-loop to implement the sliding window estimation in a straightforward manner. The following function takes input data and slides across the `date` vector, considering only a total of `look_back` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with dates and corresponding parameter estimates. As we demonstrate further below, we can also apply the same function to daily return data.
 
 ```{python}
 def roll_capm_estimation(data, look_back=60, min_obs=48):
@@ -112,12 +113,12 @@ def roll_capm_estimation(data, look_back=60, min_obs=48):
     dates = data["date"].sort_values().drop_duplicates()
 
     for i in range(look_back - 1, len(dates)):
-        start_date = dates.iloc[i - look_back + 1]
         end_date = dates.iloc[i]
+        start_date = end_date - relativedelta(months=look_back - 1)
 
         window_data = data.query("date >= @start_date & date <= @end_date")
 
-        result = estimate_capm(window_data)
+        result = estimate_capm(window_data, min_obs=min_obs)
         result["date"] = np.max(window_data["date"])
         results.append(result)
 
@@ -238,10 +239,10 @@ permnos = list(crsp_monthly["permno"].unique().astype(str))
 
 batch_size = 500
 batches = np.ceil(len(permnos)/batch_size).astype(int)
-min_obs = 1000
+min_obs = 1_000
 ```
 
-We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. Note that we also convert the daily date to the beginning of the month
+We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. Note that we also convert the daily date to the beginning of the month so that we can still look back over 60 months and get one beta estimate per month, even though we are using daily data.
 
 ```{python}
 #| output: false
@@ -279,18 +280,22 @@ for j in range(1, batches+1):
       .groupby("permno", group_keys=False)
     )
     
-    capm_daily_sub = pd.concat(
-        Parallel(n_jobs=n_cores)(
-            delayed(
-                lambda name, group: roll_capm_estimation(group).assign(permno=name)
-            )(
-                name, group
-            )
-            for name, group in crsp_daily_sub_nested
+    results = Parallel(n_jobs=n_cores)(
+        delayed(
+            lambda name, group: roll_capm_estimation(group, min_obs=min_obs).assign(permno=name)
+        )(
+            name, group
         )
-    ).get(["permno", "date", "coefficient", "estimate", "t_statistic"])
+        for name, group in crsp_daily_sub_nested
+    )
     
-    capm_daily.append(capm_daily_sub)
+    if results:
+        capm_daily_sub = pd.concat(results).get(
+            ["permno", "date", "coefficient", "estimate", "t_statistic"]
+        )
+        capm_daily.append(capm_daily_sub)
+    else:
+        print(f"Warning: Batch {j} produced no results (insufficient data)")
               
     print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
   
