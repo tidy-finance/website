@@ -25,7 +25,6 @@ The current chapter relies on this set of Python packages.
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 import statsmodels.formula.api as smf
 
 from regtabletotext import prettify_result
@@ -36,35 +35,23 @@ from regtabletotext import prettify_result
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(
-  database="data/tidy_finance_python.sqlite"
+crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
+.get(["permno", "gvkey", "date", "ret_excess", "mktcap", 
+      "mktcap_lag", "exchange"])
+.dropna()
+)
+ 
+compustat = (pd.read_parquet("data-python/compustat.parquet")
+.get(["gvkey", "datadate", "be", "op", "inv"])
+.dropna()
+) 
+
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+.get(["date", "smb", "hml"])
 )
 
-crsp_monthly = (pd.read_sql_query(
-    sql=("SELECT permno, gvkey, date, ret_excess, mktcap, "
-         "mktcap_lag, exchange FROM crsp_monthly"),
-    con=tidy_finance,
-    parse_dates={"date"})
-  .dropna()
-)
-
-compustat = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be, op, inv FROM compustat",
-    con=tidy_finance,
-    parse_dates={"datadate"})
-  .dropna()
-)
-
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, smb, hml FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
-
-factors_ff5_monthly = pd.read_sql_query(
-  sql="SELECT date, smb, hml, rmw, cma FROM factors_ff5_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
+factors_ff5_monthly = (pd.read_parquet("data-python/factors_ff5_monthly.parquet")
+.get(["date", "smb", "hml", "rmw", "cma"])
 )
 ```
 

@@ -23,7 +23,6 @@ The current chapter relies on the following set of Python packages.
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 import statsmodels.api as sm
 
 from plotnine import *
@@ -41,24 +40,17 @@ exec(open("python/render-plotnine-custom.py").read())
 We start with loading the required data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP} Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors} `beta` is the dataframe with market betas computed in the previous chapter.\index{Beta}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
+crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
+.get(["permno", "date", "ret_excess", "mktcap_lag"])
+  )
 
-crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, date, ret_excess, mktcap_lag FROM crsp_monthly",
-    con=tidy_finance,
-    parse_dates={"date"})
-)
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+.get(["date", "mkt_excess"])
+  )
 
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
-
-beta = pd.read_sql_query(
-  sql="SELECT permno, date, beta FROM beta WHERE return_type = 'monthly'",
-  con=tidy_finance,
-  parse_dates={"date"}
+beta = (pd.read_parquet("data-python/beta.parquet")
+  .query("return_type == 'monthly'")
+  .get(["permno", "date", "beta"])
 )
 ```
 

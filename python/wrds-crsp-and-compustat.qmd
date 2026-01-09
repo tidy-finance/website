@@ -198,13 +198,10 @@ crsp_monthly["industry"] = (crsp_monthly["siccd"]
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our data frame. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the data frame `factors_ff3_monthly`.
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, rf FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+  .get(["date", "rf"])
+  )
   
 crsp_monthly = (crsp_monthly
   .merge(factors_ff3_monthly, how="left", on="date")
@@ -238,12 +235,7 @@ Finally, we store the monthly CRSP file in our database.
 
 ```{python}
 #| output: false
-(crsp_monthly
-  .to_sql(name="crsp_monthly", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+crsp_monthly.to_parquet("data-python/crsp_monthly.parquet")
 ```
 
 ## First Glimpse of the CRSP Sample
@@ -284,11 +276,8 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 #| label: fig-212
 #| fig-cap: "The figure shows the monthly market capitalization by listing exchange. Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." 
-cpi_monthly = pd.read_sql_query(
-  sql="SELECT * FROM cpi_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+
+cpi_monthly = pd.read_parquet("data-python/cpi_monthly.parquet")
 
 market_cap_per_exchange = (crsp_monthly
   .merge(cpi_monthly, how="left", on="date")
@@ -396,11 +385,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 ```{python}
 #| output: false
 #| eval: false
-factors_ff3_daily = pd.read_sql(
-  sql="SELECT * FROM factors_ff3_daily", 
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+factors_ff3_daily = pd.read_parqet("data-python/factors_ff3_daily.parquet")
 
 permnos = pd.read_sql(
   sql="SELECT DISTINCT permno FROM crsp.stksecurityinfohist", 
@@ -576,12 +561,7 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 
 ```{python}
 #| output: false
-(compustat
-  .to_sql(name="compustat", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+compustat.to_parquet("data-python/compustat.parquet")
 ```
 
 The `tidyfinance` package provides a shortcut for these processing steps as well:
@@ -642,12 +622,7 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 ```{python}
 #| output: false
-(crsp_monthly
-  .to_sql(name="crsp_monthly", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+crsp_monthly.to_parquet("data-python/crsp_monthly.parquet")
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}

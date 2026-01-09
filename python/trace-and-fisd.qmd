@@ -26,7 +26,6 @@ The current chapter relies on the following set of Python packages.
 import pandas as pd
 import numpy as np
 import tidyfinance as tf
-import sqlite3
 import httpimport
 
 from plotnine import *
@@ -58,8 +57,6 @@ connection_string = (
 )
 
 wrds = create_engine(connection_string, pool_pre_ping=True)
-
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
 ```
 
 ## Mergent FISD
@@ -164,12 +161,7 @@ Finally, we save the bond characteristics to our local database. This selection 
 
 ```{python}
 #| output: false
-(fisd
-  .to_sql(name="fisd", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+fisd.to_parquet("data-python/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. The FISD redemption database also contains information on callable bonds. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -277,11 +269,8 @@ bonds_outstanding = (pd.DataFrame({"date": dates})
 Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
 
 ```{python}
-trace_enhanced = pd.read_sql_query(
-  sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt " 
-        "FROM trace_enhanced"),
-  con=tidy_finance,
-  parse_dates={"trd_exctn_dt"}
+trace_enhanced = (pd.read_parquet("data-python/trace_enhanced.parquet")
+.get(["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
 )
 
 bonds_traded = (trace_enhanced

@@ -24,7 +24,6 @@ The current chapter relies on this set of Python packages.
 import pandas as pd
 import numpy as np
 import datetime as dt
-import sqlite3
 ```
 
 Compared to previous chapters, we introduce the `datetime` module that is part of the Python standard library for manipulating dates. 
@@ -34,13 +33,9 @@ Compared to previous chapters, we introduce the `datetime` module that is part o
 First, we load the necessary data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-crsp_monthly = (pd.read_sql_query(
-    sql=("SELECT permno, gvkey, date, ret_excess, mktcap, " 
-         "mktcap_lag, exchange FROM crsp_monthly"),
-    con=tidy_finance,
-    parse_dates={"date"})
+crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
+.get(["permno", "gvkey", "date", "ret_excess", "mktcap", 
+      "mktcap_lag", "exchange"])
   .dropna()
 )
 ```
@@ -48,10 +43,8 @@ crsp_monthly = (pd.read_sql_query(
 Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.\index{Data!Compustat}
 
 ```{python}
-book_equity = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be FROM compustat",
-    con=tidy_finance, 
-    parse_dates={"datadate"})
+book_equity = (pd.read_parquet("data-python/compustat.parquet")
+  .get(["gvkey", "datadate", "be"])
   .dropna()
   .assign(
     date=lambda x: (
