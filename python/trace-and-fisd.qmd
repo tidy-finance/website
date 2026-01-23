@@ -27,6 +27,9 @@ import pandas as pd
 import numpy as np
 import tidyfinance as tf
 import httpimport
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 
 from plotnine import *
 from sqlalchemy import create_engine
@@ -215,17 +218,13 @@ for j in range(1, batches + 1):
   )
   
   if not trace_enhanced_sub.empty:
-      if j == 1:
-        if_exists_string = "replace"
-      else:
-        if_exists_string = "append"
-
-      trace_enhanced_sub.to_sql(
-        name="trace_enhanced", 
-        con=tidy_finance, 
-        if_exists=if_exists_string, 
-        index=False
-      )
+          table = pa.Table.from_pandas(trace_enhanced_sub, preserve_index=False)
+    pq.write_to_dataset(
+        table,
+        root_path="data-python/trace_enhanced",
+        partition_cols=["batch"],
+        existing_data_behavior="overwrite_or_ignore"
+    )
     
   print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
 ```
