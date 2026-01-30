@@ -19,7 +19,6 @@ We use the following R packages throughout this chapter:
 #| message: false
 library(tidyverse)
 library(arrow)
-library(scales)
 library(slider)
 library(furrr)
 ```
@@ -35,7 +34,7 @@ The estimation procedure is based on a rolling-window estimation, where we may u
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(permno, date, industry, ret_excess)
 
-factors_ff3_monthly <-read_parquet("data-r/factors_ff3_monthly.parquet") |>
+factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
   select(date, mkt_excess)
 
 crsp_monthly <- crsp_monthly |>
@@ -80,7 +79,11 @@ estimate_capm <- function(data, min_obs = 1) {
       t_statistic = coefficients[, "t value"]
     ) |>
       mutate(
-        coefficient = if_else(coefficient == "(Intercept)", "alpha", coefficient)
+        coefficient = if_else(
+          coefficient == "(Intercept)",
+          "alpha",
+          coefficient
+        )
       )
   }
 
@@ -145,10 +148,10 @@ capm_examples
 #| fig-alt: "Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock."
 beta_examples <- capm_examples |>
   left_join(examples, join_by(permno)) |>
-  filter(coefficient == "mkt_excess") 
-  
+  filter(coefficient == "mkt_excess")
+
 beta_examples |>
-  ggplot(aes(x = date,y = estimate, color = company, linetype = company)) +
+  ggplot(aes(x = date, y = estimate, color = company, linetype = company)) +
   geom_line() +
   labs(
     x = NULL,
@@ -232,14 +235,23 @@ for (j in 1:batches) {
     nest(data = c(date, ret_excess, mkt_excess))
 
   capm_daily[[j]] <- crsp_daily_sub_nested |>
-    mutate(capm = future_map(
-      data, \(x) roll_capm_estimation(x, min_obs = min_obs))
+    mutate(
+      capm = future_map(
+        data,
+        \(x) roll_capm_estimation(x, min_obs = min_obs)
+      )
     ) |>
     unnest(capm) |>
     select(permno, date, coefficient, estimate, t_statistic)
 
   message(
-    "Batch ", j, " out of ", batches, " done (", percent(j / batches), ")\n"
+    "Batch ",
+    j,
+    " out of ",
+    batches,
+    " done (",
+    scales::percent(j / batches),
+    ")\n"
   )
 }
 capm_daily <- bind_rows(capm_daily)
@@ -250,9 +262,9 @@ capm_daily <- bind_rows(capm_daily)
 What is a typical value for stock betas? First, let us extract the relevant estimates from our CAPM results based on monthly returns.
 
 ```{r}
-beta_monthly <- capm_monthly |> 
-  filter(coefficient == "mkt_excess") |> 
-  select(permno, date, beta = estimate) |> 
+beta_monthly <- capm_monthly |>
+  filter(coefficient == "mkt_excess") |>
+  select(permno, date, beta = estimate) |>
   mutate(return_type = "monthly")
 ```
 
@@ -308,9 +320,9 @@ beta_monthly |>
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. 
 
 ```{r}
-beta_daily <- capm_daily |> 
-  filter(coefficient == "mkt_excess") |> 
-  select(permno, date, beta = estimate) |> 
+beta_daily <- capm_daily |>
+  filter(coefficient == "mkt_excess") |>
+  select(permno, date, beta = estimate) |>
   mutate(return_type = "daily")
 
 beta <- bind_rows(beta_monthly, beta_daily)
@@ -356,10 +368,10 @@ Whenever you perform some kind of estimation, it also makes sense to do rough pl
 #| fig-cap: "The two lines show the share of securities with beta estimates using 5 years of monthly or daily return data."
 #| fig-alt: "Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or daily return data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the  beta."
 beta_coverage <- crossing(
-    crsp_monthly,
-    tibble(return_type = c("monthly", "daily"))
-  ) |> 
-  left_join(beta, join_by(permno, date, return_type)) |> 
+  crsp_monthly,
+  tibble(return_type = c("monthly", "daily"))
+) |>
+  left_join(beta, join_by(permno, date, return_type)) |>
   group_by(date, return_type) |>
   summarize(share = sum(!is.na(beta)) / n(), .groups = "drop")
 
@@ -368,7 +380,7 @@ beta_coverage |>
     aes(x = date, y = share, color = return_type, linetype = return_type)
   ) +
   geom_line() +
-  scale_y_continuous(labels = percent) +
+  scale_y_continuous(labels = scales::percent) +
   labs(
     x = NULL,
     y = NULL,
@@ -384,7 +396,7 @@ beta_coverage |>
 We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\index{Summary statistics}
 
 ```{r}
-beta |> 
+beta |>
   group_by(return_type) |>
   summarize(
     mean = mean(beta),
@@ -405,7 +417,7 @@ Finally, since we have two different estimators for the same theoretical object,
 ```{r}
 beta |>
   pivot_wider(names_from = return_type, values_from = beta) |>
-  select(monthly, daily) |> 
+  select(monthly, daily) |>
   cor(use = "complete.obs")
 ```
 
