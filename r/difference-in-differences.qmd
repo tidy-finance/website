@@ -29,7 +29,7 @@ library(broom)
 
 ## Data Preparation
 
-We use TRACE and Mergent FISD as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
+We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{r}
 fisd <- read_parquet("data-r/fisd.parquet") |>
@@ -39,7 +39,7 @@ fisd <- read_parquet("data-r/fisd.parquet") |>
 trace_enhanced <- open_dataset("data-r/trace_enhanced") |>
   select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt) |>
   collect() |>
-  drop_na() 
+  drop_na()
 ```
 
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}
@@ -48,12 +48,25 @@ We start our analysis by preparing the sample of bonds. We only consider bonds w
 treatment_date <- ymd("2015-12-12")
 
 polluting_industries <- c(
-  49, 13, 45, 29, 28, 33, 40, 20,
-  26, 42, 10, 53, 32, 99, 37
+  49,
+  13,
+  45,
+  29,
+  28,
+  33,
+  40,
+  20,
+  26,
+  42,
+  10,
+  53,
+  32,
+  99,
+  37
 )
 
 bonds <- fisd |>
-  filter(offering_amt > 0) |> 
+  filter(offering_amt > 0) |>
   mutate(
     time_to_maturity = as.numeric(maturity - treatment_date) / 365,
     sic_code = as.integer(substr(sic_code, 1, 2)),
@@ -62,7 +75,9 @@ bonds <- fisd |>
   filter(time_to_maturity >= 1) |>
   select(
     cusip_id = complete_cusip,
-    time_to_maturity, log_offering_amt, sic_code
+    time_to_maturity,
+    log_offering_amt,
+    sic_code
   ) |>
   mutate(polluter = sic_code %in% polluting_industries)
 ```
@@ -133,8 +148,11 @@ The second model follows the typical DiD regression approach by including indivi
 
 ```{r}
 model_without_fe <- feols(
-  avg_yield ~ treated + post_period + polluter +
-    log_offering_amt + time_to_maturity,
+  avg_yield ~ treated +
+    post_period +
+    polluter +
+    log_offering_amt +
+    time_to_maturity,
   vcov = "iid",
   data = bonds_panel
 )
@@ -146,8 +164,11 @@ model_with_fe <- feols(
 )
 
 etable(
-  model_without_fe, model_with_fe, 
-  coefstat = "tstat", digits = 3, digits.stats = 3
+  model_without_fe,
+  model_with_fe,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
 )
 ```
 
@@ -160,12 +181,11 @@ Even though the regressions above indicate that there is an impact of the PA on 
 To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data.\index{Graph!Diff-in-diff graph} 
 
 ```{r}
-#| label: fig-1301 
+#| label: fig-1301
 #| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 model_without_fe_time <- feols(
-  avg_yield ~ polluter + date:polluter +
-    time_to_maturity + log_offering_amt,
+  avg_yield ~ polluter + date:polluter + time_to_maturity + log_offering_amt,
   vcov = "iid",
   data = bonds_panel |>
     mutate(date = factor(date))
@@ -182,11 +202,8 @@ model_without_fe_coefs <- tidy(model_without_fe_time) |>
 
 model_without_fe_coefs |>
   ggplot(
-    aes(date, 
-        color = treatment,
-        linetype = treatment,
-        shape = treatment
-    )) +
+    aes(date, color = treatment, linetype = treatment, shape = treatment)
+  ) +
   geom_vline(
     aes(xintercept = floor_date(treatment_date, "month")),
     linetype = "dashed"
@@ -199,7 +216,7 @@ model_without_fe_coefs |>
     aes(ymin = ci_low, ymax = ci_up),
     alpha = 0.5
   ) +
-  guides(linetype = "none") + 
+  guides(linetype = "none") +
   geom_point(aes(y = estimate)) +
   labs(
     x = NULL,
@@ -215,14 +232,16 @@ model_without_fe_coefs |>
 Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects.\index{Graph!Diff-in-diff graph}
 
 ```{r}
-#| label: fig-1402 
+#| label: fig-1402
 #| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
 #| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
 bonds_panel_alt <- bonds_panel |>
   mutate(
     diff_to_treatment = interval(
-      floor_date(treatment_date, "month"), date
-    ) %/% months(1)
+      floor_date(treatment_date, "month"),
+      date
+    ) %/%
+      months(1)
   )
 
 variables <- bonds_panel_alt |>
@@ -236,9 +255,12 @@ for (j in 1:nrow(variables)) {
   if (variables$diff_to_treatment[j] != 0) {
     old_names <- names(bonds_panel_alt)
     bonds_panel_alt <- bonds_panel_alt |>
-      mutate(new_var = diff_to_treatment == variables$diff_to_treatment[j] & 
-               polluter)
-    new_var_name <- ifelse(variables$diff_to_treatment[j] < 0,
+      mutate(
+        new_var = diff_to_treatment == variables$diff_to_treatment[j] &
+          polluter
+      )
+    new_var_name <- ifelse(
+      variables$diff_to_treatment[j] < 0,
       str_c("lag", abs(variables$diff_to_treatment[j])),
       str_c("lead", variables$diff_to_treatment[j])
     )
@@ -246,10 +268,7 @@ for (j in 1:nrow(variables)) {
     names(bonds_panel_alt) <- c(old_names, new_var_name)
     formula <- str_c(
       formula,
-      ifelse(j == 1,
-        new_var_name,
-        str_c("+", new_var_name)
-      )
+      ifelse(j == 1, new_var_name, str_c("+", new_var_name))
     )
   }
 }
