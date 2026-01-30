@@ -273,20 +273,13 @@ where $r_{i,t}$ and $r_{m,t}$ are the realized returns of the asset and market p
 Let's turn to estimating CAPM parameters using real market data. Instead of using our previously constructed tangency portfolio, we employ the Fama-French market excess returns, which provide a widely accepted proxy for the market portfolio. These returns are already adjusted to represent excess returns over the risk-free rate, simplifying our analysis.
 
 ```{python}
-import pandas_datareader as pdr
+import tidyfinance as tf
 
-factors_raw = pdr.DataReader(
-  name="F-F_Research_Data_5_Factors_2x3",
-  data_source="famafrench", 
-  start="2000-01-01", 
-  end="2024-09-30")[0]
-
-factors = (factors_raw
-  .divide(100)
-  .reset_index(names="date")
-  .assign(date=lambda x: pd.to_datetime(x["date"].astype(str)))
-  .rename(str.lower, axis="columns")
-  .rename(columns={"mkt-rf": "mkt_excess"})
+factors = tf.download_data(
+  domain="famafrench",
+  dataset="F-F_Research_Data_5_Factors_2x3",
+  start_date="2000-01-01",
+  end_date="2024-09-30",
 )
 ```
 
@@ -297,7 +290,7 @@ import statsmodels.formula.api as smf
 
 returns_excess_monthly = (returns_monthly
   .merge(factors, on="date", how="left")
-  .assign(ret_excess=lambda x: x["ret"] - x["rf"])
+  .assign(ret_excess=lambda x: x["ret"] - x["risk_free"])
 )
 
 def estimate_capm(data):
