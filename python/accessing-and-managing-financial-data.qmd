@@ -76,7 +76,7 @@ The raw file contains documentation text followed by the actual data table(s). T
 
 ```{python}
 chunks = raw_text.split("\r\n\r\n")
-table_text = max(chunks, key=len)  
+table_text = max(chunks, key=len)
 ```
 
 Within this block, the first CSV header line starts at the first line beginning with a comma. We add a “Date” label for the index and pass everything to `read_csv`:
@@ -124,8 +124,8 @@ if start_date:
 if end_date:
     factors_ff_raw = factors_ff_raw[factors_ff_raw.index <= pd.to_datetime(end_date)]
 
-factors_ff3_monthly = (factors_ff_raw
-    .div(100)
+factors_ff3_monthly = (
+    factors_ff_raw.div(100)
     .reset_index(names="date")
     .rename(columns=str.lower)
     .rename(columns={"mkt-rf": "mkt_excess", "rf": "risk_free"})
@@ -146,10 +146,10 @@ For example, we can use the `tf.download_data()` function of the package to down
 
 ```{python}
 factors_ff3_monthly = tf.download_data(
-  domain="famafrench",
-  dataset="F-F_Research_Data_Factors",
-  start_date=start_date,
-  end_date=end_date,
+    domain="famafrench",
+    dataset="F-F_Research_Data_Factors",
+    start_date=start_date,
+    end_date=end_date,
 )
 ```
 
@@ -157,10 +157,10 @@ We also download the set *5 Factors (2x3)*, which additionally includes the retu
 
 ```{python}
 factors_ff5_monthly = tf.download_data(
-  domain="famafrench",
-  dataset="F-F_Research_Data_5_Factors_2x3",
-  start_date=start_date,
-  end_date=end_date,
+    domain="famafrench",
+    dataset="F-F_Research_Data_5_Factors_2x3",
+    start_date=start_date,
+    end_date=end_date,
 )
 ```
 
@@ -168,10 +168,10 @@ It is straightforward to download the corresponding *daily* Fama-French factors 
 
 ```{python}
 factors_ff3_daily = tf.download_data(
-  domain="famafrench",
-  dataset="F-F_Research_Data_Factors_daily",
-  start_date=start_date,
-  end_date=end_date,
+    domain="famafrench",
+    dataset="F-F_Research_Data_Factors_daily",
+    start_date=start_date,
+    end_date=end_date,
 )
 ```
 
@@ -179,10 +179,10 @@ In a subsequent chapter, we also use the monthly returns from ten industry portf
 
 ```{python}
 industries_ff_monthly = tf.download_data(
-  domain="famafrench",
-  dataset="10_Industry_Portfolios",
-  start_date=start_date,
-  end_date=end_date,
+    domain="famafrench",
+    dataset="10_Industry_Portfolios",
+    start_date=start_date,
+    end_date=end_date,
 )
 ```
 
@@ -197,25 +197,24 @@ We also need to adjust this data. First, we discard information we will not use 
 
 ```{python}
 import ssl
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 factors_q_monthly_link = (
-  "https://global-q.org/uploads/1/2/2/6/122679606/"
-  "q5_factors_monthly_2024.csv"
+    "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2024.csv"
 )
 
-factors_q_monthly = (pd.read_csv(factors_q_monthly_link)
-  .assign(
-    date=lambda x: (
-      pd.to_datetime(x["year"].astype(str) + "-" +
-        x["month"].astype(str) + "-01"))
-  )
-  .drop(columns=["R_F", "R_MKT", "year"])
-  .rename(columns=lambda x: x.replace("R_", "").lower())
-  .query(f"date >= '{start_date}' and date <= '{end_date}'")
-  .assign(
-    **{col: lambda x: x[col]/100 for col in ["me", "ia", "roe", "eg"]}
-  )
+factors_q_monthly = (
+    pd.read_csv(factors_q_monthly_link)
+    .assign(
+        date=lambda x: (
+            pd.to_datetime(x["year"].astype(str) + "-" + x["month"].astype(str) + "-01")
+        )
+    )
+    .drop(columns=["R_F", "R_MKT", "year"])
+    .rename(columns=lambda x: x.replace("R_", "").lower())
+    .query(f"date >= '{start_date}' and date <= '{end_date}'")
+    .assign(**{col: lambda x: x[col] / 100 for col in ["me", "ia", "roe", "eg"]})
 )
 
 ssl._create_default_https_context = ssl.create_default_context
@@ -226,10 +225,10 @@ Again, you can use the `tidyfinance` package for a shortcut:
 ```{python}
 #| eval: false
 tf.download_data(
-  domain="factors_q",
-  dataset="q5_factors_monthly", 
-  start_date=start_date, 
-  end_date=end_date
+    domain="factors_q",
+    dataset="q5_factors_monthly",
+    start_date=start_date,
+    end_date=end_date,
 )
 ```
 
@@ -241,8 +240,8 @@ Our next data source is a set of macroeconomic variables often used as predictor
 sheet_id = "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
 sheet_name = "macro_predictors.xlsx"
 macro_predictors_link = (
-  f"https://docs.google.com/spreadsheets/d/{sheet_id}" 
-  f"/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+    f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+    f"/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 )
 ```
 
@@ -268,21 +267,37 @@ For variable definitions and the required data transformations, you can consult 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 macro_predictors = (
-  pd.read_csv(macro_predictors_link, thousands=",")
-  .assign(
-    date=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
-    dp=lambda x: np.log(x["D12"])-np.log(x["Index"]),
-    dy=lambda x: np.log(x["D12"])-np.log(x["Index"].shift(1)),
-    ep=lambda x: np.log(x["E12"])-np.log(x["Index"]),
-    de=lambda x: np.log(x["D12"])-np.log(x["E12"]),
-    tms=lambda x: x["lty"]-x["tbl"],
-    dfy=lambda x: x["BAA"]-x["AAA"]
-  )
-  .rename(columns={"b/m": "bm"})
-  .get(["date", "dp", "dy", "ep", "de", "svar", "bm", 
-        "ntis", "tbl", "lty", "ltr", "tms", "dfy", "infl"])
-  .query("date >= @start_date and date <= @end_date")
-  .dropna()
+    pd.read_csv(macro_predictors_link, thousands=",")
+    .assign(
+        date=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
+        dp=lambda x: np.log(x["D12"]) - np.log(x["Index"]),
+        dy=lambda x: np.log(x["D12"]) - np.log(x["Index"].shift(1)),
+        ep=lambda x: np.log(x["E12"]) - np.log(x["Index"]),
+        de=lambda x: np.log(x["D12"]) - np.log(x["E12"]),
+        tms=lambda x: x["lty"] - x["tbl"],
+        dfy=lambda x: x["BAA"] - x["AAA"],
+    )
+    .rename(columns={"b/m": "bm"})
+    .get(
+        [
+            "date",
+            "dp",
+            "dy",
+            "ep",
+            "de",
+            "svar",
+            "bm",
+            "ntis",
+            "tbl",
+            "lty",
+            "ltr",
+            "tms",
+            "dfy",
+            "infl",
+        ]
+    )
+    .query("date >= @start_date and date <= @end_date")
+    .dropna()
 )
 
 ssl._create_default_https_context = ssl.create_default_context
@@ -315,17 +330,16 @@ We can then use the `requests` module to request the CSV, extract the data from 
 resp = requests.get(url)
 resp_csv = pd.io.common.StringIO(resp.text)
 
-cpi_monthly = (pd.read_csv(resp_csv)
-  .assign(
-    date=lambda x: pd.to_datetime(x["observation_date"]),
-    value=lambda x: pd.to_numeric(
-      x[series], errors="coerce"
-    ),
-      series=series,
-   )
-  .get(["date", "series", "value"])
-  .query("date >= @start_date & date <= @end_date")
-  .assign(cpi=lambda x: x["value"] / x["value"].iloc[-1])
+cpi_monthly = (
+    pd.read_csv(resp_csv)
+    .assign(
+        date=lambda x: pd.to_datetime(x["observation_date"]),
+        value=lambda x: pd.to_numeric(x[series], errors="coerce"),
+        series=series,
+    )
+    .get(["date", "series", "value"])
+    .query("date >= @start_date & date <= @end_date")
+    .assign(cpi=lambda x: x["value"] / x["value"].iloc[-1])
 )
 ```
 
@@ -335,10 +349,7 @@ The `tidyfinance` package can, of course, also fetch the same index data and man
 
 ```{python}
 tf.download_data(
-  domain="fred",
-  series = "CPIAUCNS",
-  start_date = start_date,
-  end_date = end_date
+    domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
 )
 ```
 
@@ -350,11 +361,10 @@ Now that we have downloaded some (freely available) data from the web into the m
 
 There are many ways to set up and organize your data, depending on the use case. Storing data as Parquet files creates a universal data format that seamlessly works across different programming languages and platforms. Unlike CSV files that often lose data types when shared between R, Python, Julia, or other languages, Parquet files maintain perfect data integrity regardless of which tool reads them. A dataset saved as Parquet in Python can be opened directly in Python's pandas, or Julia's DataFrames.jl.^[In previous editions of this book, we suggested using SQLite databases. However, Parquet files are more versatile and easier to handle across different programming languages. Should you still prefer using SQLite, you can find the relevant code snippets in a separate blog post.]
 ```{python}
-#| eval: false
 import os
 
 if not os.path.exists("data-python"):
-  os.makedirs("data-python")
+    os.makedirs("data-python")
 ```
 
 Next, we create a remote table with the monthly Fama-French factor data. We do so with the `pandas` function `to_pandas()`, which stores the data to parquet files.
@@ -376,16 +386,16 @@ Before we move on to the next data source, let us also store the other six table
 
 ```{python}
 data_dict = {
-  "factors_ff5_monthly": factors_ff5_monthly,
-  "factors_ff3_daily": factors_ff3_daily,
-  "industries_ff_monthly": industries_ff_monthly, 
-  "factors_q_monthly": factors_q_monthly,
-  "macro_predictors": macro_predictors,
-  "cpi_monthly": cpi_monthly
+    "factors_ff5_monthly": factors_ff5_monthly,
+    "factors_ff3_daily": factors_ff3_daily,
+    "industries_ff_monthly": industries_ff_monthly,
+    "factors_q_monthly": factors_q_monthly,
+    "macro_predictors": macro_predictors,
+    "cpi_monthly": cpi_monthly,
 }
 
 for key, value in data_dict.items():
-    value.to_parquet("data-python/"+key+".parquet")
+    value.to_parquet("data-python/" + key + ".parquet")
 ```
 
 

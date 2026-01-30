@@ -48,11 +48,11 @@ factors_ff3_monthly_raw <- download_french_data("Fama/French 3 Factors")
 factors_ff3_monthly <- factors_ff3_monthly_raw$subsets$data[[1]] |>
   mutate(
     date = floor_date(ymd(str_c(date, "01")), "month"),
-    across(c(RF, `Mkt-RF`, SMB, HML), ~as.numeric(.) / 100),
+    across(c(RF, `Mkt-RF`, SMB, HML), ~ as.numeric(.) / 100),
     .keep = "none"
   ) |>
   rename_with(str_to_lower) |>
-  rename(mkt_excess = `mkt-rf`) |> 
+  rename(mkt_excess = `mkt-rf`) |>
   filter(date >= start_date & date <= end_date)
 ```
 
@@ -65,11 +65,11 @@ factors_ff5_monthly_raw <- download_french_data("Fama/French 5 Factors (2x3)")
 factors_ff5_monthly <- factors_ff5_monthly_raw$subsets$data[[1]] |>
   mutate(
     date = floor_date(ymd(str_c(date, "01")), "month"),
-    across(c(RF, `Mkt-RF`, SMB, HML, RMW, CMA), ~as.numeric(.) / 100),
+    across(c(RF, `Mkt-RF`, SMB, HML, RMW, CMA), ~ as.numeric(.) / 100),
     .keep = "none"
   ) |>
   rename_with(str_to_lower) |>
-  rename(mkt_excess = `mkt-rf`) |> 
+  rename(mkt_excess = `mkt-rf`) |>
   filter(date >= start_date & date <= end_date)
 ```
 
@@ -82,7 +82,7 @@ factors_ff3_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
 factors_ff3_daily <- factors_ff3_daily_raw$subsets$data[[1]] |>
   mutate(
     date = ymd(date),
-    across(c(RF, `Mkt-RF`, SMB, HML), ~as.numeric(.) / 100),
+    across(c(RF, `Mkt-RF`, SMB, HML), ~ as.numeric(.) / 100),
     .keep = "none"
   ) |>
   rename_with(str_to_lower) |>
@@ -100,7 +100,7 @@ industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
   mutate(date = floor_date(ymd(str_c(date, "01")), "month")) |>
   mutate(across(where(is.numeric), ~ . / 100)) |>
   select(date, everything()) |>
-  filter(date >= start_date & date <= end_date) |> 
+  filter(date >= start_date & date <= end_date) |>
   rename_with(str_to_lower)
 ```
 
@@ -111,8 +111,8 @@ To automatically download and process Fama-French data, you can also use the `ti
 ```{r}
 #| output: false
 download_data(
-  type = "factors_ff_3_monthly", 
-  start_date = start_date, 
+  type = "factors_ff_3_monthly",
+  start_date = start_date,
   end_date = end_date
 )
 ```
@@ -137,9 +137,9 @@ factors_q_monthly_link <-
 
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(date = ymd(str_c(year, month, "01", sep = "-"))) |>
-  rename_with(~str_remove(., "R_")) |>
+  rename_with(~ str_remove(., "R_")) |>
   rename_with(str_to_lower) |>
-  mutate(across(-date, ~. / 100)) |>
+  mutate(across(-date, ~ . / 100)) |>
   select(date, risk_free = f, mkt_excess = mkt, everything()) |>
   filter(date >= start_date & date <= end_date)
 ```
@@ -149,8 +149,8 @@ Again, you can use the `tidyfinance` package for a shortcut:
 ```{r}
 #| output: false
 download_data(
-  type = "factors_q5_monthly", 
-  start_date = start_date, 
+  type = "factors_q5_monthly",
+  start_date = start_date,
   end_date = end_date
 )
 ```
@@ -164,8 +164,10 @@ Our next data source is a set of macroeconomic variables often used as predictor
 sheet_id <- "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
 sheet_name <- "Monthly"
 macro_predictors_url <- paste0(
-  "https://docs.google.com/spreadsheets/d/", sheet_id,
-  "/gviz/tq?tqx=out:csv&sheet=", sheet_name
+  "https://docs.google.com/spreadsheets/d/",
+  sheet_id,
+  "/gviz/tq?tqx=out:csv&sheet=",
+  sheet_name
 )
 macro_predictors_raw <- read_csv(macro_predictors_url)
 ```
@@ -205,9 +207,21 @@ macro_predictors <- macro_predictors_raw |>
     dfy = BAA - AAA # Default yield spread
   ) |>
   select(
-    date, rp_div, dp, dy, ep, de, svar,
-    bm = `b/m`, ntis, tbl, lty, ltr,
-    tms, dfy, infl
+    date,
+    rp_div,
+    dp,
+    dy,
+    ep,
+    de,
+    svar,
+    bm = `b/m`,
+    ntis,
+    tbl,
+    lty,
+    ltr,
+    tms,
+    dfy,
+    infl
   ) |>
   filter(date >= start_date & date <= end_date) |>
   drop_na()
@@ -231,7 +245,8 @@ The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data
 ```{r}
 series <- "CPIAUCNS"
 cpi_url <- paste0(
-  "https://fred.stlouisfed.org/graph/fredgraph.csv?id=", series
+  "https://fred.stlouisfed.org/graph/fredgraph.csv?id=",
+  series
 )
 ```
 
@@ -241,12 +256,12 @@ We can then use the `httr2` [@httr2] package to request the CSV, extract the dat
 #| message: false
 library(httr2)
 
-resp <- request(cpi_url) |> 
+resp <- request(cpi_url) |>
   req_perform()
-resp_csv <- resp |> 
-  resp_body_string() 
+resp_csv <- resp |>
+  resp_body_string()
 
-cpi_monthly <- resp_csv |> 
+cpi_monthly <- resp_csv |>
   read_csv() |>
   mutate(
     date = as.Date(observation_date),
@@ -254,7 +269,7 @@ cpi_monthly <- resp_csv |>
     series = series,
     .keep = "none"
   ) |>
-  filter(date >= start_date & date <= end_date) |> 
+  filter(date >= start_date & date <= end_date) |>
   mutate(
     cpi = value / value[date == max(date)]
   )
@@ -297,7 +312,7 @@ if (!dir.exists("data-r")) {
 Next, we create file with the monthly Fama-French factor data. We do so with the function `write_parquet`.
 
 ```{r}
-factors_ff3_monthly |> write_parquet("data-r/factors_ff3_monthly.parquet")
+write_parquet(factors_ff3_monthly, "data-r/factors_ff3_monthly.parquet")
 ```
 
 You can retrieve the data directly in your memory by calling `read_parquet()`. It is also possible to evaluate `dplyr` calls lazily, i.e., the data is not in our R session's memory, and the database does most of the work. 
@@ -305,18 +320,21 @@ You can retrieve the data directly in your memory by calling `read_parquet()`. I
 ```{r}
 read_parquet("data-r/factors_ff3_monthly.parquet") |>
   select(date, rf) |>
-  head(10) 
+  head(10)
 ```
 
 Before we move on to the next data source, let us also store the other five tables in our new data folder.
 
 ```{r}
-factors_ff5_monthly |> write_parquet("data-r/factors_ff5_monthly.parquet")
-factors_ff3_daily |> write_parquet("data-r/factors_ff3_daily.parquet")
-industries_ff_monthly |> write_parquet("data-r/industries_ff_monthly.parquet")
-factors_q_monthly |> write_parquet("data-r/factors_q_monthly.parquet")
-macro_predictors |> write_parquet("data-r/macro_predictors.parquet")
-cpi_monthly |> write_parquet("data-r/cpi_monthly.parquet")
+lst(
+  factors_ff5_monthly,
+  factors_ff3_daily,
+  industries_ff_monthly,
+  factors_q_monthly,
+  macro_predictors,
+  cpi_monthly
+) |>
+  iwalk(\(data, name) write_parquet(data, paste0("data-r/", name, ".parquet")))
 ```
 
 ## Key Takeaways
