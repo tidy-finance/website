@@ -16,10 +16,7 @@ You are reading **Tidy Finance with Python**. You can find the equivalent chapte
 
 The aim of this chapter is twofold. From a data science perspective, we introduce `scikit-learn`, a collection of packages for modeling and machine learning (ML). `scikit-learn` comes with a handy workflow for all sorts of typical prediction tasks. From a finance perspective, we address the notion of *factor zoo* [@Cochrane2011] using ML methods. We introduce Lasso, Ridge, and Elastic Net regression as a special case of penalized regression models. Then, we explain the concept of cross-validation for model *tuning* with Elastic Net regularization as a popular example. We implement and showcase the entire cycle from model specification, training, and forecast evaluation within the `scikit-learn` universe. While the tools can generally be applied to an abundance of interesting asset pricing problems, we apply penalized regressions for identifying macroeconomic variables and asset pricing factors that help explain a cross-section of industry portfolios.\index{Machine learning}
 
-In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta.\index{Factor!Zoo}\index{Factor!model}\index{CAPM} 
-Such findings question the usefulness of the Capital Asset Pricing Model. 
-In fact, during the last decades, financial economists discovered a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role in pricing applications). The search for factors that explain the cross-section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Harvey2017, @Mclean2016, and @Hou2020.
-Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *do we believe in the relevance of hundreds of risk factors?* During recent years, promising methods from the field of ML got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure, and @Dixon2020 for a detailed treatment of all methodological aspects. 
+In previous chapters, we illustrate that stock characteristics such as size provide valuable pricing information in addition to the market beta.\index{Factor!Zoo}\index{Factor!model}\index{CAPM} Such findings question the usefulness of the Capital Asset Pricing Model. In fact, during the last decades, financial economists discovered a plethora of additional factors which may be correlated with the marginal utility of consumption (and would thus deserve a prominent role in pricing applications). The search for factors that explain the cross-section of expected stock returns has produced hundreds of potential candidates, as noted more recently by @Harvey2016, @Harvey2017, @Mclean2016, and @Hou2020. Therefore, given the multitude of proposed risk factors, the challenge these days rather is: *do we believe in the relevance of hundreds of risk factors?* During recent years, promising methods from the field of ML got applied to common finance applications. We refer to @Mullainathan2017 for a treatment of ML from the perspective of an econometrician, @Nagel2021 for an excellent review of ML practices in asset pricing, @Easley2021 for ML applications in (high-frequency) market microstructure, and @Dixon2020 for a detailed treatment of all methodological aspects. 
 
 ## Brief Theoretical Background
 
@@ -29,25 +26,31 @@ To set the stage, we start with the definition of a linear model: Suppose we hav
 The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. For $K\leq T$, the well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$${#eq-ols} 
 \index{Regression!OLS}
 
-While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = \hat\beta^\text{ols}{}' \tilde x_t.$${#eq-blue} 
-Is this the best we can do? 
-Not necessarily: instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators $\hat{\beta}$ with lower variance than the estimator $\hat\beta^\text{ols}$. 
-At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones, if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set $\hat\beta^{\text{ols}}_k = 0$ for some redundant factors. 
+While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = \hat\beta^\text{ols}{}' \tilde x_t.$${#eq-blue} Is this the best we can do? Not necessarily: instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators $\hat{\beta}$ with lower variance than the estimator $\hat\beta^\text{ols}$. At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones, if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set $\hat\beta^{\text{ols}}_k = 0$ for some redundant factors. 
 
-It should be clear that the promised benefits of penalized regressions, i.e., reducing the mean squared error (MSE), come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$${#eq-model-and-noise} We want to recover $f(x)$, which denotes some unknown functional which maps the relationship between $x$ and $y$. While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. Alternative predictors $\hat{f}(x)$ could be more desirable: For instance, the MSE depends on our model choice as follows: \index{MSE} $$\begin{aligned}
+It should be clear that the promised benefits of penalized regressions, i.e., reducing the mean squared error (MSE), come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$${#eq-model-and-noise} We want to recover $f(x)$, which denotes some unknown functional which maps the relationship between $x$ and $y$. While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. Alternative predictors $\hat{f}(x)$ could be more desirable: For instance, the MSE depends on our model choice as follows: \index{MSE} 
+
+$$\begin{aligned}
 MSE &=E\left(\left(y-\hat{f}(x)\right)^2\right)=E\left(\left(f(x)+\epsilon-\hat{f}(x)\right)^2\right)\\
 &= \underbrace{E\left(\left(f(x)-\hat{f}(x)\right)^2\right)}_{\text{total quadratic error}}+\underbrace{E\left(\epsilon^2\right)}_{\text{irreducible error}} \\
 &= E\left(\hat{f}(x)^2\right)+E\left(f(x)^2\right)-2E\left(f(x)\hat{f}(x)\right)+\sigma_\varepsilon^2\\
 &=E\left(\hat{f}(x)^2\right)+f(x)^2-2f(x)E\left(\hat{f}(x)\right)+\sigma_\varepsilon^2\\
 &=\underbrace{\text{Var}\left(\hat{f}(x)\right)}_{\text{variance of model}}+ \underbrace{\left(E(f(x)-\hat{f}(x))\right)^2}_{\text{squared bias}} +\sigma_\varepsilon^2. 
-\end{aligned}$${#eq-mse} While no model can reduce $\sigma_\varepsilon^2$, a biased estimator with small variance may have a lower MSE than an unbiased estimator.
+\end{aligned}
+$${#eq-mse} 
+
+While no model can reduce $\sigma_\varepsilon^2$, a biased estimator with small variance may have a lower MSE than an unbiased estimator.
 
 ### Ridge regression
 
 \index{Regression!Ridge}
 
-One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$, the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here $c\geq 0$ is a constant that depends on the choice of $\lambda$. The larger $\lambda$, the smaller $c$ (technically speaking, there is a one-to-one relationship between $\lambda$, which corresponds to the Lagrangian of the minimization problem above and $c$). Here, $X = \left(x_1 \ldots x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y,
-$${#eq-ridge} where $I$ is the identity matrix of dimension $K$. A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: a larger value of $\lambda$ implies *shrinkage* of the regression coefficient toward 0; a smaller value of $\lambda$ reduces the bias of the resulting estimator. 
+One biased estimator is known as Ridge regression. @Hoerl1970 propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the $L_2$ norm of the parameters* $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$, the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here $c\geq 0$ is a constant that depends on the choice of $\lambda$. The larger $\lambda$, the smaller $c$ (technically speaking, there is a one-to-one relationship between $\lambda$, which corresponds to the Lagrangian of the minimization problem above and $c$). Here, $X = \left(x_1 \ldots x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: 
+$$
+\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y,
+$${#eq-ridge} 
+
+where $I$ is the identity matrix of dimension $K$. A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: a larger value of $\lambda$ implies *shrinkage* of the regression coefficient toward 0; a smaller value of $\lambda$ reduces the bias of the resulting estimator. 
 
 ::: {.calloutnote}
 Note that $X$ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that $y$ is simply demeaned before computing $\hat\beta^\text{ridge}$.
@@ -63,7 +66,9 @@ An alternative to Ridge regression is the Lasso (*l*east *a*bsolute *s*hrinkage 
 The main difference to Ridge regression is that Lasso does not only *shrink* coefficients but effectively selects variables by setting coefficients for *irrelevant* variables to zero. Lasso implements a $L_1$ penalization on the parameters such that: $$\hat\beta^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right)\text{ s.t. } \sum\limits_{k=1}^K|\beta_k| < c(\lambda).$${#eq-lasso} There is no closed-form solution for $\hat\beta^\text{Lasso}$ in the above maximization problem, but efficient algorithms exist (e.g., the `glmnet` package for R and Python). Like for Ridge regression, the hyperparameter $\lambda$ has to be specified beforehand.
 
 The corresponding Lagrangian reads as follows
-$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$${#eq-lasso-lagrangian-initial} 
+$$
+\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}
+$${#eq-lasso-lagrangian-initial} 
 
 ### Elastic Net
 
@@ -80,7 +85,6 @@ import sqlite3
 
 from plotnine import * 
 from mizani.formatters import percent_format, date_format
-from mizani.breaks import date_breaks
 from itertools import product
 from sklearn.model_selection import (
   train_test_split, GridSearchCV, TimeSeriesSplit, cross_val_score
@@ -152,7 +156,7 @@ data = (industries_ff_monthly
          how="left", left_on="date", right_on="factor_q_date")
   .merge(macro_predictors, 
          how="left", left_on="date", right_on="macro_date") 
-  .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_rf"]) 
+  .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_risk_free"]) 
   .drop(columns=["ret", "factor_ff_date", "factor_q_date", "macro_date"])
   .dropna()
 )
@@ -186,7 +190,11 @@ To illustrate penalized linear regressions, we employ the `scikit-learn` collect
 ### Pre-process data
 
 We want to explain excess returns with all available predictors. The regression equation thus takes the form 
-$$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t $${#eq-factor-model} where $r_t$ is the vector of industry excess returns at time $t$, $\otimes$ denotes the Kronecker product and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables. 
+$$
+r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t 
+$${#eq-factor-model} 
+
+where $r_t$ is the vector of industry excess returns at time $t$, $\otimes$ denotes the Kronecker product and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables. 
 
 We hence perform the following pre-processing steps: 
 
@@ -226,7 +234,10 @@ preprocessor = ColumnTransformer(
 
 \index{Regression} Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get 
 
-$$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$${#eq-lasso-lagrangian} 
+$$
+\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}
+$${#eq-lasso-lagrangian} 
+
 In the application at hand, $X$ contains `{python} len(column_combinations)` columns with all possible interactions between factor returns and macroeconomic variables.
 We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with similar code. For now, we start with the linear regression model with an arbitrarily chosen value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
@@ -296,7 +307,7 @@ predicted_values_figure = (
       x="", y="", color="", linetype="",
       title="Monthly realized and fitted manufacturing risk premia"
     )
-  + scale_x_datetime(breaks=date_breaks("5 years"), labels=date_format("%Y"))
+  + scale_x_datetime(date_breaks="5 years", date_labels="%Y")
   + scale_y_continuous(labels=percent_format())
 )
 predicted_values_figure.show()
@@ -367,9 +378,12 @@ Cross-validation is a technique that allows us to alleviate this problem. We app
 
 1.  Specify a grid of hyperparameters
 2.  Obtain predictors $\hat{y}_i(\lambda)$ to denote the predictors for the used parameters $\lambda$
-3.  Compute $$
-    \text{MSPE}(\lambda) = \frac{1}{K} \sum_{k=1}^K \frac{1}{T}\sum_{t=1}^T \left(\hat{y}_t^k(\lambda) - y_t^k\right)^2 .
-    $${#eq-mspe} With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_{\tilde{T}}^k$, with $k=1$.
+3.  Compute 
+$$
+\text{MSPE}(\lambda) = \frac{1}{K} \sum_{k=1}^K \frac{1}{T}\sum_{t=1}^T \left(\hat{y}_t^k(\lambda) - y_t^k\right)^2 .
+$${#eq-mspe} 
+
+With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_{\tilde{T}}^k$, with $k=1$.
 
 How should you pick $K$? Large values of $K$ are preferable because the training data better imitates the original data. However, larger values of $K$ will have much higher computation time.
 `scikit-learn` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters.
@@ -421,7 +435,8 @@ validation = (pd.DataFrame(finder.cv_results_)
     mspe=lambda x: -x["mean_test_score"],
     param_regressor__alpha=lambda x: pd.to_numeric(
       x["param_regressor__alpha"], errors="coerce"
-    )
+    ),
+    param_regressor__l1_ratio=lambda x: x["param_regressor__l1_ratio"].astype(str)
   )
 )
 
@@ -438,8 +453,8 @@ validation_figure = (
   + labs(
       x ="Penalty factor (lambda)", y="Root MSPE", 
       title="Root MSPE for different penalty factors",
-       color="Proportion of Lasso Penalty",
-       shape="Proportion of Lasso Penalty"
+      color="Proportion of Lasso Penalty",
+      shape="Proportion of Lasso Penalty"
     )
   + scale_x_log10()
   + guides(linetype="none")
@@ -447,7 +462,7 @@ validation_figure = (
 validation_figure.show()
 ```
 
-@fig-1404 shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__alpha"]).iloc[0, 0], 4)` and a mixture factor ($\rho$) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__l1_ratio"]).iloc[0, 0], 4)`.
+@fig-1404 shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__alpha"]).iloc[0, 0], 4)` and a mixture factor ($\rho$) of `{python} np.round(float(validation.sort_values("rank_test_score").head(1).get(["param_regressor__l1_ratio"]).iloc[0, 0]), 4)`.
 
 ### Full workflow
 

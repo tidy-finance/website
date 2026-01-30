@@ -6,14 +6,18 @@ data_downloads:
 	quarto render python/wrds-crsp-and-compustat.qmd 
 	quarto render python/trace-and-fisd.qmd
 
+intro_chapters: intro_chapters_r intro_chapters_python
+
 other_chapters: other_chapters_r other_chapters_python
 	
-other_chapters_r:
+intro_chapters_r:
 	quarto render r/working-with-stock-returns.qmd
 	quarto render r/modern-portfolio-theory.qmd
 	quarto render r/capital-asset-pricing-model.qmd
 	quarto render r/financial-statement-analysis.qmd
 	quarto render r/discounted-cash-flow-analysis.qmd
+
+other_chapters_r:
 	quarto render r/beta-estimation.qmd
 	quarto render r/univariate-portfolio-sorts.qmd
 	quarto render r/size-sorts-and-p-hacking.qmd
@@ -27,12 +31,14 @@ other_chapters_r:
 	quarto render r/parametric-portfolio-policies.qmd
 	quarto render r/constrained-optimization-and-backtesting.qmd
 	
-other_chapters_python:
+intro_chapters_python:
 	quarto render python/working-with-stock-returns.qmd
 	quarto render python/modern-portfolio-theory.qmd
 	quarto render python/capital-asset-pricing-model.qmd
 	quarto render python/financial-statement-analysis.qmd
 	quarto render python/discounted-cash-flow-analysis.qmd
+
+other_chapters_python:
 	quarto render python/beta-estimation.qmd
 	quarto render python/univariate-portfolio-sorts.qmd
 	quarto render python/size-sorts-and-p-hacking.qmd
