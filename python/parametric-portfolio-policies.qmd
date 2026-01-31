@@ -31,19 +31,21 @@ Compared to previous chapters, we introduce the `scipy.optimize` module from the
 
 ## Data Preparation
 
-To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
+To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}
 
 ```{python}
-crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
-  .dropna()
+crsp_monthly = (
+    pd.read_parquet("data-python/crsp_monthly.parquet")
+    .dropna()
 )
 ```
 
 To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas.\index{Data!Fama-French factors} 
 
 ```{python}
-factors_ff_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
-.get(["date", "mkt_excess"])
+factors_ff_monthly = (
+    pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .get(["date", "mkt_excess"])
 )
 ```
 
@@ -51,34 +53,42 @@ Next, we retrieve some stock characteristics that have been shown to have an eff
 
 ```{python}
 crsp_monthly_lags = (crsp_monthly
-  .assign(date=lambda x: x["date"]+pd.DateOffset(months=13))
-  .get(["permno", "date", "mktcap"])
+    .assign(date=lambda x: x["date"]+pd.DateOffset(months=13))
+    .get(["permno", "date", "mktcap"])
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(crsp_monthly_lags, 
-         how="inner", on=["permno", "date"], suffixes=["", "_13"])
+    .merge(crsp_monthly_lags, 
+            how="inner", on=["permno", "date"], suffixes=["", "_13"])
 )
 
 data_portfolios = (crsp_monthly
-  .assign(
-    momentum_lag=lambda x: x["mktcap_lag"]/x["mktcap_13"],
-    size_lag=lambda x: np.log(x["mktcap_lag"])
-  )
-  .dropna(subset=["momentum_lag", "size_lag"])
+    .assign(
+        momentum_lag=lambda x: x["mktcap_lag"]/x["mktcap_13"],
+        size_lag=lambda x: np.log(x["mktcap_lag"])
+    )
+    .dropna(subset=["momentum_lag", "size_lag"])
 )
 ```
 
 ## Parametric Portfolio Policies
 
 The basic idea of parametric portfolio weights is as follows. Suppose that at each date $t$, we have $N_t$ stocks in the investment universe, where each stock $i$ has a return of $r_{i, t+1}$ and is associated with a vector of firm characteristics $x_{i, t}$ such as time-series momentum or the market capitalization. The investor's problem is to choose portfolio weights $w_{i,t}$ to maximize the expected utility of the portfolio return:
-$$\begin{aligned}
+
+$$
+\begin{aligned}
 \max_{\omega} E_t\left(u(r_{p, t+1})\right) = E_t\left[u\left(\sum\limits_{i=1}^{N_t}\omega_{i,t}\cdot r_{i,t+1}\right)\right]
-\end{aligned}$${#eq-expected-utility}
+\end{aligned}
+$${#eq-expected-utility}
+
 where $u(\cdot)$ denotes the utility function.
 
 Where do the stock characteristics show up? We parameterize the optimal portfolio weights as a function of the stock characteristic $x_{i,t}$ with the following linear specification for the portfolio weights: 
-$$\omega_{i,t} = \bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t},$${#eq-portfolio-policy}
+
+$$
+\omega_{i,t} = \bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t},
+$${#eq-portfolio-policy}
+
 where $\bar{\omega}_{i,t}$ is a stock's weight in a benchmark portfolio (we use the value-weighted or naive portfolio in the application below), $\theta$ is a vector of coefficients which we are going to estimate, and $\hat{x}_{i,t}$ are the characteristics of stock $i$, cross-sectionally standardized to have zero mean and unit standard deviation. 
 
 Intuitively, the portfolio strategy is a form of active portfolio management relative to a performance benchmark. Deviations from the benchmark portfolio are derived from the individual stock characteristics. Note that by construction, the weights sum up to one as $\sum_{i=1}^{N_t}\hat{x}_{i,t} = 0$ due to the standardization. Moreover, the coefficients are constant across assets and over time. The implicit assumption is that the characteristics fully capture all aspects of the joint distribution of returns that are relevant for forming optimal portfolios.
@@ -87,28 +97,32 @@ We first implement cross-sectional standardization for the entire CRSP universe.
 
 ```{python}
 data_portfolios = (data_portfolios
-  .groupby("date")
-  .apply(lambda x: x.assign(
-      relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
+        )
     )
-  )
-  .reset_index(drop=True)
-  .set_index("date")
-  .groupby(level="date")
-  .transform(
-    lambda x: (x-x.mean())/x.std() if x.name.endswith("lag") else x
-  )
-  .reset_index()
-  .drop(["mktcap_lag"], axis=1)
+    .reset_index(drop=True)
+    .set_index("date")
+    .groupby(level="date")
+    .transform(
+        lambda x: (x-x.mean())/x.std() if x.name.endswith("lag") else x
+    )
+    .reset_index()
+    .drop(["mktcap_lag"], axis=1)
 )
 ```
 
 ## Computing Portfolio Weights
 
 Next, we move on to identify optimal choices of $\theta$.\index{Optimization} We rewrite the optimization problem together with the weight parametrization and can then estimate $\theta$ to maximize the objective function based on our sample 
-$$\begin{aligned}
+
+$$
+\begin{aligned}
 E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\limits_{i=1}^{N_t}\left(\bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\right)r_{i,t+1}\right).
-\end{aligned}$${#eq-empirical-expected-utility}
+\end{aligned}
+$${#eq-empirical-expected-utility}
+
 The allocation strategy is straightforward because the number of parameters to estimate is small. Instead of a tedious specification of the $N_t$ dimensional vector of expected returns and the $N_t(N_t+1)/2$ free elements of the covariance matrix, all we need to focus on in our application is the vector $\theta$. $\theta$ contains only two elements in our application: the relative deviation from the benchmark due to *size* and *momentum*. 
 
 To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector $\theta_0$. The next step is to choose $\theta$ optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values. Note that the value for $\theta$ of 1.5 is an arbitrary choice.
@@ -124,7 +138,10 @@ The function `compute_portfolio_weights()` below computes the portfolio weights 
 We first compute `characteristic_tilt`, the tilting values $\frac{1}{N_t}\theta'\hat{x}_{i, t}$ which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio `weight_benchmark`, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. `weight_tilt` completes the picture and contains the final portfolio weights `weight_tilt = weight_benchmark + characteristic_tilt`, which deviate from the benchmark portfolio depending on the stock characteristics.
 
 The final few lines go a bit further and implement a simple version of a no-short sale constraint. While it is generally not straightforward to ensure portfolio weight constraints via parameterization, we simply normalize the portfolio weights such that they are enforced to be positive. Finally, we make sure that the normalized weights sum up to one again:
-$$\omega_{i,t}^+ = \frac{\max(0, \omega_{i,t})}{\sum_{j=1}^{N_t}\max(0, \omega_{i,t})}.$${#eq-short-sale-constraint}
+
+$$
+\omega_{i,t}^+ = \frac{\max(0, \omega_{i,t})}{\sum_{j=1}^{N_t}\max(0, \omega_{i,t})}.
+$${#eq-short-sale-constraint}
 
 The following function computes the optimal portfolio weights in the way just described.\index{Functional programming}
 
@@ -173,17 +190,22 @@ In the next step, we compute the portfolio weights for the arbitrary vector $\th
 
 ```{python}
 weights_crsp = compute_portfolio_weights(
-  theta,
-  data_portfolios,
-  value_weighting=True,
-  allow_short_selling=True
+    theta,
+    data_portfolios,
+    value_weighting=True,
+    allow_short_selling=True
 )
 ```
 
 ## Portfolio Performance
 
 \index{Performance evaluation}
-Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function $$u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},$${#eq-power-utility} where $\gamma$ is the risk aversion factor.\index{Power utility}
+Are the computed weights optimal in any way? Most likely not, as we picked $\theta_0$ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, @Brandt2009 focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function 
+
+$$
+u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
+$${#eq-power-utility} 
+where $\gamma$ is the risk aversion factor.\index{Power utility}
 
 ```{python}
 def power_utility(r, gamma=5):
@@ -319,17 +341,17 @@ You may wonder why we return the negative value of the objective function. This 
 
 ```{python}
 optimal_theta = minimize(
-  fun=objective_function,
-  x0=[1.5]*n_parameters,
-  args=(data_portfolios, "Expected utility", True, True),
-  method="Nelder-Mead",
-  tol=1e-2
+    fun=objective_function,
+    x0=[1.5]*n_parameters,
+    args=(data_portfolios, "Expected utility", True, True),
+    method="Nelder-Mead",
+    tol=1e-2
 )
 
 (pd.DataFrame(
-  optimal_theta.x,
-  columns=["Optimal theta"],
-  index=["momentum_lag", "size_lag"]).T.round(3)
+    optimal_theta.x,
+    columns=["Optimal theta"],
+    index=["momentum_lag", "size_lag"]).T.round(3)
 )
 ```
 
@@ -385,15 +407,15 @@ allow_short_selling = [True, False]
 objective_measure = ["Expected utility"]
 
 permutations = product(
-  data, objective_measure,
-  value_weighting, allow_short_selling
+    data, objective_measure,
+    value_weighting, allow_short_selling
 )
 results = list(starmap(
-  evaluate_optimal_performance, 
-  permutations
+    evaluate_optimal_performance, 
+    permutations
 ))
 performance_table = (pd.concat(results, axis=1)
-  .T.drop_duplicates().T.round(3)
+    .T.drop_duplicates().T.round(3)
 )
 performance_table.get(["EW", "VW"])
 ``` 

@@ -30,7 +30,6 @@ Compared to previous chapters, we introduce `slider` [@slider] for sliding windo
 The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{r}
-
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(permno, date, industry, ret_excess)
 
@@ -195,15 +194,11 @@ factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
   select(date, mkt_excess)
 ```
 
-We then create a connection to the daily CRSP data, but we don't load the whole table into our memory. We only extract all distinct `permno` because we loop the beta estimation over batches of stocks. 
+We then create a connection to the daily CRSP data, but we don't load the whole table into our memory. We only extract all distinct `permno` because we loop the beta estimation over batches of stocks with size 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
 
 ```{r}
 crsp_daily_db <- open_dataset("data-r/crsp_daily")
-```
 
-We use the stocks from the monthly CRSP dataset as our reference point and process them in batches of 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
-
-```{r}
 permnos <- crsp_daily_db |>
   distinct(permno) |>
   pull(permno, as_vector = TRUE)
