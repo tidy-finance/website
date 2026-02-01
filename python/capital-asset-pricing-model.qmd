@@ -39,33 +39,33 @@ Building on our analysis from the previous chapter on [Modern Portfolio Theory](
 
 ```{python}
 symbols = tf.download_data(
-  domain="constituents", 
-  index="Dow Jones Industrial Average"
+    domain="constituents", 
+    index="Dow Jones Industrial Average"
 )
 
 prices_daily = tf.download_data(
-  domain="stock_prices", 
-  symbols=symbols["symbol"].tolist(),
-  start_date="2000-01-01", 
-  end_date="2023-12-31"
+    domain="stock_prices", 
+    symbols=symbols["symbol"].tolist(),
+    start_date="2000-01-01", 
+    end_date="2023-12-31"
 )
 
 prices_daily = (prices_daily
-  .groupby("symbol")
-  .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
-  .reset_index(drop=True)
-  .query("counts == counts.max()")
+    .groupby("symbol")
+    .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
+    .reset_index(drop=True)
+    .query("counts == counts.max()")
 )
 
 returns_monthly = (prices_daily
-  .assign(
-    date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
-  )
-  .groupby(["symbol", "date"], as_index=False)
-  .agg(adjusted_close=("adjusted_close", "last"))
-  .assign(
-    ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change()
-  )
+    .assign(
+        date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
+    )
+    .groupby(["symbol", "date"], as_index=False)
+    .agg(adjusted_close=("adjusted_close", "last"))
+    .assign(
+        ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change()
+    )
 )
 ```
 
@@ -97,19 +97,29 @@ $$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu = 0 \\\
 
 The constraint $\omega^{\prime}\tilde\mu_\omega\geq \bar\mu$ delivers 
 
-$$\bar\mu = \tilde\mu^{\prime}\omega^* = \frac{\lambda}{2}\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu \\
-\Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}.$$ Thus, the optimal portfolio weights are given by 
-$$\omega^* = \frac{\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}\Sigma^{-1}\tilde\mu.$$
+$$
+\bar\mu = \tilde\mu^{\prime}\omega^* = \frac{\lambda}{2}\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu \\
+\Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}.
+$$ 
+
+Thus, the optimal portfolio weights are given by 
+$$
+\omega^* = \frac{\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}\Sigma^{-1}\tilde\mu.
+$$
 
 Note that $\omega^*$ does not necessarily sum up to one as, mechanically, the remainder $1-\iota^{\prime}\omega^*$ is invested in the risk-free asset. However, scaling $\omega^*$ delivers the portfolio of risky assets $\omega_\text{tan}$ such that 
 
-$$\omega_\text{tan} := \frac{\omega^*}{\iota'\omega^*}= \frac{\Sigma^{-1}(\mu-r_f)}{\iota^{\prime}\Sigma^{-1}(\mu-r_f)}.$$
+$$
+\omega_\text{tan} := \frac{\omega^*}{\iota'\omega^*}= \frac{\Sigma^{-1}(\mu-r_f)}{\iota^{\prime}\Sigma^{-1}(\mu-r_f)}.
+$$
 
 Importantly, $\omega_\text{tan}$ is independent from $\bar\mu$! Thus, irrespective of the desired level of expected returns (or the investors' risk aversion), everybody chooses the same portfolio of risky assets. The only variation arises from the amount of wealth invested into the risk-free asset. Some investors may even choose to lever their risky position by borrowing at the risk-free rate and investing more than their actual wealth into the portfolio $\omega_\text{tan}$. 
 
 The portfolio 
 
-$$\omega_{tan}=\frac{\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}$$ 
+$$
+\omega_{tan}=\frac{\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}
+$$ 
 
 is central to the CAPM and is typically called the efficient tangency portfolio.
 
@@ -131,22 +141,22 @@ Next, we define the core parameters governing the distribution of asset returns,
 
 ```{python}
 assets = (returns_monthly
-  .groupby("symbol", as_index=False)
-  .agg(
-    mu=("ret", "mean"),
-    sigma=("ret", "std")
-  )
+    .groupby("symbol", as_index=False)
+    .agg(
+        mu=("ret", "mean"),
+        sigma=("ret", "std")
+    )
 )
 
 sigma = (returns_monthly
-  .pivot(index="date", columns="symbol", values="ret")
-  .cov()
+    .pivot(index="date", columns="symbol", values="ret")
+    .cov()
 )
 
 mu = (returns_monthly
-  .groupby("symbol")["ret"]
-  .mean()
-  .values
+    .groupby("symbol")["ret"]
+    .mean()
+    .values
 )
 ```
 
@@ -163,10 +173,12 @@ w_tan = w_tan / np.sum(w_tan)
 mu_w = w_tan.T @ mu
 sigma_w = np.sqrt(w_tan.T @ sigma @ w_tan)
 
-efficient_portfolios = pd.DataFrame([
-  {"symbol": "\omega_{tan}", "mu": mu_w, "sigma": sigma_w},
-  {"symbol": "r_f", "mu": rf, "sigma": 0}
-])
+efficient_portfolios = pd.DataFrame(
+    [
+        {"symbol": "\omega_{tan}", "mu": mu_w, "sigma": sigma_w},
+        {"symbol": "r_f", "mu": rf, "sigma": 0},
+    ]
+)
 
 sharpe_ratio = (mu_w - rf) / sigma_w
 ```
@@ -175,26 +187,25 @@ sharpe_ratio = (mu_w - rf) / sigma_w
 
 ```{python}
 #| label: fig-300
-#| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits." 
+#| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
 #| fig-alt: "Title: The efficient frontier with a risk-free asset and Dow index constituents. The figure shows a scatter plot with volatities on the horizontal axis and expected returns on the vertical axis."
 efficient_portfolios_figure = (
-  ggplot(
-    efficient_portfolios, 
-    aes(x="sigma", y="mu")
-  )
-  + geom_point(data=assets)
-  + geom_point(data=efficient_portfolios, color="blue")
-  + geom_label(
-      aes(label="symbol"), parse=True, 
-      adjust_text={"arrowprops": {"arrowstyle": "-"}}
+    ggplot(efficient_portfolios, aes(x="sigma", y="mu"))
+    + geom_point(data=assets)
+    + geom_point(data=efficient_portfolios, color="blue")
+    + geom_label(
+        aes(label="symbol"),
+        parse=True,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}},
     )
-  + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + labs(
-      x="Volatility", y="Expected return",
-      title="The efficient frontier with a risk-free asset and Dow index constituents"
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility",
+        y="Expected return",
+        title="The efficient frontier with a risk-free asset and Dow index constituents",
     )
-  + geom_abline(aes(intercept=rf, slope=sharpe_ratio), linetype="dotted")
+    + geom_abline(aes(intercept=rf, slope=sharpe_ratio), linetype="dotted")
 )
 efficient_portfolios_figure.show()
 ```
@@ -203,7 +214,9 @@ efficient_portfolios_figure.show()
 
 Taking another look at the efficient tangency portfolio $\omega_\text{tan}$ reveals that expected asset excess returns $\tilde\mu$ cannot be arbitrarily large or small. From the first order condition of the optimization problem above we get, via simple rearranging,
 
-$$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu =0 \\\Leftrightarrow \tilde\mu = \frac{2}{\lambda}\Sigma\omega^* = \frac{2}{\lambda}\underbrace{\iota'\omega^*}_{=\frac{\lambda}{2}\iota^{\prime}\Sigma^{-1}\tilde\mu}\Sigma\omega_\text{tan} \\ = \iota^{\prime}\Sigma^{-1}\tilde\mu\Sigma\omega_\text{tan}$$
+$$
+\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu =0 \\\Leftrightarrow \tilde\mu = \frac{2}{\lambda}\Sigma\omega^* = \frac{2}{\lambda}\underbrace{\iota'\omega^*}_{=\frac{\lambda}{2}\iota^{\prime}\Sigma^{-1}\tilde\mu}\Sigma\omega_\text{tan} \\ = \iota^{\prime}\Sigma^{-1}\tilde\mu\Sigma\omega_\text{tan}
+$$
 
 Now, note the following three simple derivations: 
 
@@ -213,7 +226,9 @@ Now, note the following three simple derivations:
   
 Putting everything together yields for the expected excess return of asset $i$: 
 
-$$\tilde{\mu}_i = \frac{E(\omega_\text{tan}^{\prime}r - r_f)}{\sigma_{\text{tan}}^2} \text{Cov}\left(r_i,r_\text{tan}\right) = \beta_i \tilde{\mu}_\text{tan}.$$
+$$
+\tilde{\mu}_i = \frac{E(\omega_\text{tan}^{\prime}r - r_f)}{\sigma_{\text{tan}}^2} \text{Cov}\left(r_i,r_\text{tan}\right) = \beta_i \tilde{\mu}_\text{tan}.
+$$
 
 The equation above is the famous CAPM equation and central to asset pricing. It states that an assets expected excess return is proportional to the assets return covariance with the efficient portfolio excess returns. The price of risk is the excess return of the efficient tangency portfolio. An asset with 0 beta has the same expected return as the risk-free rate. An asset with a beta of 1 has the same expected return as the efficient tangency portfolio. An asset with a negative beta has expected returns lower than the risk-free asset - the very definition of an insurance. Therefore, the CAPM equation explains why some assets may have the same volatility but different returns: Because their systematic risk ($\beta_i$) is different.
 
@@ -228,18 +243,12 @@ assets["beta"] = betas.values
 price_of_risk = float(w_tan.T @ mu - rf)
 
 assets_figure = (
-  ggplot(
-    assets, 
-    aes(x="beta", y="mu")
-  )
-  + geom_point()
-  + geom_abline(intercept=rf, slope=price_of_risk)
-  + scale_y_continuous(labels=percent_format())
-  + labs(
-      x="Beta", y="Expected return",
-      title="Security market line"
-    ) 
-  + annotate("text", x=0, y=rf, label="Risk-free")
+    ggplot(assets, aes(x="beta", y="mu"))
+    + geom_point()
+    + geom_abline(intercept=rf, slope=price_of_risk)
+    + scale_y_continuous(labels=percent_format())
+    + labs(x="Beta", y="Expected return", title="Security market line")
+    + annotate("text", x=0, y=rf, label="Risk-free")
 )
 assets_figure.show()
 ```
@@ -276,10 +285,10 @@ Let's turn to estimating CAPM parameters using real market data. Instead of usin
 import tidyfinance as tf
 
 factors = tf.download_data(
-  domain="famafrench",
-  dataset="F-F_Research_Data_5_Factors_2x3",
-  start_date="2000-01-01",
-  end_date="2024-09-30",
+    domain="famafrench",
+    dataset="F-F_Research_Data_5_Factors_2x3",
+    start_date="2000-01-01",
+    end_date="2024-09-30",
 )
 ```
 
@@ -289,23 +298,23 @@ For our regression analysis, we first prepare the data by calculating excess ret
 import statsmodels.formula.api as smf
 
 returns_excess_monthly = (returns_monthly
-  .merge(factors, on="date", how="left")
-  .assign(ret_excess=lambda x: x["ret"] - x["risk_free"])
+    .merge(factors, on="date", how="left")
+    .assign(ret_excess=lambda x: x["ret"] - x["risk_free"])
 )
 
 def estimate_capm(data):
-  model = smf.ols("ret_excess ~ mkt_excess", data=data).fit()
-  result = pd.DataFrame({
-    "coefficient": ["alpha", "beta"],
-    "estimate": model.params.values,
-    "t_statistic": model.tvalues.values
-  })
-  return result
+    model = smf.ols("ret_excess ~ mkt_excess", data=data).fit()
+    result = pd.DataFrame({
+        "coefficient": ["alpha", "beta"],
+        "estimate": model.params.values,
+        "t_statistic": model.tvalues.values
+    })
+    return result
 
 capm_results = (returns_excess_monthly
-  .groupby("symbol", group_keys=True)
-  .apply(estimate_capm)
-  .reset_index()
+    .groupby("symbol", group_keys=True)
+    .apply(estimate_capm)
+    .reset_index()
 )
 ```
 
@@ -316,28 +325,28 @@ The results are particularly interesting when we visualize the alphas across our
 #| fig-cap: "Estimates are based on returns adjusted for dividend payments and stock splits and using the Fama-French market excess returns as a measure for the market." 
 #| fig-alt: "Title: Estimated CAPM alphas for Dow index constituents. The figure shows a bar chart with estimated alphas and indicates whether an estimate is statistically significant at 95%. Only Nvidia exhibits a statistically significant positive alpha."
 alphas = (capm_results
-  .query("coefficient=='alpha'")
-  .assign(is_significant=lambda x: np.abs(x["t_statistic"]) >= 1.96)
+    .query("coefficient=='alpha'")
+    .assign(is_significant=lambda x: np.abs(x["t_statistic"]) >= 1.96)
 )
 
 alphas["symbol"] = pd.Categorical(
-  alphas["symbol"],
-  categories=alphas.sort_values("estimate")["symbol"],
-  ordered=True
+    alphas["symbol"],
+    categories=alphas.sort_values("estimate")["symbol"],
+    ordered=True
 )
 
 alphas_figure = (
-  ggplot(
-    alphas, 
-    aes(y="estimate", x="symbol", fill="is_significant")
-  )
-  + geom_col()
-  + scale_y_continuous(labels=percent_format())
-  + coord_flip()
-  + labs(
-      x="Estimated asset alphas", y="", fill="Significant at 95%?",
-      title="Estimated CAPM alphas for Dow index constituents"
+    ggplot(
+        alphas, 
+        aes(y="estimate", x="symbol", fill="is_significant")
     )
+    + geom_col()
+    + scale_y_continuous(labels=percent_format())
+    + coord_flip()
+    + labs(
+        x="Estimated asset alphas", y="", fill="Significant at 95%?",
+        title="Estimated CAPM alphas for Dow index constituents"
+        )
 )
 alphas_figure.show()
 ```
