@@ -1,0 +1,127 @@
+---
+title: "Blog Template"
+authors: Stefan Voigt
+date: 2025-02-01
+description: This is a blog template
+categories: 
+  - R
+  - Data
+  - Market microstructure
+---
+This is part two of two blog posts in which we announce two major updates to the [tidy-finance.org] ecosystem.
+
+1. `lobsteR` is a novel package to request and download high-frequency orderbook snapshot data from [lobsterdata.com]. We provide a short vignette on how to use the package. 
+2. Seemless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+
+## 20 years of HF data
+
+In our paper "Market responses to a VIX shock", [Albert J. Menkveld](https://albertjmenkveld.com/), [Nikolaus and Hautsch](https://homepage.univie.ac.at/nikolaus.hautsch/) and I investigated under the microscope how markets respond to a sudden increase in the VIX based on an exhaustive 2007-2025 sample of *all* NASDAQ trading messages for two exchange-traded funds (ETFs): SPY for the S&P 500 equity index and TLT for government bonds. 
+
+We collect message-level snapshots of the NASDAQ limit order book for the very acticely traded ETF SPY that provides exposure to the S\&P~500 (SPY). For our analysis we retrieve and evaluate the entire available order book message history from July~1st 2007 to October~31st 2025 from data provider LOBSTER.
+
+Our sample contains a record for *each* message (submissions, adjustments, and cancellations of market and limit orders) and reconstructed snapshots of the complete order book for the first 50 levels.
+
+We restrict our analysis to order book activity during regular trading hours. The entire dataset comprises more than 20 billion order book messages and was evaluated using the procedures described in [a previous post](blog/hf-and-lobster/index.qmd). 
+
+For a meaningful analysis, we aggregate the order book messages for each ticker into the following six variables, measured at 5-second intervals.
+
+- Initiator net volume (in million USD) which is the net of buyer and seller initiated shares transacted during the last 5-second interval. We sign transactions as +1 if executed against a sell-side limit order and -1 if executed against a buy-side limit order. For execution against a hidden limit order, we impose the sign +1 if the transaction executes at a price that exceeds the last observed midquote and -1 if the transaction price is below the last observed midquote. To make the values comparable across assets, we multiply the aggregate net number of traded shares with the rolling 12-month average midquote computed for each ticker.
+- Return (in basis points) computed as $\log(p_{t, \tau}) - \log(p_{t, \tau - 1})$, where $t$ corresponds to the trading day and 5-second time stamps are $\tau \in\left\{0, \ldots, 78\right\}$ which range from 09:30~a.m.~($\tau = 0$) until 4:00~p.m.~($\tau = 78$). $p_{t, \tau}$ is the last observed midquote on day $t$ before time stamp $\tau$. 
+-  Trading volume (in million USD), which is the cumulative trading volume during each 5-second interval. We compute trading volume as the number of traded shares times the transaction price. 
+- Bid-ask spread (in basis points), computed as the time-weighted average difference between the best prices quoted at the sell and buy side of the order book during each 5-second interval. We compute the bid-ask spread relative to the current midquote for every order book snapshot. 
+- Depth (in million USD), measured as the number of posted shares in visible limit orders 5 basis points from the current best price on both sides of the order book. We take the time-weighted average depth during each interval to aggregate depth from message level into 5-second intervals. To make the values comparable across assets, we multiply the number of available shares with the rolling 12-month average midquote computed for each ticker. 
+- Amihud illiquidity measure, computed every five seconds as $ILLIQ_{t, \tau} := {\left|\log(p_{t, \tau}) - \log(p_{t, \tau - 1})\right|}/{V_{t,\tau}}$. $ILLIQ_{t, \tau}$ corresponds to the absolute midquote log return divided by trading volume $V_{t, \tau}$ executed on NASDAQ  (in million USD). High values indicate large price impacts per unit traded and are thus associated with illiquidity. In our empirical analysis, we set $ILLIQ_{t, \tau}$ to missing values for time stamps for which the trading volume is zero.  
+
+In order to process these massive amounts of data, we relied on one of Denmarks largest supercomputing facilities. In order to render follow-up research feasible, we decided to make the aggregated data accessible on [Huggingface](https://huggingface.co/datasets/voigtstefan/sp500), including a fast, easy and transparent connector via the `tidyfinance` library. 
+
+All you need is the following call to `download_data`:
+
+```{r}
+library(tidyfinance)
+library(tidyverse)
+
+download_data("hf", start_date = "2020-01-01", end_date = "2020-01-15")
+```
+
+## A simple case study
+
+Supppose you are interested in high-frequency responses of the S&P 500 index to FOMC announcements within a short window around the announcements. [Marek Jarocinski](https://marekjarocinski.github.io/) at the ECB collected a long history of FOMC announcement dates (Source: Updating Monetary Policy and Central Bank Information shocks originally constructed in Jarocinski, M. and Karadi, P. (2020) Deconstructing Monetary Policy Surprises - The Role of Information Shocks, AEJ:Macro, DOI: http://doi.org/10.1257/mac.20180090), which we use for our case study. 
+
+Note that we focus on a lot of data. In total, we record 324 central bank event dates. For each date, we could download 5-second level observations for the S&P 500 tracking ETF SPY. Thus, the next code chunk downloads all dates for which FOMC announcements took place. We then download S&P 500 data for a random subset of 50 such days. 
+
+```{r}
+#| cache: true
+window_size <- 30
+
+central_bank_events <- read_csv("https://raw.githubusercontent.com/marekjarocinski/jkshocks_update_fed/main/shocks_fed_jk_t.csv",
+show_col_types  = FALSE) |>
+  transmute(
+    time = start,
+    start_ts = start - minutes(window_size),
+    end_ts = start + minutes(window_size)
+  ) 
+
+set.seed(2026)
+data <- central_bank_events |> 
+  mutate(date = as.Date(time)) |> 
+  filter(date > "2006-07-27") |>
+  sample_n(50) |> 
+  rowwise() |> 
+  mutate(data = map(date, ~ download_data("hf", start_date = .x, end_date = .x))) 
+```
+
+
+Once we downloaded all the data for every FOMC announcement within our sample period, we can aggregate trading information around the event times. In the example below, we focus on quoted depth, trading volume and the bid-ask spreads. 
+
+```{r}
+hf_data <- data |>
+  unnest(data) |>
+  group_by(date) |>
+  mutate(open_midquote = first(midquote),
+      time_rel = as.numeric(difftime(ts, time, units = "mins")),
+    depth = (depth5_bid + depth5_ask) * open_midquote / 1e6,
+    trading_volume = trading_volume / 1e6) |>
+  ungroup() |>
+  filter(ts >= start_ts, ts <= end_ts) |>
+  select(time_rel, trading_volume, depth, spread) |>
+  pivot_longer(cols = -time_rel) |> 
+  group_by(time_rel, name) |>
+  summarise(
+    across(value,
+      list(
+        mean = \(x) mean(x, na.rm = TRUE),
+        p5   = \(x) quantile(x, 0.05, na.rm = TRUE),
+        p95  = \(x) quantile(x, 0.95, na.rm = TRUE)
+      ),
+      .names = "{.fn}" 
+    ),
+    .groups = "drop"
+  ) |> 
+ mutate(
+    name = case_when(
+      name == "trading_volume" ~ "Trading volume (mUSD)",
+      name == "spread"         ~ "Bid-ask spread (bp)",
+      name == "depth"          ~ "Quoted depth (mUSD)")
+  )
+```
+
+Finally, we illustrate how markets respond at high-frequencies to FOMC announcements around the exact time of announcement. 
+```{r}
+hf_data |>
+  ggplot(aes(x = time_rel, y = mean)) +
+  facet_wrap(~name, scales = "free_y") +
+  geom_line() +
+  labs(
+    x = "Minutes from announcement",
+    y = NULL,
+    title = "Event-Study (HF Data): average value around FOMC announcements",
+    color = NULL
+  ) +
+  geom_ribbon(aes(ymin = p5, ymax = p95), alpha = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey") +
+  theme_minimal() +
+  theme(legend.position = "None") +
+  scale_x_continuous(breaks = seq(-window_size, window_size, by = 5))
+```
+
+
