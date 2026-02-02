@@ -1,10 +1,12 @@
 ---
 title: WRDS, CRSP, and Compustat
 aliases:
-  - ../wrds-crsp-and-compustat.html
+    - ../wrds-crsp-and-compustat.html
 metadata:
-  pagetitle: WRDS, CRSP, and Compustat with R
-  description-meta: Use the programming language R to download stock and firm data such as CRSP and Compustat from WRDS. 
+    pagetitle: WRDS, CRSP, and Compustat with R
+    description-meta: Use the programming language R to download stock and firm data such as CRSP and Compustat from WRDS. 
+params:
+    download_data: false
 ---
 
 ::: callout-note
@@ -46,6 +48,7 @@ To establish a connection to WRDS, you use the function `dbConnect()` with argum
 Additionally, you have to use two-factor authentication since May 2023 when establishing a `PostgreSQL` or other remote connections. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires two-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.\index{Two-factor authentication}\index{WRDS:Two-factor authentication}
 
 ```{r}
+#| eval: !expr params$download_data
 wrds <- dbConnect(
   Postgres(),
   host = "wrds-pgdata.wharton.upenn.edu",
@@ -72,18 +75,21 @@ The remote connection to WRDS is very useful. Yet, the database itself contains 
 \index{Data!CRSP}[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data.^[The `tbl()` function creates a lazy table in our R session based on the remote WRDS database. To look up specific tables, we use the `I("schema_name.table_name")` approach.] Actually, we need two tables to get the desired data: (i) the CRSP monthly security file,
 
 ```{r}
+#| eval: !expr params$download_data
 msf_db <- tbl(wrds, I("crsp.msf_v2"))
 ```
 
 and (ii) the identifying information,
 
 ```{r}
+#| eval: !expr params$download_data
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 ```
 
 We use the two remote tables to fetch the data we want to put into our local folder. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)^[These three criteria jointly replicate the filter `exchcd %in% c(1, 2, 3, 31, 32, 33)` used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the `conditionaltype == "RW"`, which is equivalent to the restriction of `exchcd %in% c(1, 2, 3)` with the old CRSP format.], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf` (see our blog post about [CRSP 2.0](../blog/crsp-v2-update/index.qmd) for more information). We refer to @SchwarzEtAl2026 for details on the changes in the CRSP tape rolled out in 2025. Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.\index{Permno}\index{Returns!Delisting}\index{Industry codes}
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- msf_db |>
   filter(mthcaldt >= start_date & mthcaldt <= end_date) |>
   select(-c(siccd, primaryexch, conditionaltype, tradingstatusflg)) |>
@@ -125,6 +131,7 @@ Now, we have all the relevant monthly return data in memory and proceed with pre
 The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock's price, you need to adjust it with a cumulative adjustment factor.  We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- crsp_monthly |>
   mutate(
     mktcap = shrout * prc / 10^6,
@@ -135,6 +142,7 @@ crsp_monthly <- crsp_monthly |>
 The next variable we frequently use is the one-month *lagged* market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.\index{Weighting!Value}
 
 ```{r}
+#| eval: !expr params$download_data
 mktcap_lag <- crsp_monthly |>
   mutate(date = date %m+% months(1)) |>
   select(permno, date, mktcap_lag = mktcap)
@@ -148,6 +156,7 @@ If you wonder why we do not use the `lag()` function, e.g., via `crsp_monthly |>
 Next, we transform primary listing exchange codes to explicit exchange names.\index{Exchange!Exchange codes}
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- crsp_monthly |>
   mutate(
     exchange = case_when(
@@ -162,6 +171,7 @@ crsp_monthly <- crsp_monthly |>
 Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries [e.g., @FamaFrench1997] that are commonly used.
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- crsp_monthly |>
   mutate(
     industry = case_when(
@@ -184,6 +194,7 @@ crsp_monthly <- crsp_monthly |>
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our tibble. Note that we ensure excess returns are bounded by -1 from below as a return less than -100 percent makes no sense conceptually. Before we can adjust the returns, we have to load the table `factors_ff3_monthly`.
 
 ```{r}
+#| eval: !expr params$download_data
 factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
   select(date, risk_free)
 
@@ -210,6 +221,7 @@ crsp_monthly <- download_data(
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization. 
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- crsp_monthly |>
   drop_na(ret_excess, mktcap, mktcap_lag)
 ```
@@ -217,7 +229,14 @@ crsp_monthly <- crsp_monthly |>
 Finally, we store the monthly CRSP file in our data folder. 
 
 ```{r}
+#| eval: !expr params$download_data
 write_parquet(crsp_monthly, "data-r/crsp_monthly.parquet")
+```
+
+```{r}
+#| eval: !expr "!params$download_data"
+#| echo: false
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet")
 ```
 
 ## First Glimpse of the CRSP Sample
@@ -344,8 +363,8 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `message()`.  As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
 
 ```{r}
+#| eval: !expr params$download_data
 #| output: false
-#| eval: false
 dsf_db <- tbl(wrds, I("crsp.dsf_v2"))
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 
@@ -444,12 +463,14 @@ Firm accounting data are an important source of information that we use in portf
 To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies.
 
 ```{r}
+#| eval: !expr params$download_data
 funda_db <- tbl(wrds, I("comp.funda"))
 ```
 
 We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, which includes companies that are primarily involved in manufacturing, services, and other non-financial business activities,^[Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.] (ii) in the standard format (i.e., consolidated information in standard presentation), (iii) reported in USD,^[Compustat also contains reports in CAD, which can lead a currency mismatch, e.g., when relating book equity to market equity.] and (iv) only data in the desired time window.\index{Gvkey}
 
 ```{r}
+#| eval: !expr params$download_data
 compustat_annual <- funda_db |>
   filter(
     indfmt == "INDL" &
@@ -485,6 +506,7 @@ compustat_annual <- funda_db |>
 Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Ken French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}\index{Operating profitability}
 
 ```{r}
+#| eval: !expr params$download_data
 compustat_annual <- compustat_annual |>
   mutate(
     be = coalesce(seq, ceq + pstk, at - lt) +
@@ -499,6 +521,7 @@ compustat_annual <- compustat_annual |>
 We keep only the last available information for each firm-year group. Note that `datadate` defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2022). Therefore, `datadate` is not the date when data was made available to the public. Check out the exercises for more insights into the peculiarities of `datadate`.
 
 ```{r}
+#| eval: !expr params$download_data
 compustat_annual <- compustat_annual |>
   mutate(year = year(datadate)) |>
   group_by(gvkey, year) |>
@@ -509,6 +532,7 @@ compustat_annual <- compustat_annual |>
 We also compute the investment ratio `inv` according to Ken French's variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.\index{Investment ratio}
 
 ```{r}
+#| eval: !expr params$download_data
 compustat_annual <- compustat_annual |>
   left_join(
     compustat_annual |>
@@ -525,6 +549,7 @@ compustat_annual <- compustat_annual |>
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local folder.
 
 ```{r}
+#| eval: !expr params$download_data
 write_parquet(compustat_annual, "data-r/compustat_annual.parquet")
 ```
 
@@ -539,17 +564,25 @@ compustat_annual <- download_data(
 )
 ```
 
+```{r}
+#| eval: !expr "!params$download_data"
+#| echo: false
+compustat_annual <- read_parquet("data-r/compustat_annual.parquet")
+```
+
 ## Merging CRSP with Compustat
 
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!Crsp-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table}
 
 ```{r}
+#| eval: !expr params$download_data
 ccm_linking_table_db <- tbl(wrds, I("crsp.ccmxpf_lnkhist"))
 ```
 
 The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via `today()`.
 
 ```{r}
+#| eval: !expr params$download_data
 ccm_linking_table <- ccm_linking_table_db |>
   filter(
     linktype %in% c("LU", "LC") & linkprim %in% c("P", "C")
@@ -562,6 +595,7 @@ ccm_linking_table <- ccm_linking_table_db |>
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data. 
 
 ```{r}
+#| eval: !expr params$download_data
 ccm_links <- crsp_monthly |>
   inner_join(
     ccm_linking_table,
@@ -585,6 +619,7 @@ ccm_links <- download_data(type = "wrds_ccm_links")
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local folder.
 
 ```{r}
+#| eval: !expr params$download_data
 crsp_monthly <- crsp_monthly |>
   left_join(ccm_links, join_by(permno, date))
 

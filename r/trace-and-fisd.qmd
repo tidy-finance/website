@@ -1,10 +1,12 @@
 ---
 title: TRACE and FISD
 aliases:
-  - ../trace-and-fisd.html
+    - ../trace-and-fisd.html
 metadata:
-  pagetitle: TRACE and FISD with R
-  description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language R. 
+    pagetitle: TRACE and FISD with R
+    description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language R. 
+params:
+    download_data: false
 ---
 
 ::: callout-note
@@ -30,9 +32,10 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 
 ## Bond Data from WRDS 
 
-Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{WRDS}
 
 ```{r}
+#| eval: !expr params$download_data
 wrds <- dbConnect(
   Postgres(),
   host = "wrds-pgdata.wharton.upenn.edu",
@@ -70,6 +73,7 @@ The following chunk connects to the data and selects the bond sample to remove c
 1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{r}
+#| eval: !expr params$download_data
 fisd_mergedissue_db <- tbl(wrds, I("fisd.fisd_mergedissue"))
 
 fisd <- fisd_mergedissue_db |>
@@ -139,6 +143,7 @@ fisd <- fisd_mergedissue_db |>
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
+#| eval: !expr params$download_data
 fisd_mergedissuer_db <- tbl(wrds, I("fisd.fisd_mergedissuer"))
 
 fisd_issuer <- fisd_mergedissuer_db |>
@@ -154,17 +159,25 @@ fisd <- fisd |>
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
 
 ```{r}
+#| eval: !expr params$download_data
 #| output: false
 download_data("wrds_fisd")
 ```
 
-Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
+Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
+#| eval: !expr params$download_data
 write_parquet(fisd, "data-r/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
+
+```{r}
+#| echo: false
+#| eval: !expr "!params$download_data"
+fisd <- read_parquet("data-r/fisd.parquet")
+```
 
 ## TRACE
 
@@ -184,10 +197,11 @@ fisd_parts <- split(
 )
 ```
 
-Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches. Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
 
 ```{r}
-#| eval: false
+#| eval: !expr params$download_data
+#| output: false
 batches <- length(fisd_parts)
 
 for (j in 1:batches) {
@@ -217,6 +231,7 @@ for (j in 1:batches) {
 If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
 
 ```{r}
+#| eval: !expr params$download_data
 #| output: false
 download_data(
   "wrds_trace_enhanced",
@@ -251,16 +266,16 @@ bonds_outstanding <- expand_grid(
   mutate(type = "Outstanding")
 ```
 
-Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
+Next, we look at the bonds traded each quarter in the same period. Notice that we do not have to load the complete TRACE table from our dataset into memory to perform the simple aggregation. Arrow's `open_dataset()` creates a lazy query plan that pushes all the filtering and aggregation down to its backend engine, reading only the necessary columns from Parquet and returning just the small summarized result to our session when we call `collect()`.
 
 ```{r}
-trace_enhanced <- open_dataset("data-r/trace_enhanced") |>
-  collect()
+trace_enhanced <- open_dataset("data-r/trace_enhanced")  
 
 bonds_traded <- trace_enhanced |>
   mutate(date = floor_date(trd_exctn_dt, "quarters")) |>
   group_by(date) |>
-  summarize(n = length(unique(cusip_id)), type = "Traded", .groups = "drop")
+  summarize(n = n_distinct(cusip_id), type = "Traded", .groups = "drop") |> 
+  collect()
 ```
 
 Finally, we plot the two time series in @fig-401.
@@ -325,6 +340,7 @@ trace_enhanced |>
     trade_number = n(),
     .groups = "drop"
   ) |>
+  collect() |> 
   pivot_longer(cols = c(trade_size, trade_number), names_to = "measure") |>
   group_by(measure) |>
   summarize(
