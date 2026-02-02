@@ -21,8 +21,9 @@ We use the following Python packages throughout this chapter:
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 import statsmodels.formula.api as smf
+import pyarrow.dataset as ds
+import os
 
 from plotnine import *
 from mizani.formatters import percent_format
@@ -40,26 +41,20 @@ Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmode
 
 ## Estimating Beta Using Monthly Returns
 
-The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
+The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-crsp_monthly = (pd.read_sql_query(
-    sql="SELECT permno, date, industry, ret_excess FROM crsp_monthly",
-    con=tidy_finance,
-    parse_dates={"date"})
-  .dropna()
+crsp_monthly = (pd.read_parquet("data-python/crsp_monthly.parquet")
+    .get(["permno", "date", "industry", "ret_excess"])
+    .dropna()
 )
 
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, mkt_excess FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .get(["date", "mkt_excess"])
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(factors_ff3_monthly, how="left", on="date")
+    .merge(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -231,70 +226,62 @@ Before we provide some descriptive statistics of our beta estimates, we implemen
 First, we load the daily Fama-French market excess returns and extract the vector of dates.
 
 ```{python}
-factors_ff3_daily = pd.read_sql_query(
-  sql="SELECT date, mkt_excess FROM factors_ff3_daily",
-  con=tidy_finance,
-  parse_dates={"date"}
+factors_ff3_daily = (pd.read_parquet("data-python/factors_ff3_daily.parquet")
+    .get(["date", "mkt_excess"])
 )
 ```
 
-We use the stocks from the monthly CRSP dataset as our reference point and process them in batches of 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
+We then create a connection to the daily CRSP data, but we don't load the whole table into our memory. We only extract all distinct `permno` because we loop the beta estimation over batches of stocks with size 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
 
 ```{python}
-permnos = list(crsp_monthly["permno"].unique().astype(str))
+crsp_daily_db = ds.dataset(
+    "data-python/crsp_daily", format="parquet", partitioning="hive"
+)
+
+permnos = [
+    int(folder.split("=")[1])
+    for folder in os.listdir("data-python/crsp_daily")
+    if folder.startswith("permno=")
+]
 
 batch_size = 500
-batches = np.ceil(len(permnos)/batch_size).astype(int)
+batches = np.ceil(len(permnos) / batch_size).astype(int)
 min_obs = 1_000
 ```
 
 We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. Note that we also convert the daily date to the beginning of the month so that we can still look back over 60 months and get one beta estimate per month, even though we are using daily data.
 
 ```{python}
-#| output: false
+# | output: false
 capm_daily = []
 
-for j in range(1, batches+1):  
-    permno_batch = permnos[
-      ((j-1)*batch_size):(min(j*batch_size, len(permnos)))
-    ]
-    
-    permno_batch_formatted = (
-      ", ".join(f"'{permno}'" for permno in permno_batch)
-    )
-    permno_string = f"({permno_batch_formatted})"
-    
-    crsp_daily_sub_query = (
-      "SELECT permno, date, ret_excess "
-        "FROM crsp_daily "
-       f"WHERE permno IN {permno_string}" 
-    )
-      
-    crsp_daily_sub = pd.read_sql_query(
-      sql=crsp_daily_sub_query,
-      con=tidy_finance,
-      dtype={"permno": int},
-      parse_dates={"date"}
-    )
-    
-    crsp_daily_sub_nested = (crsp_daily_sub
-      .merge(factors_ff3_daily, how="inner", on="date")
-      .assign(
-          date = lambda x: 
-            x["date"].dt.to_period("M").dt.to_timestamp()
+for j in range(1, batches + 1):
+    permno_batch = permnos[((j - 1) * batch_size) : (min(j * batch_size, len(permnos)))]
+
+    crsp_daily_sub = (crsp_daily_db
+        .scanner(
+            columns=["permno", "date", "ret_excess"],
+            filter=ds.field("permno").isin(permno_batch),
         )
-      .groupby("permno", group_keys=False)
+        .to_table()
+        .to_pandas()
     )
-    
+
+    crsp_daily_sub_nested = (crsp_daily_sub
+        .merge(factors_ff3_daily, how="inner", on="date")
+        .assign(date=lambda x: x["date"].dt.to_period("M").dt.to_timestamp())
+        .groupby("permno", group_keys=False)
+    )
+
     results = Parallel(n_jobs=n_cores)(
         delayed(
-            lambda name, group: roll_capm_estimation(group, min_obs=min_obs).assign(permno=name)
-        )(
-            name, group
-        )
+            lambda name, group: roll_capm_estimation(group, min_obs=min_obs).assign(
+                permno=name
+            )
+        )(name, group)
         for name, group in crsp_daily_sub_nested
     )
-    
+
     if results:
         capm_daily_sub = pd.concat(results).get(
             ["permno", "date", "coefficient", "estimate", "t_statistic"]
@@ -302,9 +289,9 @@ for j in range(1, batches+1):
         capm_daily.append(capm_daily_sub)
     else:
         print(f"Warning: Batch {j} produced no results (insufficient data)")
-              
-    print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
-  
+
+    print(f"Batch {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
+
 capm_daily = pd.concat(capm_daily)
 ```
 
@@ -440,17 +427,12 @@ beta_comparison_figure.show()
 
 The estimates in @fig-604 look as expected. As you can see, it really depends on the data frequency how your beta estimates turn out because the estimates based on daily data are much smoother due to the higher number of observations in each regression. 
 
-Finally, we write the estimates to our database so that we can use them in later chapters. 
+Finally, we write the estimates to our local folder so that we can use them in later chapters. 
 
 ```{python}
 #| output: false
-(beta.to_sql(
-  name="beta", 
-  con=tidy_finance, 
-  if_exists="replace",
-  index=False
-  )
-)
+
+beta.to_parquet("data-python/beta.parquet")
 ```
 
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. This descriptive helps us discover potential errors in our data preparation or estimation procedure. For instance, suppose there was a gap in our output where we do not have any betas. In this case, we would have to go back and check all previous steps to find out what went wrong. 
@@ -462,8 +444,8 @@ Whenever you perform some kind of estimation, it also makes sense to do rough pl
 #| fig-pos: "htb"
 return_types = pd.DataFrame({"return_type": ["monthly", "daily"]})
 
-beta_coverage = (
-    crsp_monthly.merge(return_types, how="cross")
+beta_coverage = (crsp_monthly
+    .merge(return_types, how="cross")
     .merge(beta, on=["permno", "date", "return_type"], how="left")
     .groupby(["date", "return_type"], as_index=False)
     .apply(lambda x: pd.Series({"share": x["beta"].notna().sum() / len(x)}))

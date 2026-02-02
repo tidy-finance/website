@@ -1,8 +1,8 @@
 ---
 title: WRDS, CRSP, and Compustat
 metadata:
-  pagetitle: WRDS, CRSP, and Compustat with Python
-  description-meta: Use the programming language Python to download stock and firm data such as CRSP and Compustat from WRDS.
+    pagetitle: WRDS, CRSP, and Compustat with Python
+    description-meta: Use the programming language Python to download stock and firm data such as CRSP and Compustat from WRDS.
 ---
 
 ```{python}
@@ -14,9 +14,9 @@ exec(open("python/render-settings.py").read())
 You are reading **Tidy Finance with Python**. You can find the equivalent chapter for the sibling **Tidy Finance with R** [here](../r/wrds-crsp-and-compustat.qmd).
 :::
 
-This chapter shows how to connect to [Wharton Research Data Services (WRDS),](https://wrds-www.wharton.upenn.edu/) a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the databases and store them in the SQLite database introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
+This chapter shows how to connect to [Wharton Research Data Services (WRDS),](https://wrds-www.wharton.upenn.edu/) a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the datasets and store them as Parquet-files introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.\index{WRDS}
 
-If you don't have access to WRDS but still want to run the code in this book, we refer to [WRDS Dummy Data](wrds-dummy-data.qmd), where we show how to create a dummy database that contains the WRDS tables and corresponding columns. With this database at hand, all code chunks in this book can be executed with this dummy database.
+If you don't have access to WRDS but still want to run the code in this book, we refer to [WRDS Pseudo Data](wrds-dummy-data.qmd), where we show how to create a pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.
 
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. The last two packages are used for plotting.
 
@@ -24,7 +24,9 @@ First, we load the Python packages that we use throughout this chapter. Later on
 import pandas as pd
 import numpy as np
 import tidyfinance as tf
-import sqlite3
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 
 from plotnine import *
 from mizani.formatters import comma_format, percent_format
@@ -45,9 +47,10 @@ end_date = "12/31/2024"
 
 ## Accessing WRDS
 
-WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is also organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with Python as SQL. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.^[An alternative to establish a connection to WRDS is to use the `WRDS-Py` library. We chose to work with `sqlalchemy` [@sqlalchemy] to show how to access PostgreSQL engines  in general.]\index{Database!PostgreSQL} 
+WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with Python as SQL. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.^[An alternative to establish a connection to WRDS is to use the `WRDS-Py` library. We chose to work with `sqlalchemy` [@sqlalchemy] to show how to access PostgreSQL engines  in general.]\index{Database!PostgreSQL} 
 
 ```{python}
+#| eval: false
 from sqlalchemy import create_engine
 ```
 
@@ -56,15 +59,17 @@ To establish a connection to WRDS, you use the function `create_engine()` with a
 Additionally, you have to use two-factor authentication since May 2023 when establishing a remote connection to WRDS. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires two-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.\index{Two-factor authentication}\index{WRDS!Two-factor authentication}
 
 ```{python}
+#| eval: false
 #| output: false
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 connection_string = (
-  "postgresql+psycopg2://"
- f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
-  "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
+    "postgresql+psycopg2://"
+    f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
+    "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
 )
 
 wrds = create_engine(connection_string, pool_pre_ping=True)
@@ -84,9 +89,10 @@ The remote connection to WRDS is very useful. Yet, the database itself contains 
 
 \index{Data!CRSP}[The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` engine object that we just created to first access monthly CRSP return data. Actually, we need two tables to get the desired data: (i) the CRSP monthly security file (`msf`), and (ii) the historical identifying information (`stksecurityinfohist `).
 
-We use the two remote tables to fetch the data we want to put into our local database. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)^[These three criteria jointly replicate the filter `exchcd %in% c(1, 2, 3, 31, 32, 33)` used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the `conditionaltype == "RW"`, which is equivalent to the restriction of `exchcd %in% c(1, 2, 3)` with the old CRSP format.], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf` (see our blog post about [CRSP 2.0](../blog/crsp-v2-update/index.qmd) for more information). Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.\index{Permno}\index{Returns!Delisting}\index{Industry codes}
+We use the two remote tables to fetch the data we want to put into our local folder. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)^[These three criteria jointly replicate the filter `exchcd %in% c(1, 2, 3, 31, 32, 33)` used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the `conditionaltype == "RW"`, which is equivalent to the restriction of `exchcd %in% c(1, 2, 3)` with the old CRSP format.], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf` (see our blog post about [CRSP 2.0](../blog/crsp-v2-update/index.qmd) for more information). We refer to @SchwarzEtAl2026 for details on the changes in the CRSP tape rolled out in 2025. Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.\index{Permno}\index{Returns!Delisting}\index{Industry codes}
 
 ```{python}
+#| eval: false
 crsp_monthly_query = (
   "SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "
          "msf.mthret AS ret, msf.shrout, msf.mthprc AS altprc, "
@@ -108,11 +114,11 @@ crsp_monthly_query = (
 )
 
 crsp_monthly = (pd.read_sql_query(
-    sql=crsp_monthly_query,
-    con=wrds,
-    dtype={"permno": int, "siccd": int},
-    parse_dates={"date"})
-  .assign(shrout=lambda x: x["shrout"]*1000)
+        sql=crsp_monthly_query,
+        con=wrds,
+        dtype={"permno": int, "siccd": int},
+        parse_dates={"date"})
+    .assign(shrout=lambda x: x["shrout"]*1000)
 )
 ```
 
@@ -121,31 +127,34 @@ Now, we have all the relevant monthly return data in memory and proceed with pre
 The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock's price, you need to adjust it with a cumulative adjustment factor.  We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{python}
+#| eval: false
 crsp_monthly = (crsp_monthly
-  .assign(mktcap=lambda x: x["shrout"]*x["altprc"]/1000000)
-  .assign(mktcap=lambda x: x["mktcap"].replace(0, np.nan))
+    .assign(mktcap=lambda x: x["shrout"]*x["altprc"]/1000000)
+    .assign(mktcap=lambda x: x["mktcap"].replace(0, np.nan))
 )
 ```
 
 The next variable we frequently use is the one-month *lagged* market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.\index{Weighting!Value}
 
 ```{python}
+#| eval: false
 mktcap_lag = (crsp_monthly
-  .assign(
-    date=lambda x: x["date"]+pd.DateOffset(months=1),
-    mktcap_lag=lambda x: x["mktcap"]
-  )
-  .get(["permno", "date", "mktcap_lag"])
+    .assign(
+        date=lambda x: x["date"]+pd.DateOffset(months=1),
+        mktcap_lag=lambda x: x["mktcap"]
+    )
+    .get(["permno", "date", "mktcap_lag"])
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(mktcap_lag, how="left", on=["permno", "date"])
+    .merge(mktcap_lag, how="left", on=["permno", "date"])
 )
 ```
 
 Next, we transform primary listing exchange codes to explicit exchange names.\index{Exchange!Exchange codes}
 
 ```{python}
+#| eval: false
 def assign_exchange(primaryexch):
     if primaryexch == "N":
         return "NYSE"
@@ -157,13 +166,14 @@ def assign_exchange(primaryexch):
         return "Other"
 
 crsp_monthly["exchange"] = (crsp_monthly["primaryexch"]
-  .apply(assign_exchange)
+    .apply(assign_exchange)
 )
 ```
 
 Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries [e.g., @FamaFrench1997] that are commonly used.
 
 ```{python}
+#| eval: false
 def assign_industry(siccd):
     if 1 <= siccd <= 999:
         return "Agriculture"
@@ -191,26 +201,23 @@ def assign_industry(siccd):
         return "Missing"
 
 crsp_monthly["industry"] = (crsp_monthly["siccd"]
-  .apply(assign_industry)
+    .apply(assign_industry)
 )
 ```
 
-Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our data frame. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we have to connect to our database and load the data frame `factors_ff3_monthly`.
+Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our data frame. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we load the data frame `factors_ff3_monthly`.
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT date, risk_free FROM factors_ff3_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
+#| eval: false
+factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .get(["date", "risk_free"])
 )
   
 crsp_monthly = (crsp_monthly
-  .merge(factors_ff3_monthly, how="left", on="date")
-  .assign(ret_excess=lambda x: x["ret"]-x["risk_free"])
-  .assign(ret_excess=lambda x: x["ret_excess"].clip(lower=-1))
-  .drop(columns=["risk_free"])
+    .merge(factors_ff3_monthly, how="left", on="date")
+    .assign(ret_excess=lambda x: x["ret"]-x["risk_free"])
+    .assign(ret_excess=lambda x: x["ret_excess"].clip(lower=-1))
+    .drop(columns=["risk_free"])
 )
 ```
 
@@ -219,31 +226,33 @@ The `tidyfinance` package provides a shortcut to implement all these processing 
 ```{python}
 #| eval: false
 crsp_monthly = tf.download_data(
-  domain="wrds",
-  dataset="crsp_monthly",
-  start_date=start_date,
-  end_date=end_date
+    domain="wrds",
+    dataset="crsp_monthly",
+    start_date=start_date,
+    end_date=end_date
 )
 ```
 
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization. 
 
 ```{python}
+#| eval: false
 crsp_monthly = (crsp_monthly
-  .dropna(subset=["ret_excess", "mktcap", "mktcap_lag"])
+    .dropna(subset=["ret_excess", "mktcap", "mktcap_lag"])
 )
 ```
 
-Finally, we store the monthly CRSP file in our database.
+Finally, we store the monthly CRSP file in our folder.
 
 ```{python}
+#| eval: false
 #| output: false
-(crsp_monthly
-  .to_sql(name="crsp_monthly", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+crsp_monthly.to_parquet("data-python/crsp_monthly.parquet")
+```
+
+```{python}
+#| eval: true
+crsp_monthly = pd.read_parquet("data-python/crsp_monthly.parquet")
 ```
 
 ## First Glimpse of the CRSP Sample
@@ -257,62 +266,58 @@ Before we move on to other data sources, let us look at some descriptive statist
 #| fig-cap: "The figure shows the monthly number of stocks in the CRSP sample listed at each of the US exchanges."
 #| fig-alt: "Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2024. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."
 securities_per_exchange = (crsp_monthly
-  .groupby(["exchange", "date"])
-  .size()
-  .reset_index(name="n")
+    .groupby(["exchange", "date"])
+    .size()
+    .reset_index(name="n")
 )
 
 securities_per_exchange_figure = (
-  ggplot(
-    securities_per_exchange, 
-    aes(x="date", y="n", color="exchange", linetype="exchange")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-      title="Monthly number of securities by listing exchange"
+    ggplot(
+        securities_per_exchange, 
+        aes(x="date", y="n", color="exchange", linetype="exchange")
     )
-  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
-  + scale_y_continuous(labels=comma_format())
+    + geom_line()
+    + labs(
+        x="", y="", color="", linetype="",
+        title="Monthly number of securities by listing exchange"
+        )
+    + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+    + scale_y_continuous(labels=comma_format())
 )
 securities_per_exchange_figure.show()
 ```
 
-Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in @fig-212. To ensure that we look at meaningful data that is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our database to calculate aggregate market caps by listing exchange. All values in @fig-212 are in terms of the end of 2024 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
+Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in @fig-212. To ensure that we look at meaningful data that is comparable over time, we adjust the nominal values for inflation. In fact, we can use the tables that are already in our folder to calculate aggregate market caps by listing exchange. All values in @fig-212 are in terms of the end of 2024 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.\index{Data!CPI}
 
 ```{python}
 #| label: fig-212
 #| fig-cap: "The figure shows the monthly market capitalization by listing exchange. Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." 
-cpi_monthly = pd.read_sql_query(
-  sql="SELECT * FROM cpi_monthly",
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+cpi_monthly = pd.read_parquet("data-python/cpi_monthly.parquet")
 
 market_cap_per_exchange = (crsp_monthly
-  .merge(cpi_monthly, how="left", on="date")
-  .groupby(["date", "exchange"])
-  .apply(
-    lambda group: pd.Series({
-      "mktcap": group["mktcap"].sum()/group["cpi"].mean()
-    })
-  )
-  .reset_index()
+    .merge(cpi_monthly, how="left", on="date")
+    .groupby(["date", "exchange"])
+    .apply(
+        lambda group: pd.Series({
+        "mktcap": group["mktcap"].sum()/group["cpi"].mean()
+        })
+    )
+    .reset_index()
 )
 
 market_cap_per_exchange_figure = (
-  ggplot(
-    market_cap_per_exchange, 
-    aes(x="date", y="mktcap/1000", color="exchange", linetype="exchange")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-      title="Monthly market cap by listing exchange in billions of Dec 2024 USD"
+    ggplot(
+        market_cap_per_exchange, 
+        aes(x="date", y="mktcap/1000", color="exchange", linetype="exchange")
     )
-  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
-  + scale_y_continuous(labels=comma_format())
+    + geom_line()
+    + labs(
+        x="", y="", color="", linetype="",
+        title="Monthly market cap by listing exchange in billions of Dec 2024 USD"
+        )
+    + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+    + scale_y_continuous(labels=comma_format())
 )
 market_cap_per_exchange_figure.show()
 ```
@@ -324,29 +329,29 @@ Next, we look at the same descriptive statistics by industry. @fig-213 plots the
 #| fig-cap: "The figure shows the monthly number of stocks in the CRSP sample associated with different industries."
 #| fig-alt: "Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2024 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2024, the segment of firms within public administration is the largest in terms of the number of listed stocks."
 securities_per_industry = (crsp_monthly
-  .groupby(["industry", "date"])
-  .size()
-  .reset_index(name="n")
+    .groupby(["industry", "date"])
+    .size()
+    .reset_index(name="n")
 )
 
 linetypes = ["-", "--", "-.", ":"]
 n_industries = securities_per_industry["industry"].nunique()
 
 securities_per_industry_figure = (
-  ggplot(
-    securities_per_industry, 
-    aes(x="date", y="n", color="industry", linetype="industry")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-      title="Monthly number of securities by industry"
+    ggplot(
+        securities_per_industry, 
+        aes(x="date", y="n", color="industry", linetype="industry")
     )
-  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
-  + scale_y_continuous(labels=comma_format())
-  + scale_linetype_manual(
-      values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
-    ) 
+    + geom_line()
+    + labs(
+        x="", y="", color="", linetype="",
+        title="Monthly number of securities by industry"
+        )
+    + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+    + scale_y_continuous(labels=comma_format())
+    + scale_linetype_manual(
+        values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
+        ) 
 )
 securities_per_industry_figure.show()
 ```
@@ -358,54 +363,50 @@ We also compute the market cap of all stocks belonging to the respective industr
 #| fig-cap: "The figure shows the total Market capitalization in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2024."
 #| fig-alt: "Title: Monthly total market cap by industry in billions as of Dec 2024 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2024 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past."
 market_cap_per_industry = (crsp_monthly
-  .merge(cpi_monthly, how="left", on="date")
-  .groupby(["date", "industry"])
-  .apply(
-    lambda group: pd.Series({
-      "mktcap": (group["mktcap"].sum()/group["cpi"].mean())
-    })
-  )
-  .reset_index()
+    .merge(cpi_monthly, how="left", on="date")
+    .groupby(["date", "industry"])
+    .apply(
+        lambda group: pd.Series({
+        "mktcap": (group["mktcap"].sum()/group["cpi"].mean())
+        })
+    )
+    .reset_index()
 )
 
 market_cap_per_industry_figure = (
-  ggplot(
-    market_cap_per_industry, 
-    aes(x="date", y="mktcap/1000", color="industry", linetype="industry")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-      title="Monthly market cap by industry in billions of Dec 2024 USD"
+    ggplot(
+        market_cap_per_industry, 
+        aes(x="date", y="mktcap/1000", color="industry", linetype="industry")
     )
-  + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
-  + scale_y_continuous(labels=comma_format())
-  + scale_linetype_manual(
-      values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
-    ) 
+    + geom_line()
+    + labs(
+        x="", y="", color="", linetype="",
+        title="Monthly market cap by industry in billions of Dec 2024 USD"
+        )
+    + scale_x_datetime(date_breaks="10 years", date_labels="%Y")
+    + scale_y_continuous(labels=comma_format())
+    + scale_linetype_manual(
+        values=[linetypes[l % len(linetypes)] for l in range(n_industries)]
+        ) 
 )
 market_cap_per_industry_figure.show()
 ```
 
 ## Daily CRSP Data
 
-Before we turn to accounting data, we provide a proposal for downloading daily CRSP data with the same filters used for the monthly data (i.e., using information from `stksecurityinfohist`). While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20 GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire dataset to your local database), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your Python session. 
+Before we turn to accounting data, we provide a proposal for downloading daily CRSP data with the same filters used for the monthly data (i.e., using information from `stksecurityinfohist`). While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20 GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire dataset to your local folder), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your Python session. 
 
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `print()`. Notice that we also use the method `to_sql()` here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
 
 ```{python}
 #| output: false
 #| eval: false
-factors_ff3_daily = pd.read_sql(
-  sql="SELECT * FROM factors_ff3_daily", 
-  con=tidy_finance,
-  parse_dates={"date"}
-)
+factors_ff3_daily = pd.read_parquet("data-python/factors_ff3_daily.parquet")
 
 permnos = pd.read_sql(
-  sql="SELECT DISTINCT permno FROM crsp.stksecurityinfohist", 
-  con=wrds,
-  dtype={"permno": int}
+    sql="SELECT DISTINCT permno FROM crsp.stksecurityinfohist", 
+    con=wrds,
+    dtype={"permno": int}
 )
 
 permnos = list(permnos["permno"].astype(str))
@@ -415,81 +416,80 @@ batches = np.ceil(len(permnos)/batch_size).astype(int)
 
 for j in range(1, batches+1):  
     
-  permno_batch = permnos[
-    ((j-1)*batch_size):(min(j*batch_size, len(permnos)))
-  ]
-  
-  permno_batch_formatted = (
-    ", ".join(f"'{permno}'" for permno in permno_batch)
-  )
-  permno_string = f"({permno_batch_formatted})"
-  
-  crsp_daily_sub_query = (
-    "SELECT dsf.permno, dlycaldt AS date, dlyret AS ret "
-      "FROM crsp.dsf_v2 AS dsf "
-      "INNER JOIN crsp.stksecurityinfohist AS ssih "
-      "ON dsf.permno = ssih.permno AND "
-         "ssih.secinfostartdt <= dsf.dlycaldt AND "
-         "dsf.dlycaldt <= ssih.secinfoenddt "
-      f"WHERE dsf.permno IN {permno_string} "
-           f"AND dlycaldt BETWEEN '{start_date}' AND '{end_date}' "
-            "AND ssih.sharetype = 'NS' "
-            "AND ssih.securitytype = 'EQTY' "  
-            "AND ssih.securitysubtype = 'COM' " 
-            "AND ssih.usincflg = 'Y' " 
-            "AND ssih.issuertype in ('ACOR', 'CORP') " 
-            "AND ssih.primaryexch in ('N', 'A', 'Q') "
-            "AND ssih.conditionaltype in ('RW', 'NW') "
-            "AND ssih.tradingstatusflg = 'A'"
-  )
+    permno_batch = permnos[
+        ((j-1)*batch_size):(min(j*batch_size, len(permnos)))
+    ]
     
-  crsp_daily_sub = (pd.read_sql_query(
-      sql=crsp_daily_sub_query,
-      con=wrds,
-      dtype={"permno": int},
-      parse_dates={"date"}
+    permno_batch_formatted = (
+        ", ".join(f"'{permno}'" for permno in permno_batch)
     )
-    .dropna()
-   )
-
-  if not crsp_daily_sub.empty:
+    permno_string = f"({permno_batch_formatted})"
     
-      crsp_daily_sub = (crsp_daily_sub
-        .merge(factors_ff3_daily[["date", "risk_free"]], 
-               on="date", how="left")
-        .assign(
-          ret_excess = lambda x: 
-            ((x["ret"] - x["risk_free"]).clip(lower=-1))
-        )
-        .get(["permno", "date", "ret_excess"])
-      )
+    crsp_daily_sub_query = (
+        "SELECT dsf.permno, dlycaldt AS date, dlyret AS ret "
+        "FROM crsp.dsf_v2 AS dsf "
+        "INNER JOIN crsp.stksecurityinfohist AS ssih "
+        "ON dsf.permno = ssih.permno AND "
+            "ssih.secinfostartdt <= dsf.dlycaldt AND "
+            "dsf.dlycaldt <= ssih.secinfoenddt "
+        f"WHERE dsf.permno IN {permno_string} "
+            f"AND dlycaldt BETWEEN '{start_date}' AND '{end_date}' "
+                "AND ssih.sharetype = 'NS' "
+                "AND ssih.securitytype = 'EQTY' "  
+                "AND ssih.securitysubtype = 'COM' " 
+                "AND ssih.usincflg = 'Y' " 
+                "AND ssih.issuertype in ('ACOR', 'CORP') " 
+                "AND ssih.primaryexch in ('N', 'A', 'Q') "
+                "AND ssih.conditionaltype in ('RW', 'NW') "
+                "AND ssih.tradingstatusflg = 'A'"
+    )
         
-      if j == 1:
-        if_exists_string = "replace"
-      else:
-        if_exists_string = "append"
+    crsp_daily_sub = (pd.read_sql_query(
+        sql=crsp_daily_sub_query,
+        con=wrds,
+        dtype={"permno": int},
+        parse_dates={"date"}
+        )
+        .dropna()
+    )
 
-      crsp_daily_sub.to_sql(
-        name="crsp_daily", 
-        con=tidy_finance, 
-        if_exists=if_exists_string, 
-        index=False
-      )
-            
-  print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
+    if not crsp_daily_sub.empty:
+        
+        crsp_daily_sub = (crsp_daily_sub
+            .merge(factors_ff3_daily[["date", "risk_free"]], 
+                on="date", how="left")
+            .assign(
+            ret_excess = lambda x: 
+                ((x["ret"] - x["risk_free"]).clip(lower=-1)),
+                batch = j
+            )
+            .get(["batch", "permno", "date", "ret_excess"])
+        )
+
+        table = pa.Table.from_pandas(crsp_daily_sub, preserve_index=False)
+        pq.write_to_dataset(
+            table,
+            root_path="data-python/crsp_daily",
+            partition_cols=["permno"],
+            existing_data_behavior="overwrite_or_ignore"
+        )
+                
+    print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
 ```
 
-Eventually, we end up with more than 72 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local database contains only the data that we actually use. 
+The choice of partitioning strategy depends on your intended analysis. Partitioning by `permno` as above is efficient when you need to parallelize computations at the firm level or frequently query data for specific stocks, since only the relevant partition files are read. However, this creates many small files, which introduces overhead when reading the entire dataset. If your analysis primarily involves cross-sectional operations on specific dates, partitioning by `date` or `year` would be more efficient. Alternatively, you can skip partitioning entirely and store the data as fewer large files, which minimizes file-open overhead for full scans while still allowing filtering on any column—though without the benefit of partition pruning.
+
+Eventually, we end up with more than 72 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local folder contains only the data that we actually use. 
 
 To download the daily CRSP data via the `tidyfinance` package, you can call:
 
 ```{python}
 #| eval: false
 crsp_daily = tf.download_data(
-  domain="wrds",
-  dataset="crsp_daily",
-  start_date = start_date,
-  end_date = end_date
+    domain="wrds",
+    dataset="crsp_daily",
+    start_date = start_date,
+    end_date = end_date
 )
 ```
 
@@ -497,103 +497,108 @@ Note that you need at least 16 GB of memory to hold all the daily CRSP returns i
 
 ## Preparing Compustat Data
 
-Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence,](https://www.spglobal.com/marketintelligence/en/) which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962.
+Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by [S&P Global Market Intelligence,](https://www.spglobal.com/marketintelligence/en/) which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world.\index{Data!Compustat} For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962. We refer to @LyleEtAl2025 for a detailed account of the Compustat data collection process and ongoing readjustments, which may pose challenges for replicating prior research and may introduce look-ahead bias in archival data analyses.
 
 To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies. We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, which includes companies that are primarily involved in manufacturing, services, and other non-financial business activities,^[Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.], (ii) in the standard format (i.e., consolidated information in standard presentation), (iii) reported in USD,^[Compustat also contains reports in CAD, which can lead a currency mismatch, e.g., when relating book equity to market equity.] and (iv) only data in the desired time window.\index{Gvkey}
 
 ```{python}
+#| eval: false
 compustat_query = (
-  "SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,  pstkrv, "
-         "pstkl, pstk, capx, oancf, sale, cogs, xint, xsga "
-    "FROM comp.funda "
-    "WHERE indfmt = 'INDL' "
-          "AND datafmt = 'STD' "
-          "AND consol = 'C' "
-          "AND curcd = 'USD' "
-         f"AND datadate BETWEEN '{start_date}' AND '{end_date}'"
+    "SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,  pstkrv, "
+            "pstkl, pstk, capx, oancf, sale, cogs, xint, xsga "
+        "FROM comp.funda "
+        "WHERE indfmt = 'INDL' "
+            "AND datafmt = 'STD' "
+            "AND consol = 'C' "
+            "AND curcd = 'USD' "
+            f"AND datadate BETWEEN '{start_date}' AND '{end_date}'"
 )
 
-compustat = pd.read_sql_query(
-  sql=compustat_query,
-  con=wrds,
-  dtype={"gvkey": str},
-  parse_dates={"datadate"}
+compustat_annual = pd.read_sql_query(
+    sql=compustat_query,
+    con=wrds,
+    dtype={"gvkey": str},
+    parse_dates={"datadate"}
 )
 ```
 
 Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) Note that we set negative or zero equity to missing, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}\index{Preferred stock}\index{Operating profitability}
 
 ```{python}
-compustat = (compustat
-  .assign(
-    be=lambda x: 
-      (x["seq"].combine_first(x["ceq"]+x["pstk"])
-       .combine_first(x["at"]-x["lt"])+
-       x["txditc"].combine_first(x["txdb"]+x["itcb"]).fillna(0)-
-       x["pstkrv"].combine_first(x["pstkl"])
-       .combine_first(x["pstk"]).fillna(0))
-  )
-  .assign(
-    be=lambda x: x["be"].apply(lambda y: np.nan if y <= 0 else y)
-  )
-  .assign(
-    op=lambda x: 
-      ((x["sale"]-x["cogs"].fillna(0)- 
-        x["xsga"].fillna(0)-x["xint"].fillna(0))/x["be"])
-  )
+#| eval: false
+compustat_annual = (compustat_annual
+    .assign(
+        be=lambda x: 
+        (x["seq"].combine_first(x["ceq"]+x["pstk"])
+        .combine_first(x["at"]-x["lt"])+
+        x["txditc"].combine_first(x["txdb"]+x["itcb"]).fillna(0)-
+        x["pstkrv"].combine_first(x["pstkl"])
+        .combine_first(x["pstk"]).fillna(0))
+    )
+    .assign(
+        be=lambda x: x["be"].apply(lambda y: np.nan if y <= 0 else y)
+    )
+    .assign(
+        op=lambda x: 
+        ((x["sale"]-x["cogs"].fillna(0)- 
+            x["xsga"].fillna(0)-x["xint"].fillna(0))/x["be"])
+    )
 )
 ```
 
 We keep only the last available information for each firm-year group (by using the `tail(1)` pandas function for each group). Note that `datadate` defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2022). Therefore, `datadate` is not the date when data was made available to the public. Check out the Exercises for more insights into the peculiarities of `datadate`.
 
 ```{python}
-compustat = (compustat
-  .assign(year=lambda x: pd.DatetimeIndex(x["datadate"]).year)
-  .sort_values("datadate")
-  .groupby(["gvkey", "year"])
-  .tail(1)
-  .reset_index()
+#| eval: false
+compustat_annual = (compustat_annual
+    .assign(year=lambda x: pd.DatetimeIndex(x["datadate"]).year)
+    .sort_values("datadate")
+    .groupby(["gvkey", "year"])
+    .tail(1)
+    .reset_index()
 )
 ```
 
 We also compute the investment ratio (`inv`) according to Kenneth French's variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.\index{Investment ratio}
 
 ```{python}
-compustat_lag = (compustat
-  .get(["gvkey", "year", "at"])
-  .assign(year=lambda x: x["year"]+1)
-  .rename(columns={"at": "at_lag"})
+#| eval: false
+compustat_annual_lag = (compustat_annual
+    .get(["gvkey", "year", "at"])
+    .assign(year=lambda x: x["year"]+1)
+    .rename(columns={"at": "at_lag"})
 )
 
-compustat = (compustat
-  .merge(compustat_lag, how="left", on=["gvkey", "year"])
-  .assign(inv=lambda x: x["at"]/x["at_lag"]-1)
-  .assign(inv=lambda x: np.where(x["at_lag"] <= 0, np.nan, x["inv"]))
+compustat_annual = (compustat_annual
+    .merge(compustat_annual_lag, how="left", on=["gvkey", "year"])
+    .assign(inv=lambda x: x["at"]/x["at_lag"]-1)
+    .assign(inv=lambda x: np.where(x["at_lag"] <= 0, np.nan, x["inv"]))
 )
 ```
 
-With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local database. 
+With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local folder. 
 
 ```{python}
 #| output: false
-(compustat
-  .to_sql(name="compustat", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+#| eval: false
+compustat_annual.to_parquet("data-python/compustat_annual.parquet")
 ```
 
 The `tidyfinance` package provides a shortcut for these processing steps as well:
 
 ```{python}
 #| eval: false
-compustat = tf.download_data(
-  domain="wrds",
-  dataset="compustat_annual",
-  start_date = start_date,
-  end_date = end_date
+compustat_annual = tf.download_data(
+    domain="wrds",
+    dataset="compustat_annual",
+    start_date = start_date,
+    end_date = end_date
 )
+```
+
+```{python}
+#| eval: true
+compustat_annual = pd.read_parquet("data-python/compustat_annual.parquet")
 ```
 
 ## Merging CRSP with Compustat
@@ -601,19 +606,20 @@ compustat = tf.download_data(
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!CRSP-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table} The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via the SQL verb `CURRENT_DATE`.
 
 ```{python}
+#| eval: false
 ccm_linking_table_query = (
-  "SELECT lpermno AS permno, gvkey, linkdt, "
-         "COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "
-    "FROM crsp.ccmxpf_linktable "
-    "WHERE linktype IN ('LU', 'LC') "
-          "AND linkprim IN ('P', 'C')"
+    "SELECT lpermno AS permno, gvkey, linkdt, "
+            "COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "
+        "FROM crsp.ccmxpf_linktable "
+        "WHERE linktype IN ('LU', 'LC') "
+            "AND linkprim IN ('P', 'C')"
 )
 
 ccm_linking_table = pd.read_sql_query(
-  sql=ccm_linking_table_query,
-  con=wrds,
-  dtype={"permno": int, "gvkey": str},
-  parse_dates={"linkdt", "linkenddt"}
+    sql=ccm_linking_table_query,
+    con=wrds,
+    dtype={"permno": int, "gvkey": str},
+    parse_dates={"linkdt", "linkenddt"}
 )
 ```
 
@@ -627,63 +633,62 @@ ccm_links = tf.download_data(domain="wrds", dataset="ccm_links")
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data.
 
 ```{python}
+#| eval: false
 ccm_links = (crsp_monthly
-  .merge(ccm_linking_table, how="inner", on="permno")
-  .query("~gvkey.isnull() & (date >= linkdt) & (date <= linkenddt)")
-  .get(["permno", "gvkey", "date"])
+    .merge(ccm_linking_table, how="inner", on="permno")
+    .query("~gvkey.isnull() & (date >= linkdt) & (date <= linkenddt)")
+    .get(["permno", "gvkey", "date"])
 )
 
 crsp_monthly = (crsp_monthly
-  .merge(ccm_links, how="left", on=["permno", "date"])
+    .merge(ccm_links, how="left", on=["permno", "date"])
 )
 ```
 
-As the last step, we update the previously prepared monthly CRSP file with the linking information in our local database.
+As the last step, we update the previously prepared monthly CRSP file with the linking information in our local folder.
 
 ```{python}
+#| eval: false
 #| output: false
-(crsp_monthly
-  .to_sql(name="crsp_monthly", 
-          con=tidy_finance, 
-          if_exists="replace",
-          index=False)
-)
+crsp_monthly.to_parquet("data-python/crsp_monthly.parquet")
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 ```{python}
-#| label: fig-215 
-#| fig-cap: "The figure shows the end-of-year share of securities with book equity values by listing exchange."
-#| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
+# | label: fig-215
+# | fig-cap: "The figure shows the end-of-year share of securities with book equity values by listing exchange."
+# | fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
 share_with_be = (crsp_monthly
-  .assign(year=lambda x: pd.DatetimeIndex(x["date"]).year)
-  .sort_values("date")
-  .groupby(["permno", "year"])
-  .tail(1)
-  .reset_index()
-  .merge(compustat, how="left", on=["gvkey", "year"])
-  .groupby(["exchange", "year"])
-  .apply(
-    lambda x: pd.Series({
-    "share": x["permno"][~x["be"].isnull()].nunique()/x["permno"].nunique()
-    })
-  )
-  .reset_index()
+    .assign(year=lambda x: pd.DatetimeIndex(x["date"]).year)
+    .sort_values("date")
+    .groupby(["permno", "year"])
+    .tail(1)
+    .reset_index()
+    .merge(compustat_annual, how="left", on=["gvkey", "year"])
+    .groupby(["exchange", "year"])
+    .apply(
+        lambda x: pd.Series(
+            {"share": x["permno"][~x["be"].isnull()].nunique() / x["permno"].nunique()}
+        )
+    )
+    .reset_index()
 )
 
 share_with_be_figure = (
-  ggplot(
-    share_with_be, 
-    aes(x="year", y="share", color="exchange", linetype="exchange")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-      title="Share of securities with book equity values by exchange"
+    ggplot(
+        share_with_be, aes(x="year", y="share", color="exchange", linetype="exchange")
     )
-  + scale_y_continuous(labels=percent_format())
-  + coord_cartesian(ylim=(0, 1))
+    + geom_line()
+    + labs(
+        x="",
+        y="",
+        color="",
+        linetype="",
+        title="Share of securities with book equity values by exchange",
+    )
+    + scale_y_continuous(labels=percent_format())
+    + coord_cartesian(ylim=(0, 1))
 )
 share_with_be_figure.show()
 ```
@@ -701,8 +706,8 @@ The difference arises from the distinct coverage of the two databases. CRSP focu
 
 1. Compute `mkt_cap_lag` using `shift()` rather than using joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are the two measures different?
 1. Plot the average market capitalization of firms for each exchange and industry, respectively, over time. What do you find?
-1. In the `compustat` table, `datadate` refers to the date to which the fiscal year of a corresponding firm refers. Count the number of observations in Compustat by `month` of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
+1. In the `compustat_annual` table, `datadate` refers to the date to which the fiscal year of a corresponding firm refers. Count the number of observations in Compustat by `month` of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
 1. Go back to the original Compustat and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
-1. Keep the last observation of `crsp_monthly` by year and join it with the `compustat` table. Create the following plots: (i) aggregate book equity by exchange over time and (ii) aggregate annual book equity by industry over time. Do you notice any different patterns to the corresponding plots based on market capitalization?
+1. Keep the last observation of `crsp_monthly` by year and join it with the `compustat_annual` table. Create the following plots: (i) aggregate book equity by exchange over time and (ii) aggregate annual book equity by industry over time. Do you notice any different patterns to the corresponding plots based on market capitalization?
 1. Repeat the analysis of market capitalization for book equity, which we computed from the Compustat data. Then, use the matched sample to plot book equity against market capitalization. How are these two variables related?
 1. Before merging the CRSP and Compustat datasets, calculate and plot the proportion of Compustat firms that have corresponding stock return data in CRSP for each year. How does the coverage evolve over time?

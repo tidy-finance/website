@@ -19,7 +19,7 @@ Throughout this chapter, we use the following R packages:
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 library(scales)
 library(nloptr)
 ```
@@ -28,18 +28,11 @@ Compared to previous chapters, we introduce the `nloptr` package [@nloptr] to pe
 
 ## Data Preparation
 
-We start by loading the required data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
+We start by loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-industry_returns <- tbl(tidy_finance, "industries_ff_monthly") |>
+industry_returns <- read_parquet("data-r/industries_ff_monthly.parquet") |>
   select(-date) |>
-  collect() |> 
   drop_na()
 ```
 
@@ -106,6 +99,7 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 
 The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). 
 For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$. 
+
 ```{r}
 compute_efficient_weight <- function(Sigma,
                                      mu,

@@ -21,7 +21,7 @@ The chapter relies on the following set of packages:
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 library(scales)
 library(sandwich)
 library(lmtest)
@@ -33,21 +33,13 @@ Compared to previous chapters, we introduce the `rlang` package [@rlang] for mor
 
 ## Data Preparation
 
-First, we retrieve the relevant data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we retrieve the relevant data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet")
 
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-  collect()
-
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(smb) |>
-  collect()
+factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+  select(smb)
 ```
 
 ## Size Distribution
@@ -70,28 +62,39 @@ crsp_monthly |>
     top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1, 0)
   ) |>
   summarize(
-    total_market_cap =  sum(mktcap),
+    total_market_cap = sum(mktcap),
     `Largest 1% of stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
     `Largest 5% of stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
     `Largest 10% of stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
     `Largest 25% of stocks` = sum(mktcap[top25 == 1]) / total_market_cap,
     .groups = "drop"
   ) |>
-  select(-total_market_cap) |> 
+  select(-total_market_cap) |>
   pivot_longer(cols = -date) |>
-  mutate(name = factor(name, levels = c(
-    "Largest 1% of stocks", "Largest 5% of stocks",
-    "Largest 10% of stocks", "Largest 25% of stocks"
-  ))) |>
+  mutate(
+    name = factor(
+      name,
+      levels = c(
+        "Largest 1% of stocks",
+        "Largest 5% of stocks",
+        "Largest 10% of stocks",
+        "Largest 25% of stocks"
+      )
+    )
+  ) |>
   ggplot(aes(
-    x = date, 
-    y = value, 
+    x = date,
+    y = value,
     color = name,
-    linetype = name)) +
+    linetype = name
+  )) +
   geom_line() +
   scale_y_continuous(labels = percent, limits = c(0, 1)) +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Percentage of total market capitalization in largest stocks"
   )
 ```
@@ -104,14 +107,14 @@ Next, firm sizes also differ across listing exchanges. Stocks' primary listings 
 #| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 crsp_monthly |>
   group_by(date, exchange) |>
-  summarize(mktcap = sum(mktcap),
-            .groups = "drop_last") |>
+  summarize(mktcap = sum(mktcap), .groups = "drop_last") |>
   mutate(share = mktcap / sum(mktcap)) |>
   ggplot(aes(
-    x = date, 
-    y = share, 
-    fill = exchange, 
-    color = exchange)) +
+    x = date,
+    y = share,
+    fill = exchange,
+    color = exchange
+  )) +
   geom_area(
     position = "stack",
     stat = "identity",
@@ -120,7 +123,10 @@ crsp_monthly |>
   geom_line(position = "stack") +
   scale_y_continuous(labels = percent) +
   labs(
-    x = NULL, y = NULL, fill = NULL, color = NULL,
+    x = NULL,
+    y = NULL,
+    fill = NULL,
+    color = NULL,
     title = "Share of total market capitalization per listing exchange"
   )
 ```
@@ -149,10 +155,12 @@ crsp_monthly |>
   filter(date == max(date)) |>
   group_by(exchange) |>
   create_summary(mktcap) |>
-  add_row(crsp_monthly |>
-            filter(date == max(date)) |>
-            create_summary(mktcap) |>
-            mutate(exchange = "Overall"))
+  add_row(
+    crsp_monthly |>
+      filter(date == max(date)) |>
+      create_summary(mktcap) |>
+      mutate(exchange = "Overall")
+  )
 ```
 
 ## Univariate Size Portfolios with Flexible Breakpoints
@@ -185,7 +193,7 @@ assign_portfolio <- function(
       )
     ) |>
     pull(portfolio)
-  
+
   assigned_portfolios
 }
 ```
@@ -228,7 +236,7 @@ compute_portfolio_returns <- function(
         ret[portfolio == max(portfolio)]
     ) |>
     summarize(size_premium = mean(size_premium))
-  
+
   portfolio_returns
 }
 ```
@@ -295,20 +303,22 @@ n_cores = availableCores() - 1
 plan(multisession, workers = n_cores)
 
 p_hacking_setup <- p_hacking_setup |>
-  mutate(size_premium = future_pmap(
-    .l = list(
-      n_portfolios,
-      exchanges,
-      value_weighted,
-      data
-    ),
-    .f = ~ compute_portfolio_returns(
-      n_portfolios = ..1,
-      exchanges = ..2,
-      value_weighted = ..3,
-      data = eval_tidy(..4)
+  mutate(
+    size_premium = future_pmap(
+      .l = list(
+        n_portfolios,
+        exchanges,
+        value_weighted,
+        data
+      ),
+      .f = ~ compute_portfolio_returns(
+        n_portfolios = ..1,
+        exchanges = ..2,
+        value_weighted = ..3,
+        data = eval_tidy(..4)
+      )
     )
-  ))
+  )
 
 p_hacking_results <- p_hacking_setup |>
   mutate(data = map_chr(data, deparse)) |>
@@ -329,10 +339,12 @@ p_hacking_results |>
   ggplot(aes(x = size_premium)) +
   geom_histogram(bins = nrow(p_hacking_results)) +
   labs(
-    x = NULL, y = NULL,
+    x = NULL,
+    y = NULL,
     title = "Distribution of size premiums for different sorting choices"
   ) +
-  geom_vline(aes(xintercept = mean(factors_ff3_monthly$smb)),
+  geom_vline(
+    aes(xintercept = mean(factors_ff3_monthly$smb)),
     linetype = "dashed"
   ) +
   scale_x_continuous(labels = percent)

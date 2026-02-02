@@ -33,41 +33,33 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 library(sandwich)
 library(broom)
 ```
 
 ## Data Preparation
 
-We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
+We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Compustat}\index{Beta}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(permno, gvkey, date, ret_excess, mktcap) |>
   collect()
 
-compustat <- tbl(tidy_finance, "compustat") |>
-  select(datadate, gvkey, be) |>
-  collect()
+compustat_annual <- read_parquet("data-r/compustat_annual.parquet") |>
+  select(datadate, gvkey, be)
 
-beta <- tbl(tidy_finance, "beta") |> 
-  filter(return_type == "monthly") |> 
-  select(permno, date, beta) |>
-  collect()
+beta <- read_parquet("data-r/beta.parquet") |>
+  filter(return_type == "monthly") |>
+  select(permno, date, beta)
 ```
 
 We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization.\index{Book-to-market ratio}\index{Market capitalization} 
 Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.\index{Beta}\index{CAPM}
 
 ```{r}
-characteristics <- compustat |>
+characteristics <- compustat_annual |>
   mutate(date = floor_date(ymd(datadate), "month")) |>
   left_join(crsp_monthly, join_by(gvkey, date)) |>
   left_join(beta, join_by(permno, date)) |>
@@ -85,10 +77,11 @@ data_fama_macbeth <- crsp_monthly |>
   arrange(date) |>
   fill(c(beta, bm, log_mktcap), .direction = "down") |>
   ungroup() |>
-  left_join(crsp_monthly |>
-    select(permno, date, ret_excess_lead = ret_excess) |>
-    mutate(date = date %m-% months(1)),
-  join_by(permno, date)
+  left_join(
+    crsp_monthly |>
+      select(permno, date, ret_excess_lead = ret_excess) |>
+      mutate(date = date %m-% months(1)),
+    join_by(permno, date)
   ) |>
   select(permno, date, ret_excess_lead, beta, log_mktcap, bm) |>
   drop_na()
@@ -101,10 +94,12 @@ Next, we run the cross-sectional regressions with the characteristics as explana
 ```{r}
 risk_premiums <- data_fama_macbeth |>
   nest(data = c(ret_excess_lead, beta, log_mktcap, bm, permno)) |>
-  mutate(estimates = map(
-    data,
-    \(x) tidy(lm(ret_excess_lead ~ beta + log_mktcap + bm, data = x))
-  )) |>
+  mutate(
+    estimates = map(
+      data,
+      \(x) tidy(lm(ret_excess_lead ~ beta + log_mktcap + bm, data = x))
+    )
+  ) |>
   unnest(estimates)
 ```
 
@@ -136,12 +131,10 @@ price_of_risk_newey_west <- regressions_for_newey_west |>
   mutate(newey_west_se = map_dbl(model, \(x) sqrt(NeweyWest(x)))) |>
   unnest(mean) |>
   mutate(t_statistic_newey_west = estimate / newey_west_se) |>
-  select(factor,
-    risk_premium = estimate,
-    t_statistic_newey_west
-  )
+  select(factor, risk_premium = estimate, t_statistic_newey_west)
 
-left_join(price_of_risk,
+left_join(
+  price_of_risk,
   price_of_risk_newey_west |>
     select(factor, t_statistic_newey_west),
   join_by(factor)
@@ -157,7 +150,7 @@ You can also replicate the results using the `tidyfinace` package via the `estim
 library(tidyfinance)
 
 estimate_fama_macbeth(
-  data = data_fama_macbeth, 
+  data = data_fama_macbeth,
   model = "ret_excess_lead ~ beta + bm + log_mktcap",
   vcov = "newey-west"
 )

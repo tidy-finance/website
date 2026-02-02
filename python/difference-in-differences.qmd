@@ -25,8 +25,8 @@ The current chapter relies on this set of Python packages.
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 import pyfixest as pf
+import pyarrow.dataset as ds
 
 from plotnine import *
 from scipy.stats import norm
@@ -41,24 +41,17 @@ Compared to previous chapters, we introduce the `scipy.stats` module from the `s
 
 ## Data Preparation
 
-We use TRACE and Mergent FISD as data sources from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
+We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-fisd = (pd.read_sql_query(
-    sql="SELECT complete_cusip, maturity, offering_amt, sic_code FROM fisd",
-    con=tidy_finance,
-    parse_dates={"maturity"})
-  .dropna()
+fisd = (pd.read_parquet("data-python/fisd.parquet")
+    .dropna()
 )
 
-trace_enhanced = (pd.read_sql_query(
-    sql=("SELECT cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt " 
-         "FROM trace_enhanced"),
-    con=tidy_finance,
-    parse_dates={"trd_exctn_dt"})
-  .dropna()
+trace_enhanced = (ds.dataset("data-r/trace_enhanced")
+    .to_table(columns=["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
+    .to_pandas()
+    .dropna()
 )
 ```
 
@@ -67,21 +60,21 @@ We start our analysis by preparing the sample of bonds. We only consider bonds w
 ```{python}
 treatment_date = pd.to_datetime("2015-12-12")
 polluting_industries = [
-  49, 13, 45, 29, 28, 33, 40, 20, 26, 42, 10, 53, 32, 99, 37
+    49, 13, 45, 29, 28, 33, 40, 20, 26, 42, 10, 53, 32, 99, 37
 ]
 
 bonds = (fisd
-  .query("offering_amt > 0 & sic_code != 'None'")
-  .assign(
-    time_to_maturity=lambda x: (x["maturity"]-treatment_date).dt.days / 365,
-    sic_code=lambda x: x["sic_code"].astype(str).str[:2].astype(int),
-    log_offering_amt=lambda x: np.log(x["offering_amt"])
-  )
-  .query("time_to_maturity >= 1")
-  .rename(columns={"complete_cusip": "cusip_id"})
-  .get(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
-  .assign(polluter=lambda x: x["sic_code"].isin(polluting_industries))
-  .reset_index(drop=True)
+    .query("offering_amt > 0 & sic_code != 'None'")
+    .assign(
+        time_to_maturity=lambda x: (x["maturity"]-treatment_date).dt.days / 365,
+        sic_code=lambda x: x["sic_code"].astype(str).str[:2].astype(int),
+        log_offering_amt=lambda x: np.log(x["offering_amt"])
+    )
+    .query("time_to_maturity >= 1")
+    .rename(columns={"complete_cusip": "cusip_id"})
+    .get(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
+    .assign(polluter=lambda x: x["sic_code"].isin(polluting_industries))
+    .reset_index(drop=True)
 )
 ```
 
@@ -90,34 +83,34 @@ We consider bond yields for a bond's last trading day in a month. Therefore, we 
 
 ```{python}
 trace_enhanced = (trace_enhanced
-  .query("rptd_pr > 25")
-  .assign(weight=lambda x: x["entrd_vol_qt"]*x["rptd_pr"])
-  .assign(weighted_yield=lambda x: x["weight"]*x["yld_pt"])
+    .query("rptd_pr > 25")
+    .assign(weight=lambda x: x["entrd_vol_qt"]*x["rptd_pr"])
+    .assign(weighted_yield=lambda x: x["weight"]*x["yld_pt"])
 )
 
 trace_aggregated = (trace_enhanced
-  .groupby(["cusip_id", "trd_exctn_dt"])
-  .aggregate(
-    weighted_yield_sum=("weighted_yield", "sum"),
-    weight_sum=("weight", "sum"),
-    trades=("rptd_pr", "count")
-  )
-  .reset_index()
-  .assign(avg_yield=lambda x: x["weighted_yield_sum"]/x["weight_sum"])
-  .dropna(subset=["avg_yield"])
-  .query("trades >= 5")
-  .assign(trd_exctn_dt=lambda x: pd.to_datetime(x["trd_exctn_dt"]))
-  .assign(date=lambda x: x["trd_exctn_dt"]-pd.offsets.MonthBegin())
+    .groupby(["cusip_id", "trd_exctn_dt"])
+    .aggregate(
+        weighted_yield_sum=("weighted_yield", "sum"),
+        weight_sum=("weight", "sum"),
+        trades=("rptd_pr", "count")
+    )
+    .reset_index()
+    .assign(avg_yield=lambda x: x["weighted_yield_sum"]/x["weight_sum"])
+    .dropna(subset=["avg_yield"])
+    .query("trades >= 5")
+    .assign(trd_exctn_dt=lambda x: pd.to_datetime(x["trd_exctn_dt"]))
+    .assign(date=lambda x: x["trd_exctn_dt"]-pd.offsets.MonthBegin())
 )
 
 date_index = (trace_aggregated
-  .groupby(["cusip_id", "date"])["trd_exctn_dt"]
-  .idxmax()
+    .groupby(["cusip_id", "date"])["trd_exctn_dt"]
+    .idxmax()
 )
 
 trace_aggregated = (trace_aggregated
-  .loc[date_index]
-  .get(["cusip_id", "date", "avg_yield"])
+    .loc[date_index]
+    .get(["cusip_id", "date", "avg_yield"])
 )
 ```
 
@@ -125,8 +118,8 @@ By combining the bond-specific information from Mergent FISD for our bond sample
 
 ```{python}
 bonds_panel = (bonds
-  .merge(trace_aggregated, how="inner", on="cusip_id")
-  .dropna()
+    .merge(trace_aggregated, how="inner", on="cusip_id")
+    .dropna()
 )
 ```
 
@@ -134,13 +127,13 @@ Before we can run the first regression, we need to define the `treated` indicato
 
 ```{python}
 bonds_panel = (bonds_panel
-  .assign(
-    post_period=lambda x: (
-      x["date"] >= (treatment_date-pd.offsets.MonthBegin())
+    .assign(
+        post_period=lambda x: (
+        x["date"] >= (treatment_date-pd.offsets.MonthBegin())
+        )
     )
-  )
-  .assign(treated=lambda x: x["polluter"] & x["post_period"])
-  .assign(date_cat=lambda x: pd.Categorical(x["date"], ordered=True))
+    .assign(treated=lambda x: x["polluter"] & x["post_period"])
+    .assign(date_cat=lambda x: pd.Categorical(x["date"], ordered=True))
 )
 ```
 
@@ -148,10 +141,10 @@ As usual, we tabulate summary statistics of the variables that enter the regress
 
 ```{python}
 bonds_panel_summary = (bonds_panel
-  .melt(var_name="measure",
-        value_vars=["avg_yield", "time_to_maturity", "log_offering_amt"])
-  .groupby("measure")
-  .describe(percentiles=[0.05, 0.5, 0.95])
+    .melt(var_name="measure",
+            value_vars=["avg_yield", "time_to_maturity", "log_offering_amt"])
+    .groupby("measure")
+    .describe(percentiles=[0.05, 0.5, 0.95])
 )
 np.round(bonds_panel_summary, 2)
 ```
@@ -164,15 +157,15 @@ The second model follows the typical DiD regression approach by including indivi
 
 ```{python}
 model_without_fe = pf.feols(
-  "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
-  vcov = "iid",
-  data = bonds_panel
+    "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
+    vcov = "iid",
+    data = bonds_panel
 )
 
 model_with_fe = pf.feols(
-  "avg_yield ~ treated | cusip_id + date",
-  vcov = "iid",
-  data = bonds_panel
+    "avg_yield ~ treated | cusip_id + date",
+    vcov = "iid",
+    data = bonds_panel
 )
 
 pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
@@ -192,43 +185,43 @@ To provide such visual evidence, we revisit the simple OLS model and replace the
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 #| fig-pos: "htb"
 model_without_fe_time = pf.feols(
-  "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
-  vcov = "iid",
-  data = bonds_panel.assign(date = lambda x: x["date"].astype(str))
+    "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
+    vcov = "iid",
+    data = bonds_panel.assign(date = lambda x: x["date"].astype(str))
 )
 
 model_without_fe_coefs = (pd.DataFrame({
-    "estimate": model_without_fe_time.coef(),
-    "std_error": model_without_fe_time.se()
-  })
-  .reset_index(names="term")
-  .query("term.str.contains('date')")
-  .assign(
-    treatment=lambda x: x["term"].str.contains(":polluter"),
-    date=lambda x: x["term"].str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
-    ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
-    ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
-  )
+        "estimate": model_without_fe_time.coef(),
+        "std_error": model_without_fe_time.se()
+    })
+    .reset_index(names="term")
+    .query("term.str.contains('date')")
+    .assign(
+        treatment=lambda x: x["term"].str.contains(":polluter"),
+        date=lambda x: x["term"].str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
+        ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
+    )
 )
 
 model_without_fe_figure = (
-  ggplot(
-    model_without_fe_coefs, 
-    aes(x="date", y="estimate", color="treatment",
-        linetype="treatment", shape="treatment")
-  )
-  + geom_vline(xintercept=pd.to_datetime(treatment_date) -
-               pd.offsets.MonthBegin(), linetype="dashed")
-  + geom_hline(yintercept=0, linetype="dashed")
-  + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
-  + geom_point()
-  + guides(linetype=None)
-  + labs(
-      x="", y="Yield", shape="Polluter?", color="Polluter?",
-      title="Polluters respond stronger than green firms"
+    ggplot(
+        model_without_fe_coefs, 
+        aes(x="date", y="estimate", color="treatment",
+            linetype="treatment", shape="treatment")
     )
-  + scale_linetype_manual(values=["solid", "dashed"])
-  + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + geom_vline(xintercept=pd.to_datetime(treatment_date) -
+                pd.offsets.MonthBegin(), linetype="dashed")
+    + geom_hline(yintercept=0, linetype="dashed")
+    + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
+    + geom_point()
+    + guides(linetype=None)
+    + labs(
+        x="", y="Yield", shape="Polluter?", color="Polluter?",
+        title="Polluters respond stronger than green firms"
+        )
+    + scale_linetype_manual(values=["solid", "dashed"])
+    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
 )
 model_without_fe_figure.show()
 ```
@@ -239,23 +232,23 @@ Instead of plotting both groups using the simple model approach, we can also use
 
 ```{python}
 bonds_panel_alt = (bonds_panel
-  .assign(
-    diff_to_treatment=lambda x: (
-      np.round(
-        ((x["date"]-(treatment_date- 
-            pd.offsets.MonthBegin())).dt.days/365)*12, 0
-      ).astype(int)
+    .assign(
+        diff_to_treatment=lambda x: (
+        np.round(
+            ((x["date"]-(treatment_date- 
+                pd.offsets.MonthBegin())).dt.days/365)*12, 0
+        ).astype(int)
+        )
     )
-  )
 )
 
 variables = (bonds_panel_alt
-  .get(["diff_to_treatment", "date"])
-  .drop_duplicates()
-  .sort_values("date")
-  .copy()
-  .assign(variable_name=np.nan)
-  .reset_index(drop=True)
+    .get(["diff_to_treatment", "date"])
+    .drop_duplicates()
+    .sort_values("date")
+    .copy()
+    .assign(variable_name=np.nan)
+    .reset_index(drop=True)
 )
 ```
 
@@ -284,9 +277,9 @@ for j in range(variables.shape[0]):
 formula = formula + " | cusip_id + date "
 
 model_with_fe_time = pf.feols(
-  formula,
-  vcov = "iid",
-  data = bonds_panel_alt
+    formula,
+    vcov = "iid",
+    data = bonds_panel_alt
 )
 ```
 
@@ -294,31 +287,31 @@ We then collect the regression results into a dataframe that contains the estima
 
 ```{python}
 lag0_row = pd.DataFrame({
-  "term": ["lag0"],
-  "estimate": [0],
-  "std_error": [0],
-  "ci_up": [0],
-  "ci_low": [0],
-  "diff_to_treatment": [0],
-  "date": [treatment_date - pd.offsets.MonthBegin()]
+    "term": ["lag0"],
+    "estimate": [0],
+    "std_error": [0],
+    "ci_up": [0],
+    "ci_low": [0],
+    "diff_to_treatment": [0],
+    "date": [treatment_date - pd.offsets.MonthBegin()]
 })
 
 model_with_fe_time_coefs = (pd.DataFrame({
-    "estimate": model_with_fe_time.coef(),
-    "std_error": model_with_fe_time.se()
-  })
-  .reset_index(names="term")
-  .assign(
-    ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
-    ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
-  )
-  .merge(variables, how="left", left_on="term", right_on="variable_name")
-  .drop(columns="variable_name")
+        "estimate": model_with_fe_time.coef(),
+        "std_error": model_with_fe_time.se()
+    })
+    .reset_index(names="term")
+    .assign(
+        ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
+        ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
+    )
+    .merge(variables, how="left", left_on="term", right_on="variable_name")
+    .drop(columns="variable_name")
 )
 
 model_with_fe_time_coefs = pd.concat(
-  [model_with_fe_time_coefs, lag0_row], 
-  ignore_index=True
+    [model_with_fe_time_coefs, lag0_row], 
+    ignore_index=True
 )
 ```
 
@@ -330,20 +323,20 @@ model_with_fe_time_coefs = pd.concat(
 #| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
 #| fig-pos: "htb"
 model_with_fe_time_figure = (
-  ggplot(
-    model_with_fe_time_coefs,
-    aes(x="date", y="estimate")
-  )
-  + geom_vline(aes(xintercept=treatment_date - pd.offsets.MonthBegin()), 
-                   linetype="dashed")
-  + geom_hline(aes(yintercept=0), linetype="dashed")
-  + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
-  + geom_point(aes(y="estimate"))
-  + labs(
-      x="", y="Yield",
-      title="Polluters' yield patterns around Paris Agreement signing"
+    ggplot(
+        model_with_fe_time_coefs,
+        aes(x="date", y="estimate")
     )
-  + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + geom_vline(aes(xintercept=treatment_date - pd.offsets.MonthBegin()), 
+                    linetype="dashed")
+    + geom_hline(aes(yintercept=0), linetype="dashed")
+    + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
+    + geom_point(aes(y="estimate"))
+    + labs(
+        x="", y="Yield",
+        title="Polluters' yield patterns around Paris Agreement signing"
+        )
+    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
 )
 model_with_fe_time_figure.show()
 ```

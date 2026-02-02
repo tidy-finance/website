@@ -23,38 +23,33 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 ```
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(
-    permno, gvkey, date, ret_excess,
-    mktcap, mktcap_lag, exchange
-  ) |>
-  collect()
+    permno,
+    gvkey,
+    date,
+    ret_excess,
+    mktcap,
+    mktcap_lag,
+    exchange
+  )
 
-compustat <- tbl(tidy_finance, "compustat") |>
-    select(gvkey, datadate, be, op, inv) |>
-    collect() 
+compustat_annual <- read_parquet("data-r/compustat_annual.parquet") |>
+  select(gvkey, datadate, be, op, inv)
 
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  select(date, smb, hml) |>
-  collect()
+factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+  select(date, smb, hml)
 
-factors_ff5_monthly <- tbl(tidy_finance, "factors_ff5_monthly") |>
-  select(date, smb, hml, rmw, cma) |>
-  collect()
+factors_ff5_monthly <- read_parquet("data-r/factors_ff5_monthly.parquet") |>
+  select(date, smb, hml, rmw, cma)
 ```
 
 Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
@@ -74,7 +69,7 @@ market_equity <- crsp_monthly |>
   mutate(sorting_date = ymd(str_c(year(date) + 1, "0701)"))) |>
   select(permno, gvkey, sorting_date, me = mktcap)
 
-book_to_market <- compustat |>
+book_to_market <- compustat_annual |>
   mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
   select(gvkey, sorting_date, be) |>
   inner_join(market_equity, join_by(gvkey, sorting_date)) |>
@@ -83,8 +78,9 @@ book_to_market <- compustat |>
 
 sorting_variables <- size |>
   inner_join(
-    book_to_market, join_by(permno, sorting_date)
-    ) |>
+    book_to_market,
+    join_by(permno, sorting_date)
+  ) |>
   drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
@@ -95,8 +91,8 @@ Next, we construct our portfolios with an adjusted `assign_portfolio()` function
 
 ```{r}
 assign_portfolio <- function(
-  data, 
-  sorting_variable, 
+  data,
+  sorting_variable,
   percentiles
 ) {
   breakpoints <- data |>
@@ -109,14 +105,16 @@ assign_portfolio <- function(
     )
 
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval(
-      pick(everything()) |>
-        pull({{ sorting_variable }}),
-      breakpoints,
-      all.inside = TRUE
-    )) |>
+    mutate(
+      portfolio = findInterval(
+        pick(everything()) |>
+          pull({{ sorting_variable }}),
+        breakpoints,
+        all.inside = TRUE
+      )
+    ) |>
     pull(portfolio)
-  
+
   assigned_portfolios
 }
 
@@ -134,9 +132,8 @@ portfolios <- sorting_variables |>
       percentiles = c(0.3, 0.7)
     )
   ) |>
-  ungroup() |> 
-  select(permno, sorting_date, 
-         portfolio_size, portfolio_bm)
+  ungroup() |>
+  select(permno, sorting_date, portfolio_size, portfolio_bm)
 ```
 
 Alternatively, you can implement the same portfolio sorts using the `assign_portfolio()` function from the `tidyfinance` package, which we omit to avoid repeating almost the same code chunk as above.  
@@ -145,10 +142,12 @@ Next, we merge the portfolios to the return data for the rest of the year. To im
 
 ```{r}
 portfolios <- crsp_monthly |>
-  mutate(sorting_date = case_when(
-    month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
-    month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
-  )) |>
+  mutate(
+    sorting_date = case_when(
+      month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
+      month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
+    )
+  ) |>
   inner_join(portfolios, join_by(permno, sorting_date))
 ```
 
@@ -160,7 +159,8 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 factors_replicated <- portfolios |>
   group_by(portfolio_size, portfolio_bm, date) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag), .groups = "drop"
+    ret = weighted.mean(ret_excess, mktcap_lag),
+    .groups = "drop"
   ) |>
   group_by(date) |>
   summarize(
@@ -179,7 +179,7 @@ In the previous section, we replicated the size and value premiums following the
 test <- factors_ff3_monthly |>
   inner_join(factors_replicated, join_by(date)) |>
   mutate(
-    across(c(smb_replicated, hml_replicated), ~round(., 4))
+    across(c(smb_replicated, hml_replicated), ~ round(., 4))
   )
 ```
 
@@ -206,19 +206,18 @@ The evidence hence allows us to conclude that we did a relatively good job in re
 Now, let us move to the replication of the five-factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `drop_na()` statement yields different sample sizes as some firms with `be` values might not have `op` or `inv` values. 
 
 ```{r}
-other_sorting_variables <- compustat |>
+other_sorting_variables <- compustat_annual |>
   mutate(sorting_date = ymd(str_c(year(datadate) + 1, "0701"))) |>
   select(gvkey, sorting_date, be, op, inv) |>
-  inner_join(market_equity, 
-             join_by(gvkey, sorting_date)) |>
+  inner_join(market_equity, join_by(gvkey, sorting_date)) |>
   mutate(bm = be / me) |>
   select(permno, sorting_date, me, be, bm, op, inv)
 
 sorting_variables <- size |>
   inner_join(
-    other_sorting_variables, 
+    other_sorting_variables,
     join_by(permno, sorting_date)
-    ) |>
+  ) |>
   drop_na() |>
   distinct(permno, sorting_date, .keep_all = TRUE)
 ```
@@ -233,30 +232,37 @@ portfolios <- sorting_variables |>
       data = pick(everything()),
       sorting_variable = "size",
       percentiles = c(0.5)
-    )) |> 
-  group_by(sorting_date, portfolio_size) |> 
+    )
+  ) |>
+  group_by(sorting_date, portfolio_size) |>
   mutate(
     across(
-      c(bm, op, inv), 
-      ~assign_portfolio(
-        data = pick(everything()), 
-        sorting_variable = ., 
+      c(bm, op, inv),
+      ~ assign_portfolio(
+        data = pick(everything()),
+        sorting_variable = .,
         percentiles = c(0.3, 0.7)
       ),
       .names = "portfolio_{.col}"
     )
   ) |>
-  ungroup() |> 
+  ungroup() |>
   select(
-    permno, sorting_date, 
-    portfolio_size, portfolio_bm, portfolio_op, portfolio_inv
+    permno,
+    sorting_date,
+    portfolio_size,
+    portfolio_bm,
+    portfolio_op,
+    portfolio_inv
   )
 
 portfolios <- crsp_monthly |>
-  mutate(sorting_date = case_when(
-    month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
-    month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
-  )) |>
+  mutate(
+    sorting_date = case_when(
+      month(date) <= 6 ~ ymd(str_c(year(date) - 1, "0701")),
+      month(date) >= 7 ~ ymd(str_c(year(date), "0701"))
+    )
+  ) |>
   inner_join(portfolios, join_by(permno, sorting_date))
 ```
 
@@ -266,7 +272,7 @@ Now, we want to construct each of the factors, but this time the size factor act
 portfolios_value <- portfolios |>
   group_by(portfolio_size, portfolio_bm, date) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag), 
+    ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )
 
@@ -284,9 +290,9 @@ For the profitability factor, RMW, we take a long position in the two high profi
 portfolios_profitability <- portfolios |>
   group_by(portfolio_size, portfolio_op, date) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag), 
+    ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
-  ) 
+  )
 
 factors_profitability <- portfolios_profitability |>
   group_by(date) |>
@@ -302,7 +308,7 @@ For the investment factor, CMA, we go long the two low investment portfolios and
 portfolios_investment <- portfolios |>
   group_by(portfolio_size, portfolio_inv, date) |>
   summarize(
-    ret = weighted.mean(ret_excess, mktcap_lag), 
+    ret = weighted.mean(ret_excess, mktcap_lag),
     .groups = "drop"
   )
 
@@ -321,7 +327,7 @@ factors_size <- bind_rows(
   portfolios_value,
   portfolios_profitability,
   portfolios_investment
-) |> 
+) |>
   group_by(date) |>
   summarize(
     smb_replicated = mean(ret[portfolio_size == 1]) -
@@ -340,8 +346,10 @@ factors_replicated <- factors_size |>
 test <- factors_ff5_monthly |>
   inner_join(factors_replicated, join_by(date)) |>
   mutate(
-    across(c(smb_replicated, hml_replicated, 
-             rmw_replicated, cma_replicated), ~round(., 4))
+    across(
+      c(smb_replicated, hml_replicated, rmw_replicated, cma_replicated),
+      ~ round(., 4)
+    )
   )
 ```
 

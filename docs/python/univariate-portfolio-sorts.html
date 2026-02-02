@@ -517,7 +517,7 @@ window.Quarto = {
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../python/wrds-dummy-data.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">WRDS Dummy Data</span></a>
+ <span class="menu-text">WRDS Pseudo Data</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -611,84 +611,79 @@ Note
 <p>In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing <span class="citation" data-cites="BaliEngleMurray2016">(e.g., <a href="#ref-BaliEngleMurray2016" role="doc-biblioref">Bali, Engle, and Murray 2016</a>)</span>. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in <a href="../python/value-and-bivariate-sorts.html">Value and Bivariate Sorts</a>.</p>
 <p>A univariate portfolio sort considers only one sorting variable <span class="math inline">\(x_{i,t-1}\)</span>. Here, <span class="math inline">\(i\)</span> denotes the stock and <span class="math inline">\(t-1\)</span> indicates that the characteristic is observable by investors at time <span class="math inline">\(t\)</span>. The objective is to assess the cross-sectional relation between <span class="math inline">\(x_{i,t-1}\)</span> and, typically, stock excess returns <span class="math inline">\(r_{i,t}\)</span> at time <span class="math inline">\(t\)</span> as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.</p>
 <p>The current chapter relies on the following set of Python packages.</p>
-<div id="e8ebcae7" class="cell" data-execution_count="2">
+<div id="281d50ae" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.formatters <span class="im">import</span> percent_format</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> regtabletotext <span class="im">import</span> prettify_result</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.api <span class="im">as</span> sm</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mizani.formatters <span class="im">import</span> percent_format</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> regtabletotext <span class="im">import</span> prettify_result</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>We start with loading the required data from our SQLite database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. In particular, we use the monthly CRSP sample as our asset universe. Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha). <code>beta</code> is the dataframe with market betas computed in the previous chapter.</p>
-<div id="c1e4bc8b" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT permno, date, ret_excess, mktcap_lag FROM crsp_monthly"</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"date"</span>})</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="op">=</span> pd.read_sql_query(</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  sql<span class="op">=</span><span class="st">"SELECT date, mkt_excess FROM factors_ff3_monthly"</span>,</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>{<span class="st">"date"</span>}</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>beta <span class="op">=</span> pd.read_sql_query(</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  sql<span class="op">=</span><span class="st">"SELECT permno, date, beta FROM beta WHERE return_type = 'monthly'"</span>,</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  parse_dates<span class="op">=</span>{<span class="st">"date"</span>}</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>We start with loading the required data from our Parquet files introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. In particular, we use the monthly CRSP sample as our asset universe. Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha). <code>beta</code> is the dataframe with market betas computed in the previous chapter.</p>
+<div id="01071e47" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    pd.read_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"ret_excess"</span>, <span class="st">"mktcap_lag"</span>])</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="op">=</span> (</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    pd.read_parquet(<span class="st">"data-python/factors_ff3_monthly.parquet"</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"date"</span>, <span class="st">"mkt_excess"</span>])</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>beta <span class="op">=</span> (</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>    pd.read_parquet(<span class="st">"data-python/beta.parquet"</span>)</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"return_type == 'monthly'"</span>)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"beta"</span>])</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="sorting-by-market-beta" class="level2">
 <h2 class="anchored" data-anchor-id="sorting-by-market-beta">Sorting by Market Beta</h2>
 <p>Next, we merge our sorting variable with the return data. We use the one-month <em>lagged</em> betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month <span class="math inline">\(t\)</span> information is available in month <span class="math inline">\(t+1\)</span>. You may be tempted to simply use a call such as <code>crsp_monthly['beta_lag'] = crsp_monthly.groupby('permno')['beta'].shift(1)</code> instead. This procedure, however, does not work correctly if there are implicit missing values in the time series.</p>
-<div id="4e1d277a" class="cell" data-execution_count="5">
+<div id="42a5dc91" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>beta_lag <span class="op">=</span> (beta</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  .assign(date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"date"</span>]<span class="op">+</span>pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"beta"</span>])</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"beta"</span>: <span class="st">"beta_lag"</span>})</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    .assign(date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"date"</span>]<span class="op">+</span>pd.DateOffset(months<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"beta"</span>])</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    .rename(columns<span class="op">=</span>{<span class="st">"beta"</span>: <span class="st">"beta_lag"</span>})</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    .dropna()</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>data_for_sorts <span class="op">=</span> (crsp_monthly</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  .merge(beta_lag, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"date"</span>])</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    .merge(beta_lag, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"date"</span>])</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. For simplicity, we start with the median lagged market beta as the single breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in <code>np.average()</code>.</p>
-<div id="2ae29e22" class="cell" data-execution_count="6">
+<div id="2f341dae" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios <span class="op">=</span> (data_for_sorts</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"date"</span>)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: (x.assign(</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>      portfolio<span class="op">=</span>pd.qcut(</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"beta_lag"</span>], q<span class="op">=</span>[<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>], labels<span class="op">=</span>[<span class="st">"low"</span>, <span class="st">"high"</span>]))</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"portfolio"</span>,<span class="st">"date"</span>])</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>]))</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  .reset_index(name<span class="op">=</span><span class="st">"ret"</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"date"</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">apply</span>(<span class="kw">lambda</span> x: (x.assign(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>        portfolio<span class="op">=</span>pd.qcut(</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>            x[<span class="st">"beta_lag"</span>], q<span class="op">=</span>[<span class="dv">0</span>, <span class="fl">0.5</span>, <span class="dv">1</span>], labels<span class="op">=</span>[<span class="st">"low"</span>, <span class="st">"high"</span>]))</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    .groupby([<span class="st">"portfolio"</span>,<span class="st">"date"</span>])</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">apply</span>(<span class="kw">lambda</span> x: np.average(x[<span class="st">"ret_excess"</span>], weights<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>]))</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    .reset_index(name<span class="op">=</span><span class="st">"ret"</span>)</span>
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="performance-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="performance-evaluation">Performance Evaluation</h2>
 <p>We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.</p>
-<div id="192150cf" class="cell" data-execution_count="7">
+<div id="6c64dd11" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>beta_longshort <span class="op">=</span> (beta_portfolios</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .pivot_table(index<span class="op">=</span><span class="st">"date"</span>, columns<span class="op">=</span><span class="st">"portfolio"</span>, values<span class="op">=</span><span class="st">"ret"</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  .assign(long_short<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"high"</span>]<span class="op">-</span>x[<span class="st">"low"</span>])</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    .pivot_table(index<span class="op">=</span><span class="st">"date"</span>, columns<span class="op">=</span><span class="st">"portfolio"</span>, values<span class="op">=</span><span class="st">"ret"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .reset_index()</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    .assign(long_short<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"high"</span>]<span class="op">-</span>x[<span class="st">"low"</span>])</span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using <span class="citation" data-cites="Newey1987">Newey and West (<a href="#ref-Newey1987" role="doc-biblioref">1987</a>)</span> <span class="math inline">\(t\)</span>-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so in the <code>fit()</code> function by indicating the <code>cov_type</code> as <code>HAC</code> and providing the maximum lag length through an additional keywords dictionary.</p>
-<div id="55b55ff6" class="cell" data-execution_count="8">
+<div id="af7b15f5" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS.from_formula(</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"long_short ~ 1"</span>,</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>beta_longshort</span>
@@ -702,7 +697,7 @@ long_short ~ 1
 
 Coefficients:
            Estimate  Std. Error  t-Statistic  p-Value
-Intercept       0.0       0.001        0.408    0.684
+Intercept       0.0       0.001        0.408    0.683
 
 Summary statistics:
 - Number of observations: 719
@@ -717,7 +712,7 @@ Summary statistics:
 <h2 class="anchored" data-anchor-id="functional-programming-for-portfolio-sorts">Functional Programming for Portfolio Sorts</h2>
 <p>Now, we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we define a function that gives us flexibility concerning which variable to use for the sorting, denoted by <code>sorting_variable</code>. We use <code>np.quantile()</code> to compute breakpoints for <code>n_portfolios</code>. Then, we assign portfolios to stocks using the <code>pd.cut()</code> function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.</p>
 <p>In some applications, the variable used for the sorting might be clustered (e.g., at a lower bound of 0). Then, multiple breakpoints may be identical, leading to empty portfolios. Similarly, some portfolios might have a very small number of stocks at the beginning of the sample. Cases where the number of portfolio constituents differs substantially due to the distribution of the characteristics require careful consideration and, depending on the application, might require customized sorting approaches.</p>
-<div id="c15e577a" class="cell" data-execution_count="9">
+<div id="3f56076a" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> assign_portfolio(data, sorting_variable, n_portfolios):</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Assign portfolios to a bin between breakpoints."""</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -738,7 +733,7 @@ Summary statistics:
 <span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> assigned_portfolios</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.</p>
-<div id="37919e91" class="cell" data-execution_count="10">
+<div id="a00c3f79" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios <span class="op">=</span> (data_for_sorts</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"date"</span>)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
@@ -759,7 +754,7 @@ Summary statistics:
 <section id="more-performance-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="more-performance-evaluation">More Performance Evaluation</h2>
 <p>In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.</p>
-<div id="acef0a70" class="cell" data-execution_count="11">
+<div id="a3fd24d0" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>beta_portfolios_summary <span class="op">=</span> (beta_portfolios</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"portfolio"</span>)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
@@ -795,7 +790,7 @@ Summary statistics:
 <span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>beta_portfolios_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
-<div id="fig-701" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-pos="htb" alt="Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low-beta portfolios are positive, while high-beta portfolios show negative alphas.">
+<div id="fig-701" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low-beta portfolios are positive, while high-beta portfolios show negative alphas." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-701-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="univariate-portfolio-sorts_files/figure-html/fig-701-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The figure shows CAPM alphas of beta-sorted portfolios. Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period."><img src="univariate-portfolio-sorts_files/figure-html/fig-701-output-1.png" data-fig-pos="htb" alt="Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low-beta portfolios are positive, while high-beta portfolios show negative alphas." width="2100" height="1500" class="figure-img"></a>
@@ -845,7 +840,7 @@ Figure&nbsp;1: The figure shows CAPM alphas of beta-sorted portfolios. Portfolio
 <span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>sml_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
-<div id="fig-702" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-pos="htb" alt="Title: Average portfolio excess returns and beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data.">
+<div id="fig-702" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Average portfolio excess returns and beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-702-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="univariate-portfolio-sorts_files/figure-html/fig-702-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;2: The figure shows average portfolio excess returns and beta estimates. Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas."><img src="univariate-portfolio-sorts_files/figure-html/fig-702-output-1.png" data-fig-pos="htb" alt="Title: Average portfolio excess returns and beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data." width="2100" height="1500" class="figure-img"></a>
@@ -858,7 +853,7 @@ Figure&nbsp;2: The figure shows average portfolio excess returns and beta estima
 </div>
 </div>
 <p>To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.</p>
-<div id="8101b6bd" class="cell" data-execution_count="14">
+<div id="fc786c16" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>beta_longshort <span class="op">=</span> (beta_portfolios</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    portfolio<span class="op">=</span><span class="kw">lambda</span> x: (</span>
@@ -876,7 +871,7 @@ Figure&nbsp;2: The figure shows average portfolio excess returns and beta estima
 <span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Again, the resulting long-short strategy does not exhibit statistically significant returns.</p>
-<div id="66285bbb" class="cell" data-execution_count="15">
+<div id="342e49b2" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS.from_formula(</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"long_short ~ 1"</span>, </span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>beta_longshort</span>
@@ -890,7 +885,7 @@ long_short ~ 1
 
 Coefficients:
            Estimate  Std. Error  t-Statistic  p-Value
-Intercept     0.003       0.003        0.885    0.376
+Intercept     0.003       0.003        0.884    0.377
 
 Summary statistics:
 - Number of observations: 719
@@ -900,7 +895,7 @@ Summary statistics:
 </div>
 </div>
 <p>However, controlling for the effect of beta, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting-against-beta factor <span class="citation" data-cites="Frazzini2014">(<a href="#ref-Frazzini2014" role="doc-biblioref">Frazzini and Pedersen 2014</a>)</span>. Betting-against-beta corresponds to a strategy that shorts high-beta stocks and takes a (levered) long position in low-beta stocks. If borrowing constraints prevent investors from taking positions on the security market line they are instead incentivized to buy high-beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high-beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital-constrained investors with lower risk aversion.</p>
-<div id="1f93ec59" class="cell" data-execution_count="16">
+<div id="e0447c9a" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>model_fit <span class="op">=</span> (sm.OLS.from_formula(</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    formula<span class="op">=</span><span class="st">"long_short ~ 1 + mkt_excess"</span>, </span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    data<span class="op">=</span>beta_longshort</span>
@@ -914,13 +909,13 @@ long_short ~ 1 + mkt_excess
 
 Coefficients:
             Estimate  Std. Error  t-Statistic  p-Value
-Intercept     -0.004       0.002       -1.648    0.099
+Intercept     -0.004       0.002       -1.650    0.099
 mkt_excess     1.134       0.069       16.529    0.000
 
 Summary statistics:
 - Number of observations: 719
 - R-squared: 0.419, Adjusted R-squared: 0.418
-- F-statistic: 273.202 on 1 and 717 DF, p-value: 0.000
+- F-statistic: 273.199 on 1 and 717 DF, p-value: 0.000
 </code></pre>
 </div>
 </div>
@@ -951,7 +946,7 @@ Summary statistics:
 <span id="cb18-23"><a href="#cb18-23" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb18-24"><a href="#cb18-24" aria-hidden="true" tabindex="-1"></a>beta_longshort_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
-<div id="fig-703" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-pos="htb" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods.">
+<div id="fig-703" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods." data-fig-pos="htb">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-703-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <a href="univariate-portfolio-sorts_files/figure-html/fig-703-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure&nbsp;3: The figure shows annual returns of beta portfolios. We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks."><img src="univariate-portfolio-sorts_files/figure-html/fig-703-output-1.png" data-fig-pos="htb" alt="Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods." width="2100" height="1500" class="figure-img"></a>

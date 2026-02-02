@@ -24,7 +24,6 @@ The chapter relies on the following set of Python packages:
 ```{python}
 import pandas as pd
 import numpy as np
-import sqlite3
 
 from plotnine import *
 from mizani.formatters import percent_format
@@ -41,24 +40,12 @@ Compared to previous chapters, we introduce `itertools`, which is a component of
 
 ## Data Preparation
 
-First, we retrieve the relevant data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we retrieve the relevant data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(
-  database="data/tidy_finance_python.sqlite"
-)
+crsp_monthly = pd.read_parquet("data-python/crsp_monthly.parquet")
 
-crsp_monthly = pd.read_sql_query(
-  sql="SELECT * FROM crsp_monthly", 
-  con=tidy_finance, 
-  parse_dates={"date"}
-)
-
-factors_ff3_monthly = pd.read_sql_query(
-  sql="SELECT * FROM factors_ff3_monthly", 
-  con=tidy_finance, 
-  parse_dates={"date"}
-)
+factors_ff3_monthly = pd.read_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
 ## Size Distribution
@@ -73,39 +60,39 @@ Before we build our size portfolios, we investigate the distribution of the vari
 #| fig-alt: "Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent."
 #| fig-pos: "htb"
 market_cap_concentration = (crsp_monthly
-  .groupby("date")
-  .apply(lambda x: x.assign(
-    top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
-    top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
-    top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
-    top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)))
-  )
-  .reset_index(drop=True)
-  .groupby("date")
-  .apply(lambda x: pd.Series({
-    "Largest 1%": x["mktcap"][x["top01"]].sum()/x["mktcap"].sum(),
-    "Largest 5%": x["mktcap"][x["top05"]].sum()/x["mktcap"].sum(),
-    "Largest 10%": x["mktcap"][x["top10"]].sum()/x["mktcap"].sum(),
-    "Largest 25%": x["mktcap"][x["top25"]].sum()/x["mktcap"].sum()
-    })
-  )
-  .reset_index()
-  .melt(id_vars="date", var_name="name", value_name="value")
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
+        top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
+        top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
+        top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)))
+    )
+    .reset_index(drop=True)
+    .groupby("date")
+    .apply(lambda x: pd.Series({
+        "Largest 1%": x["mktcap"][x["top01"]].sum()/x["mktcap"].sum(),
+        "Largest 5%": x["mktcap"][x["top05"]].sum()/x["mktcap"].sum(),
+        "Largest 10%": x["mktcap"][x["top10"]].sum()/x["mktcap"].sum(),
+        "Largest 25%": x["mktcap"][x["top25"]].sum()/x["mktcap"].sum()
+        })
+    )
+    .reset_index()
+    .melt(id_vars="date", var_name="name", value_name="value")
 )
 
 market_cap_concentration_figure = (
-  ggplot(
-    market_cap_concentration, 
-    aes(x="date", y="value", color="name", linetype="name")
-  )
-  + geom_line()
-  + scale_y_continuous(labels=percent_format())
-  + scale_x_date(name="", date_labels="%Y")
-  + labs(
-      x="", y="", color="", linetype="", 
-      title="Percentage of total market capitalization in largest stocks"
+    ggplot(
+        market_cap_concentration, 
+        aes(x="date", y="value", color="name", linetype="name")
     )
-  + theme(legend_title=element_blank())
+    + geom_line()
+    + scale_y_continuous(labels=percent_format())
+    + scale_x_date(name="", date_labels="%Y")
+    + labs(
+        x="", y="", color="", linetype="", 
+        title="Percentage of total market capitalization in largest stocks"
+        )
+    + theme(legend_title=element_blank())
 )
 market_cap_concentration_figure.show()
 ```
@@ -118,29 +105,29 @@ Next, firm sizes also differ across listing exchanges. The primary listings of s
 #| fig.alt: "Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible."
 #| fig-pos: "htb"
 market_cap_share = (crsp_monthly
-  .groupby(["date", "exchange"])
-  .aggregate({"mktcap": "sum"})
-  .reset_index(drop=False)
-  .groupby("date")
-  .apply(lambda x:
-    x.assign(total_market_cap=lambda x: x["mktcap"].sum(),
-             share=lambda x: x["mktcap"]/x["total_market_cap"]
-             )
-    )
-  .reset_index(drop=True)
+    .groupby(["date", "exchange"])
+    .aggregate({"mktcap": "sum"})
+    .reset_index(drop=False)
+    .groupby("date")
+    .apply(lambda x:
+        x.assign(total_market_cap=lambda x: x["mktcap"].sum(),
+                share=lambda x: x["mktcap"]/x["total_market_cap"]
+                )
+        )
+    .reset_index(drop=True)
 )
 
 plot_market_cap_share = (
-  ggplot(market_cap_share, 
-         aes(x="date", y="share", 
-             fill="exchange", color="exchange")) +
-  geom_area(position="stack", stat="identity", alpha=0.5) +
-  geom_line(position="stack") +
-  scale_y_continuous(labels=percent_format()) +
-  scale_x_date(name="", date_labels="%Y") +
-  labs(x="", y="", fill="", color="",
-       title="Share of total market capitalization per listing exchange") +
-  theme(legend_title=element_blank())
+    ggplot(market_cap_share, 
+            aes(x="date", y="share", 
+                fill="exchange", color="exchange"))
+    + geom_area(position="stack", stat="identity", alpha=0.5)
+    + geom_line(position="stack")
+    + scale_y_continuous(labels=percent_format())
+    + scale_x_date(name="", date_labels="%Y")
+    + labs(x="", y="", fill="", color="",
+           title="Share of total market capitalization per listing exchange")
+    + theme(legend_title=element_blank())
 )
 plot_market_cap_share.draw()
 ```
@@ -171,10 +158,10 @@ def compute_summary(data, variable, filter_variable, percentiles):
     return summary.round(0)
 
 compute_summary(
-  crsp_monthly[crsp_monthly["date"] == crsp_monthly["date"].max()],
-  variable="mktcap",
-  filter_variable="exchange",
-  percentiles=[0.05, 0.5, 0.95]
+    crsp_monthly[crsp_monthly["date"] == crsp_monthly["date"].max()],
+    variable="mktcap",
+    filter_variable="exchange",
+    percentiles=[0.05, 0.5, 0.95]
 )
 ```
 
@@ -189,20 +176,20 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
     """Assign portfolio for a given sorting variable."""
     
     breakpoints = (data
-      .query(f"exchange in {exchanges}")
-      .get(sorting_variable)
-      .quantile(np.linspace(0, 1, num=n_portfolios+1), 
-                interpolation="linear")
-      .drop_duplicates()
+        .query(f"exchange in {exchanges}")
+        .get(sorting_variable)
+        .quantile(np.linspace(0, 1, num=n_portfolios+1), 
+                    interpolation="linear")
+        .drop_duplicates()
     )
-    breakpoints.iloc[[0, -1]] = [-np.Inf, np.Inf]
+    breakpoints.iloc[[0, -1]] = [-np.inf, np.inf]
     
     assigned_portfolios = pd.cut(
-      data[sorting_variable],
-      bins=breakpoints,
-      labels=range(1, breakpoints.size),
-      include_lowest=True,
-      right=False
+        data[sorting_variable],
+        bins=breakpoints,
+        labels=range(1, breakpoints.size),
+        include_lowest=True,
+        right=False
     )
     
     return assigned_portfolios
@@ -258,17 +245,17 @@ To see how the function `compute_portfolio_returns()` works, we consider a simpl
 
 ```{python}
 ret_all = compute_portfolio_returns(
-  n_portfolios=2,
-  exchanges=["NYSE", "NASDAQ", "AMEX"],
-  value_weighted=True,
-  data=crsp_monthly
+    n_portfolios=2,
+    exchanges=["NYSE", "NASDAQ", "AMEX"],
+    value_weighted=True,
+    data=crsp_monthly
 )
 
 ret_nyse = compute_portfolio_returns(
-  n_portfolios=2,
-  exchanges=["NYSE"],
-  value_weighted=True,
-  data=crsp_monthly
+    n_portfolios=2,
+    exchanges=["NYSE"],
+    value_weighted=True,
+    data=crsp_monthly
 )
 
 data = pd.DataFrame([ret_all*100, ret_nyse*100], 
@@ -297,13 +284,13 @@ n_portfolios = [2, 5, 10]
 exchanges = [["NYSE"], ["NYSE", "NASDAQ", "AMEX"]]
 value_weighted = [True, False]
 data = [
-  crsp_monthly,
-  crsp_monthly[crsp_monthly["industry"] != "Finance"],
-  crsp_monthly[crsp_monthly["date"] < "1990-06-01"],
-  crsp_monthly[crsp_monthly["date"] >= "1990-06-01"],
+    crsp_monthly,
+    crsp_monthly[crsp_monthly["industry"] != "Finance"],
+    crsp_monthly[crsp_monthly["date"] < "1990-06-01"],
+    crsp_monthly[crsp_monthly["date"] >= "1990-06-01"],
 ]
 p_hacking_setup = list(
-  product(n_portfolios, exchanges, value_weighted, data)
+    product(n_portfolios, exchanges, value_weighted, data)
 )
 ```
 
@@ -313,9 +300,9 @@ To speed the computation up, we parallelize the (many) different sorting procedu
 #| warning: false
 n_cores = cpu_count()-1
 p_hacking_results = pd.concat(
-  Parallel(n_jobs=n_cores)
-  (delayed(compute_portfolio_returns)(x, y, z, w) 
-   for x, y, z, w in p_hacking_setup)
+    Parallel(n_jobs=n_cores)
+    (delayed(compute_portfolio_returns)(x, y, z, w) 
+    for x, y, z, w in p_hacking_setup)
 )
 p_hacking_results = p_hacking_results.reset_index(name="size_premium")
 ```
@@ -330,19 +317,19 @@ We provide a graph in @fig-803 that shows the different premiums. The figure als
 #| fig-alt: "Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge, but the estimated coefficients are positive for all choices."
 #| fig-pos: "htb"
 p_hacking_results_figure = (
-  ggplot(
-    p_hacking_results, 
-    aes(x="size_premium")
-  )
-  + geom_histogram(bins=len(p_hacking_results))
-  + scale_x_continuous(labels=percent_format())
-  + labs(
-      x="", y="",
-      title="Distribution of size premiums for various sorting choices"
+    ggplot(
+        p_hacking_results, 
+        aes(x="size_premium")
     )
-  + geom_vline(
-      aes(xintercept=factors_ff3_monthly["smb"].mean()), linetype="dashed"
-    )
+    + geom_histogram(bins=len(p_hacking_results))
+    + scale_x_continuous(labels=percent_format())
+    + labs(
+        x="", y="",
+        title="Distribution of size premiums for various sorting choices"
+        )
+    + geom_vline(
+        aes(xintercept=factors_ff3_monthly["smb"].mean()), linetype="dashed"
+        )
 )
 p_hacking_results_figure.show()
 ```

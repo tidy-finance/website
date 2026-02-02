@@ -491,7 +491,7 @@ cookieconsent.run({
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../python/wrds-dummy-data.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">WRDS Dummy Data</span></a>
+ <span class="menu-text">WRDS Pseudo Data</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -583,11 +583,11 @@ Note
 <p>In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discuss in <a href="../python/fixed-effects-and-clustered-standard-errors.html">Fixed Effects and Clustered Standard Errors</a>. We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.</p>
 <p>The approach we use here replicates the results of <span class="citation" data-cites="Seltzer2022">Seltzer, Starks, and Zhu (<a href="#ref-Seltzer2022" role="doc-biblioref">2022</a>)</span> partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on environmental, social, and governance (ESG) effects in corporate bond markets is already large but continues to grow (for recent examples, see, e.g., <span class="citation" data-cites="Halling2021">Halling, Yu, and Zechner (<a href="#ref-Halling2021" role="doc-biblioref">2021</a>)</span>, <span class="citation" data-cites="Handler2022">Handler, Jankowitsch, and Pasler (<a href="#ref-Handler2022" role="doc-biblioref">2022</a>)</span>, <span class="citation" data-cites="Huynh2021">Huynh and Xia (<a href="#ref-Huynh2021" role="doc-biblioref">2021</a>)</span>, among many others).</p>
 <p>The current chapter relies on this set of Python packages.</p>
-<div id="9e0db67c" class="cell" data-execution_count="2">
+<div id="024e8977" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> sqlite3</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pyfixest <span class="im">as</span> pf</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pyfixest <span class="im">as</span> pf</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pyarrow.dataset <span class="im">as</span> ds</span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.stats <span class="im">import</span> norm</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -595,108 +595,101 @@ Note
 <p>Compared to previous chapters, we introduce the <code>scipy.stats</code> module from the <code>scipy</code> <span class="citation" data-cites="scipy">(<a href="#ref-scipy" role="doc-biblioref">Virtanen et al. 2020</a>)</span> for simple retrieval of quantiles of the standard normal distribution.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>We use TRACE and Mergent FISD as data sources from our SQLite database introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/trace-and-fisd.html">TRACE and FISD</a>. </p>
-<div id="b26193fe" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="op">=</span> sqlite3.<span class="ex">connect</span>(database<span class="op">=</span><span class="st">"data/tidy_finance_python.sqlite"</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>fisd <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span><span class="st">"SELECT complete_cusip, maturity, offering_amt, sic_code FROM fisd"</span>,</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"maturity"</span>})</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="op">=</span> (pd.read_sql_query(</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    sql<span class="op">=</span>(<span class="st">"SELECT cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt "</span> </span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>         <span class="st">"FROM trace_enhanced"</span>),</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>    con<span class="op">=</span>tidy_finance,</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>    parse_dates<span class="op">=</span>{<span class="st">"trd_exctn_dt"</span>})</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>We use TRACE and Mergent FISD as data sources from our Parquet files introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/trace-and-fisd.html">TRACE and FISD</a>. </p>
+<div id="b1326497" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>fisd <span class="op">=</span> (pd.read_parquet(<span class="st">"data-python/fisd.parquet"</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    .dropna()</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="op">=</span> (ds.dataset(<span class="st">"data-r/trace_enhanced"</span>)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    .to_table(columns<span class="op">=</span>[<span class="st">"cusip_id"</span>, <span class="st">"trd_exctn_dt"</span>, <span class="st">"rptd_pr"</span>, <span class="st">"entrd_vol_qt"</span>, <span class="st">"yld_pt"</span>])</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    .to_pandas()</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    .dropna()</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries <span class="citation" data-cites="Seltzer2022">(in line with <a href="#ref-Seltzer2022" role="doc-biblioref">Seltzer, Starks, and Zhu 2022</a>)</span>.</p>
-<div id="e26f82db" class="cell" data-execution_count="5">
+<div id="463e9bac" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>treatment_date <span class="op">=</span> pd.to_datetime(<span class="st">"2015-12-12"</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>polluting_industries <span class="op">=</span> [</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="dv">49</span>, <span class="dv">13</span>, <span class="dv">45</span>, <span class="dv">29</span>, <span class="dv">28</span>, <span class="dv">33</span>, <span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">26</span>, <span class="dv">42</span>, <span class="dv">10</span>, <span class="dv">53</span>, <span class="dv">32</span>, <span class="dv">99</span>, <span class="dv">37</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="dv">49</span>, <span class="dv">13</span>, <span class="dv">45</span>, <span class="dv">29</span>, <span class="dv">28</span>, <span class="dv">33</span>, <span class="dv">40</span>, <span class="dv">20</span>, <span class="dv">26</span>, <span class="dv">42</span>, <span class="dv">10</span>, <span class="dv">53</span>, <span class="dv">32</span>, <span class="dv">99</span>, <span class="dv">37</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>]</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>bonds <span class="op">=</span> (fisd</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"offering_amt &gt; 0 &amp; sic_code != 'None'"</span>)</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    time_to_maturity<span class="op">=</span><span class="kw">lambda</span> x: (x[<span class="st">"maturity"</span>]<span class="op">-</span>treatment_date).dt.days <span class="op">/</span> <span class="dv">365</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    sic_code<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"sic_code"</span>].astype(<span class="bu">str</span>).<span class="bu">str</span>[:<span class="dv">2</span>].astype(<span class="bu">int</span>),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    log_offering_amt<span class="op">=</span><span class="kw">lambda</span> x: np.log(x[<span class="st">"offering_amt"</span>])</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"time_to_maturity &gt;= 1"</span>)</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  .rename(columns<span class="op">=</span>{<span class="st">"complete_cusip"</span>: <span class="st">"cusip_id"</span>})</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"cusip_id"</span>, <span class="st">"time_to_maturity"</span>, <span class="st">"log_offering_amt"</span>, <span class="st">"sic_code"</span>])</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  .assign(polluter<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"sic_code"</span>].isin(polluting_industries))</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"offering_amt &gt; 0 &amp; sic_code != 'None'"</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>        time_to_maturity<span class="op">=</span><span class="kw">lambda</span> x: (x[<span class="st">"maturity"</span>]<span class="op">-</span>treatment_date).dt.days <span class="op">/</span> <span class="dv">365</span>,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>        sic_code<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"sic_code"</span>].astype(<span class="bu">str</span>).<span class="bu">str</span>[:<span class="dv">2</span>].astype(<span class="bu">int</span>),</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>        log_offering_amt<span class="op">=</span><span class="kw">lambda</span> x: np.log(x[<span class="st">"offering_amt"</span>])</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"time_to_maturity &gt;= 1"</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    .rename(columns<span class="op">=</span>{<span class="st">"complete_cusip"</span>: <span class="st">"cusip_id"</span>})</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"cusip_id"</span>, <span class="st">"time_to_maturity"</span>, <span class="st">"log_offering_amt"</span>, <span class="st">"sic_code"</span>])</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    .assign(polluter<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"sic_code"</span>].isin(polluting_industries))</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond’s last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature <span class="citation" data-cites="Bessembinder2008">(see, e.g., <a href="#ref-Bessembinder2008" role="doc-biblioref">Bessembinder et al. 2008</a>)</span>. We weigh each transaction by volume to reflect a trade’s relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices <code>rptd_pr</code> larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions). </p>
-<div id="7ea3e1ad" class="cell" data-execution_count="6">
+<div id="202756d1" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>trace_enhanced <span class="op">=</span> (trace_enhanced</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"rptd_pr &gt; 25"</span>)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  .assign(weight<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"entrd_vol_qt"</span>]<span class="op">*</span>x[<span class="st">"rptd_pr"</span>])</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  .assign(weighted_yield<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weight"</span>]<span class="op">*</span>x[<span class="st">"yld_pt"</span>])</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"rptd_pr &gt; 25"</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .assign(weight<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"entrd_vol_qt"</span>]<span class="op">*</span>x[<span class="st">"rptd_pr"</span>])</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    .assign(weighted_yield<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weight"</span>]<span class="op">*</span>x[<span class="st">"yld_pt"</span>])</span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>trace_aggregated <span class="op">=</span> (trace_enhanced</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"cusip_id"</span>, <span class="st">"trd_exctn_dt"</span>])</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  .aggregate(</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    weighted_yield_sum<span class="op">=</span>(<span class="st">"weighted_yield"</span>, <span class="st">"sum"</span>),</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>    weight_sum<span class="op">=</span>(<span class="st">"weight"</span>, <span class="st">"sum"</span>),</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    trades<span class="op">=</span>(<span class="st">"rptd_pr"</span>, <span class="st">"count"</span>)</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  .reset_index()</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  .assign(avg_yield<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weighted_yield_sum"</span>]<span class="op">/</span>x[<span class="st">"weight_sum"</span>])</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>  .dropna(subset<span class="op">=</span>[<span class="st">"avg_yield"</span>])</span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"trades &gt;= 5"</span>)</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>  .assign(trd_exctn_dt<span class="op">=</span><span class="kw">lambda</span> x: pd.to_datetime(x[<span class="st">"trd_exctn_dt"</span>]))</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  .assign(date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"trd_exctn_dt"</span>]<span class="op">-</span>pd.offsets.MonthBegin())</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    .groupby([<span class="st">"cusip_id"</span>, <span class="st">"trd_exctn_dt"</span>])</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    .aggregate(</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>        weighted_yield_sum<span class="op">=</span>(<span class="st">"weighted_yield"</span>, <span class="st">"sum"</span>),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>        weight_sum<span class="op">=</span>(<span class="st">"weight"</span>, <span class="st">"sum"</span>),</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>        trades<span class="op">=</span>(<span class="st">"rptd_pr"</span>, <span class="st">"count"</span>)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>    .reset_index()</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    .assign(avg_yield<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weighted_yield_sum"</span>]<span class="op">/</span>x[<span class="st">"weight_sum"</span>])</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    .dropna(subset<span class="op">=</span>[<span class="st">"avg_yield"</span>])</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"trades &gt;= 5"</span>)</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>    .assign(trd_exctn_dt<span class="op">=</span><span class="kw">lambda</span> x: pd.to_datetime(x[<span class="st">"trd_exctn_dt"</span>]))</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>    .assign(date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"trd_exctn_dt"</span>]<span class="op">-</span>pd.offsets.MonthBegin())</span>
 <span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>date_index <span class="op">=</span> (trace_aggregated</span>
-<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>  .groupby([<span class="st">"cusip_id"</span>, <span class="st">"date"</span>])[<span class="st">"trd_exctn_dt"</span>]</span>
-<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>  .idxmax()</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>    .groupby([<span class="st">"cusip_id"</span>, <span class="st">"date"</span>])[<span class="st">"trd_exctn_dt"</span>]</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>    .idxmax()</span>
 <span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-26"><a href="#cb4-26" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-27"><a href="#cb4-27" aria-hidden="true" tabindex="-1"></a>trace_aggregated <span class="op">=</span> (trace_aggregated</span>
-<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>  .loc[date_index]</span>
-<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"cusip_id"</span>, <span class="st">"date"</span>, <span class="st">"avg_yield"</span>])</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true" tabindex="-1"></a>    .loc[date_index]</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"cusip_id"</span>, <span class="st">"date"</span>, <span class="st">"avg_yield"</span>])</span>
 <span id="cb4-30"><a href="#cb4-30" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>By combining the bond-specific information from Mergent FISD for our bond sample with the aggregated TRACE data, we arrive at the main sample for our analysis.</p>
-<div id="20498f69" class="cell" data-execution_count="7">
+<div id="6865f53c" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="op">=</span> (bonds</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  .merge(trace_aggregated, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"cusip_id"</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  .dropna()</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    .merge(trace_aggregated, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"cusip_id"</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .dropna()</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Before we can run the first regression, we need to define the <code>treated</code> indicator,<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> which is the product of the <code>post_period</code> (i.e., all months after the signing of the PA) and the <code>polluter</code> indicator defined above.</p>
-<div id="1a648336" class="cell" data-execution_count="8">
+<div id="f709a8f5" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>bonds_panel <span class="op">=</span> (bonds_panel</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    post_period<span class="op">=</span><span class="kw">lambda</span> x: (</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>      x[<span class="st">"date"</span>] <span class="op">&gt;=</span> (treatment_date<span class="op">-</span>pd.offsets.MonthBegin())</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  .assign(treated<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"polluter"</span>] <span class="op">&amp;</span> x[<span class="st">"post_period"</span>])</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  .assign(date_cat<span class="op">=</span><span class="kw">lambda</span> x: pd.Categorical(x[<span class="st">"date"</span>], ordered<span class="op">=</span><span class="va">True</span>))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        post_period<span class="op">=</span><span class="kw">lambda</span> x: (</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        x[<span class="st">"date"</span>] <span class="op">&gt;=</span> (treatment_date<span class="op">-</span>pd.offsets.MonthBegin())</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    .assign(treated<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"polluter"</span>] <span class="op">&amp;</span> x[<span class="st">"post_period"</span>])</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    .assign(date_cat<span class="op">=</span><span class="kw">lambda</span> x: pd.Categorical(x[<span class="st">"date"</span>], ordered<span class="op">=</span><span class="va">True</span>))</span>
 <span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.</p>
-<div id="763d14a8" class="cell" data-execution_count="9">
+<div id="c0fe6430" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>bonds_panel_summary <span class="op">=</span> (bonds_panel</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  .melt(var_name<span class="op">=</span><span class="st">"measure"</span>,</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        value_vars<span class="op">=</span>[<span class="st">"avg_yield"</span>, <span class="st">"time_to_maturity"</span>, <span class="st">"log_offering_amt"</span>])</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  .groupby(<span class="st">"measure"</span>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  .describe(percentiles<span class="op">=</span>[<span class="fl">0.05</span>, <span class="fl">0.5</span>, <span class="fl">0.95</span>])</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    .melt(var_name<span class="op">=</span><span class="st">"measure"</span>,</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>            value_vars<span class="op">=</span>[<span class="st">"avg_yield"</span>, <span class="st">"time_to_maturity"</span>, <span class="st">"log_offering_amt"</span>])</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"measure"</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    .describe(percentiles<span class="op">=</span>[<span class="fl">0.05</span>, <span class="fl">0.5</span>, <span class="fl">0.95</span>])</span>
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>np.<span class="bu">round</span>(bonds_panel_summary, <span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="31">
+<div class="cell-output cell-output-display" data-execution_count="9">
 <div>
 
 
@@ -732,7 +725,7 @@ Note
 <tbody>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">avg_yield</th>
-<td>127539.0</td>
+<td>127540.0</td>
 <td>4.08</td>
 <td>4.21</td>
 <td>0.06</td>
@@ -743,7 +736,7 @@ Note
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">log_offering_amt</th>
-<td>127539.0</td>
+<td>127540.0</td>
 <td>13.27</td>
 <td>0.82</td>
 <td>4.64</td>
@@ -754,7 +747,7 @@ Note
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">time_to_maturity</th>
-<td>127539.0</td>
+<td>127540.0</td>
 <td>8.55</td>
 <td>8.42</td>
 <td>1.01</td>
@@ -774,70 +767,70 @@ Note
 <h2 class="anchored" data-anchor-id="panel-regressions">Panel Regressions</h2>
 <p>The PA is a legally binding international treaty on climate change. It was adopted by 196 parties at COP 21 in Paris on December 12, 2015 and entered into force on November 4, 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an ordinary least square (OLS) regression without fixed effects where we include the <code>treated</code>, <code>post_period</code>, and <code>polluter</code> dummies, as well as the bond-specific characteristics <code>log_offering_amt</code> and <code>time_to_maturity</code>. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.</p>
 <p>The second model follows the typical DiD regression approach by including individual (<code>cusip_id</code>) and time (<code>date</code>) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: <code>treated</code>.</p>
-<div id="b65b3ac3" class="cell" data-execution_count="10">
+<div id="5c3382a8" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>model_without_fe <span class="op">=</span> pf.feols(</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity"</span>,</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  data <span class="op">=</span> bonds_panel</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity"</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> bonds_panel</span>
 <span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>model_with_fe <span class="op">=</span> pf.feols(</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"avg_yield ~ treated | cusip_id + date"</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  data <span class="op">=</span> bonds_panel</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"avg_yield ~ treated | cusip_id + date"</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> bonds_panel</span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>pf.etable([model_without_fe, model_with_fe], coef_fmt <span class="op">=</span> <span class="st">"b (t)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="32">
-<div id="qmwoswmeuf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div class="cell-output cell-output-display" data-execution_count="10">
+<div id="loyuqvhjde" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#qmwoswmeuf table {
+#loyuqvhjde table {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
         }
 
-#qmwoswmeuf thead, tbody, tfoot, tr, td, th { border-style: none; }
+#loyuqvhjde thead, tbody, tfoot, tr, td, th { border-style: none; }
  tr { background-color: transparent; }
-#qmwoswmeuf p { margin: 0; padding: 0; }
- #qmwoswmeuf .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
- #qmwoswmeuf .gt_caption { padding-top: 4px; padding-bottom: 4px; }
- #qmwoswmeuf .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
- #qmwoswmeuf .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
- #qmwoswmeuf .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #qmwoswmeuf .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
- #qmwoswmeuf .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #qmwoswmeuf .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
- #qmwoswmeuf .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
- #qmwoswmeuf .gt_column_spanner_outer:first-child { padding-left: 0; }
- #qmwoswmeuf .gt_column_spanner_outer:last-child { padding-right: 0; }
- #qmwoswmeuf .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
- #qmwoswmeuf .gt_spanner_row { border-bottom-style: hidden; }
- #qmwoswmeuf .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
- #qmwoswmeuf .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
- #qmwoswmeuf .gt_from_md> :first-child { margin-top: 0; }
- #qmwoswmeuf .gt_from_md> :last-child { margin-bottom: 0; }
- #qmwoswmeuf .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
- #qmwoswmeuf .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
- #qmwoswmeuf .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
- #qmwoswmeuf .gt_row_group_first td { border-top-width: 0.5px; }
- #qmwoswmeuf .gt_row_group_first th { border-top-width: 0.5px; }
- #qmwoswmeuf .gt_striped { color: #333333; background-color: #F4F4F4; }
- #qmwoswmeuf .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
- #qmwoswmeuf .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
- #qmwoswmeuf .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
- #qmwoswmeuf .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
- #qmwoswmeuf .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
- #qmwoswmeuf .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
- #qmwoswmeuf .gt_left { text-align: left; }
- #qmwoswmeuf .gt_center { text-align: center; }
- #qmwoswmeuf .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
- #qmwoswmeuf .gt_font_normal { font-weight: normal; }
- #qmwoswmeuf .gt_font_bold { font-weight: bold; }
- #qmwoswmeuf .gt_font_italic { font-style: italic; }
- #qmwoswmeuf .gt_super { font-size: 65%; }
- #qmwoswmeuf .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
- #qmwoswmeuf .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#loyuqvhjde p { margin: 0; padding: 0; }
+ #loyuqvhjde .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+ #loyuqvhjde .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+ #loyuqvhjde .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+ #loyuqvhjde .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+ #loyuqvhjde .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #loyuqvhjde .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+ #loyuqvhjde .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #loyuqvhjde .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+ #loyuqvhjde .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+ #loyuqvhjde .gt_column_spanner_outer:first-child { padding-left: 0; }
+ #loyuqvhjde .gt_column_spanner_outer:last-child { padding-right: 0; }
+ #loyuqvhjde .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
+ #loyuqvhjde .gt_spanner_row { border-bottom-style: hidden; }
+ #loyuqvhjde .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
+ #loyuqvhjde .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
+ #loyuqvhjde .gt_from_md> :first-child { margin-top: 0; }
+ #loyuqvhjde .gt_from_md> :last-child { margin-bottom: 0; }
+ #loyuqvhjde .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
+ #loyuqvhjde .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+ #loyuqvhjde .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+ #loyuqvhjde .gt_row_group_first td { border-top-width: 0.5px; }
+ #loyuqvhjde .gt_row_group_first th { border-top-width: 0.5px; }
+ #loyuqvhjde .gt_striped { color: #333333; background-color: #F4F4F4; }
+ #loyuqvhjde .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
+ #loyuqvhjde .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+ #loyuqvhjde .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+ #loyuqvhjde .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+ #loyuqvhjde .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #loyuqvhjde .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+ #loyuqvhjde .gt_left { text-align: left; }
+ #loyuqvhjde .gt_center { text-align: center; }
+ #loyuqvhjde .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+ #loyuqvhjde .gt_font_normal { font-weight: normal; }
+ #loyuqvhjde .gt_font_bold { font-weight: bold; }
+ #loyuqvhjde .gt_font_italic { font-style: italic; }
+ #loyuqvhjde .gt_super { font-size: 65%; }
+ #loyuqvhjde .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+ #loyuqvhjde .gt_asterisk { font-size: 100%; vertical-align: 0; }
  
 </style>
 
@@ -858,12 +851,12 @@ Note
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">treated</th>
-<td class="gt_row gt_center">0.453*** (9.135)</td>
+<td class="gt_row gt_center">0.453*** (9.133)</td>
 <td class="gt_row gt_center">0.975*** (29.294)</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">post_period</th>
-<td class="gt_row gt_center">-0.178*** (-6.040)</td>
+<td class="gt_row gt_center">-0.177*** (-6.036)</td>
 <td class="gt_row gt_center"></td>
 </tr>
 <tr class="even">
@@ -873,17 +866,17 @@ Note
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">log_offering_amt</th>
-<td class="gt_row gt_center">-0.550*** (-38.992)</td>
+<td class="gt_row gt_center">-0.550*** (-38.994)</td>
 <td class="gt_row gt_center"></td>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">time_to_maturity</th>
-<td class="gt_row gt_center">0.058*** (41.526)</td>
+<td class="gt_row gt_center">0.058*** (41.527)</td>
 <td class="gt_row gt_center"></td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">Intercept</th>
-<td class="gt_row gt_center">10.733*** (57.057)</td>
+<td class="gt_row gt_center">10.733*** (57.060)</td>
 <td class="gt_row gt_center"></td>
 </tr>
 <tr class="gt_group_heading_row even">
@@ -904,8 +897,8 @@ Note
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">Observations</th>
-<td class="gt_row gt_center">127539</td>
-<td class="gt_row gt_center">127194</td>
+<td class="gt_row gt_center">127540</td>
+<td class="gt_row gt_center">127195</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">S.E. type</th>
@@ -942,43 +935,43 @@ Note
 <p>To provide such visual evidence, we revisit the simple OLS model and replace the <code>treated</code> and <code>post_period</code> indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data.</p>
 <div id="cell-fig-1301" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>model_without_fe_time <span class="op">=</span> pf.feols(</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt"</span>,</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  data <span class="op">=</span> bonds_panel.assign(date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"date"</span>].astype(<span class="bu">str</span>))</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt"</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> bonds_panel.assign(date <span class="op">=</span> <span class="kw">lambda</span> x: x[<span class="st">"date"</span>].astype(<span class="bu">str</span>))</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>model_without_fe_coefs <span class="op">=</span> (pd.DataFrame({</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"estimate"</span>: model_without_fe_time.coef(),</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"std_error"</span>: model_without_fe_time.se()</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  })</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  .reset_index(names<span class="op">=</span><span class="st">"term"</span>)</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  .query(<span class="st">"term.str.contains('date')"</span>)</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    treatment<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"term"</span>].<span class="bu">str</span>.contains(<span class="st">":polluter"</span>),</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"term"</span>].<span class="bu">str</span>.extract(<span class="vs">r"date</span><span class="ch">\[</span><span class="vs">T</span><span class="ch">\.</span><span class="kw">(</span><span class="dv">\d</span><span class="op">{4}</span><span class="vs">-</span><span class="dv">\d</span><span class="op">{2}</span><span class="vs">-</span><span class="dv">\d</span><span class="op">{2}</span><span class="kw">)</span><span class="ch">\]</span><span class="vs">"</span>),</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    ci_up<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.975</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>],</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>    ci_low<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.025</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>]</span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimate"</span>: model_without_fe_time.coef(),</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>        <span class="st">"std_error"</span>: model_without_fe_time.se()</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    .reset_index(names<span class="op">=</span><span class="st">"term"</span>)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"term.str.contains('date')"</span>)</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>        treatment<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"term"</span>].<span class="bu">str</span>.contains(<span class="st">":polluter"</span>),</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>        date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"term"</span>].<span class="bu">str</span>.extract(<span class="vs">r"date</span><span class="ch">\[</span><span class="vs">T</span><span class="ch">\.</span><span class="kw">(</span><span class="dv">\d</span><span class="op">{4}</span><span class="vs">-</span><span class="dv">\d</span><span class="op">{2}</span><span class="vs">-</span><span class="dv">\d</span><span class="op">{2}</span><span class="kw">)</span><span class="ch">\]</span><span class="vs">"</span>),</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>        ci_up<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.975</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>],</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>        ci_low<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.025</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>]</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>model_without_fe_figure <span class="op">=</span> (</span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  ggplot(</span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    model_without_fe_coefs, </span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    aes(x<span class="op">=</span><span class="st">"date"</span>, y<span class="op">=</span><span class="st">"estimate"</span>, color<span class="op">=</span><span class="st">"treatment"</span>,</span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>        linetype<span class="op">=</span><span class="st">"treatment"</span>, shape<span class="op">=</span><span class="st">"treatment"</span>)</span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_vline(xintercept<span class="op">=</span>pd.to_datetime(treatment_date) <span class="op">-</span></span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>               pd.offsets.MonthBegin(), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_hline(yintercept<span class="op">=</span><span class="dv">0</span>, linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
-<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_errorbar(aes(ymin<span class="op">=</span><span class="st">"ci_low"</span>, ymax<span class="op">=</span><span class="st">"ci_up"</span>), alpha<span class="op">=</span><span class="fl">0.5</span>)</span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_point()</span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> guides(linetype<span class="op">=</span><span class="va">None</span>)</span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(</span>
-<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>      x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">"Yield"</span>, shape<span class="op">=</span><span class="st">"Polluter?"</span>, color<span class="op">=</span><span class="st">"Polluter?"</span>,</span>
-<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>      title<span class="op">=</span><span class="st">"Polluters respond stronger than green firms"</span></span>
-<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_linetype_manual(values<span class="op">=</span>[<span class="st">"solid"</span>, <span class="st">"dashed"</span>])</span>
-<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"1 year"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    ggplot(</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>        model_without_fe_coefs, </span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>        aes(x<span class="op">=</span><span class="st">"date"</span>, y<span class="op">=</span><span class="st">"estimate"</span>, color<span class="op">=</span><span class="st">"treatment"</span>,</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>            linetype<span class="op">=</span><span class="st">"treatment"</span>, shape<span class="op">=</span><span class="st">"treatment"</span>)</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_vline(xintercept<span class="op">=</span>pd.to_datetime(treatment_date) <span class="op">-</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>                pd.offsets.MonthBegin(), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_hline(yintercept<span class="op">=</span><span class="dv">0</span>, linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_errorbar(aes(ymin<span class="op">=</span><span class="st">"ci_low"</span>, ymax<span class="op">=</span><span class="st">"ci_up"</span>), alpha<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point()</span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> guides(linetype<span class="op">=</span><span class="va">None</span>)</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">"Yield"</span>, shape<span class="op">=</span><span class="st">"Polluter?"</span>, color<span class="op">=</span><span class="st">"Polluter?"</span>,</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Polluters respond stronger than green firms"</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_linetype_manual(values<span class="op">=</span>[<span class="st">"solid"</span>, <span class="st">"dashed"</span>])</span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"1 year"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
 <span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a>model_without_fe_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
@@ -996,29 +989,29 @@ Figure&nbsp;1: The figure shows the coefficient estimates and 95 percent confide
 </div>
 <p><a href="#fig-1301" class="quarto-xref">Figure&nbsp;1</a> shows that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement.</p>
 <p>Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter’s yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the <code>treated</code> indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date.</p>
-<div id="dd34e833" class="cell" data-execution_count="12">
+<div id="ffe241b1" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>bonds_panel_alt <span class="op">=</span> (bonds_panel</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    diff_to_treatment<span class="op">=</span><span class="kw">lambda</span> x: (</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>      np.<span class="bu">round</span>(</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>        ((x[<span class="st">"date"</span>]<span class="op">-</span>(treatment_date<span class="op">-</span> </span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>            pd.offsets.MonthBegin())).dt.days<span class="op">/</span><span class="dv">365</span>)<span class="op">*</span><span class="dv">12</span>, <span class="dv">0</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>      ).astype(<span class="bu">int</span>)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        diff_to_treatment<span class="op">=</span><span class="kw">lambda</span> x: (</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>        np.<span class="bu">round</span>(</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>            ((x[<span class="st">"date"</span>]<span class="op">-</span>(treatment_date<span class="op">-</span> </span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>                pd.offsets.MonthBegin())).dt.days<span class="op">/</span><span class="dv">365</span>)<span class="op">*</span><span class="dv">12</span>, <span class="dv">0</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        ).astype(<span class="bu">int</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>variables <span class="op">=</span> (bonds_panel_alt</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  .get([<span class="st">"diff_to_treatment"</span>, <span class="st">"date"</span>])</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>  .drop_duplicates()</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  .sort_values(<span class="st">"date"</span>)</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>  .copy()</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>  .assign(variable_name<span class="op">=</span>np.nan)</span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>  .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"diff_to_treatment"</span>, <span class="st">"date"</span>])</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    .drop_duplicates()</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    .sort_values(<span class="st">"date"</span>)</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>    .copy()</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    .assign(variable_name<span class="op">=</span>np.nan)</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and <code>cusip_id</code> and <code>date</code> fixed effects.</p>
-<div id="2db9f8f1" class="cell" data-execution_count="13">
+<div id="d1916611" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>formula <span class="op">=</span> <span class="st">"avg_yield ~ 1 + "</span></span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> j <span class="kw">in</span> <span class="bu">range</span>(variables.shape[<span class="dv">0</span>]):</span>
@@ -1041,58 +1034,58 @@ Figure&nbsp;1: The figure shows the coefficient estimates and 95 percent confide
 <span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>formula <span class="op">=</span> formula <span class="op">+</span> <span class="st">" | cusip_id + date "</span></span>
 <span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a>model_with_fe_time <span class="op">=</span> pf.feols(</span>
-<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>  formula,</span>
-<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>  vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
-<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>  data <span class="op">=</span> bonds_panel_alt</span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>    formula,</span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> bonds_panel_alt</span>
 <span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We then collect the regression results into a dataframe that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies.</p>
-<div id="0ff842d9" class="cell" data-execution_count="14">
+<div id="8aa72476" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>lag0_row <span class="op">=</span> pd.DataFrame({</span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"term"</span>: [<span class="st">"lag0"</span>],</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"estimate"</span>: [<span class="dv">0</span>],</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"std_error"</span>: [<span class="dv">0</span>],</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"ci_up"</span>: [<span class="dv">0</span>],</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"ci_low"</span>: [<span class="dv">0</span>],</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"diff_to_treatment"</span>: [<span class="dv">0</span>],</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"date"</span>: [treatment_date <span class="op">-</span> pd.offsets.MonthBegin()]</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"term"</span>: [<span class="st">"lag0"</span>],</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="st">"estimate"</span>: [<span class="dv">0</span>],</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"std_error"</span>: [<span class="dv">0</span>],</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ci_up"</span>: [<span class="dv">0</span>],</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"ci_low"</span>: [<span class="dv">0</span>],</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"diff_to_treatment"</span>: [<span class="dv">0</span>],</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"date"</span>: [treatment_date <span class="op">-</span> pd.offsets.MonthBegin()]</span>
 <span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>})</span>
 <span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>model_with_fe_time_coefs <span class="op">=</span> (pd.DataFrame({</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"estimate"</span>: model_with_fe_time.coef(),</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"std_error"</span>: model_with_fe_time.se()</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  })</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>  .reset_index(names<span class="op">=</span><span class="st">"term"</span>)</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>  .assign(</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    ci_up<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.975</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>],</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    ci_low<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.025</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>]</span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>  .merge(variables, how<span class="op">=</span><span class="st">"left"</span>, left_on<span class="op">=</span><span class="st">"term"</span>, right_on<span class="op">=</span><span class="st">"variable_name"</span>)</span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>  .drop(columns<span class="op">=</span><span class="st">"variable_name"</span>)</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        <span class="st">"estimate"</span>: model_with_fe_time.coef(),</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">"std_error"</span>: model_with_fe_time.se()</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    })</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    .reset_index(names<span class="op">=</span><span class="st">"term"</span>)</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        ci_up<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.975</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>],</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>        ci_low<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"estimate"</span>]<span class="op">+</span>norm.ppf(<span class="fl">0.025</span>)<span class="op">*</span>x[<span class="st">"std_error"</span>]</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    .merge(variables, how<span class="op">=</span><span class="st">"left"</span>, left_on<span class="op">=</span><span class="st">"term"</span>, right_on<span class="op">=</span><span class="st">"variable_name"</span>)</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>    .drop(columns<span class="op">=</span><span class="st">"variable_name"</span>)</span>
 <span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>model_with_fe_time_coefs <span class="op">=</span> pd.concat(</span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>  [model_with_fe_time_coefs, lag0_row], </span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>  ignore_index<span class="op">=</span><span class="va">True</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>    [model_with_fe_time_coefs, lag0_row], </span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>    ignore_index<span class="op">=</span><span class="va">True</span></span>
 <span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p><a href="#fig-1402" class="quarto-xref">Figure&nbsp;2</a> shows the resulting coefficient estimates.</p>
 <div id="cell-fig-1402" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>model_with_fe_time_figure <span class="op">=</span> (</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  ggplot(</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    model_with_fe_time_coefs,</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    aes(x<span class="op">=</span><span class="st">"date"</span>, y<span class="op">=</span><span class="st">"estimate"</span>)</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_vline(aes(xintercept<span class="op">=</span>treatment_date <span class="op">-</span> pd.offsets.MonthBegin()), </span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>                   linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_hline(aes(yintercept<span class="op">=</span><span class="dv">0</span>), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_errorbar(aes(ymin<span class="op">=</span><span class="st">"ci_low"</span>, ymax<span class="op">=</span><span class="st">"ci_up"</span>), alpha<span class="op">=</span><span class="fl">0.5</span>)</span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> geom_point(aes(y<span class="op">=</span><span class="st">"estimate"</span>))</span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> labs(</span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>      x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">"Yield"</span>,</span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>      title<span class="op">=</span><span class="st">"Polluters' yield patterns around Paris Agreement signing"</span></span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"1 year"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    ggplot(</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        model_with_fe_time_coefs,</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>        aes(x<span class="op">=</span><span class="st">"date"</span>, y<span class="op">=</span><span class="st">"estimate"</span>)</span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_vline(aes(xintercept<span class="op">=</span>treatment_date <span class="op">-</span> pd.offsets.MonthBegin()), </span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>                    linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_hline(aes(yintercept<span class="op">=</span><span class="dv">0</span>), linetype<span class="op">=</span><span class="st">"dashed"</span>)</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_errorbar(aes(ymin<span class="op">=</span><span class="st">"ci_low"</span>, ymax<span class="op">=</span><span class="st">"ci_up"</span>), alpha<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(aes(y<span class="op">=</span><span class="st">"estimate"</span>))</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">""</span>, y<span class="op">=</span><span class="st">"Yield"</span>,</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Polluters' yield patterns around Paris Agreement signing"</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_datetime(date_breaks<span class="op">=</span><span class="st">"1 year"</span>, date_labels<span class="op">=</span><span class="st">"%Y"</span>)</span>
 <span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>model_with_fe_time_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">

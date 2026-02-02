@@ -24,40 +24,34 @@ The current chapter relies on this set of Python packages.
 import pandas as pd
 import numpy as np
 import datetime as dt
-import sqlite3
 ```
 
 Compared to previous chapters, we introduce the `datetime` module that is part of the Python standard library for manipulating dates. 
 
 ## Data Preparation
 
-First, we load the necessary data from our SQLite database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we load the necessary data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{python}
-tidy_finance = sqlite3.connect(database="data/tidy_finance_python.sqlite")
-
-crsp_monthly = (pd.read_sql_query(
-    sql=("SELECT permno, gvkey, date, ret_excess, mktcap, " 
-         "mktcap_lag, exchange FROM crsp_monthly"),
-    con=tidy_finance,
-    parse_dates={"date"})
-  .dropna()
+crsp_monthly = (
+    pd.read_parquet("data-python/crsp_monthly.parquet")
+    .get(["permno", "gvkey", "date", "ret_excess", "mktcap", 
+          "mktcap_lag", "exchange"])
+    .dropna()
 )
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.\index{Data!Compustat}
+Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.\index{Data!Compustat}
 
 ```{python}
-book_equity = (pd.read_sql_query(
-    sql="SELECT gvkey, datadate, be FROM compustat",
-    con=tidy_finance, 
-    parse_dates={"datadate"})
-  .dropna()
-  .assign(
-    date=lambda x: (
-      pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()
+book_equity = (pd.read_parquet("data-python/compustat_annual.parquet")
+    .get(["gvkey", "datadate", "be"])
+    .dropna()
+    .assign(
+        date=lambda x: (
+        pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()
+        )
     )
-  )
 )
 ```
 
@@ -71,45 +65,45 @@ Having both variables, i.e., firm size lagged by one month and book-to-market la
 
 ```{python}
 size = (crsp_monthly
-  .assign(sorting_date=lambda x: x["date"]+pd.DateOffset(months=1))
-  .rename(columns={"mktcap": "size"})
-  .get(["permno", "sorting_date", "size"])
+    .assign(sorting_date=lambda x: x["date"]+pd.DateOffset(months=1))
+    .rename(columns={"mktcap": "size"})
+    .get(["permno", "sorting_date", "size"])
 )
 
 bm = (book_equity
-  .merge(crsp_monthly, how="inner", on=["gvkey", "date"])
-  .assign(bm=lambda x: x["be"]/x["mktcap"],
-          sorting_date=lambda x: x["date"]+pd.DateOffset(months=6))
-  .assign(accounting_date=lambda x: x["sorting_date"])
-  .get(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
+    .merge(crsp_monthly, how="inner", on=["gvkey", "date"])
+    .assign(bm=lambda x: x["be"]/x["mktcap"],
+            sorting_date=lambda x: x["date"]+pd.DateOffset(months=6))
+    .assign(accounting_date=lambda x: x["sorting_date"])
+    .get(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
 )
 
 data_for_sorts = (crsp_monthly
-  .merge(bm, 
-         how="left", 
-         left_on=["permno", "gvkey", "date"], 
-         right_on=["permno", "gvkey", "sorting_date"])
-  .merge(size, 
-         how="left", 
-         left_on=["permno", "date"], 
-         right_on=["permno", "sorting_date"])
-  .get(["permno", "gvkey", "date", "ret_excess", 
-        "mktcap_lag", "size", "bm", "exchange", "accounting_date"])
+    .merge(bm, 
+            how="left", 
+            left_on=["permno", "gvkey", "date"], 
+            right_on=["permno", "gvkey", "sorting_date"])
+    .merge(size, 
+            how="left", 
+            left_on=["permno", "date"], 
+            right_on=["permno", "sorting_date"])
+    .get(["permno", "gvkey", "date", "ret_excess", 
+            "mktcap_lag", "size", "bm", "exchange", "accounting_date"])
 )
 
 data_for_sorts = (data_for_sorts
-  .sort_values(by=["permno", "gvkey", "date"])
-  .groupby(["permno", "gvkey"])
-  .apply(lambda x: x.assign(
-      bm=x["bm"].fillna(method="ffill"), 
-      accounting_date=x["accounting_date"].fillna(method="ffill")
+    .sort_values(by=["permno", "gvkey", "date"])
+    .groupby(["permno", "gvkey"])
+    .apply(lambda x: x.assign(
+        bm=x["bm"].fillna(method="ffill"), 
+        accounting_date=x["accounting_date"].fillna(method="ffill")
+        )
     )
-  )
-  .reset_index(drop=True)
-  .assign(threshold_date = lambda x: (x["date"]-pd.DateOffset(months=12)))
-  .query("accounting_date > threshold_date")
-  .drop(columns=["accounting_date", "threshold_date"])
-  .dropna()
+    .reset_index(drop=True)
+    .assign(threshold_date = lambda x: (x["date"]-pd.DateOffset(months=12)))
+    .query("accounting_date > threshold_date")
+    .drop(columns=["accounting_date", "threshold_date"])
+    .dropna()
 )
 ```
 
@@ -152,23 +146,23 @@ To implement the independent bivariate portfolio sort, we assign monthly portfol
 
 ```{python}
 value_portfolios = (data_for_sorts
-  .groupby("date")
-  .apply(lambda x: x.assign(
-      portfolio_bm=assign_portfolio(
-        data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
-      ),
-      portfolio_size=assign_portfolio(
-        data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
-      )
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        ),
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
     )
-  )
-  .reset_index(drop=True)
-  .groupby(["date", "portfolio_bm", "portfolio_size"])
-  .apply(lambda x: pd.Series({
-      "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-    })
-  )
-  .reset_index()
+    .reset_index(drop=True)
+    .groupby(["date", "portfolio_bm", "portfolio_size"])
+    .apply(lambda x: pd.Series({
+        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
+        })
+    )
+    .reset_index()
 )
 ```
 
@@ -176,18 +170,18 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 
 ```{python}
 value_premium = (value_portfolios
-  .groupby(["date", "portfolio_bm"])
-  .aggregate({"ret": "mean"})
-  .reset_index()
-  .groupby("date")
-  .apply(lambda x: pd.Series({
-    "value_premium": (
-        x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() - 
-          x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
-      )
-    })
-  )
-  .aggregate({"value_premium": "mean"})
+    .groupby(["date", "portfolio_bm"])
+    .aggregate({"ret": "mean"})
+    .reset_index()
+    .groupby("date")
+    .apply(lambda x: pd.Series({
+        "value_premium": (
+            x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() - 
+            x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
+        )
+        })
+    )
+    .aggregate({"value_premium": "mean"})
 )
 ```
 
@@ -201,43 +195,43 @@ To implement the dependent sorts, we first create the size portfolios by calling
 
 ```{python}
 value_portfolios = (data_for_sorts
-  .groupby("date")
-  .apply(lambda x: x.assign(
-      portfolio_size=assign_portfolio(
-        data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
-      )
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
     )
-  )
-  .reset_index(drop=True)
-  .groupby(["date", "portfolio_size"])
-  .apply(lambda x: x.assign(
-      portfolio_bm=assign_portfolio(
-        data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
-      )
+    .reset_index(drop=True)
+    .groupby(["date", "portfolio_size"])
+    .apply(lambda x: x.assign(
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
     )
-  )
-  .reset_index(drop=True)
-  .groupby(["date", "portfolio_bm", "portfolio_size"])
-  .apply(lambda x: pd.Series({
-      "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-    })
-  )
-  .reset_index()
+    .reset_index(drop=True)
+    .groupby(["date", "portfolio_bm", "portfolio_size"])
+    .apply(lambda x: pd.Series({
+        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
+        })
+    )
+    .reset_index()
 )
 
 value_premium = (value_portfolios
-  .groupby(["date", "portfolio_bm"])
-  .aggregate({"ret": "mean"})
-  .reset_index()
-  .groupby("date")
-  .apply(lambda x: pd.Series({
-    "value_premium": (
-        x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() -
-          x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
-      )
-    })
-  )
-  .aggregate({"value_premium": "mean"})
+    .groupby(["date", "portfolio_bm"])
+    .aggregate({"ret": "mean"})
+    .reset_index()
+    .groupby("date")
+    .apply(lambda x: pd.Series({
+        "value_premium": (
+            x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() -
+            x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
+        )
+        })
+    )
+    .aggregate({"value_premium": "mean"})
 )
 ```
 

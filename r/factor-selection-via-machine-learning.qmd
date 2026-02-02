@@ -69,7 +69,7 @@ To get started, we load the required R packages and data. The main focus is on t
 
 ```{r}
 #| message: false
-library(RSQLite)
+library(arrow)
 library(tidyverse)
 library(tidymodels)
 library(scales)
@@ -78,7 +78,7 @@ library(glmnet)
 library(timetk)
 ```
 
-In this analysis, we use four different data sources that we load from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
+In this analysis, we use four different data sources that we load from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications. 
 
 - The standard workhorse: monthly Fama-French 3 factor returns (market, small-minus-big, and high-minus-low book-to-market valuation sorts) defined in @Fama1992 and @Fama1993
 - Monthly q-factor returns from @Hou2015. The factors contain the size factor, the investment factor, the return-on-equity factor, and the expected growth factor
@@ -91,29 +91,19 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macroeconomic predictors}\index{Data!Industry portfolios}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-factors_ff3_monthly <- tbl(tidy_finance, "factors_ff3_monthly") |>
-  collect() |>
+factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
   rename_with(~ str_c("factor_ff_", .), -date)
 
-factors_q_monthly <- tbl(tidy_finance, "factors_q_monthly") |>
-  collect() |>
+factors_q_monthly <- read_parquet("data-r/factors_q_monthly.parquet") |>
   rename_with(~ str_c("factor_q_", .), -date)
 
-macro_predictors <- tbl(tidy_finance, "macro_predictors") |>
-  collect() |>
+macro_predictors <- read_parquet("data-r/macro_predictors.parquet") |>
   rename_with(~ str_c("macro_", .), -date) |>
   select(-macro_rp_div)
 
-industries_ff_monthly <- tbl(tidy_finance, "industries_ff_monthly") |>
-  collect() |>
+industries_ff_monthly <- read_parquet("data-r/industries_ff_monthly.parquet") |>
   pivot_longer(-date, names_to = "industry", values_to = "ret") |>
-  arrange(desc(industry)) |> 
+  arrange(desc(industry)) |>
   mutate(industry = as_factor(industry))
 ```
 
@@ -125,7 +115,7 @@ data <- industries_ff_monthly |>
   left_join(factors_q_monthly, join_by(date)) |>
   left_join(macro_predictors, join_by(date)) |>
   mutate(
-    ret = ret - factor_ff_rf
+    ret = ret - factor_ff_risk_free
   ) |>
   select(date, industry, ret_excess = ret, everything()) |>
   drop_na()
@@ -144,7 +134,8 @@ data |>
   geom_boxplot() +
   coord_flip() +
   labs(
-    x = NULL, y = NULL,
+    x = NULL,
+    y = NULL,
     title = "Excess return distributions by industry in percent"
   ) +
   scale_y_continuous(

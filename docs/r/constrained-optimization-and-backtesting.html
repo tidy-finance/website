@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.7.32">
+<meta name="generator" content="quarto-1.8.25">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -92,14 +92,15 @@ div.csl-indent {
 <link href="../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
 <script src="../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="../site_libs/quarto-html/popper.min.js"></script>
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-37eea08aefeeee20ff55810ff984fec1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-99a8851848bcfc05e6486f9d9e6d6ff3.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-0514632cc3f7a6d071f65f884e64e3e1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -173,7 +174,7 @@ const typesetMath = (el) => {
     var macros = [];
     for (var i = 0; i < mathElements.length; i++) {
       var texText = mathElements[i].firstChild;
-      if (mathElements[i].tagName == "SPAN") {
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
         window.katex.render(texText.data, mathElements[i], {
           displayMode: mathElements[i].classList.contains('display'),
           throwOnError: false,
@@ -207,7 +208,8 @@ window.Quarto = {
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a href="../index.html" class="navbar-brand navbar-brand-logo">
-    <img src="../assets/img/logo-website-white.png" alt="" class="navbar-logo">
+    <img src="../assets/img/logo-website-white.png" alt="" class="navbar-logo light-content">
+    <img src="../assets/img/logo-website-white.png" alt="" class="navbar-logo dark-content">
     </a>
     <a class="navbar-brand" href="../index.html">
     <span class="navbar-title">Tidy Finance</span>
@@ -271,6 +273,10 @@ window.Quarto = {
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
   <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+      <a href="../index.html" class="sidebar-logo-link">
+      </a>
+      </div>
         <div class="mt-2 flex-shrink-0 align-items-center">
         <div class="sidebar-search">
         <div id="quarto-search" class="" title="Search"></div>
@@ -511,7 +517,7 @@ window.Quarto = {
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="../r/wrds-dummy-data.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">WRDS Dummy Data</span></a>
+ <span class="menu-text">WRDS Pseudo Data</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -530,12 +536,6 @@ window.Quarto = {
   <div class="sidebar-item-container"> 
   <a href="../r/proofs.html" class="sidebar-item-text sidebar-link">
  <span class="menu-text">Proofs</span></a>
-  </div>
-</li>
-          <li class="sidebar-item">
-  <div class="sidebar-item-container"> 
-  <a href="../r/hex-sticker.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text">Hex Sticker</span></a>
   </div>
 </li>
           <li class="sidebar-item">
@@ -605,39 +605,32 @@ Note
 <p> In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in R. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.</p>
 <p>Throughout this chapter, we use the following R packages:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(arrow)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nloptr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nloptr)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Compared to previous chapters, we introduce the <code>nloptr</code> package <span class="citation" data-cites="nloptr">(<a href="#ref-nloptr" role="doc-biblioref">Johnson 2007</a>)</span> to perform numerical constrained optimization for portfolio choice problems.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
-<p>We start by loading the required data from our <code>SQLite</code>-database introduced in <a href="../r/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
+<p>We start by loading the required data from our Parquet files introduced in <a href="../r/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a>. For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. </p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tidy_finance <span class="ot">&lt;-</span> <span class="fu">dbConnect</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">SQLite</span>(),</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"data/tidy_finance_r.sqlite"</span>,</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">extended_types =</span> <span class="cn">TRUE</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>industry_returns <span class="ot">&lt;-</span> <span class="fu">tbl</span>(tidy_finance, <span class="st">"industries_ff_monthly"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>date) <span class="sc">|&gt;</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>industry_returns <span class="ot">&lt;-</span> <span class="fu">read_parquet</span>(<span class="st">"data-r/industries_ff_monthly.parquet"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>date) <span class="sc">|&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="recap-of-portfolio-choice" class="level2">
 <h2 class="anchored" data-anchor-id="recap-of-portfolio-choice">Recap of Portfolio Choice</h2>
 <p>A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation which delivers the lowest possible return variance for a given minimum level of expected returns. In the most extreme case, where the investor is only concerned about portfolio variance, they may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to <span class="math display">\[\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1\]</span> where <span class="math inline">\(\Sigma\)</span> is the <span class="math inline">\((N \times N)\)</span> covariance matrix of the returns. The optimal weights <span class="math inline">\(\omega_\text{mvp}\)</span> can be found analytically and are <span class="math inline">\(\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}\)</span>. In terms of code, the math is equivalent to the following chunk. </p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n_industries <span class="ot">&lt;-</span> <span class="fu">ncol</span>(industry_returns)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>n_industries <span class="ot">&lt;-</span> <span class="fu">ncol</span>(industry_returns)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>Sigma <span class="ot">&lt;-</span> <span class="fu">cov</span>(industry_returns)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="ot">&lt;-</span> <span class="fu">solve</span>(Sigma) <span class="sc">%*%</span> <span class="fu">rep</span>(<span class="dv">1</span>, n_industries)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>w_mvp <span class="ot">&lt;-</span> <span class="fu">as.vector</span>(w_mvp <span class="sc">/</span> <span class="fu">sum</span>(w_mvp))</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>mu <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(industry_returns)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>mu <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(industry_returns)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Next, consider an investor who aims to achieve minimum variance <em>given a required expected portfolio return</em> <span class="math inline">\(\bar{\mu}\)</span> such that she chooses <span class="math display">\[\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.\]</span> We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor <span class="math inline">\(\gamma\)</span>. That means the investor aims to choose portfolio weights as the solution to <span class="math display">\[ \omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1.\]</span> The solution to the optimal portfolio choice problem is: <span class="math display">\[\omega^*_{\gamma}  = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu  + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.\]</span> Empirically, this classical solution imposes many problems. In particular, the estimates of <span class="math inline">\(\mu\)</span> are noisy over short horizons, the (<span class="math inline">\(N \times N\)</span>) matrix <span class="math inline">\(\Sigma\)</span> contains <span class="math inline">\(N(N-1)/2\)</span> distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are <span class="citation" data-cites="Brown1976">Brown (<a href="#ref-Brown1976" role="doc-biblioref">1976</a>)</span>, <span class="citation" data-cites="Jobson1980">Jobson and Korkie (<a href="#ref-Jobson1980" role="doc-biblioref">1980</a>)</span>, <span class="citation" data-cites="Jorion1986">Jorion (<a href="#ref-Jorion1986" role="doc-biblioref">1986</a>)</span>, and <span class="citation" data-cites="Chopra1993">Chopra and Ziemba (<a href="#ref-Chopra1993" role="doc-biblioref">1993</a>)</span>.</p>
 <p>Even worse, if the asset universe contains more assets than available time periods <span class="math inline">\((N &gt; T)\)</span>, the sample covariance matrix is no longer positive definite such that the inverse <span class="math inline">\(\Sigma^{-1}\)</span> does not exist anymore. To address estimation issues for vast-dimensional covariance matrices, regularization techniques are a popular tool <span class="citation" data-cites="Ledoit2003 Ledoit2004 Ledoit2012 Fan2008">(see, e.g., <a href="#ref-Ledoit2003" role="doc-biblioref">Ledoit and Wolf 2003</a>, <a href="#ref-Ledoit2004" role="doc-biblioref">2004</a>, <a href="#ref-Ledoit2012" role="doc-biblioref">2012</a>; <a href="#ref-Fan2008" role="doc-biblioref">Fan, Fan, and Lv 2008</a>)</span>.</p>
@@ -659,7 +652,7 @@ Note
 <h2 class="anchored" data-anchor-id="optimal-portfolio-choice">Optimal Portfolio Choice</h2>
 <p>The function below implements the efficient portfolio weight in its general form, allowing for transaction costs (conditional on the holdings <em>before</em> reallocation). For <span class="math inline">\(\beta=0\)</span>, the computation resembles the standard mean-variance efficient framework. <code>gamma</code> denotes the coefficient of risk aversion <span class="math inline">\(\gamma\)</span>, <code>beta</code> is the transaction cost parameter <span class="math inline">\(\beta\)</span> and <code>w_prev</code> are the weights before rebalancing <span class="math inline">\(\omega_{t^+}\)</span>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>compute_efficient_weight <span class="ot">&lt;-</span> <span class="cf">function</span>(Sigma,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>compute_efficient_weight <span class="ot">&lt;-</span> <span class="cf">function</span>(Sigma,</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>                                     mu,</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">gamma =</span> <span class="dv">2</span>,</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">beta =</span> <span class="dv">0</span>, <span class="co"># transaction costs</span></span>
@@ -683,15 +676,15 @@ Note
 <span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>w_efficient <span class="ot">&lt;-</span> <span class="fu">compute_efficient_weight</span>(Sigma, mu)</span>
-<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_efficient, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_efficient, <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code> [1]  1.192  0.239 -1.666  0.616  0.453 -0.437  0.755  0.359 -0.047
-[10] -0.464</code></pre>
+<pre><code> [1]  1.192  0.239 -1.664  0.616  0.453 -0.438  0.755  0.359 -0.047
+[10] -0.465</code></pre>
 </div>
 </div>
 <p>The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient <span class="math inline">\(\gamma=2\)</span> in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of <span class="math inline">\(-1\)</span> implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter <span class="math inline">\(\beta\)</span> and risk aversion <span class="math inline">\(\gamma\)</span>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gammas <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">20</span>)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gammas <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">4</span>, <span class="dv">8</span>, <span class="dv">20</span>)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>betas <span class="ot">&lt;-</span> <span class="dv">20</span> <span class="sc">*</span> <span class="fu">qexp</span>((<span class="dv">1</span><span class="sc">:</span><span class="dv">99</span>) <span class="sc">/</span> <span class="dv">100</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>                   </span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>transaction_costs <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(</span>
@@ -711,11 +704,11 @@ Note
 <span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>      )</span>
 <span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    ),</span>
 <span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">concentration =</span> <span class="fu">map_dbl</span>(weights, \(x) <span class="fu">sum</span>(<span class="fu">abs</span>(x <span class="sc">-</span> w_mvp)))</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The code chunk above computes the optimal weight in presence of transaction cost for different values of <span class="math inline">\(\beta\)</span> and <span class="math inline">\(\gamma\)</span> but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses their optimal allocation along the efficient frontier to reflect their own risk preferences. If transaction costs would be absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, their optimal portfolio choice reflects a shift toward the efficient portfolio, whereas their current portfolio anchors their investment.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>transaction_costs <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>transaction_costs <span class="sc">|&gt;</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">risk_aversion =</span> <span class="fu">as_factor</span>(gamma)) <span class="sc">|&gt;</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> beta,</span>
@@ -730,7 +723,7 @@ Note
 <span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Distance from MVP"</span>,</span>
 <span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">"Risk aversion"</span>,</span>
 <span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Portfolio weights for different risk aversion and transaction cost"</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div id="fig-1701" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion.">
 <figure class="quarto-float quarto-float-fig figure">
@@ -752,7 +745,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <p>We rely on the powerful <code>nloptr</code> package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of <span class="citation" data-cites="Kraft1994">Kraft (<a href="#ref-Kraft1994" role="doc-biblioref">1994</a>)</span> because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.</p>
 <p>We illustrate the use of the <code>nloptr()</code> function by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that <code>near()</code> is a safe way to compare two vectors for pairwise equality. The alternative <code>==</code> is sensitive to small differences that may occur due to the representation of floating points on a computer, while <code>near()</code> has a built-in tolerance.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>w_initial <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">1</span> <span class="sc">/</span> n_industries, n_industries)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>w_initial <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">1</span> <span class="sc">/</span> n_industries, n_industries)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>objective_mvp <span class="ot">&lt;-</span> <span class="cf">function</span>(w) {</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fl">0.5</span> <span class="sc">*</span> <span class="fu">t</span>(w) <span class="sc">%*%</span> Sigma <span class="sc">%*%</span> w</span>
@@ -785,11 +778,11 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">opts =</span> options</span>
 <span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">near</span>(w_mvp, w_mvp_numerical<span class="sc">$</span>solution))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">near</span>(w_mvp, w_mvp_numerical<span class="sc">$</span>solution))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] TRUE</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>objective_efficient <span class="ot">&lt;-</span> <span class="cf">function</span>(w) {</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>objective_efficient <span class="ot">&lt;-</span> <span class="cf">function</span>(w) {</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="dv">2</span> <span class="sc">*</span> <span class="fl">0.5</span> <span class="sc">*</span> <span class="fu">t</span>(w) <span class="sc">%*%</span> Sigma <span class="sc">%*%</span> w <span class="sc">-</span> <span class="fu">sum</span>((<span class="dv">1</span> <span class="sc">+</span> mu) <span class="sc">*</span> w)</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -806,7 +799,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">opts =</span> options</span>
 <span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">near</span>(w_efficient, w_efficient_numerical<span class="sc">$</span>solution))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a><span class="fu">all</span>(<span class="fu">near</span>(w_efficient, w_efficient_numerical<span class="sc">$</span>solution))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] TRUE</code></pre>
 </div>
@@ -814,7 +807,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <p>The result above shows that indeed the numerical procedure recovered the optimal weights for a scenario, where we already know the analytic solution. For more complex optimization routines, <a href="https://cran.r-project.org/web/views/Optimization.html">R’s optimization task view</a> provides an overview of the vast optimization landscape. </p>
 <p>Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies <span class="math inline">\(N\)</span> inequality constraints of the form <span class="math inline">\(\omega_i &gt;=0\)</span>. We can implement the short-sale constraints by imposing a vector of lower bounds <code>lb = rep(0, n_industries)</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>w_no_short_sale <span class="ot">&lt;-</span> <span class="fu">nloptr</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>w_no_short_sale <span class="ot">&lt;-</span> <span class="fu">nloptr</span>(</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">x0 =</span> w_initial, </span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">eval_f =</span> objective_efficient, </span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">eval_grad_f =</span> gradient_efficient,</span>
@@ -824,7 +817,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">opts =</span> options</span>
 <span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_no_short_sale<span class="sc">$</span>solution, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_no_short_sale<span class="sc">$</span>solution, <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code> [1] 0.280 0.000 0.000 0.198 0.000 0.000 0.339 0.182 0.000 0.000</code></pre>
 </div>
@@ -832,7 +825,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <p>As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. You can verify that <code>sum(w_no_short_sale$solution)</code> returns 1. In other words, <code>nloptr()</code> provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion <code>gamma = 2</code>, where negative holdings are forbidden.</p>
 <p><code>nloptr()</code> can also handle more complex problems. As an example, we show how to compute optimal weights, subject to the so-called <a href="https://en.wikipedia.org/wiki/Regulation_T">Regulation-T constraint,</a> which requires that the sum of all absolute portfolio weights is smaller than 1.5, that is <span class="math inline">\(\sum_{i=1}^N |\omega_i| \leq 1.5\)</span>. The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. </p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>reg_t <span class="ot">&lt;-</span> <span class="fl">1.5</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>reg_t <span class="ot">&lt;-</span> <span class="fl">1.5</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>inequality_constraint <span class="ot">&lt;-</span> <span class="cf">function</span>(w) {</span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sum</span>(<span class="fu">abs</span>(w)) <span class="sc">-</span> reg_t</span>
@@ -862,15 +855,15 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <span id="cb14-28"><a href="#cb14-28" aria-hidden="true" tabindex="-1"></a>  <span class="at">opts =</span> options</span>
 <span id="cb14-29"><a href="#cb14-29" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb14-30"><a href="#cb14-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_reg_t<span class="sc">$</span>solution, <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb14-31"><a href="#cb14-31" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(w_reg_t<span class="sc">$</span>solution, <span class="dv">3</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code> [1]  0.359  0.000 -0.250  0.245  0.051  0.000  0.401  0.195  0.000
+<pre><code> [1]  0.358  0.000 -0.250  0.245  0.051  0.000  0.401  0.195  0.000
 [10]  0.000</code></pre>
 </div>
 </div>
 <p><a href="#fig-1702" class="quarto-xref">Figure&nbsp;2</a> shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with <span class="math inline">\(\gamma\)</span> = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tibble</span>(</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">No short-sale</span><span class="st">`</span> <span class="ot">=</span> w_no_short_sale<span class="sc">$</span>solution,</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Minimum Variance</span><span class="st">`</span> <span class="ot">=</span> w_mvp,</span>
 <span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">`</span><span class="at">Efficient portfolio</span><span class="st">`</span> <span class="ot">=</span> <span class="fu">compute_efficient_weight</span>(Sigma, mu),</span>
@@ -892,7 +885,7 @@ Figure&nbsp;1: The horizontal axis indicates the distance from the empirical min
 <span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Allocation weight"</span>, <span class="at">fill =</span> <span class="cn">NULL</span>,</span>
 <span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Optimal allocations for different strategies"</span></span>
 <span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> percent)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> percent)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div id="fig-1702" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the 10 different industries. The figures indicate extreme long and short positions for the efficient portfolio.">
 <figure class="quarto-float quarto-float-fig figure">
@@ -909,7 +902,7 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <p>The results clearly indicate the effect of imposing additional constraints: the extreme holdings the investor implements if they follow the (theoretically optimal) efficient portfolio vanish under, e.g., the Regulation-T constraint. You may wonder why an investor would deviate from what is theoretically the optimal portfolio by imposing potentially arbitrary constraints. The short answer is: the <em>efficient portfolio</em> is only efficient if the true parameters of the data-generating process correspond to the estimated parameters <span class="math inline">\(\hat\Sigma\)</span> and <span class="math inline">\(\hat\mu\)</span>. Estimation uncertainty may thus lead to inefficient allocations. By imposing restrictions, we implicitly shrink the set of possible weights and prevent extreme allocations, which could result from <em>error-maximization</em> due to estimation uncertainty <span class="citation" data-cites="Jagannathan2003">(<a href="#ref-Jagannathan2003" role="doc-biblioref">Jagannathan and Ma 2003</a>)</span>.</p>
 <p>Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form <span class="math inline">\(\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|\)</span>. No closed-form solution exists, and we rely on non-linear optimization procedures.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>compute_efficient_weight_L1_TC <span class="ot">&lt;-</span> <span class="cf">function</span>(mu,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>compute_efficient_weight_L1_TC <span class="ot">&lt;-</span> <span class="cf">function</span>(mu,</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>                                           Sigma,</span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>                                           gamma,</span>
 <span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>                                           beta,</span>
@@ -935,7 +928,7 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(w_optimal<span class="sc">$</span>solution)</span>
-<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="out-of-sample-backtesting" class="level2">
@@ -943,7 +936,7 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <p>For the sake of simplicity, we committed one fundamental error in computing portfolio weights above: we used the full sample of the data to determine the optimal allocation <span class="citation" data-cites="Harvey2019">(<a href="#ref-Harvey2019" role="doc-biblioref">Arnott, Harvey, and Markowitz 2019</a>)</span>. To implement this strategy at the beginning of the 2000s, you will need to know how the returns will evolve until 2021. While interesting from a methodological point of view, we cannot evaluate the performance of the portfolios in a reasonable out-of-sample fashion. We do so next in a backtesting application for three strategies. For the backtest, we recompute optimal weights just based on past available data.</p>
 <p>The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>window_length <span class="ot">&lt;-</span> <span class="dv">120</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>window_length <span class="ot">&lt;-</span> <span class="dv">120</span></span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>periods <span class="ot">&lt;-</span> <span class="fu">nrow</span>(industry_returns) <span class="sc">-</span> window_length</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>beta <span class="ot">&lt;-</span> <span class="dv">50</span></span>
@@ -964,11 +957,11 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>w_prev_1 <span class="ot">&lt;-</span> w_prev_2 <span class="ot">&lt;-</span> w_prev_3 <span class="ot">&lt;-</span> <span class="fu">rep</span>(</span>
 <span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>  <span class="dv">1</span> <span class="sc">/</span> n_industries,</span>
 <span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>  n_industries</span>
-<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb18-22"><a href="#cb18-22" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>adjust_weights <span class="ot">&lt;-</span> <span class="cf">function</span>(w, next_return) {</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>adjust_weights <span class="ot">&lt;-</span> <span class="cf">function</span>(w, next_return) {</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  w_prev <span class="ot">&lt;-</span> <span class="dv">1</span> <span class="sc">+</span> w <span class="sc">*</span> next_return</span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.numeric</span>(w_prev <span class="sc">/</span> <span class="fu">sum</span>(<span class="fu">as.vector</span>(w_prev)))</span>
 <span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>}</span>
@@ -978,11 +971,11 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  turnover <span class="ot">&lt;-</span> <span class="fu">sum</span>(<span class="fu">abs</span>(w <span class="sc">-</span> w_previous))</span>
 <span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  net_return <span class="ot">&lt;-</span> raw_return <span class="sc">-</span> beta <span class="sc">/</span> <span class="dv">10000</span> <span class="sc">*</span> turnover</span>
 <span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(raw_return, turnover, net_return)</span>
-<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The following code chunk performs a rolling-window estimation, which we implement in a loop. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample variance-covariance matrix and ignore the estimation of <span class="math inline">\(\hat\mu\)</span> entirely, but you might use more advanced estimators in practice.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (p <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>periods) {</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (p <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span>periods) {</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  returns_window <span class="ot">&lt;-</span> industry_returns[p<span class="sc">:</span>(p <span class="sc">+</span> window_length <span class="sc">-</span> <span class="dv">1</span>), ]</span>
 <span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  next_return <span class="ot">&lt;-</span> industry_returns[p <span class="sc">+</span> window_length, ] <span class="sc">|&gt;</span> <span class="fu">as.matrix</span>()</span>
 <span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -1031,11 +1024,11 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <span id="cb20-47"><a href="#cb20-47" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb20-48"><a href="#cb20-48" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-49"><a href="#cb20-49" aria-hidden="true" tabindex="-1"></a>  w_prev_3 <span class="ot">&lt;-</span> <span class="fu">adjust_weights</span>(w_3, next_return)</span>
-<span id="cb20-50"><a href="#cb20-50" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb20-50"><a href="#cb20-50" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Finally, we get to the evaluation of the portfolio strategies <em>net-of-transaction costs</em>. Note that we compute annualized returns and standard deviations.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">lapply</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>performance <span class="ot">&lt;-</span> <span class="fu">lapply</span>(</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  performance_values,</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  as_tibble</span>
 <span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
@@ -1056,13 +1049,13 @@ Figure&nbsp;2: Optimal allocation weights for the 10 industry portfolios and the
 <span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>performance_table <span class="sc">|&gt;</span> </span>
-<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="sc">-</span>Strategy, <span class="sc">~</span><span class="fu">round</span>(., <span class="dv">4</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="sc">-</span>Strategy, <span class="sc">~</span><span class="fu">round</span>(., <span class="dv">4</span>)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 3 × 5
   Strategy  Mean    SD `Sharpe ratio` Turnover
   &lt;chr&gt;    &lt;dbl&gt; &lt;dbl&gt;          &lt;dbl&gt;    &lt;dbl&gt;
 1 MV       -1.06  12.6         NA     210.    
-2 MV (TC)  12.1   15.1          0.798   0.0186
+2 MV (TC)  12.1   15.1          0.798   0.0188
 3 Naive    12.1   15.1          0.796   0.236 </code></pre>
 </div>
 </div>
@@ -1223,13 +1216,14 @@ Wang, Zhenyu. 2005. <span>“<span class="nocase">A shrinkage approach to model 
       e.clearSelection();
     }
     const getTextToCopy = function(trigger) {
-        const codeEl = trigger.previousElementSibling.cloneNode(true);
-        for (const childEl of codeEl.children) {
-          if (isCodeAnnotation(childEl)) {
-            childEl.remove();
-          }
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
         }
-        return codeEl.innerText;
+      }
+      return codeEl.innerText;
     }
     const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
       text: getTextToCopy
@@ -1583,8 +1577,8 @@ Wang, Zhenyu. 2005. <span>“<span class="nocase">A shrinkage approach to model 
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="../r/wrds-dummy-data.html" class="pagination-link" aria-label="WRDS Dummy Data">
-        <span class="nav-page-text">WRDS Dummy Data</span> <i class="bi bi-arrow-right-short"></i>
+      <a href="../r/wrds-dummy-data.html" class="pagination-link" aria-label="WRDS Pseudo Data">
+        <span class="nav-page-text">WRDS Pseudo Data</span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav>

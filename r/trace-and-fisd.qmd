@@ -1,10 +1,12 @@
 ---
 title: TRACE and FISD
 aliases:
-  - ../trace-and-fisd.html
+    - ../trace-and-fisd.html
 metadata:
-  pagetitle: TRACE and FISD with R
-  description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language R. 
+    pagetitle: TRACE and FISD with R
+    description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language R. 
+params:
+    download_data: false
 ---
 
 ::: callout-note
@@ -22,7 +24,7 @@ The current chapter relies on this set of R packages.
 library(tidyverse)
 library(tidyfinance)
 library(dbplyr)
-library(RSQLite)
+library(arrow)
 library(RPostgres)
 ```
 
@@ -30,9 +32,10 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 
 ## Bond Data from WRDS 
 
-Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Additionally, we connect to our local `SQLite`-database to store the data we download.\index{WRDS}
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{WRDS}
 
 ```{r}
+#| eval: !expr params$download_data
 wrds <- dbConnect(
   Postgres(),
   host = "wrds-pgdata.wharton.upenn.edu",
@@ -41,12 +44,6 @@ wrds <- dbConnect(
   sslmode = "require",
   user = Sys.getenv("WRDS_USER"),
   password = Sys.getenv("WRDS_PASSWORD")
-)
-
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
 )
 ```
 
@@ -76,6 +73,7 @@ The following chunk connects to the data and selects the bond sample to remove c
 1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{r}
+#| eval: !expr params$download_data
 fisd_mergedissue_db <- tbl(wrds, I("fisd.fisd_mergedissue"))
 
 fisd <- fisd_mergedissue_db |>
@@ -86,31 +84,34 @@ fisd <- fisd_mergedissue_db |>
     asset_backed == "N" | is.na(asset_backed),
     defeased == "N" | is.na(defeased),
     is.na(defeased_date),
-    bond_type %in% c(
-      "CDEB",
-      "CMTN",
-      "CMTZ",
-      "CZ",
-      "USBN"
-    ), 
+    bond_type %in%
+      c(
+        "CDEB",
+        "CMTN",
+        "CMTZ",
+        "CZ",
+        "USBN"
+      ),
     pay_in_kind != "Y" | is.na(pay_in_kind),
     is.na(pay_in_kind_exp_date),
     yankee == "N" | is.na(yankee),
     canadian == "N" | is.na(canadian),
     foreign_currency == "N",
-    coupon_type %in% c(
-      "F",
-      "Z"
-    ), 
+    coupon_type %in%
+      c(
+        "F",
+        "Z"
+      ),
     is.na(fix_frequency),
     coupon_change_indicator == "N",
-    interest_frequency %in% c(
-      "0",
-      "1",
-      "2",
-      "4",
-      "12"
-    ),
+    interest_frequency %in%
+      c(
+        "0",
+        "1",
+        "2",
+        "4",
+        "12"
+      ),
     rule_144a == "N",
     private_placement == "N" | is.na(private_placement),
     defaulted == "N",
@@ -123,14 +124,18 @@ fisd <- fisd_mergedissue_db |>
     exchangeable == "N" | is.na(exchangeable),
     perpetual == "N",
     preferred_security == "N" | is.na(preferred_security)
-  ) |> 
+  ) |>
   select(
-    complete_cusip, maturity,
-    offering_amt, offering_date,
-    dated_date, 
-    interest_frequency, coupon,
-    last_interest_date, 
-    issue_id, issuer_id
+    complete_cusip,
+    maturity,
+    offering_amt,
+    offering_date,
+    dated_date,
+    interest_frequency,
+    coupon,
+    last_interest_date,
+    issue_id,
+    issuer_id
   ) |>
   collect()
 ```
@@ -138,7 +143,8 @@ fisd <- fisd_mergedissue_db |>
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
-fisd_mergedissuer_db <- tbl(wrds, I("fisd.fisd_mergedissuer")) 
+#| eval: !expr params$download_data
+fisd_mergedissuer_db <- tbl(wrds, I("fisd.fisd_mergedissuer"))
 
 fisd_issuer <- fisd_mergedissuer_db |>
   select(issuer_id, sic_code, country_domicile) |>
@@ -153,22 +159,25 @@ fisd <- fisd |>
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
 
 ```{r}
+#| eval: !expr params$download_data
 #| output: false
 download_data("wrds_fisd")
 ```
 
-Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
+Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
-dbWriteTable(
-  conn = tidy_finance,
-  name = "fisd",
-  value = fisd,
-  overwrite = TRUE
-)
+#| eval: !expr params$download_data
+write_parquet(fisd, "data-r/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
+
+```{r}
+#| echo: false
+#| eval: !expr "!params$download_data"
+fisd <- read_parquet("data-r/fisd.parquet")
+```
 
 ## TRACE
 
@@ -184,15 +193,15 @@ fisd_cusips <- fisd |>
 
 fisd_parts <- split(
   fisd_cusips,
-  rep(1:10, 
-      length.out = length(fisd_cusips))
+  rep(1:10, length.out = length(fisd_cusips))
 )
 ```
 
-Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches. Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
 
 ```{r}
-#| eval: false
+#| eval: !expr params$download_data
+#| output: false
 batches <- length(fisd_parts)
 
 for (j in 1:batches) {
@@ -203,27 +212,31 @@ for (j in 1:batches) {
     end_date = ymd("2016-11-30")
   )
 
-  dbWriteTable(
-    conn = tidy_finance,
-    name = "trace_enhanced",
-    value = trace_enhanced,
-    overwrite = ifelse(j == 1, TRUE, FALSE),
-    append = ifelse(j != 1, TRUE, FALSE)
+  trace_enhanced |>
+    group_by(batch = j) |>
+    write_dataset("data-r/trace_enhanced", partitioning = "batch")
+
+  message(
+    "Batch ",
+    j,
+    " out of ",
+    batches,
+    " done (",
+    round(j / batches, 2) * 100,
+    "%)\n"
   )
-  
-  message("Batch ", j, " out of ", batches, " done (", 
-          round(j / batches, 2) * 100, "%)\n")
 }
 ```
 
 If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
 
 ```{r}
+#| eval: !expr params$download_data
 #| output: false
 download_data(
   "wrds_trace_enhanced",
   cusips = c("00101JAH9"),
-  start_date = "2019-01-01", 
+  start_date = "2019-01-01",
   end_date = "2021-12-31"
 )
 ```
@@ -236,31 +249,33 @@ We start by looking into the number of bonds outstanding over time and compare i
 
 ```{r}
 bonds_outstanding <- expand_grid(
-  "date" = seq(ymd("2014-01-01"), ymd("2016-11-30"), by = "quarter"), 
+  "date" = seq(ymd("2014-01-01"), ymd("2016-11-30"), by = "quarter"),
   "complete_cusip" = fisd$complete_cusip
-) |> 
-  left_join(fisd |> 
-              select(complete_cusip, offering_date, maturity), 
-            join_by(complete_cusip)) |> 
-  mutate(offering_date = floor_date(offering_date),
-         maturity = floor_date(maturity)) |> 
-  filter(date >= offering_date & date <= maturity) |> 
-  count(date) |> 
+) |>
+  left_join(
+    fisd |>
+      select(complete_cusip, offering_date, maturity),
+    join_by(complete_cusip)
+  ) |>
+  mutate(
+    offering_date = floor_date(offering_date),
+    maturity = floor_date(maturity)
+  ) |>
+  filter(date >= offering_date & date <= maturity) |>
+  count(date) |>
   mutate(type = "Outstanding")
 ```
 
-Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
+Next, we look at the bonds traded each quarter in the same period. Notice that we do not have to load the complete TRACE table from our dataset into memory to perform the simple aggregation. Arrow's `open_dataset()` creates a lazy query plan that pushes all the filtering and aggregation down to its backend engine, reading only the necessary columns from Parquet and returning just the small summarized result to our session when we call `collect()`.
 
 ```{r}
-trace_enhanced <- tbl(tidy_finance, "trace_enhanced") |>
-  collect()
+trace_enhanced <- open_dataset("data-r/trace_enhanced")  
 
-bonds_traded <- trace_enhanced |> 
-  mutate(date = floor_date(trd_exctn_dt, "quarters")) |> 
-  group_by(date) |> 
-  summarize(n = length(unique(cusip_id)),
-            type = "Traded",
-            .groups = "drop") 
+bonds_traded <- trace_enhanced |>
+  mutate(date = floor_date(trd_exctn_dt, "quarters")) |>
+  group_by(date) |>
+  summarize(n = n_distinct(cusip_id), type = "Traded", .groups = "drop") |> 
+  collect()
 ```
 
 Finally, we plot the two time series in @fig-401.
@@ -269,17 +284,20 @@ Finally, we plot the two time series in @fig-401.
 #| label: fig-401
 #| fig-cap: "The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016."
 #| fig-alt: "Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016."
-bonds_outstanding |> 
-  bind_rows(bonds_traded) |> 
+bonds_outstanding |>
+  bind_rows(bonds_traded) |>
   ggplot(aes(
-    x = date, 
-    y = n, 
-    color = type, 
+    x = date,
+    y = n,
+    color = type,
     linetype = type
   )) +
   geom_line() +
   labs(
-    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
     title = "Number of bonds outstanding and traded each quarter"
   )
 ```
@@ -289,11 +307,15 @@ Does this lack of liquidity mean that corporate bond markets are irrelevant in t
 
 ```{r}
 fisd |>
-  mutate(maturity = as.numeric(maturity - offering_date) / 365,
-         offering_amt = offering_amt / 10^3) |> 
-  pivot_longer(cols = c(maturity, coupon, offering_amt),
-               names_to = "measure") |>
-  drop_na() |> 
+  mutate(
+    maturity = as.numeric(maturity - offering_date) / 365,
+    offering_amt = offering_amt / 10^3
+  ) |>
+  pivot_longer(
+    cols = c(maturity, coupon, offering_amt),
+    names_to = "measure"
+  ) |>
+  drop_na() |>
   group_by(measure) |>
   summarize(
     mean = mean(value),
@@ -311,13 +333,15 @@ We see that the average bond in our sample period has an offering amount of over
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
 ```{r}
-trace_enhanced |> 
-  group_by(trd_exctn_dt) |> 
-  summarize(trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
-            trade_number = n(),
-            .groups = "drop") |> 
-  pivot_longer(cols = c(trade_size, trade_number),
-               names_to = "measure") |> 
+trace_enhanced |>
+  group_by(trd_exctn_dt) |>
+  summarize(
+    trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
+    trade_number = n(),
+    .groups = "drop"
+  ) |>
+  collect() |> 
+  pivot_longer(cols = c(trade_size, trade_number), names_to = "measure") |>
   group_by(measure) |>
   summarize(
     mean = mean(value),

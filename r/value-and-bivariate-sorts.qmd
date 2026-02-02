@@ -20,35 +20,32 @@ The current chapter relies on this set of R packages.
 ```{r}
 #| message: false
 library(tidyverse)
-library(RSQLite)
+library(arrow)
 ```
 
 ## Data Preparation
 
-First, we load the necessary data from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
+First, we load the necessary data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{r}
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
-
-crsp_monthly <- tbl(tidy_finance, "crsp_monthly") |>
-    select(
-    permno, gvkey, date, ret_excess,
-    mktcap, mktcap_lag, exchange
-  ) |> 
-  collect() |>
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+  select(
+    permno,
+    gvkey,
+    date,
+    ret_excess,
+    mktcap,
+    mktcap_lag,
+    exchange
+  ) |>
   drop_na()
 ```
 
 Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.\index{Data!Compustat}
 
 ```{r}
-book_equity <- tbl(tidy_finance, "compustat") |>
+book_equity <- read_parquet("data-r/compustat_annual.parquet") |>
   select(gvkey, datadate, be) |>
-  collect() |>
   drop_na() |>
   mutate(date = floor_date(ymd(datadate), "month"))
 ```
@@ -77,21 +74,30 @@ bm <- book_equity |>
 
 data_for_sorts <- crsp_monthly |>
   left_join(
-    bm, join_by(permno, gvkey, date == sorting_date)
+    bm,
+    join_by(permno, gvkey, date == sorting_date)
   ) |>
   left_join(
-    size, join_by(permno, date == sorting_date)
+    size,
+    join_by(permno, date == sorting_date)
   ) |>
   select(
-    permno, gvkey, date, ret_excess,
-    mktcap_lag, size, bm, exchange, accounting_date
+    permno,
+    gvkey,
+    date,
+    ret_excess,
+    mktcap_lag,
+    size,
+    bm,
+    exchange,
+    accounting_date
   )
 
 data_for_sorts <- data_for_sorts |>
   arrange(permno, gvkey, date) |>
   group_by(permno, gvkey) |>
   fill(bm, accounting_date) |>
-  ungroup() |> 
+  ungroup() |>
   filter(accounting_date > date %m-% months(12)) |>
   select(-accounting_date) |>
   drop_na()
@@ -101,9 +107,9 @@ The last step of preparation for the portfolio sorts is the computation of break
 
 ```{r}
 assign_portfolio <- function(
-  data, 
-  sorting_variable, 
-  n_portfolios, 
+  data,
+  sorting_variable,
+  n_portfolios,
   exchanges
 ) {
   breakpoints <- data |>
@@ -116,14 +122,16 @@ assign_portfolio <- function(
     )
 
   assigned_portfolios <- data |>
-    mutate(portfolio = findInterval(
-      pick(everything()) |>
-        pull({{ sorting_variable }}),
-      breakpoints,
-      all.inside = TRUE
-    )) |>
+    mutate(
+      portfolio = findInterval(
+        pick(everything()) |>
+          pull({{ sorting_variable }}),
+        breakpoints,
+        all.inside = TRUE
+      )
+    ) |>
     pull(portfolio)
-  
+
   assigned_portfolios
 }
 ```
@@ -153,7 +161,8 @@ value_portfolios <- data_for_sorts |>
       sorting_variable = "size",
       n_portfolios = 5,
       exchanges = c("NYSE")
-    )) |>
+    )
+  ) |>
   group_by(date, portfolio_bm, portfolio_size) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
@@ -170,7 +179,7 @@ value_premium <- value_portfolios |>
   summarize(
     value_premium = ret[portfolio_bm == max(portfolio_bm)] -
       ret[portfolio_bm == min(portfolio_bm)]
-  ) |> 
+  ) |>
   summarize(
     value_premium = mean(value_premium)
   )
@@ -187,12 +196,14 @@ To implement the dependent sorts, we first create the size portfolios by calling
 ```{r}
 value_portfolios <- data_for_sorts |>
   group_by(date) |>
-  mutate(portfolio_size = assign_portfolio(
-    data = pick(everything()),
-    sorting_variable = "size",
-    n_portfolios = 5,
-    exchanges = c("NYSE")
-  )) |>
+  mutate(
+    portfolio_size = assign_portfolio(
+      data = pick(everything()),
+      sorting_variable = "size",
+      n_portfolios = 5,
+      exchanges = c("NYSE")
+    )
+  ) |>
   group_by(date, portfolio_size) |>
   mutate(
     portfolio_bm = assign_portfolio(
@@ -200,7 +211,8 @@ value_portfolios <- data_for_sorts |>
       sorting_variable = "bm",
       n_portfolios = 5,
       exchanges = c("NYSE")
-    )) |>
+    )
+  ) |>
   group_by(date, portfolio_size, portfolio_bm) |>
   summarize(
     ret = weighted.mean(ret_excess, mktcap_lag),
@@ -213,7 +225,7 @@ value_premium <- value_portfolios |>
   summarize(
     value_premium = ret[portfolio_bm == max(portfolio_bm)] -
       ret[portfolio_bm == min(portfolio_bm)]
-  ) |> 
+  ) |>
   summarize(
     value_premium = mean(value_premium)
   )
