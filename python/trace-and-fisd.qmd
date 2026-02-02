@@ -1,8 +1,8 @@
 ---
 title: TRACE and FISD
 metadata:
-  pagetitle: TRACE and FISD with Python
-  description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language Python. 
+    pagetitle: TRACE and FISD with Python
+    description-meta: Download and prepare corporate bond data such as TRACE and FISD from WRDS using the programming language Python. 
 ---
 
 ```{python}
@@ -45,17 +45,18 @@ Compared to previous chapters, we load `httpimport` [@httpimport] to source code
 
 ## Bond Data from WRDS 
 
-Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the PostgreSQL connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Additionally, we connect to our local SQLite-database to store the data we download.\index{WRDS}
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the PostgreSQL connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{WRDS}
 
 ```{python}
+#| eval: false
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
 connection_string = (
-  "postgresql+psycopg2://"
-  f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
-  "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
+    "postgresql+psycopg2://"
+    f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
+    "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
 )
 
 wrds = create_engine(connection_string, pool_pre_ping=True)
@@ -86,6 +87,7 @@ The following chunk connects to the data and selects the bond sample to remove c
 1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{python}
+#| eval: false
 fisd_query = (
   "SELECT complete_cusip, maturity, offering_amt, offering_date, "
          "dated_date, interest_frequency, coupon, last_interest_date, "
@@ -122,51 +124,60 @@ fisd_query = (
 )
 
 fisd = pd.read_sql_query(
-  sql=fisd_query,
-  con=wrds,
-  dtype={"complete_cusip": str, "interest_frequency": str, 
-         "issue_id": int, "issuer_id": int},
-  parse_dates={"maturity", "offering_date", 
-               "dated_date", "last_interest_date"}
+    sql=fisd_query,
+    con=wrds,
+    dtype={"complete_cusip": str, "interest_frequency": str, 
+            "issue_id": int, "issuer_id": int},
+    parse_dates={"maturity", "offering_date", 
+                "dated_date", "last_interest_date"}
 )
 ```
 
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{python}
+#| eval: false
 fisd_issuer_query = (
-  "SELECT issuer_id, sic_code, country_domicile "
-    "FROM fisd.fisd_mergedissuer"
+    "SELECT issuer_id, sic_code, country_domicile "
+        "FROM fisd.fisd_mergedissuer"
 )
 
 fisd_issuer = pd.read_sql_query(
-  sql=fisd_issuer_query,
-  con=wrds,
-  dtype={"issuer_id": int, "sic_code": str, "country_domicile": str}
+    sql=fisd_issuer_query,
+    con=wrds,
+    dtype={"issuer_id": int, "sic_code": str, "country_domicile": str}
 )
 
 fisd = (fisd
-  .merge(fisd_issuer, how="inner", on="issuer_id")
-  .query("country_domicile == 'USA'")
-  .drop(columns="country_domicile")
+    .merge(fisd_issuer, how="inner", on="issuer_id")
+    .query("country_domicile == 'USA'")
+    .drop(columns="country_domicile")
 )
 ```
 
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `tf.set_wrds_credentials()`.
 
 ```{python}
+#| eval: false
 #| output: false
 fisd = tf.download_data(domain="wrds", dataset="fisd")
 ```
 
-Finally, we save the bond characteristics to our local database. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
+Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{python}
+#| eval: false
 #| output: false
 fisd.to_parquet("data-python/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. The FISD redemption database also contains information on callable bonds. Moreover, FISD also provides information on bond ratings. We do not need either here.
+
+```{python}
+#| echo: false
+#| eval: true
+fisd = pd.read_parquet("data-python/fisd.parquet")
+```
 
 ## TRACE
 
@@ -177,67 +188,75 @@ Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted wit
 We store code for cleaning enhanced TRACE with Python on the following GitHub [Gist.](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) \index{GitHub!Gist} [Clean Enhanced TRACE with Python](clean-enhanced-trace-with-python.qmd) also contains the code for reference. We only need to source the code from the Gist, which we can do with the code below using `httpimport`. In the chunk, we explicitly load the necessary function interpreting the Gist as a module (i.e., you could also use it as a module and precede the function calls with the module's name). Alternatively, you can also go to the Gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively. 
 
 ```{python}
-gist_url = (
-  "https://gist.githubusercontent.com/patrick-weiss/"
-  "86ddef6de978fbdfb22609a7840b5d8b/raw/"
-  "8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
+#| eval: false
+#| warning: false
+import requests
+
+url = (
+    "https://gist.githubusercontent.com/patrick-weiss/"
+    "86ddef6de978fbdfb22609a7840b5d8b/raw/"
+    "8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
 )
 
-with httpimport.remote_repo(gist_url):
-  from clean_enhanced_TRACE_python import clean_enhanced_trace
+response = requests.get(url, verify=False)
+exec(response.text)
 ```
 
-The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1000 bonds, which we define below.\index{Paris (Climate) Agreement}
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1,000 bonds, which we define below.\index{Paris (Climate) Agreement}
 
 ```{python}
+#| eval: false
 cusips = list(fisd["complete_cusip"].unique())
 batch_size = 1000
 batches = np.ceil(len(cusips)/batch_size).astype(int)
 ```
 
-Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing table for batch two and all following batches.
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches.  Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
 
 ```{python}
 #| eval: false
 #| output: false
 for j in range(1, batches + 1):
   
-  cusip_batch = cusips[
-    ((j-1)*batch_size):(min(j*batch_size, len(cusips)))
-  ]
-  
-  cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
-  cusip_string = f"({cusip_batch_formatted})"
+    cusip_batch = cusips[
+            ((j-1)*batch_size):(min(j*batch_size, len(cusips)))
+    ]
+    
+    cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
+    cusip_string = f"({cusip_batch_formatted})"
 
-  trace_enhanced_sub = clean_enhanced_trace(
-    cusips=cusip_string,
-    connection=wrds, 
-    start_date="'01/01/2014'", 
-    end_date="'11/30/2016'"
-  )
-  
-  if not trace_enhanced_sub.empty:
-          table = pa.Table.from_pandas(trace_enhanced_sub, preserve_index=False)
-    pq.write_to_dataset(
-        table,
-        root_path="data-python/trace_enhanced",
-        partition_cols=["batch"],
-        existing_data_behavior="overwrite_or_ignore"
+    trace_enhanced_sub = clean_enhanced_trace(
+            cusips=cusip_string,
+            connection=wrds, 
+            start_date="'01/01/2014'", 
+            end_date="'11/30/2016'"
     )
     
-  print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
+    if not trace_enhanced_sub.empty:
+            table = (pa.Table.from_pandas(trace_enhanced_sub, preserve_index=False)
+                .append_column("batch", pa.array([j] * len(trace_enhanced_sub)))
+            )
+            pq.write_to_dataset(
+                table,
+                root_path="data-python/trace_enhanced",
+                partition_cols=["batch"],
+                existing_data_behavior="overwrite_or_ignore"
+            )
+        
+    print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
 ```
 
 If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
 
 ```{python}
+#| eval: false
 #| output: false
 tf.download_data(
-  domain="wrds",
-  dataset="trace_enhanced",
-  cusips=["00101JAH9"],
-  start_date="2019-01-01", 
-  end_date="2021-12-31"
+    domain="wrds",
+    dataset="trace_enhanced",
+    cusips=["00101JAH9"],
+    start_date="2019-01-01", 
+    end_date="2021-12-31"
 )
 ```
 
@@ -248,40 +267,38 @@ While many news outlets readily provide information on stocks and the underlying
 We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
 
 ```{python}
-dates = pd.date_range(start="2014-01-01", end="2016-11-30", freq="Q")
+dates = pd.date_range(start="2014-01-01", end="2016-11-30", freq="QE")
 
 bonds_outstanding = (pd.DataFrame({"date": dates})
-  .merge(fisd[["complete_cusip"]], how="cross")
-  .merge(fisd[["complete_cusip", "offering_date", "maturity"]],
-         on="complete_cusip", how="left")
-  .assign(offering_date=lambda x: x["offering_date"].dt.floor("D"),
-          maturity=lambda x: x["maturity"].dt.floor("D"))
-  .query("date >= offering_date & date <= maturity")
-  .groupby("date")
-  .size()
-  .reset_index(name="count")
-  .assign(type="Outstanding")
+    .merge(fisd[["complete_cusip"]], how="cross")
+    .merge(fisd[["complete_cusip", "offering_date", "maturity"]],
+            on="complete_cusip", how="left")
+    .assign(offering_date=lambda x: x["offering_date"].dt.floor("D"),
+            maturity=lambda x: x["maturity"].dt.floor("D"))
+    .query("date >= offering_date & date <= maturity")
+    .groupby("date")
+    .size()
+    .reset_index(name="count")
+    .assign(type="Outstanding")
 )
 ```
 
-Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete trace table from our database, as we only have a single part of it in the environment from the download loop above.
+Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete TRACE data from our dataset, as we only have a single part of it in the environment from the download loop above.
 
 ```{python}
-trace_enhanced = (pd.read_parquet("data-python/trace_enhanced.parquet")
-.get(["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
-)
+trace_enhanced = ds.dataset("data-python/trace_enhanced", format="parquet").to_table().to_pandas()
 
 bonds_traded = (trace_enhanced
-  .assign(
-    date=lambda x: (
-      (x["trd_exctn_dt"]-pd.offsets.MonthBegin(1))
-        .dt.to_period("Q").dt.start_time
+    .assign(
+        date=lambda x: (
+        (x["trd_exctn_dt"]-pd.offsets.MonthBegin(1))
+            .dt.to_period("Q").dt.start_time
+        )
     )
-  )
-  .groupby("date")
-  .aggregate(count=("cusip_id", "nunique"))
-  .reset_index()
-  .assign(type="Traded")
+    .groupby("date")
+    .aggregate(count=("cusip_id", "nunique"))
+    .reset_index()
+    .assign(type="Traded")
 )
 ```
 
@@ -293,21 +310,21 @@ Finally, we plot the two time series in @fig-401.
 #| fig-alt: "Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016."
 #| fig-pos: "htb"
 bonds_combined = pd.concat(
-  [bonds_outstanding, bonds_traded], ignore_index=True
+    [bonds_outstanding, bonds_traded], ignore_index=True
 )
 
 bonds_figure = (
-  ggplot(
-    bonds_combined, 
-    aes(x="date", y="count", color="type", linetype="type")
-  )
-  + geom_line()
-  + labs(
-      x="", y="", color="", linetype="",
-       title="Number of bonds outstanding and traded each quarter"
+    ggplot(
+        bonds_combined, 
+        aes(x="date", y="count", color="type", linetype="type")
     )
-  + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
-  + scale_y_continuous(labels=comma_format())
+    + geom_line()
+    + labs(
+        x="", y="", color="", linetype="",
+        title="Number of bonds outstanding and traded each quarter"
+        )
+    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + scale_y_continuous(labels=comma_format())
 )
 bonds_figure.draw()
 ```
@@ -316,17 +333,17 @@ We see that the number of bonds outstanding increases steadily between 2014 and 
 
 ```{python}
 average_characteristics = (fisd
-  .assign(
-    maturity=lambda x: (x["maturity"] - x["offering_date"]).dt.days/365,
-    offering_amt=lambda x: x["offering_amt"]/10**3
-  )
-  .melt(var_name="measure",
-        value_vars=["maturity", "coupon", "offering_amt"], 
-        value_name="value")
-  .dropna()
-  .groupby("measure")["value"]
-  .describe(percentiles=[.05, .50, .95])
-  .drop(columns="count")
+    .assign(
+        maturity=lambda x: (x["maturity"] - x["offering_date"]).dt.days/365,
+        offering_amt=lambda x: x["offering_amt"]/10**3
+    )
+    .melt(var_name="measure",
+            value_vars=["maturity", "coupon", "offering_amt"], 
+            value_name="value")
+    .dropna()
+    .groupby("measure")["value"]
+    .describe(percentiles=[.05, .50, .95])
+    .drop(columns="count")
 )
 average_characteristics.round(2)
 ```
@@ -337,19 +354,19 @@ Finally, let us compute some summary statistics for the trades in this market. T
 
 ```{python}
 average_trade_size = (trace_enhanced
-  .groupby("trd_exctn_dt")
-  .aggregate(
-    trade_size=("entrd_vol_qt", lambda x: (
-      sum(x*trace_enhanced.loc[x.index, "rptd_pr"]/100)/10**6)
-    ),
-    trade_number=("trd_exctn_dt", "size")
-  )
-  .reset_index()
-  .melt(id_vars=["trd_exctn_dt"], var_name="measure",
-        value_vars=["trade_size", "trade_number"], value_name="value")
-  .groupby("measure")["value"]
-  .describe(percentiles=[.05, .50, .95])
-  .drop(columns="count")
+    .groupby("trd_exctn_dt")
+    .aggregate(
+        trade_size=("entrd_vol_qt", lambda x: (
+        sum(x*trace_enhanced.loc[x.index, "rptd_pr"]/100)/10**6)
+        ),
+        trade_number=("trd_exctn_dt", "size")
+    )
+    .reset_index()
+    .melt(id_vars=["trd_exctn_dt"], var_name="measure",
+            value_vars=["trade_size", "trade_number"], value_name="value")
+    .groupby("measure")["value"]
+    .describe(percentiles=[.05, .50, .95])
+    .drop(columns="count")
 )
 average_trade_size.round(0)
 ```
