@@ -1,0 +1,345 @@
+---
+title: Working with Stock Returns
+metadata:
+  pagetitle: Working with Stock Returns in Stata
+  description-meta: Learn how to use Stata for downloading and analyzing stock market data.
+---
+
+::: callout-note
+You are reading the work-in-progress version of **Tidy Finance with Stata**. If you discover an error or have a suggestion, please consider opening an [issue](https://github.com/tidy-finance/website/issues). 
+:::
+
+The main aim of this chapter is to familiarize yourself with Stata for working with stock market data. We focus on downloading and visualizing stock data from Yahoo Finance.
+
+At the start of each session, we ensure we have the required Stata packages installed. Throughout this chapter, we use several user-written commands that extend Stata's functionality for financial data analysis.
+
+You typically have to install a package once before you can use it. In case you have not done this yet, you can install packages from SSC or GitHub. For downloading stock data from Yahoo Finance, we'll use a combination of Stata's Python integration and potentially user-written commands.
+
+```{stata}
+clear all
+set more off
+```
+
+## Downloading Data
+
+We first download daily prices for one stock symbol, e.g., the Apple stock (*AAPL*), directly from the data provider Yahoo Finance. Since Stata doesn't have a native Yahoo Finance connector, we have several options: use Stata's Python integration, use a user-written command, or import pre-downloaded CSV files.
+
+In the following code, we demonstrate using Stata's Python integration to download data. We request daily data from the beginning of 2000 to the end of 2024, which is a period of more than 20 years.
+
+```{stata}
+python:
+import pandas as pd
+import numpy as np
+import tidyfinance as tf
+from sfi import Data, Macro
+
+prices = tf.download_data(
+  domain="stock_prices", 
+  symbols="AAPL",
+  start_date="2000-01-01", 
+  end_date="2024-12-31"
+)
+
+n = len(prices)
+Data.setObsTotal(n)
+
+Data.addVarStr("date_str", 10)
+Data.addVarStr("symbol", 5)
+Data.addVarDouble("open")
+Data.addVarDouble("high")
+Data.addVarDouble("low")
+Data.addVarDouble("close")
+Data.addVarDouble("volume")
+Data.addVarDouble("adjusted_close")
+
+for i in range(n):
+    Data.storeAt("date_str", i, str(prices['date'].iloc[i].date()))
+    Data.storeAt("symbol", i, str(prices['symbol'].iloc[i]))
+    Data.storeAt("open", i, float(prices['open'].iloc[i]))
+    Data.storeAt("high", i, float(prices['high'].iloc[i]))
+    Data.storeAt("low", i, float(prices['low'].iloc[i]))
+    Data.storeAt("close", i, float(prices['close'].iloc[i]))
+    Data.storeAt("volume", i, float(prices['volume'].iloc[i]))
+    Data.storeAt("adjusted_close", i, float(prices['adjusted_close'].iloc[i]))
+end
+
+gen date = date(date_str, "YMD")
+format date %td
+drop date_str
+
+order symbol date open high low close adjusted_close volume
+
+describe
+```
+
+The downloaded data contains daily market data with self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
+
+Next, we use Stata's graphics capabilities to visualize the time series of adjusted prices in @fig-100. Stata's `twoway` command provides flexible options for creating publication-quality graphs.
+
+```{stata}
+*| label: fig-100 
+*| fig-cap: "Prices are in USD, adjusted for dividend payments and stock splits."
+*| fig-alt: "Title: Apple stock prices between beginning of 2000 and end of 2024. The figure shows that the stock price of Apple increased from about 1 USD to around 125 USD."
+
+twoway (line adjusted_close date), ///
+    title("Apple stock prices between beginning of 2000 and end of 2024") ///
+    xtitle("") ytitle("")
+```
+
+## Computing Returns
+
+Instead of analyzing prices, we compute daily returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted price at the end of day $t$. In that context, indexing with `[_n-1]` is helpful by returning the previous value.
+
+```{stata}
+sort date
+gen ret = adjusted_close / adjusted_close[_n-1] - 1
+keep symbol date ret
+
+describe
+```
+
+The resulting dataset has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`.`) because there is no previous price. Obviously, the use of `[_n-1]` would be meaningless if the time series is not ordered by ascending dates. The command `sort` provides a convenient way to order observations in the correct way for our application. If you want to order observations by descending values, you could use `gsort -ret`. Always check that your data has the desired structure before using lag operators.
+
+For the upcoming examples, we remove missing values as these would require separate treatment for many applications. For example, missing values can affect sums and averages by reducing the number of valid data points if not properly accounted for. In general, always ensure you understand why missing values occur and carefully examine if you can simply get rid of these observations.
+
+```{stata}
+drop if missing(ret)
+```
+
+Next, we visualize the distribution of daily returns in a histogram in @fig-101. Additionally, we draw a dashed line that indicates the historical five percent quantile of the daily returns, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators.
+
+```{stata}
+*| label: fig-101 
+*| fig-alt: "Title: Distribution of daily Apple stock returns in percent. The figure shows a histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed around zero. The vertical line indicates that the historical five percent quantile of daily returns was around negative three percent."
+*| fig-cap: "The dotted vertical line indicates the historical five percent quantile."
+quietly summarize ret, detail
+local quantile_05 = r(p5)
+
+histogram ret, bins(100) ///
+    xline(`quantile_05', lpattern(dash)) ///
+    title("Distribution of daily Apple stock returns") ///
+    xtitle("") ytitle("") ///
+    xlabel(, format(%9.2f))
+```
+
+Here, `bins(100)` determines the number of bins used in the illustration and, hence, implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the `xline()` option to add a dashed line that indicates the historical five percent quantile of the daily returns. Before proceeding with *any* data, a typical task is to compute and analyze the summary statistics for the main variables of interest.
+
+```{stata}
+summarize ret, detail
+```
+
+We see that the maximum *daily* return was substantial. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
+
+You can also compute these summary statistics for each year individually by using `bysort`. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the year variable. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
+
+```{stata}
+gen year = year(date)
+
+preserve
+collapse (mean) daily_mean=ret (sd) daily_sd=ret ///
+         (min) daily_min=ret (max) daily_max=ret, by(year)
+list year daily_mean daily_sd daily_min daily_max, noobs
+restore
+```
+
+## Scaling Up the Analysis
+
+As a next step, we generalize the previous code so that all computations can handle an arbitrary number of symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.
+
+This is where the power of Stata's data management starts: Panel data structures make it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any number of symbols, e.g., all current constituents of the Dow Jones Industrial Average index, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once.
+
+```{stata}
+clear all
+
+python:
+import pandas as pd
+import tidyfinance as tf
+from sfi import Data
+
+symbols = tf.download_data(
+  domain="constituents", 
+  index="Dow Jones Industrial Average"
+)
+
+prices = tf.download_data(
+  domain="stock_prices",
+  symbols=symbols['symbol'].tolist(),
+  start_date="2000-01-01",
+  end_date="2023-12-31"
+)
+
+n = len(prices)
+Data.setObsTotal(n)
+
+Data.addVarStr("symbol", 10)
+Data.addVarStr("date_str", 10)
+Data.addVarDouble("open")
+Data.addVarDouble("high")
+Data.addVarDouble("low")
+Data.addVarDouble("close")
+Data.addVarDouble("volume")
+Data.addVarDouble("adjusted_close")
+
+for i in range(n):
+    Data.storeAt("symbol", i, str(prices['symbol'].iloc[i]))
+    Data.storeAt("date_str", i, str(prices['date'].iloc[i].date()))
+    Data.storeAt("open", i, float(prices['open'].iloc[i]))
+    Data.storeAt("high", i, float(prices['high'].iloc[i]))
+    Data.storeAt("low", i, float(prices['low'].iloc[i]))
+    Data.storeAt("close", i, float(prices['close'].iloc[i]))
+    Data.storeAt("volume", i, float(prices['volume'].iloc[i]))
+    Data.storeAt("adjusted_close", i, float(prices['adjusted_close'].iloc[i]))
+
+end
+
+gen date = date(date_str, "YMD")
+format date %td
+drop date_str
+order symbol date open high low close adjusted_close volume
+save "data-stata/prices_daily.dta", replace
+
+describe
+```
+
+Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index for a specific point in time with a single call.
+
+The resulting dataset contains daily observations for all different stocks in the Dow Jones index. @fig-102 illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index overlayed on a single plot.
+
+```{stata}
+*| label: fig-102
+*| fig-cap: "Prices in USD, adjusted for dividend payments and stock splits." 
+*| fig-alt: "Title: Stock prices of Dow Jones index constituents. The figure shows many time series with daily prices. The general trend seems positive for most stocks in the Dow Jones index."
+encode symbol, gen(symbol_id)
+xtset symbol_id date
+xtline adjusted_close, overlay legend(off) ///
+    title("Stock prices of Dow Jones index constituents") ///
+    xtitle("") ytitle("")
+```
+
+Do you notice the differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to use panel data commands. Of course, there are simply too many lines on the overlay graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrary number of subjects quite well.
+
+The same holds for stock returns. Before computing the returns, we use `bysort symbol` such that the return calculation is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `bysort symbol` is the key to aggregating the time series into symbol-specific variables of interest.
+
+```{stata}
+bysort symbol (date): gen ret = adjusted_close / adjusted_close[_n-1] - 1
+keep symbol date ret
+drop if missing(ret)
+
+save "data-stata/returns_daily.dta", replace
+
+preserve
+collapse (mean) daily_mean=ret (sd) daily_sd=ret ///
+         (min) daily_min=ret (max) daily_max=ret, by(symbol)
+list symbol daily_mean daily_sd daily_min daily_max, noobs abbreviate(12)
+restore
+```
+
+Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just change the index name to "S&P 500" in the Python download call. However, don't try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
+
+## Different Frequencies
+
+Financial data often exists at different frequencies due to varying reporting schedules, trading calendars, and economic data releases. For example, stock prices are typically recorded daily, while macroeconomic indicators such as GDP or inflation are reported monthly or quarterly. Additionally, some datasets are recorded only when transactions occur, resulting in irregular timestamps. To compare data meaningfully, we have to align different frequencies appropriately. For example, to compare returns across different frequencies, we use annualization techniques.
+
+So far, we have worked with daily returns, but we can easily convert our data to other frequencies. Let's create monthly returns from our daily data:
+
+```{stata}
+gen monthly_date = mofd(date)
+format monthly_date %tm
+
+bysort symbol monthly_date: gen temp = 1 + ret
+bysort symbol monthly_date: gen ret_monthly = exp(sum(ln(temp))) - 1
+bysort symbol monthly_date: keep if _n == _N
+
+keep symbol monthly_date ret_monthly
+rename monthly_date date
+
+save "data-stata/returns_monthly.dta", replace
+```
+
+To visualize how return characteristics change across different frequencies, we can compare histograms as in @fig-103:
+
+```{stata}
+*| label: fig-103
+*| fig-cap: "Returns are based on prices adjusted for dividend payments and stock splits."
+*| fig-alt: "Title: Distribution of Apple returns across different frequencies. The figure shows the distribution of daily and monthly returns in two separate facets."
+use "data-stata/returns_daily.dta", clear
+keep if symbol == "AAPL"
+gen frequency = "Daily"
+rename ret return
+tempfile daily
+save `daily'
+
+use "data-stata/returns_monthly.dta", clear
+keep if symbol == "AAPL"
+gen frequency = "Monthly"
+rename ret_monthly return
+tempfile monthly
+save `monthly'
+
+use `daily', clear
+append using `monthly'
+
+twoway (histogram return if frequency == "Daily", bins(50) color(blue%50)) ///
+       (histogram return if frequency == "Monthly", bins(50) color(red%50)), ///
+    by(frequency, cols(2) note("") title("Distribution of Apple returns across different frequencies")) ///
+    legend(off) ///
+    xtitle("") ytitle("") ///
+    xlabel(, format(%9.2f))
+```
+
+## Other Forms of Data Aggregation
+
+Of course, aggregation across variables other than `symbol` or `date` can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column `volume` is denoted in the number of traded shares. Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by `1e9` denotes daily trading volume in billion USD.
+
+```{stata}
+*| label: fig-104
+*| fig-cap: "Total daily trading volume in billion USD."
+*| fig-alt: "Title: Aggregate daily trading volume of Dow Jones index constituents. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2023, with a maximum of more than 100."
+use "data-stata/prices_daily", clear
+
+gen trading_volume_usd = volume * adjusted_close
+collapse (sum) trading_volume = trading_volume_usd, by(date)
+replace trading_volume = trading_volume / 1e9
+
+twoway (line trading_volume date), ///
+    title("Aggregate daily trading volume of Dow Jones index constituents") ///
+    xtitle("") ytitle("Billion USD")
+```
+
+@fig-104 indicates a clear upward trend in aggregated daily trading volume. In particular, since the outbreak of the COVID-19 pandemic, markets have processed substantial trading volumes. One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. In @fig-105, we add a dotted 45°-line to indicate a hypothetical one-to-one relation, addressing potential differences in the axes' scales.
+
+```{stata}
+*| label: fig-105
+*| fig-cap: "Total daily trading volume in billion USD."
+*| fig-alt: "Title: Persistence in daily trading volume of Dow Jones index constituents. The figure shows a scatterplot where aggregate trading volume and previous-day aggregate trading volume neatly line up along a 45-degree line."
+sort date
+gen lag_trading_volume = trading_volume[_n-1]
+
+twoway (scatter trading_volume lag_trading_volume, msize(tiny)) ///
+       (function y=x, range(0 150) lpattern(dash)), ///
+    title("Persistence in daily trading volume of Dow Jones index constituents") ///
+    xtitle("Previous day aggregate trading volume (Billion USD)") ///
+    ytitle("Aggregate trading volume (Billion USD)") ///
+    legend(off)
+```
+
+Do you understand where the message about missing values comes from when creating the lag? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.
+
+## Key Takeaways
+
+- You can use Stata's data management commands and Python integration to efficiently analyze stock market data.
+- The `tidyfinance` Python package allows seamless downloading of historical stock prices and index data directly from Yahoo Finance.
+- Panel data structures in Stata enable efficient analysis of financial data across multiple securities.
+- Adjusted stock prices provide a more accurate reflection of investor returns by accounting for dividends and stock splits.
+- Summary statistics such as mean, standard deviation, and quantiles offer insights into stock return behavior over time.
+- Visualizations created with Stata's graphics commands help identify trends, volatility, and return distributions in financial time series.
+- Stata's `bysort` and `collapse` commands make it easy to scale financial analyses from a single stock to entire indices like the Dow Jones or S&P 500.
+- Consistent workflows form the foundation for advanced financial analysis.
+
+## Exercises
+
+1.  Download daily prices for another stock market symbol of your choice from Yahoo Finance using the Python integration shown in this chapter. Plot two time series of the symbol's un-adjusted and adjusted closing prices. Explain any visible differences.
+2.  Compute daily net returns for an asset of your choice and visualize the distribution of daily returns in a histogram using 100 bins. Also, use `xline()` to add a dashed red vertical line that indicates the 5 percent quantile of the daily returns. Compute summary statistics (mean, standard deviation, minimum, and maximum) for the daily returns.
+3.  Take your code from the previous exercises and generalize it such that you can perform all the computations for an arbitrary number of symbols (e.g., `"AAPL" "MMM" "BA"`). Automate the download, the plot of the price time series, and create a table of return summary statistics for this arbitrary number of assets.
+4.  To facilitate the computation of the annualization factor, write a Stata program that takes a variable of return dates as input and determines the frequency before returning the appropriate annualization factor.
+5.  Are days with high aggregate trading volume often also days with large absolute returns? Find an appropriate visualization to analyze the question using the symbol `AAPL`.
