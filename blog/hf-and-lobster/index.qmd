@@ -2,7 +2,7 @@
 title: "lobsteR package and high-frequency data"
 author: Stefan Voigt
 date: 2025-02-01
-description: Introduction the lobsteR package and R cleaning procedures for HF-data
+description: Introducing the lobsteR package and tidy cleaning procedures in R for LOBSTER high-frequency data
 categories: 
   - R
   - Data
@@ -12,18 +12,30 @@ execute:
   warning: false
 ---
 
-This is part one of two blog posts in which we announce two major updates to the [tidy-finance.org] ecosystem.
 
-1. `lobsteR` is a novel package to request and download high-frequency orderbook snapshot data from [lobsterdata.com]. We provide a short vignette on how to use the package. 
-2. Seemless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+Recently, [Nikolaus Hautsch](https://homepage.univie.ac.at/nikolaus.hautsch/), [Albert J. Menkveld](https://albertjmenkveld.com/) and I released a new working paper [Market responses to a VIX shock]() for which we analysed more than 30 billion order book events and trades in the S&P 500 index tracking ETF SPY. The paper is based on high-frequency data from [LOBSTER](https://lobsterdata.com/), which provides detailed information on the limit order book for all assets traded on NASDAQ.
 
-To connect the dots between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [lobsterdata.com]. 
+As part of our research, we developed a novel R package, [lobsteR](https://voigtstefan.github.io/lobsteR/), to request, download, and clean LOBSTER data. The package is now available on CRAN and GitHub. We also made cleaned 5-second trading and liquidity information on SPY available for everyone to use.
+
+This is part one of two blog posts in which we announce and explain these two major updates to the [tidy-finance.org](www.tidy-finance.org) ecosystem.
+
+1. `lobsteR` is a novel package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package. 
+2. Seamless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+
+To connect the dots between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [LOBSTER](https://lobsterdata.com/). 
 
 ## The `lobsteR` package
 
-The goal of [lobsteR](https://voigtstefan.github.io/lobsteR/) is to provide a tidy framework to request data from lobsterdata.com, to download, unzip, and clean the data. The package focuses on the core functionalities required to get LOBSTER data ready fast. 
+The goal of [lobsteR](https://voigtstefan.github.io/lobsteR/) is to provide a tidy framework to request data from lobsterdata.com, to download, unzip, and clean the data. The package focuses on the core functionalities required to get [LOBSTER](lobsterdata.com) data ready fast. 
 
-You can install the development version of lobsteR from GitHub with:
+You can install `lobsteR` from CRAN with:
+
+```{r}
+#| eval: false
+install.packages("lobsteR")
+```
+
+Or install the development version from GitHub with:
 
 ```{r}
 #| eval: false
@@ -34,19 +46,21 @@ pak::pak("voigtstefan/lobsteR")
 library(lobsteR)
 ```
 
-Lobster provides message-level snapshot data for all assets traded on NASDAQ, starting from June 27, 2006. The data comes with nanosecond time stamps and offers nearly unprecedened granularity and insights into the inner workings of some of the worlds most actively traded assets. 
+[LOBSTER](lobsterdata.com) reconstructs the complete history of limit order book snapshots from NASDAQ exchange data for all assets traded on the exchange, starting from June 27, 2006. For each trading day, [LOBSTER](lobsterdata.com) delivers two files: a message file with nanosecond-timestamped records of every order book event, and an order book snapshot file capturing the state of the book after each event. This level of granularity offers unprecedented insights into the inner workings of some of the world's most actively traded assets.
 
-With `lobsteR` you can connect easily connect with lobsterdata.com using your own credentials.
+With `lobsteR` you can connect to [LOBSTER](lobsterdata.com) using your own credentials.
 
 ```{r}
 #| eval: false
 lobster_login <- account_login(
   login = Sys.getenv("user"), # replace with your username
-  pwd   = Sys.getenv("pwd")   # replace with your passworduse_github_links(overwrite = FALSE)
+  pwd   = Sys.getenv("pwd")   # replace with your password
 )
 ```
 
-I recommend to store your credentials in the `.Renviron` file to avoid hardcoding them in your scripts. Next, we request some data from lobsterdata.com, e.g., message-level data from *SPY*, a large ETF tracking the S&P 500 index for the May 6, 2010, the day of the famous [2010 flash crash](https://en.wikipedia.org/wiki/2010_flash_crash). `level´ corresponds to the requested number of orderbook snapshot levels.
+I recommend storing your credentials in the `.Renviron` file (e.g., via `usethis::edit_r_environ()`) to avoid hardcoding them in your scripts. 
+
+Next, we request data from LOBSTER — for example, order book data for *SPY*, a large ETF tracking the S&P 500 index, on May 6, 2010: the day of the famous [2010 flash crash](https://en.wikipedia.org/wiki/2010_flash_crash). `level` corresponds to the requested number of order book levels (bid and ask sides each).
 
 ```{r}
 #| eval: false
@@ -57,7 +71,7 @@ data_request <- request_query(
   level = 20)
 ```
 
-Next, submit the requests to lobsterdata.com: 
+Next, we submit the requests to the interface of data provider LOBSTER. The processing of the request is done in the background on the servers of Lobster, so you can close the session after submitting the request. Once done, the requested data will be available in your account archive, ready to download.
 
 ```{r}
 #| eval: false
@@ -65,7 +79,7 @@ request_submit(account_login = lobster_login,
                request = data_request)
 ```
 
-After submitting the request, lobsterdata.com will work on providing the order book snapshots. Depending on the number of messages to process,
+After submitting the request, LOBSTER will work on providing the order book snapshots. Depending on the number of messages to process,
 this may take some time. You can close the session during the time, the processing will be done in the background on the servers of Lobster.
 Once done, the requested data is available in your account archive - ready to download!
 
