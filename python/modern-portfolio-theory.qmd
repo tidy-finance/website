@@ -51,15 +51,14 @@ Thus, leveraging the approach introduced in [Working with Stock Returns](working
 
 ```{python}
 symbols = tf.download_data(
-  domain="constituents", 
-  index="Dow Jones Industrial Average"
+    domain="constituents", index="Dow Jones Industrial Average"
 )
 
 prices_daily = tf.download_data(
-  domain="stock_prices", 
-  symbols=symbols["symbol"].tolist(),
-  start_date="2000-01-01", 
-  end_date="2023-12-31"
+    domain="stock_prices",
+    symbols=symbols["symbol"].tolist(),
+    start_date="2000-01-01",
+    end_date="2023-12-31",
 )
 ```
 
@@ -67,10 +66,10 @@ To have a stable stock universe and to keep the analysis simple, we ensure that 
 
 ```{python}
 prices_daily = (prices_daily
-  .groupby("symbol")
-  .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
-  .reset_index(drop=True)
-  .query("counts == counts.max()")
+    .groupby("symbol")
+    .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
+    .reset_index(drop=True)
+    .query("counts == counts.max()")
 )
 ```
 
@@ -78,14 +77,12 @@ We compute the sample average returns as $\frac{1}{T} \sum_{t=1}^{T} r_{i,t},$ w
 
 ```{python}
 returns_monthly = (prices_daily
-  .assign(
-    date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
-  )
-  .groupby(["symbol", "date"], as_index=False)
-  .agg(adjusted_close=("adjusted_close", "last"))
-  .assign(
-    ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change()
-  )
+    .assign(
+        date=lambda x: x["date"].dt.to_period("M").dt.to_timestamp()
+    )
+    .groupby(["symbol", "date"], as_index=False)
+    .agg(adjusted_close=("adjusted_close", "last"))
+    .assign(ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change())
 )
 ```
 
@@ -95,11 +92,11 @@ We compute the sample standard deviation for each asset by using the `std()` fun
 
 ```{python}
 assets = (returns_monthly
-  .groupby("symbol", as_index=False)
-  .agg(
-    mu=("ret", "mean"),
-    sigma=("ret", "std")
-  )
+    .groupby("symbol", as_index=False)
+    .agg(
+        mu=("ret", "mean"),
+        sigma=("ret", "std")
+    )
 )
 ```
 
@@ -110,18 +107,18 @@ We can illustrate the resulting distribution of the asset returns in @fig-201, s
 #| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
 #| fig-alt: "Title: Expected returns and volatilities of Dow Jones index constituents. The figure is a scatter plot with volatilities on the horizontal and expected returns on the vertical axis."
 assets_figure = (
-  ggplot(
-    assets, 
-    aes(x="sigma", y="mu", label="symbol")
-  )
-  + geom_point()
-  + geom_text(adjust_text={"arrowprops": {"arrowstyle": "-"}})
-  + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + labs(
-      x="Volatility", y="Expected return",
-      title="Expected returns and volatilities of Dow Jones index constituents"
-  )
+    ggplot(
+        assets, 
+        aes(x="sigma", y="mu", label="symbol")
+    )
+    + geom_point()
+    + geom_text(adjust_text={"arrowprops": {"arrowstyle": "-"}})
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility", y="Expected return",
+        title="Expected returns and volatilities of Dow Jones index constituents"
+    )
 )
 assets_figure.show()
 ```
@@ -134,13 +131,13 @@ We can use the `cov()` function that takes a matrix of returns as inputs. We thu
 
 ```{python}
 returns_wide = (returns_monthly
-  .pivot(index="date", columns="symbol", values="ret")
-  .reset_index()
+    .pivot(index="date", columns="symbol", values="ret")
+    .reset_index()
 )
 
 sigma = (returns_wide
-  .drop(columns=["date"])
-  .cov()
+    .drop(columns=["date"])
+    .cov()
 )
 ```
 
@@ -151,28 +148,28 @@ Figure @fig-203 illustrates the resulting variance-covariance matrix.
 #| fig-cap: "Variances and covariances based on monthly returns adjusted for dividend payments and stock splits." 
 #| fig-alt: "Title: Variance-covariance matrix of Dow Jones index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
 sigma_long = (sigma
-  .reset_index()
-  .melt(id_vars="symbol", var_name="symbol_b", value_name="value")
+    .reset_index()
+    .melt(id_vars="symbol", var_name="symbol_b", value_name="value")
 )
 
 sigma_long["symbol_b"] = pd.Categorical(
-  sigma_long["symbol_b"], 
-  categories=sigma_long["symbol_b"].unique()[::-1],
-  ordered=True
+    sigma_long["symbol_b"], 
+    categories=sigma_long["symbol_b"].unique()[::-1],
+    ordered=True
 )
 
 sigma_figure = (
-  ggplot(
-    sigma_long, 
-    aes(x="symbol", y="symbol_b", fill="value")
-  )
-  + geom_tile()
-  + labs(
-      x="", y="", fill="(Co-)Variance",
-      title="Sample Variance-covariance matrix of Dow Jones index constituents"
+    ggplot(
+        sigma_long, 
+        aes(x="symbol", y="symbol_b", fill="value")
     )
-  + scale_fill_continuous(labels=percent_format())
-  + theme(axis_text_x=element_text(angle=45, hjust=1))
+    + geom_tile()
+    + labs(
+        x="", y="", fill="(Co-)Variance",
+        title="Sample Variance-covariance matrix of Dow Jones index constituents"
+        )
+    + scale_fill_continuous(labels=percent_format())
+    + theme(axis_text_x=element_text(angle=45, hjust=1))
 )
 sigma_figure.show()
 ```
@@ -206,21 +203,21 @@ Figure @fig-204 shows the resulting portfolio weights.
 assets = assets.assign(omega_mvp=omega_mvp)
 
 assets["symbol"] = pd.Categorical(
-  assets["symbol"],
-  categories=assets.sort_values("omega_mvp")["symbol"],
-  ordered=True
+    assets["symbol"],
+    categories=assets.sort_values("omega_mvp")["symbol"],
+    ordered=True
 )
 
 omega_figure = (
-  ggplot(
-    assets,
-    aes(y="omega_mvp", x="symbol", fill="omega_mvp>0")
-  )
-  + geom_col()
-  + coord_flip()
-  + scale_y_continuous(labels=percent_format())
-  + labs(x="", y="", title="Minimum-variance portfolio weights")
-  + theme(legend_position="none")
+    ggplot(
+        assets,
+        aes(y="omega_mvp", x="symbol", fill="omega_mvp>0")
+    )
+    + geom_col()
+    + coord_flip()
+    + scale_y_continuous(labels=percent_format())
+    + labs(x="", y="", title="Minimum-variance portfolio weights")
+    + theme(legend_position="none")
 )
 omega_figure.show()
 ```
@@ -231,11 +228,13 @@ Before we move on to other portfolios, we collect the return and volatility of t
 mu = assets["mu"].values
 mu_mvp = omega_mvp @ mu
 sigma_mvp = np.sqrt(omega_mvp @ sigma.values @ omega_mvp)
-summary_mvp = pd.DataFrame({
-  "mu": [mu_mvp],
-  "sigma": [sigma_mvp],
-  "type": ["Minimum-Variance Portfolio"]
-})
+summary_mvp = pd.DataFrame(
+    {
+        "mu": [mu_mvp],
+        "sigma": [sigma_mvp],
+        "type": ["Minimum-Variance Portfolio"],
+    }
+)
 summary_mvp
 ```
 
@@ -265,43 +264,39 @@ The code below implements the analytic solution to this optimization problem and
 C = iota @ sigma_inv @ iota
 D = iota @ sigma_inv @ mu
 E = mu @ sigma_inv @ mu
-lambda_tilde = 2 * (mu_bar - D / C) / (E - (D ** 2) / C)
+lambda_tilde = 2 * (mu_bar - D / C) / (E - (D**2) / C)
 omega_efp = omega_mvp + (lambda_tilde / 2) * (sigma_inv @ mu - D * omega_mvp)
 mu_efp = omega_efp @ mu
 sigma_efp = np.sqrt(omega_efp @ sigma.values @ omega_efp)
 
-summary_efp = pd.DataFrame({
-  "mu": [mu_efp],
-  "sigma": [sigma_efp],
-  "type": ["Efficient Portfolio"]
-})
+summary_efp = pd.DataFrame(
+    {"mu": [mu_efp], "sigma": [sigma_efp], "type": ["Efficient Portfolio"]}
+)
 ```
 
 Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio. 
 
 ```{python}
 #| label: fig-205
-#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents." 
+#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents."
 #| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents."
 #| warning: false
-summaries = pd.concat(
-  [assets, summary_mvp, summary_efp], ignore_index=True
-)
+summaries = pd.concat([assets, summary_mvp, summary_efp], ignore_index=True)
 
 summaries_figure = (
-  ggplot(
-    summaries, 
-    aes(x="sigma", y="mu")
-  )
-  + geom_point(data=summaries.query("type.isna()"))
-  + geom_point(data=summaries.query("type.notna()"), color="#F21A00", size=3)
-  + geom_label(aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}})
-  + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + labs(
-      x="Volatility", y="Expected return",
-      title="Efficient & minimum-variance portfolios"
-    ) 
+    ggplot(summaries, aes(x="sigma", y="mu"))
+    + geom_point(data=summaries.query("type.isna()"))
+    + geom_point(data=summaries.query("type.notna()"), color="#F21A00", size=3)
+    + geom_label(
+        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
+    )
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility",
+        y="Expected return",
+        title="Efficient & minimum-variance portfolios",
+    )
 )
 summaries_figure.show()
 ```
@@ -326,48 +321,42 @@ The code below implements the construction of this efficient frontier, which cha
 
 ```{python}
 efficient_frontier = (
-  pd.DataFrame({
-    "a": np.arange(-1, 2.01, 0.01)
-  })
-  .assign(
-    omega=lambda x: x["a"].map(lambda x: x * omega_efp + (1 - x) * omega_mvp)
-  )
-  .assign(
-    mu=lambda x: x["omega"].map(lambda x: x @ mu),
-    sigma=lambda x: x["omega"].map(lambda x: np.sqrt(x @ sigma @ x))
-  )
+    pd.DataFrame({"a": np.arange(-1, 2.01, 0.01)})
+    .assign(
+        omega=lambda x: x["a"].map(
+            lambda x: x * omega_efp + (1 - x) * omega_mvp
+        )
+    )
+    .assign(
+        mu=lambda x: x["omega"].map(lambda x: x @ mu),
+        sigma=lambda x: x["omega"].map(lambda x: np.sqrt(x @ sigma @ x)),
+    )
 )
 ```
 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios in a figure using `ggplot` (see @fig-206). We also add the individual stocks in the same plot.\index{Graph!Efficient frontier}
 
 ```{python}
-#| label: fig-206
-#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers three times the expected return of the minimum-variance portfolio, respectively. The small dots indicate the location of the individual constituents."
-#| fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
-#| warning: false
-summaries = pd.concat(
-  [summaries, efficient_frontier], ignore_index=True
-)
+# | label: fig-206
+# | fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers three times the expected return of the minimum-variance portfolio, respectively. The small dots indicate the location of the individual constituents."
+# | fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
+# | warning: false
+summaries = pd.concat([summaries, efficient_frontier], ignore_index=True)
 
 summaries_figure = (
-  ggplot(
-    summaries, 
-    aes(x="sigma", y="mu")
-  )
-  + geom_point(
-      data = summaries.query("type.isna()")
+    ggplot(summaries, aes(x="sigma", y="mu"))
+    + geom_point(data=summaries.query("type.isna()"))
+    + geom_point(data=summaries.query("type.notna()"), color="#F21A00", size=3)
+    + geom_label(
+        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
-  + geom_point(
-      data = summaries.query("type.notna()"), color="#F21A00", size=3
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility",
+        y="Expected return",
+        title="Efficient & minimum-variance portfolios",
     )
-  + geom_label(aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}})
-  + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + labs(
-      x="Volatility", y="Expected return",
-      title="Efficient & minimum-variance portfolios"
-    ) 
 )
 summaries_figure.show()
 ```

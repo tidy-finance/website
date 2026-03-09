@@ -1,38 +1,34 @@
 ---
 title: Colophon
 ---
-
 ```{python}
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
 
 In this appendix chapter, we provide details on the package versions used in this edition. The book was built with Python [@python] version 3.10.11 and the following packages:\index{Colophon}
-
 ```{python}
 #| echo: false
 import pandas as pd
 from IPython.display import HTML
 
-def parse_requirements(file_path):
-    """Parse a requirements.txt file and return a list of (package, version) tuples."""
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-        
-    parsed = []
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
-        # Split package and version using common delimiters
-        for delimiter in ['==', '>=', '<=', '>', '<', '!=']:
-            if delimiter in line:
-                package, version = line.split(delimiter)
-                parsed.append((package.strip(), version.strip()))
-                break
-        else:
-            parsed.append((line, ""))
+def parse_uv_lock(file_path):
+    """Parse a uv.lock file and return a list of (package, version) tuples."""
+    with open(file_path, 'rb') as file:
+        data = tomllib.load(file)
+    
+    parsed = []
+    for package in data.get('package', []):
+        name = package.get('name', '')
+        version = package.get('version', '')
+        if name:
+            parsed.append((name, version))
+    
     return parsed
 
 def to_dataframe(data):
@@ -40,7 +36,7 @@ def to_dataframe(data):
     df = pd.DataFrame(data, columns=["Package", "Version"])
     return df
 
-data = parse_requirements("../requirements.txt")
+data = parse_uv_lock("uv.lock")
 df = to_dataframe(data)
-HTML(df.to_html())
+HTML(df.to_html(index=False))
 ```

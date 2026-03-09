@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.7.32">
+<meta name="generator" content="quarto-1.8.25">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -93,14 +93,15 @@ div.csl-indent {
 <link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
 <script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="../../site_libs/quarto-html/popper.min.js"></script>
 <script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-37eea08aefeeee20ff55810ff984fec1.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-99a8851848bcfc05e6486f9d9e6d6ff3.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-0514632cc3f7a6d071f65f884e64e3e1.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -178,7 +179,8 @@ cookieconsent.run({
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a href="../../index.html" class="navbar-brand navbar-brand-logo">
-    <img src="../../assets/img/logo-website-white.png" alt="" class="navbar-logo">
+    <img src="../../assets/img/logo-website-white.png" alt="" class="navbar-logo light-content">
+    <img src="../../assets/img/logo-website-white.png" alt="" class="navbar-logo dark-content">
     </a>
     <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">Tidy Finance</span>
@@ -313,17 +315,17 @@ cookieconsent.run({
 <p>In this blog post, we show how to obtain and analyze shareholder proposal voting data for publicly listed firms in the US. For context, the SEC allows shareholders to submit proposals a few months before the annual general meeting (AGM), and these proposals end up on the ballot and are voted on if (1) a firm’s management does not submit a ‘no-action request’ accepted by the SEC or (2) management and shareholders do not reach an agreement prior to the AGM. Voting outcomes are non-binding, but management usually experiences pressure from organizations such as the Council of Institutional Investors (CII) if they do not adequately act on a proposal’s voting outcome <span class="citation" data-cites="bachmetzger2017">(<a href="#ref-bachmetzger2017" role="doc-biblioref">Bach and Metzger 2017</a>)</span>. We refer to data provided by Institutional Shareholder Services (ISS), which gained popularity as one of the major US proxy advisors. A proxy advisor provides recommendations to institutional investors on how to vote on proposals at AGMs, and in this context, ISS has used its advantageous position to build an extensive database that collects information on management and shareholder proposals.</p>
 <p>Our code relies on the following R packages.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyfinance)</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RSQLite)</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readxl)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We start by establishing a connection to WRDS using the <code>tidyfinance</code> package (you can find more information <a href="https://www.tidy-finance.org/r/wrds-crsp-and-compustat.html#accessing-wrds">here</a>) to query the data directly through their servers. We also load stocks’ identifying information to match ISS identifiers (8-digit CUSIPs) with CRSP PERMNOs. Finally, we read in an Excel file containing granular ESG-type categorization of proposal types, which is separately provided by ISS.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>wrds <span class="ot">&lt;-</span> <span class="fu">get_wrds_connection</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>wrds <span class="ot">&lt;-</span> <span class="fu">get_wrds_connection</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="fetching-shareholder-proposals" class="level3">
 <h3 class="anchored" data-anchor-id="fetching-shareholder-proposals">Fetching Shareholder Proposals</h3>
@@ -334,57 +336,57 @@ cookieconsent.run({
 </ul>
 <p>The Shareholder Proposals table contains all shareholder proposals that were submitted to the SEC, regardless of whether they eventually came to a vote at the AGM (sample coverage: 2006 - 2024). The Company Vote Results table, on the other hand, has all proposals that made it to the ballot at AGM and hence also includes management proposals<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> (sample coverage: 2002 - 2024).<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> We use the Company Vote Results data as we are primarily interested in proposals that shareholders actually voted on, and exploit the slightly longer sample period. We extract company names and identifiers, meeting dates, vote shares, and short descriptions of proposal contents.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"iss_va_vote_us.vavoteresults"</span>)) <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"iss_va_vote_us.vavoteresults"</span>)) <span class="sc">|&gt;</span> </span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(cusip, companyid, name, ticker,</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         meetingdate, recorddate, meetingid,</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>         sponsor, itemonagendaid, issagendaitemid,</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>         agendageneraldesc, itemdesc,</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>         outstandingshare, voterequirement, base,</span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>         votedabstain, votedagainst, votedfor, votedwithheld) <span class="sc">|&gt;</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>In order to filter for proposals submitted by shareholders, we refer to the variable <code>sponsor</code> and keep the sponsor type denoted as <code>"Shareholder"</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(sponsor <span class="sc">==</span> <span class="st">"Shareholder"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(sponsor <span class="sc">==</span> <span class="st">"Shareholder"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="add-variables-on-vote-outcomes" class="level3">
 <h3 class="anchored" data-anchor-id="add-variables-on-vote-outcomes">Add Variables on Vote Outcomes</h3>
 <p>As we are dealing with shareholder proposal voting data, our main interest is, of course, the voting outcome, which we determine by computing vote shares. Firms define voting rules in their corporate charters, and the variable <code>base</code> informs us about the voting rule that applies to a specific observation in our sample. One primarily distinguishes two cases: either abstentions are counted as votes against the proposal (<code>base == "F+A+AB"</code>), or they are simply ignored (<code>base == "F+A"</code>). We need to be careful with the values in <code>base</code> since the voting rules are spelled inconsistently. Two additional, though unpopular, voting categories need to be accounted for: <code>"Outstanding"</code> and <code>"Capital Represe"</code>. These require dividing the votes in favor of the proposals by the total number of shares outstanding.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">vote_share =</span> <span class="fu">case_when</span>(base <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"F+A"</span>, <span class="st">"F A"</span>) <span class="sc">~</span> votedfor <span class="sc">/</span> (votedfor <span class="sc">+</span> votedagainst),</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>                          base <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"F+A+AB"</span>, <span class="st">"F A AB"</span>) <span class="sc">~</span> votedfor <span class="sc">/</span> (votedfor <span class="sc">+</span> votedagainst <span class="sc">+</span> votedabstain),</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>                          base <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Outstanding"</span>, <span class="st">"Capital Represe"</span>) <span class="sc">~</span> votedfor <span class="sc">/</span> outstandingshare,</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                          <span class="at">.default =</span> <span class="cn">NA</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>                          <span class="at">.default =</span> <span class="cn">NA</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>As pointed out by <span class="citation" data-cites="cunatetal2020">Cunat, Giné, and Guadalupe (<a href="#ref-cunatetal2020" role="doc-biblioref">2020</a>)</span>, early studies mainly used a so-called simple majority rule, which translates into dividing votes in favor of the proposal by votes against the proposal. The reason is that earlier versions of the ISS database did not contain specific information on the voting rules defined in corporate charters but only provided votes in favor versus votes against a proposal. To be able to replicate prior results, we add a variable that computes the simple voting rule, which will collapse to the sophisticated voting rule if firms use <code>votedfor</code> / <code>votedagainst</code> (i.e., <code>base == "F+A"</code>). Next, we determine whether a proposal passed by comparing the vote share with the vote requirement.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> If the vote share exceeds the vote requirement, we assign a value equal to one and zero otherwise.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">vote_share_simple =</span> votedfor <span class="sc">/</span> (votedfor <span class="sc">+</span> votedagainst))</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">pass =</span> <span class="fu">if_else</span>(vote_share <span class="sc">&gt;=</span> voterequirement, <span class="dv">1</span>, <span class="dv">0</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">pass_simple =</span> <span class="fu">if_else</span>(vote_share_simple <span class="sc">&gt;=</span> voterequirement, <span class="dv">1</span>, <span class="dv">0</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">pass_simple =</span> <span class="fu">if_else</span>(vote_share_simple <span class="sc">&gt;=</span> voterequirement, <span class="dv">1</span>, <span class="dv">0</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We also compute the absolute distance of the vote share to the majority threshold.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">distance_threshold =</span> <span class="fu">abs</span>(voterequirement <span class="sc">-</span> vote_share),</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         <span class="at">distance_threshold_simple =</span> <span class="fu">abs</span>(voterequirement <span class="sc">-</span> vote_share_simple))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         <span class="at">distance_threshold_simple =</span> <span class="fu">abs</span>(voterequirement <span class="sc">-</span> vote_share_simple))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We detected a few obvious data errors, which we account for by applying some additional cleaning steps. We require that proposals must have received at least one vote, no matter whether for or against, and that <code>base</code> is unequal to <code>Votes Represent</code> because we are not sure what this voting rule refers to.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(votedfor <span class="sc">+</span> votedagainst <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(base <span class="sc">!=</span> <span class="st">"Votes Represent"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(base <span class="sc">!=</span> <span class="st">"Votes Represent"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We also make sure to exclude proposals for which we cannot properly compute vote shares.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(vote_share) <span class="sc">|</span> <span class="sc">!</span><span class="fu">is.na</span>(vote_share_simple),</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>         <span class="sc">!</span><span class="fu">is.na</span>(voterequirement))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>         <span class="sc">!</span><span class="fu">is.na</span>(voterequirement))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 </section>
@@ -392,19 +394,19 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="proposal-classification">Proposal Classification</h2>
 <p>For most analyses, we want to know the reason for the proposal’s submission, or more precisely, what is actually voted on at AGMs. For that matter, ISS divides proposals into two resolution types, governance (GOV) and socially responsible investing (SRI), but also provides a more detailed categorization within GOV and SRI (see variable <code>issagendaitemid</code>). We refer to this more granular categorization and additionally rely on <span class="citation" data-cites="heetal2023">He, Kahraman, and Lowry (<a href="#ref-heetal2023" role="doc-biblioref">2023</a>)</span>, who check and classify proposals manually to ensure we correctly capture proposals that are related to the issues we would like to analyze. ISS separately provides broad ESG-type classifications that can be linked to <code>issagendaitemid</code>. The respective Excel file containing the ESG classifications can be downloaded from <a href="https://wrds-www.wharton.upenn.edu/documents/1972/ISSAgendaCodes_2023_All_Codes.xlsx">WRDS</a> (in the subsequent code, this file is <code>ISSAgendaCodes_2023_All_Codes.xlsx</code>).</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>iss_agenda_ids <span class="ot">&lt;-</span> <span class="fu">read_excel</span>(<span class="st">"ISSAgendaCodes_2023_All_Codes.xlsx"</span>) <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>iss_agenda_ids <span class="ot">&lt;-</span> <span class="fu">read_excel</span>(<span class="st">"ISSAgendaCodes_2023_All_Codes.xlsx"</span>) <span class="sc">|&gt;</span> </span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">clean_names</span>() <span class="sc">|&gt;</span> </span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">agenda_esg_type =</span> <span class="fu">gsub</span>(<span class="st">"[^a-zA-Z]"</span>, <span class="st">""</span>, proposal_class)) <span class="sc">|&gt;</span> </span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(agenda_code, agenda_esg_type)</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(iss_agenda_ids,</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>            <span class="fu">join_by</span>(issagendaitemid <span class="sc">==</span> agenda_code))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>            <span class="fu">join_by</span>(issagendaitemid <span class="sc">==</span> agenda_code))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>One additional comment on proposal classification is in order. As <span class="citation" data-cites="heetal2023">He, Kahraman, and Lowry (<a href="#ref-heetal2023" role="doc-biblioref">2023</a>)</span> investigate ISS resolution types, they find that not all proposals labeled as SRI (GOV) actually deal with issues related to SRI (GOV). Hence, one should be cautious when using ISS resolution types and <code>issagendaitemid</code> without additional checks. In their <a href="https://oup.silverchair-cdn.com/oup/backfile/Content_public/Journal/rfs/36/12/10.1093_rfs_hhad033/1/hhad033_supplementary_data.pdf?Expires=1747773259&amp;Signature=eeGoXl0oCUzG2XTBwQ9qiQm5om~OD4wbALbhH1X6i87qd62rARIOySXqUaNMxO54ALDS~M836ayI4A5e1~mx~iOrwto-LQDjQYJD3HuuE5rVkk361lg9nevqO4ezbDSWAUuMdF6LD1p4WY8FB99C~ETlQb4RsS6ZRjFP0XPl3T82zcCDgtRFK89lGtScw0CpP9uzOTlYvkV4hSUjlJaOPafemsMLBfnQ0s3aE7Zcq0k1mjh6Lgtkx-oFH1jTgoo1nb7ANUBGlDVN0bi4IUE9UyI0aZUmyflC4DpWFCpuIk83nHjmFZjhy~kPo3V72~HrZ0q8nBxwDRIukoDDaYnmDg__&amp;Key-Pair-Id=APKAIE5G5CRDK6RD3PGA">online appendix</a>, <span class="citation" data-cites="heetal2023">He, Kahraman, and Lowry (<a href="#ref-heetal2023" role="doc-biblioref">2023</a>)</span> provide a list of <code>issagendaitemid</code> that actually reflects proposal types related to ecological and social issues, which allows us to gain more confidence in the classification. In the past, researchers have primarily relied on the coarse resolution type classification by ISS <span class="citation" data-cites="cunatetal2012">Flammer (<a href="#ref-flammer2015" role="doc-biblioref">2015</a>)</span>, which introduces a potential source for replication failures when using more sophisticated classification procedures instead.</p>
 <p>As the resolution type variable is only available in the Shareholder Proposals table, we now also extract unique pairs of resolution type and <code>issagendaitemid</code> from this dataset. We match these to our Vote Results table. Since it is possible that a given <code>issagendaitemid</code> refers to both GOV and SRI, we remove <code>issagendaitemid</code>s that correspond to both, GOV and SRI. We document that this is only the case for id <code>S0810</code> in the dataset at hand.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>va_shareholder <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"iss_va_shareholder.va_proposals"</span>)) <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>va_shareholder <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"iss_va_shareholder.va_proposals"</span>)) <span class="sc">|&gt;</span> </span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(issagendaitemid, resolution_type) <span class="sc">|&gt;</span> </span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect</span>() <span class="sc">|&gt;</span> </span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">drop_na</span>()</span>
@@ -413,35 +415,35 @@ cookieconsent.run({
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(issagendaitemid) <span class="sc">|&gt;</span></span>
 <span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">n =</span> <span class="fu">n_distinct</span>(resolution_type),</span>
 <span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>            <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">|&gt;</span> </span>
-<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 2
   issagendaitemid     n
   &lt;chr&gt;           &lt;int&gt;
 1 S0810               2</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>resolution_types <span class="ot">&lt;-</span> va_shareholder <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>resolution_types <span class="ot">&lt;-</span> va_shareholder <span class="sc">|&gt;</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(issagendaitemid <span class="sc">!=</span> <span class="st">"S0810"</span>)</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  </span>
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span></span>
 <span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(resolution_types,</span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>            <span class="fu">join_by</span>(issagendaitemid))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>            <span class="fu">join_by</span>(issagendaitemid))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We have substantially manipulated the raw data, and to keep things tractable, we now make sure to keep only relevant variables for further analysis.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span></span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(cusip, name, ticker,</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>         <span class="at">date =</span> meetingdate, recorddate,</span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>         meetingid, itemonagendaid,</span>
 <span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>         agenda_esg_type, issagendaitemid, agendageneraldesc, itemdesc, </span>
 <span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>         voterequirement, vote_share, vote_share_simple,</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>         distance_threshold, distance_threshold_simple, pass, pass_simple)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>         distance_threshold, distance_threshold_simple, pass, pass_simple)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="confounding-proposal-identification" class="level3">
 <h3 class="anchored" data-anchor-id="confounding-proposal-identification">Confounding Proposal Identification</h3>
 <p>Assume that we aim to explore the effect of passing close-vote ecological and social proposals, i.e., those that have passed or failed close to the majority threshold, on expected and realized returns. In this case, <span class="citation" data-cites="cunatetal2012">Cuñat, Gine, and Guadalupe (<a href="#ref-cunatetal2012" role="doc-biblioref">2012</a>)</span> and <span class="citation" data-cites="flammer2015">Flammer (<a href="#ref-flammer2015" role="doc-biblioref">2015</a>)</span> correctly point out that there are possibly multiple close-vote proposals per AGM. It is straightforward to account for these proposals if they are also related to ecological or social concerns from an econometric point of view. However, if confounding proposals are of type governance, it becomes infeasible to disentangle the effects of close-vote governance versus close-vote ecological and social proposals on expected and realized returns. We decide to construct count variables that inform us about the number of confounding close-vote proposals (at different distances to the threshold: 5%, 10%, and 20%, respectively) that are not ecologically or socially related. Later, this procedure allows us to run robustness checks by excluding AGMs that had close-vote governance proposals in addition to close-vote ecological or social proposals.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cusip, date) <span class="sc">|&gt;</span></span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">confounding_close_votes_five =</span> </span>
 <span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>           <span class="fu">sum</span>(distance_threshold <span class="sc">&lt;=</span> <span class="fl">0.05</span> <span class="sc">&amp;</span> <span class="sc">!</span>(agenda_esg_type <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"E"</span>, <span class="st">"S"</span>, <span class="st">"ES"</span>))),</span>
@@ -449,7 +451,7 @@ cookieconsent.run({
 <span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>           <span class="fu">sum</span>(distance_threshold <span class="sc">&lt;=</span> <span class="fl">0.1</span> <span class="sc">&amp;</span> <span class="sc">!</span>(agenda_esg_type <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"E"</span>, <span class="st">"S"</span>, <span class="st">"ES"</span>))),</span>
 <span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">confounding_close_votes_twenty =</span></span>
 <span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>           <span class="fu">sum</span>(distance_threshold <span class="sc">&lt;=</span> <span class="fl">0.2</span> <span class="sc">&amp;</span> <span class="sc">!</span>(agenda_esg_type <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"E"</span>, <span class="st">"S"</span>, <span class="st">"ES"</span>)))) <span class="sc">|&gt;</span> </span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 </section>
@@ -457,14 +459,14 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="matching-with-other-data-sources">Matching with Other Data Sources</h2>
 <p>To conduct meaningful analyses, we must link shareholder proposal voting outcomes from ISS with other data sources such as CRSP or Compustat. In what follows, we provide code and describe how to match ISS identifiers with CRSP identifiers.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>va_vote_results <span class="ot">&lt;-</span> va_vote_results <span class="sc">|&gt;</span> </span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cusip6 =</span> <span class="fu">substr</span>(cusip, <span class="dv">1</span>, <span class="dv">6</span>),</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>         <span class="at">cusip8 =</span> <span class="fu">substr</span>(cusip, <span class="dv">1</span>, <span class="dv">8</span>)) <span class="sc">|&gt;</span> </span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rowid_to_column</span>(<span class="st">"id"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rowid_to_column</span>(<span class="st">"id"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Before the actual matching can be performed, we need to prepare a linking table based on the Security Information History table and the Company Names table from CRSP.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>stksecurityinfohist_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.stksecurityinfohist"</span>))</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>stksecurityinfohist_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.stksecurityinfohist"</span>))</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>stksecurityinfohist <span class="ot">&lt;-</span> stksecurityinfohist_db <span class="sc">|&gt;</span> </span>
 <span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cusip6 =</span> <span class="fu">substr</span>(cusip, <span class="dv">1</span>, <span class="dv">6</span>),</span>
@@ -489,11 +491,11 @@ cookieconsent.run({
 <span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">start_date =</span> <span class="fu">pmax</span>(secinfostartdt, namedt, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
 <span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>         <span class="at">end_date =</span> <span class="fu">pmin</span>(secinfoenddt, nameenddt, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">|&gt;</span> </span>
 <span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(permno, <span class="fu">contains</span>(<span class="st">"cusip"</span>), ticker, comnam, start_date, end_date) <span class="sc">|&gt;</span> </span>
-<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>In the first step, we match ISS CUSIPs with 8- and 6-digit CUSIPs from CRSP. In case there is no appropriate match using CUSIPs, we continue the matching procedure based on standardized company names and tickers. Finally, we check for potential backward-filling in the ISS data by using a forward-looking name/CUSIP/ticker combination. Overall, we can match most shareholder proposals from ISS with CRSP identifying information following our procedure.<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a></p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>matched_va_vote_results <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>matched_va_vote_results <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  va_vote_results,</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  va_vote_results <span class="sc">|&gt;</span></span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">inner_join</span>(linking_table <span class="sc">|&gt;</span></span>
@@ -551,7 +553,7 @@ cookieconsent.run({
 <span id="cb18-56"><a href="#cb18-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(id) <span class="sc">|&gt;</span> </span>
 <span id="cb18-57"><a href="#cb18-57" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">1</span>) <span class="sc">|&gt;</span> </span>
 <span id="cb18-58"><a href="#cb18-58" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">|&gt;</span> </span>
-<span id="cb18-59"><a href="#cb18-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>id, <span class="sc">-</span>cusip6, <span class="sc">-</span>cusip8, <span class="sc">-</span>match)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb18-59"><a href="#cb18-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>id, <span class="sc">-</span>cusip6, <span class="sc">-</span>cusip8, <span class="sc">-</span>match)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="coverage" class="level2">
@@ -685,13 +687,14 @@ He, Yazhou Ellen, Bige Kahraman, and Michelle Lowry. 2023. <span>“ES Risks and
       e.clearSelection();
     }
     const getTextToCopy = function(trigger) {
-        const codeEl = trigger.previousElementSibling.cloneNode(true);
-        for (const childEl of codeEl.children) {
-          if (isCodeAnnotation(childEl)) {
-            childEl.remove();
-          }
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
         }
-        return codeEl.innerText;
+      }
+      return codeEl.innerText;
     }
     const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
       text: getTextToCopy

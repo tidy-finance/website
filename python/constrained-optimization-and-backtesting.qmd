@@ -38,19 +38,24 @@ Compared to previous chapters, we introduce `expon` from `scipy.stats` to calcul
 
 ## Data Preparation
 
-We start by loading the required data from our database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
+We start by loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 ```{python}
-industry_returns = (pd.read_parquet("data-python/industry_returns.parquet")
-    .get(["permno", "date", "industry", "ret_excess"])
+industry_returns = (
+    pd.read_parquet("data-python/industries_ff_monthly.parquet")
     .drop(columns=["date"])
+    .dropna()
 )
 ```
 
 ## Recap of Portfolio Choice 
 
 A common objective for portfolio optimization is to find mean-variance efficient portfolio weights, i.e., the allocation that delivers the lowest possible return variance for a given minimum level of expected returns. \index{Optimization}\index{Optimization!Constrained} In the most extreme case, where the investor is only concerned about portfolio variance, they may choose to implement the minimum variance portfolio (MVP) weights which are given by the solution to 
-$$\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1$${#eq-recap-mvp} 
+
+$$
+\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1
+$${#eq-recap-mvp} 
+
 where $\Sigma$ is the $(N \times N)$ covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In terms of code, the math is equivalent to the following chunk. \index{Minimum variance portfolio}
 
 ```{python}
@@ -62,20 +67,30 @@ w_mvp = np.linalg.inv(sigma) @ np.ones(n_industries)
 w_mvp = w_mvp/w_mvp.sum()
 
 weights_mvp = pd.DataFrame({
-  "Industry": industry_returns.columns.tolist(),
-  "Minimum variance": w_mvp
+    "Industry": industry_returns.columns.tolist(),
+    "Minimum variance": w_mvp
 })
 weights_mvp.round(3)
 ```
 
 Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* $\bar{\mu}$ such that she chooses
-$$\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.$${#eq-recap-efficient-portfolio}
+
+$$
+\omega_\text{eff}({\bar{\mu}}) =\arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota = 1 \text{ and } \omega'\mu \geq \bar{\mu}.
+$${#eq-recap-efficient-portfolio}
+
 We leave it as an exercise below to show that the portfolio choice problem can equivalently be formulated for an investor with mean-variance preferences and risk aversion factor $\gamma$. That means the investor aims to choose portfolio weights as the solution to
-$$ \omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1.$${#eq-recap-mean-variance}
+$$
+\omega^*_\gamma = \arg\max \omega' \mu - \frac{\gamma}{2}\omega'\Sigma \omega\quad \text{ s.t. } \omega'\iota = 1.
+$${#eq-recap-mean-variance}
+
 The solution to the optimal portfolio choice problem is:
-$$\omega^*_{\gamma} = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.$${#eq-analytical-solution-mv}
-To proof this statement, we refer to the derivations in [Proofs](proofs.qmd).
-Empirically, this classical solution imposes many problems. In particular, the estimates of $\mu$ are noisy over short horizons, the ($N \times N$) matrix $\Sigma$ contains $N(N-1)/2$ distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are @Brown1976, @Jobson1980, @Jorion1986, and @Chopra1993.
+
+$$
+\omega^*_{\gamma} = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota.
+$${#eq-analytical-solution-mv}
+
+To proof this statement, we refer to the derivations in [Proofs](proofs.qmd). Empirically, this classical solution imposes many problems. In particular, the estimates of $\mu$ are noisy over short horizons, the ($N \times N$) matrix $\Sigma$ contains $N(N-1)/2$ distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are @Brown1976, @Jobson1980, @Jorion1986, and @Chopra1993.
 
 Even worse, if the asset universe contains more assets than available time periods $(N > T)$, the sample covariance matrix is no longer positive definite such that the inverse $\Sigma^{-1}$ does not exist anymore. To address estimation issues for vast-dimensional covariance matrices, regularization techniques [see, e.g., @Ledoit2003; @Ledoit2004; @Ledoit2012; @Fan2008] and the parametric approach from the previous chapter are popular tools.\index{Covariance}
 
@@ -87,21 +102,36 @@ On top of the estimation uncertainty, *transaction costs* are a major concern.\i
 
 The empirical evidence regarding the performance of a mean-variance optimization procedure in which you simply plug in some sample estimates $\hat \mu$ and $\hat \Sigma$ can be summarized rather briefly: mean-variance optimization performs poorly! The literature discusses many proposals to overcome these empirical issues. For instance, one may impose some form of regularization of $\Sigma$, rely on Bayesian priors inspired by theoretical asset pricing models [@Kan2007], or use high-frequency data to improve forecasting [@Hautsch2015]. One unifying framework that works easily, effectively (even for large dimensions), and is purely inspired by economic arguments is an ex-ante adjustment for transaction costs [@Hautsch2019]. 
 
-Assume that returns are from a multivariate normal distribution with mean $\mu$ and variance-covariance matrix $\Sigma$, $N(\mu,\Sigma)$. Additionally, we assume quadratic transaction costs which penalize rebalancing such that $$
+Assume that returns are from a multivariate normal distribution with mean $\mu$ and variance-covariance matrix $\Sigma$, $N(\mu,\Sigma)$. Additionally, we assume quadratic transaction costs which penalize rebalancing such that 
+
+$$
 \begin{aligned}
-\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned}$${#eq-definition-transaction-costs}
+\nu\left(\omega_{t+1},\omega_{t^+}, \beta\right) = \frac{\beta}{2} \left(\omega_{t+1} - \omega_{t^+}\right)'\left(\omega_{t+1}- \omega_{t^+}\right),\end{aligned}
+$${#eq-definition-transaction-costs}
+
 with cost parameter $\beta>0$ and $\omega_{t^+} = {\omega_t \circ (1 +r_{t})}/{\iota' (\omega_t \circ (1 + r_{t}))}$, where $\circ$ is the element-wise Hadamard product. $\omega_{t^+}$ denotes the portfolio weights just before rebalancing. Note that $\omega_{t^+}$ differs mechanically from $\omega_t$ due to the returns in the past period. Intuitively, transaction costs penalize portfolio performance when the portfolio is shifted from the current holdings $\omega_{t^+}$ to a new allocation $\omega_{t+1}$. In this setup, transaction costs do not increase linearly. Instead, larger rebalancing is penalized more heavily than small adjustments. 
 Then, the optimal portfolio choice for an investor with mean variance preferences is
-$$\begin{aligned}\omega_{t+1} ^* &= \arg\max \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \text{ s.t. } \iota'\omega = 1\\
+
+$$
+\begin{aligned}\omega_{t+1} ^* &= \arg\max \omega'\mu - \nu_t (\omega,\omega_{t^+}, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \text{ s.t. } \iota'\omega = 1\\
 &=\arg\max
-\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t.} \iota'\omega=1,\end{aligned}$${#eq-tc-optimization-problem}
+\omega'\mu^* - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t.} \iota'\omega=1,\end{aligned}
+$${#eq-tc-optimization-problem}
+
 where
-$$\mu^*=\mu+\beta \omega_{t^+} \quad \text{and} \quad \Sigma^*=\Sigma + \frac{\beta}{\gamma} I_N.$${#eq-tc-optimization-solution}
+
+$$
+\mu^*=\mu+\beta \omega_{t^+} \quad \text{and} \quad \Sigma^*=\Sigma + \frac{\beta}{\gamma} I_N.
+$${#eq-tc-optimization-solution}
+
 As a result, adjusting for transaction costs implies a standard mean-variance optimal portfolio choice with adjusted return parameters $\Sigma^*$ and $\mu^*$: $$\omega^*_{t+1} = \frac{1}{\gamma}\left(\Sigma^{*-1} - \frac{1}{\iota' \Sigma^{*-1}\iota }\Sigma^{*-1}\iota\iota' \Sigma^{*-1} \right) \mu^* + \frac{1}{\iota' \Sigma^{*-1} \iota }\Sigma^{*-1} \iota.$${#eq-tc-weights}
 
 An alternative formulation of the optimal portfolio can be derived as follows: 
+
 $$\omega_{t+1} ^*=\arg\max
-\omega'\left(\mu+\beta\left(\omega_{t^+} - \frac{1}{N}\iota\right)\right) - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t. } \iota'\omega=1.$${#eq-tc-alternative-weights}
+\omega'\left(\mu+\beta\left(\omega_{t^+} - \frac{1}{N}\iota\right)\right) - \frac{\gamma}{2}\omega'\Sigma^* \omega \text{ s.t. } \iota'\omega=1.
+$${#eq-tc-alternative-weights}
+
 The optimal weights correspond to a mean-variance portfolio, where the vector of expected returns is such that assets that currently exhibit a higher weight are considered as delivering a higher expected return. 
 
 ## Optimal Portfolio Choice
@@ -109,33 +139,38 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 The function below implements the efficient portfolio weights in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$.
 
 ```{python}
-def compute_efficient_weight(sigma, 
-                             mu, 
-                             gamma=2, 
-                             beta=0,
-                             w_prev=np.ones(sigma.shape[1])/sigma.shape[1]):
+def compute_efficient_weight(
+    sigma, mu, gamma=2, beta=0, w_prev=np.ones(sigma.shape[1]) / sigma.shape[1]
+):
     """Compute efficient portfolio weights."""
-    
+
     n = sigma.shape[1]
     iota = np.ones(n)
-    sigma_processed = sigma+(beta/gamma)*np.eye(n)
-    mu_processed = mu+beta*w_prev
+    sigma_processed = sigma + (beta / gamma) * np.eye(n)
+    mu_processed = mu + beta * w_prev
 
     sigma_inverse = np.linalg.inv(sigma_processed)
 
     w_mvp = sigma_inverse @ iota
-    w_mvp = w_mvp/np.sum(w_mvp)
-    w_opt = w_mvp+(1/gamma)*\
-        (sigma_inverse-np.outer(w_mvp, iota) @ sigma_inverse) @ mu_processed
-        
+    w_mvp = w_mvp / np.sum(w_mvp)
+    w_opt = (
+        w_mvp
+        + (1 / gamma)
+        * (sigma_inverse - np.outer(w_mvp, iota) @ sigma_inverse)
+        @ mu_processed
+    )
+
     return w_opt
+
 
 w_efficient = compute_efficient_weight(sigma, mu)
 
-weights_efficient = pd.DataFrame({
-  "Industry": industry_returns.columns.tolist(),
-  "Efficient portfolio": w_efficient
-})
+weights_efficient = pd.DataFrame(
+    {
+        "Industry": industry_returns.columns.tolist(),
+        "Efficient portfolio": w_efficient,
+    }
+)
 weights_efficient.round(3)
 ```
 
@@ -146,42 +181,47 @@ gammas = [2, 4, 8, 20]
 betas = 20*expon.ppf(np.arange(1, 100)/100, scale=1)
 
 transaction_costs = (pd.DataFrame(
-    list(product(gammas, betas)), 
-    columns=["gamma", "beta"]
-  )
-  .assign(
-    weights=lambda x: x.apply(lambda y:
-      compute_efficient_weight(
-        sigma, mu, gamma=y["gamma"], beta=y["beta"]/10000, w_prev=w_mvp), 
-      axis=1
-    ),
-    concentration=lambda x: x["weights"].apply(
-      lambda x: np.sum(np.abs(x-w_mvp))
+        list(product(gammas, betas)), 
+        columns=["gamma", "beta"]
     )
-  )
+    .assign(
+        weights=lambda x: x.apply(lambda y:
+        compute_efficient_weight(
+            sigma, mu, gamma=y["gamma"], beta=y["beta"]/10000, w_prev=w_mvp), 
+        axis=1
+        ),
+        concentration=lambda x: x["weights"].apply(
+        lambda x: np.sum(np.abs(x-w_mvp))
+        )
+    )
 )
 ```
 
 The code chunk above computes the optimal weight in the presence of transaction cost for different values of $\beta$ and $\gamma$ but with the same initial allocation, the theoretical optimal minimum variance portfolio. Starting from the initial allocation, the investor chooses their optimal allocation along the efficient frontier to reflect their own risk preferences. If transaction costs were absent, the investor would simply implement the mean-variance efficient allocation. If transaction costs make it costly to rebalance, their optimal portfolio choice reflects a shift toward the efficient portfolio, whereas their current portfolio anchors their investment.\index{Graph!Comparative statics}
 
 ```{python}
-#| label: fig-1701
-#| fig-cap: "The figure shows portfolio weights for different risk aversion and transaction cost. The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark."
-#| fig-alt: "Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."
-#| fig-pos: "htb"
+# | label: fig-1701
+# | fig-cap: "The figure shows portfolio weights for different risk aversion and transaction cost. The horizontal axis indicates the distance from the empirical minimum variance portfolio weight, measured by the sum of the absolute deviations of the chosen portfolio from the benchmark."
+# | fig-alt: "Title: Portfolio weights for different risk aversion and transaction cost. The figure shows four lines that indicate that rebalancing from the initial portfolio decreases for higher transaction costs and for higher risk aversion."
+# | fig-pos: "htb"
 rebalancing_figure = (
     ggplot(
-      transaction_costs, 
-      aes(x="beta", y="concentration", 
-          color="factor(gamma)", linetype="factor(gamma)")
+        transaction_costs,
+        aes(
+            x="beta",
+            y="concentration",
+            color="factor(gamma)",
+            linetype="factor(gamma)",
+        ),
     )
     + geom_line()
     + guides(linetype=None)
     + labs(
-        x="Transaction cost parameter", y="Distance from MVP",
-        color="Risk aversion", 
-        title="Portfolio weights for different risk aversion and transaction cost"
-      )
+        x="Transaction cost parameter",
+        y="Distance from MVP",
+        color="Risk aversion",
+        title="Portfolio weights for different risk aversion and transaction cost",
+    )
 )
 rebalancing_figure.show()
 ```
@@ -197,60 +237,66 @@ We rely on the powerful `scipy.optimize` package, which provides a common interf
 We illustrate the use of `minimize()` by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `np.allclose()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `np.allclose()` has a built-in tolerance. It returns `True` if both are equal, which is the case in both applications below. 
 
 ```{python}
-#| output: false
-w_initial = np.ones(n_industries)/n_industries
+# | output: false
+w_initial = np.ones(n_industries) / n_industries
+
 
 def objective_mvp(w):
-    return 0.5*w.T @ sigma @ w
-  
+    return 0.5 * w.T @ sigma @ w
+
+
 def gradient_mvp(w):
     return sigma @ w
 
+
 def equality_constraint(w):
-    return np.sum(w)-1
+    return np.sum(w) - 1
+
 
 def jacobian_equality(w):
     return np.ones_like(w)
 
-constraints = (
-  {"type": "eq", "fun": equality_constraint, "jac": jacobian_equality}
-)
 
-options = {
-  "tol":1e-20,
-  "maxiter": 10000,
-  "method":"SLSQP"
+constraints = {
+    "type": "eq",
+    "fun": equality_constraint,
+    "jac": jacobian_equality,
 }
 
+options = {"tol": 1e-20, "maxiter": 10000, "method": "SLSQP"}
+
 w_mvp_numerical = minimize(
-  x0=w_initial,
-  fun=objective_mvp,
-  jac=gradient_mvp,
-  constraints=constraints,
-  tol=options["tol"],
-  options={"maxiter": options["maxiter"]},
-  method=options["method"]
+    x0=w_initial,
+    fun=objective_mvp,
+    jac=gradient_mvp,
+    constraints=constraints,
+    tol=options["tol"],
+    options={"maxiter": options["maxiter"]},
+    method=options["method"],
 )
 
 np.allclose(w_mvp, w_mvp_numerical.x, atol=1e-3)
 
+
 def objective_efficient(w):
-    return 2*0.5*w.T @ sigma @ w-(1+mu) @ w
+    return 2 * 0.5 * w.T @ sigma @ w - (1 + mu) @ w
+
 
 def gradient_efficient(w):
-    return 2*sigma @ w-(1+mu)
+    return 2 * sigma @ w - (1 + mu)
+
 
 w_efficient_numerical = minimize(
-  x0=w_initial,
-  fun=objective_efficient,
-  jac=gradient_efficient,
-  constraints=constraints,
-  tol=options["tol"],
-  options={"maxiter": options["maxiter"]},
-  method=options["method"]
+    x0=w_initial,
+    fun=objective_efficient,
+    jac=gradient_efficient,
+    constraints=constraints,
+    tol=options["tol"],
+    options={"maxiter": options["maxiter"]},
+    method=options["method"],
 )
 
-np.allclose(w_efficient, w_efficient_numerical.x, atol = 1e-3)
+np.allclose(w_efficient, w_efficient_numerical.x, atol=1e-3)
 ```
 
 The result above shows that the numerical procedure indeed recovered the optimal weights for a scenario where we already know the analytic solution.
@@ -259,20 +305,22 @@ Next, we approach problems where no analytical solutions exist. First, we additi
 
 ```{python}
 w_no_short_sale = minimize(
-  x0=w_initial,
-  fun=objective_efficient,
-  jac=gradient_efficient,
-  constraints=constraints,
-  bounds=((0, None), )*n_industries,
-  tol=options["tol"],
-  options={"maxiter": options["maxiter"]},
-  method=options["method"]
+    x0=w_initial,
+    fun=objective_efficient,
+    jac=gradient_efficient,
+    constraints=constraints,
+    bounds=((0, None),) * n_industries,
+    tol=options["tol"],
+    options={"maxiter": options["maxiter"]},
+    method=options["method"],
 )
 
-weights_no_short_sale = pd.DataFrame({
-  "Industry": industry_returns.columns.tolist(),
-  "No short-sale": w_no_short_sale.x
-})
+weights_no_short_sale = pd.DataFrame(
+    {
+        "Industry": industry_returns.columns.tolist(),
+        "No short-sale": w_no_short_sale.x,
+    }
+)
 weights_no_short_sale.round(3)
 ```
 
@@ -285,37 +333,41 @@ The constraint enforces that a maximum of 50 percent of the allocated wealth can
 ```{python}
 reg_t = 1.5
 
+
 def inequality_constraint(w):
-    return reg_t-np.sum(np.abs(w))
+    return reg_t - np.sum(np.abs(w))
+
 
 def jacobian_inequality(w):
     return -np.sign(w)
 
+
 def objective_reg_t(w):
-    return -w @ (1+mu)+2*0.5*w.T @ sigma @ w
+    return -w @ (1 + mu) + 2 * 0.5 * w.T @ sigma @ w
+
 
 def gradient_reg_t(w):
-    return -(1+mu)+2*np.dot(sigma, w)
+    return -(1 + mu) + 2 * np.dot(sigma, w)
+
 
 constraints = (
-  {"type": "eq", "fun": equality_constraint, "jac": jacobian_equality},
-  {"type": "ineq", "fun": inequality_constraint, "jac": jacobian_inequality}
+    {"type": "eq", "fun": equality_constraint, "jac": jacobian_equality},
+    {"type": "ineq", "fun": inequality_constraint, "jac": jacobian_inequality},
 )
 
 w_reg_t = minimize(
-  x0=w_initial,
-  fun=objective_reg_t,
-  jac=gradient_reg_t,
-  constraints=constraints,
-  tol=options["tol"],
-  options={"maxiter": options["maxiter"]},
-  method=options["method"]
+    x0=w_initial,
+    fun=objective_reg_t,
+    jac=gradient_reg_t,
+    constraints=constraints,
+    tol=options["tol"],
+    options={"maxiter": options["maxiter"]},
+    method=options["method"],
 )
 
-weights_reg_t = pd.DataFrame({
-  "Industry": industry_returns.columns.tolist(),
-  "Regulation-T": w_reg_t.x
-})
+weights_reg_t = pd.DataFrame(
+    {"Industry": industry_returns.columns.tolist(), "Regulation-T": w_reg_t.x}
+)
 weights_reg_t.round(3)
 ```
 
@@ -327,24 +379,24 @@ weights_reg_t.round(3)
 #| fig-alt: "Title: Optimal allocations for different strategies. The figure shows the portfolio weights for the four different strategies across the ten different industries. The figures indicate extreme long and short positions for the efficient portfolio."
 #| fig-pos: "htb"
 weights = (weights_mvp
-  .merge(weights_efficient)
-  .merge(weights_no_short_sale)
-  .merge(weights_reg_t)
-  .melt(id_vars="Industry", var_name="Strategy", value_name="weights")
+    .merge(weights_efficient)
+    .merge(weights_no_short_sale)
+    .merge(weights_reg_t)
+    .melt(id_vars="Industry", var_name="Strategy", value_name="weights")
 )
 
 weights_figure = (
-  ggplot(
-    weights, 
-    aes(x="Industry", y="weights", fill="Strategy")
-  )
-  + geom_bar(stat="identity", position="dodge", width=0.7)
-  + coord_flip()
-  + labs(
-      y="Allocation weight", fill="",
-      title="Optimal allocations for different strategies"
+    ggplot(
+        weights, 
+        aes(x="Industry", y="weights", fill="Strategy")
     )
-  + scale_y_continuous(labels=percent_format())
+    + geom_bar(stat="identity", position="dodge", width=0.7)
+    + coord_flip()
+    + labs(
+        y="Allocation weight", fill="",
+        title="Optimal allocations for different strategies"
+        )
+    + scale_y_continuous(labels=percent_format())
 )
 weights_figure.show()
 ```
@@ -355,20 +407,28 @@ Before we move on, we want to propose a final allocation strategy, which reflect
 
 ```{python}
 def compute_efficient_weight_L1_TC(mu, sigma, gamma, beta, initial_weights):
-    """Compute efficient portfolio weights with L1 constraint."""       
-    
+    """Compute efficient portfolio weights with L1 constraint."""
+
     def objective(w):
-      return (gamma*0.5*w.T @ sigma @ w-(1+mu) @ w
-               +(beta/10000)/2*np.sum(np.abs(w-initial_weights)))
+        return (
+            gamma * 0.5 * w.T @ sigma @ w
+            - (1 + mu) @ w
+            + (beta / 10000) / 2 * np.sum(np.abs(w - initial_weights))
+        )
 
     def gradient(w):
-      return (-mu+gamma*sigma @ w 
-              +(beta/10000)*0.5*np.sign(w-initial_weights))
-      
-    constraints = (
-      {"type": "eq", "fun": equality_constraint, "jac": jacobian_equality}
-    )
-    
+        return (
+            -mu
+            + gamma * sigma @ w
+            + (beta / 10000) * 0.5 * np.sign(w - initial_weights)
+        )
+
+    constraints = {
+        "type": "eq",
+        "fun": equality_constraint,
+        "jac": jacobian_equality,
+    }
+
     result = minimize(
         x0=initial_weights,
         fun=objective,
@@ -376,9 +436,9 @@ def compute_efficient_weight_L1_TC(mu, sigma, gamma, beta, initial_weights):
         constraints=constraints,
         tol=options["tol"],
         options={"maxiter": options["maxiter"]},
-        method=options["method"]
+        method=options["method"],
     )
-    
+
     return result.x
 ```
 
@@ -391,7 +451,7 @@ The few lines below define the general setup. We consider 120 periods from the p
 
 ```{python}
 window_length = 120
-periods = industry_returns.shape[0]-window_length
+periods = industry_returns.shape[0] - window_length
 
 beta = 50
 gamma = 2
@@ -399,29 +459,30 @@ gamma = 2
 performance_values = np.empty((periods, 3))
 performance_values[:] = np.nan
 performance_values = {
-  "MV (TC)": performance_values.copy(), 
-  "Naive": performance_values.copy(), 
-  "MV": performance_values.copy()
+    "MV (TC)": performance_values.copy(),
+    "Naive": performance_values.copy(),
+    "MV": performance_values.copy(),
 }
 
 n_industries = industry_returns.shape[1]
-w_prev_1 = w_prev_2 = w_prev_3 = np.ones(n_industries)/n_industries
+w_prev_1 = w_prev_2 = w_prev_3 = np.ones(n_industries) / n_industries
 ```
 
 We also define two helper functions: One to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs. 
 
 ```{python}
 def adjust_weights(w, next_return):
-    w_prev = 1+w*next_return
-    return np.array(w_prev/np.sum(np.array(w_prev)))
+    w_prev = 1 + w * next_return
+    return np.array(w_prev / np.sum(np.array(w_prev)))
+
 
 def evaluate_performance(w, w_previous, next_return, beta=50):
-    """Calculate portfolio evaluation measures."""  
-    
+    """Calculate portfolio evaluation measures."""
+
     raw_return = np.dot(next_return, w)
-    turnover = np.sum(np.abs(w-w_previous))
-    net_return = raw_return-beta/10000*turnover
-    
+    turnover = np.sum(np.abs(w - w_previous))
+    net_return = raw_return - beta / 10000 * turnover
+
     return np.array([raw_return, turnover, net_return])
 ```
 
@@ -429,36 +490,37 @@ The following code chunk performs a rolling-window estimation, which we implemen
 
 ```{python}
 for p in range(periods):
-    returns_window = industry_returns.iloc[p:(p+window_length-1), :]
-    next_return = industry_returns.iloc[p+window_length, :]
+    returns_window = industry_returns.iloc[p : (p + window_length - 1), :]
+    next_return = industry_returns.iloc[p + window_length, :]
 
     sigma_window = np.array(returns_window.cov())
-    mu = 0*np.array(returns_window.mean())
+    mu = 0 * np.array(returns_window.mean())
 
     # Transaction-cost adjusted portfolio
     w_1 = compute_efficient_weight_L1_TC(
-      mu=mu, sigma=sigma_window, 
-      beta=beta, 
-      gamma=gamma, 
-      initial_weights=w_prev_1
+        mu=mu,
+        sigma=sigma_window,
+        beta=beta,
+        gamma=gamma,
+        initial_weights=w_prev_1,
     )
 
     performance_values["MV (TC)"][p, :] = evaluate_performance(
-      w_1, w_prev_1, next_return, beta=beta
+        w_1, w_prev_1, next_return, beta=beta
     )
     w_prev_1 = adjust_weights(w_1, next_return)
 
     # Naive portfolio
-    w_2 = np.ones(n_industries)/n_industries
+    w_2 = np.ones(n_industries) / n_industries
     performance_values["Naive"][p, :] = evaluate_performance(
-      w_2, w_prev_2, next_return
+        w_2, w_prev_2, next_return
     )
     w_prev_2 = adjust_weights(w_2, next_return)
 
     # Mean-variance efficient portfolio (w/o transaction costs)
     w_3 = compute_efficient_weight(sigma=sigma_window, mu=mu, gamma=gamma)
     performance_values["MV"][p, :] = evaluate_performance(
-      w_3, w_prev_3, next_return
+        w_3, w_prev_3, next_return
     )
     w_prev_3 = adjust_weights(w_3, next_return)
 ```
@@ -469,8 +531,8 @@ Finally, we get to the evaluation of the portfolio strategies *net-of-transactio
 performance = pd.DataFrame()
 for i in enumerate(performance_values.keys()):
     tmp_data = pd.DataFrame(
-      performance_values[i[1]], 
-      columns=["raw_return", "turnover", "net_return"]
+        performance_values[i[1]],
+        columns=["raw_return", "turnover", "net_return"],
     )
     tmp_data["strategy"] = i[1]
     performance = pd.concat([performance, tmp_data], axis=0)
@@ -478,17 +540,22 @@ for i in enumerate(performance_values.keys()):
 length_year = 12
 
 performance_table = (performance
-  .groupby("strategy")
-  .aggregate(
-    mean=("net_return", lambda x: length_year*100*x.mean()),
-    sd=("net_return", lambda x: np.sqrt(length_year)*100*x.std()),
-    sharpe_ratio=("net_return", lambda x: (
-      (length_year*100*x.mean())/(np.sqrt(length_year)*100*x.std()) 
-        if x.mean() > 0 else np.nan)
-    ),
-    turnover=("turnover", lambda x: 100*x.mean())
-  )
-  .reset_index()
+    .groupby("strategy")
+    .aggregate(
+        mean=("net_return", lambda x: length_year * 100 * x.mean()),
+        sd=("net_return", lambda x: np.sqrt(length_year) * 100 * x.std()),
+        sharpe_ratio=(
+            "net_return",
+            lambda x: (
+                (length_year * 100 * x.mean())
+                / (np.sqrt(length_year) * 100 * x.std())
+                if x.mean() > 0
+                else np.nan
+            ),
+        ),
+        turnover=("turnover", lambda x: 100 * x.mean()),
+    )
+    .reset_index()
 )
 performance_table.round(3)
 ``` 

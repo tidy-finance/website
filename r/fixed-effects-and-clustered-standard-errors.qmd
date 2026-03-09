@@ -30,25 +30,26 @@ Compared to previous chapters, we introduce `fixest` [@fixest] for the fixed eff
 
 ## Data Preparation
 
-We use CRSP and annual Compustat as data sources from our `SQLite`-database introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
+We use CRSP and annual Compustat as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{r}
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(gvkey, date, mktcap)
 
-compustat <- read_parquet("data-r/compustat.parquet") |>
+compustat_annual <- read_parquet("data-r/compustat_annual.parquet") |>
   select(datadate, gvkey, year, at, be, capx, oancf, txdb)
 ```
 
 The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.\index{Regression!Panel}
 
 ```{r}
-data_investment <- compustat |>
+data_investment <- compustat_annual |>
   mutate(date = floor_date(datadate, "month")) |>
-  left_join(compustat |>
-    select(gvkey, year, at_lag = at) |>
-    mutate(year = year + 1),
-  join_by(gvkey, year)
+  left_join(
+    compustat_annual |>
+      select(gvkey, year, at_lag = at) |>
+      mutate(year = year + 1),
+    join_by(gvkey, year)
   ) |>
   filter(at > 0, at_lag > 0) |>
   mutate(
@@ -57,9 +58,10 @@ data_investment <- compustat |>
   )
 
 data_investment <- data_investment |>
-  left_join(data_investment |>
-    select(gvkey, year, investment_lead = investment) |>
-    mutate(year = year - 1),
+  left_join(
+    data_investment |>
+      select(gvkey, year, investment_lead = investment) |>
+      mutate(year = year - 1),
     join_by(gvkey, year)
   )
 ```
@@ -138,7 +140,11 @@ model_ols
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data. 
 
 One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects*; i.e., model parameters that are fixed for specific groups [e.g., @Wooldridge2010]. In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
-$$ \text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},$$
+
+$$ 
+\text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
+$$
+
 where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms' investments as deviations from the firms' average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm's average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
 
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
@@ -174,8 +180,12 @@ Before we discuss the properties of our estimation errors, we want to point out 
 
 ```{r}
 etable(
-  model_ols, model_fe_firm, model_fe_firmyear,
-  coefstat = "tstat", digits = 3, digits.stats = 3
+  model_ols,
+  model_fe_firm,
+  model_fe_firmyear,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
 )
 ```
 
@@ -206,8 +216,12 @@ The table below shows the comparison of the different assumptions behind the sta
 
 ```{r}
 etable(
-  model_fe_firmyear, model_cluster_firm, model_cluster_firmyear,
-  coefstat = "tstat", digits = 3, digits.stats = 3
+  model_fe_firmyear,
+  model_cluster_firm,
+  model_cluster_firmyear,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
 )
 ```
 
