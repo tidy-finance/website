@@ -16,7 +16,6 @@ This is part two of two blog posts in which we announce and explain two major up
 1. `lobsteR` is a novel R package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package in the [first post](../hf-and-lobster/index.qmd).
 2. Seamless access to a massive, 5-second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
 
-
 ## 20 years of HF data
 
 In our paper "Market responses to a VIX shock", [Nikolaus Hautsch](https://homepage.univie.ac.at/nikolaus.hautsch/), [Albert J. Menkveld](https://albertjmenkveld.com/) and I investigated under the microscope how markets respond to a sudden increase in the VIX based on an exhaustive 2007-2025 sample of *all* NASDAQ trading messages for two exchange-traded funds (ETFs): SPY for the S&P 500 equity index and TLT for government bonds. 
@@ -36,7 +35,7 @@ For a meaningful analysis, we aggregate the order book messages for each ticker 
 - Depth (in million USD), measured as the number of posted shares in visible limit orders 5 basis points from the current best price on both sides of the order book. We take the time-weighted average depth during each interval to aggregate depth from message level into 5-second intervals. To make the values comparable across assets, we multiply the number of available shares with the rolling 12-month average midquote computed for each ticker. 
 - Amihud illiquidity measure, computed every five seconds as $ILLIQ_{t, \tau} := {\left|\log(p_{t, \tau}) - \log(p_{t, \tau - 1})\right|}/{V_{t,\tau}}$. $ILLIQ_{t, \tau}$ corresponds to the absolute midquote log return divided by trading volume $V_{t, \tau}$ executed on NASDAQ  (in million USD). High values indicate large price impacts per unit traded and are thus associated with illiquidity. In our empirical analysis, we set $ILLIQ_{t, \tau}$ to missing values for time stamps for which the trading volume is zero.  
 
-In order to process these massive amounts of data, we relied on one of Denmark's largest supercomputing facilities. In order to render follow-up research feasible, we decided to make the aggregated data accessible on [Huggingface](https://huggingface.co/datasets/voigtstefan/sp500), including a fast, easy and transparent connector via the `tidyfinance` library. 
+In order to process these massive amounts of data, we relied on one of Denmark's largest supercomputing facilities. In order to render follow-up research feasible, we decided to make the aggregated data accessible on [Hugging Face](https://huggingface.co/datasets/voigtstefan/sp500), including a fast, easy and transparent connector via the `tidyfinance` library. 
 
 All you need is the following call to `download_data`:
 
@@ -57,20 +56,24 @@ Note that we focus on a lot of data. In total, we record 324 central bank event 
 #| cache: true
 window_size <- 30
 
-central_bank_events <- read_csv("https://raw.githubusercontent.com/marekjarocinski/jkshocks_update_fed/main/shocks_fed_jk_t.csv",
-show_col_types  = FALSE) |>
+central_bank_events <- read_csv(
+  "https://raw.githubusercontent.com/marekjarocinski/jkshocks_update_fed/main/shocks_fed_jk_t.csv",
+  show_col_types = FALSE
+) |>
   transmute(
     time = start,
     start_ts = start - minutes(window_size),
     end_ts = start + minutes(window_size)
-  ) 
+  )
 
 set.seed(2026)
-data <- central_bank_events |> 
-  mutate(date = as.Date(time)) |> 
+data <- central_bank_events |>
+  mutate(date = as.Date(time)) |>
   filter(date > "2006-07-27") |>
   slice_sample(n = 50) |>
-  mutate(data = map(date, \(x) download_data("hf", start_date = x, end_date = x)))
+  mutate(
+    data = map(date, \(x) download_data("hf", start_date = x, end_date = x))
+  )
 ```
 
 Once we downloaded all the data for every FOMC announcement within our sample period, we can aggregate trading information around the event times. In the example below, we focus on quoted depth, trading volume and the bid-ask spreads. 
@@ -79,35 +82,40 @@ Once we downloaded all the data for every FOMC announcement within our sample pe
 hf_data <- data |>
   unnest(data) |>
   group_by(date) |>
-  mutate(open_midquote = first(midquote),
-      time_rel = as.numeric(difftime(ts, time, units = "mins")),
+  mutate(
+    open_midquote = first(midquote),
+    time_rel = as.numeric(difftime(ts, time, units = "mins")),
     depth = (depth5_bid + depth5_ask) * open_midquote / 1e6,
-    trading_volume = trading_volume / 1e6) |>
+    trading_volume = trading_volume / 1e6
+  ) |>
   ungroup() |>
   filter(ts >= start_ts, ts <= end_ts) |>
   select(time_rel, trading_volume, depth, spread) |>
-  pivot_longer(cols = -time_rel) |> 
+  pivot_longer(cols = -time_rel) |>
   group_by(time_rel, name) |>
   summarise(
-    across(value,
+    across(
+      value,
       list(
         mean = \(x) mean(x, na.rm = TRUE),
-        p5   = \(x) quantile(x, 0.05, na.rm = TRUE),
-        p95  = \(x) quantile(x, 0.95, na.rm = TRUE)
+        p5 = \(x) quantile(x, 0.05, na.rm = TRUE),
+        p95 = \(x) quantile(x, 0.95, na.rm = TRUE)
       ),
-      .names = "{.fn}" 
+      .names = "{.fn}"
     ),
     .groups = "drop"
-  ) |> 
- mutate(
+  ) |>
+  mutate(
     name = case_when(
       name == "trading_volume" ~ "Trading volume (mUSD)",
-      name == "spread"         ~ "Bid-ask spread (bp)",
-      name == "depth"          ~ "Quoted depth (mUSD)")
+      name == "spread" ~ "Bid-ask spread (bp)",
+      name == "depth" ~ "Quoted depth (mUSD)"
+    )
   )
 ```
 
 Finally, we illustrate how markets respond at high-frequencies to FOMC announcements around the exact time of announcement. 
+
 ```{r}
 hf_data |>
   ggplot(aes(x = time_rel, y = mean)) +

@@ -68,15 +68,18 @@ data_request <- request_query(
   symbol = "SPY",
   start_date = "2010-05-06",
   end_date = "2010-05-06",
-  level = 20)
+  level = 20
+)
 ```
 
 Next, we submit the requests to the interface of data provider LOBSTER. The processing of the request is done in the background on the servers of Lobster, so you can close the session after submitting the request. Once done, the requested data will be available in your account archive, ready to download.
 
 ```{r}
 #| eval: false
-request_submit(account_login = lobster_login,
-               request = data_request)
+request_submit(
+  account_login = lobster_login,
+  request = data_request
+)
 ```
 
 After submitting the request, LOBSTER will work on providing the order book snapshots. Depending on the number of messages to process,
@@ -93,8 +96,8 @@ When downloading, the data is unzipped automatically (this can be omitted using 
 #| eval: false
 data_download(
   requested_data = lobster_archive,
-  account_login = lobster_login,
-  )
+  account_login = lobster_login
+)
 ```
 
 ## Clean and organize `lobsteR` data
@@ -140,7 +143,6 @@ I read the `.csv` files with `data.table::fread` rather than a tidyverse reader 
 
 ```{r}
 #| eval: false
-
 library(data.table)
 
 orderbook_raw <- fread(
@@ -176,14 +178,12 @@ orderbook_raw[,
   .SDcols = ask_price_cols
 ]
 orderbook_raw[, midquote := (ask_price_1 / 2 + bid_price_1 / 2)]
-
 ```
 
 A natural question is: *how many shares can I buy (or sell) with a market order before the marginal execution price is x basis points away from the current best price?* The `compute_depth` helper below answers this for any side and basis-point threshold.
 
 ```{r}
 #| eval: false
-
 compute_depth <- function(df, side = "bid", bp = 0) {
   mat <- as.matrix(df)
 
@@ -217,27 +217,24 @@ orderbook_aggregated <- orderbook_raw[, .(
       depth0_ask = ask_size_1,
       depth5_ask,
       depth5_bid    
-      )]
-
+    )]
 ```
 
 Next, we read the message file, which records every change to the order book. NASDAQ's regular trading session runs from 9:30am to 4pm, corresponding to 34,200 to 57,600 seconds after midnight.
 
 ```{r}
 #| eval: false
-
 messages_raw <- fread(
-    message_file,
-    select = 1:6,
-    col.names = c("ts", "type", "order_id", "m_size", "m_price", "direction")
-  )
+  message_file,
+  select = 1:6,
+  col.names = c("ts", "type", "order_id", "m_size", "m_price", "direction")
+)
 
 messages_raw[, m_price := m_price / 10000]
 ```
 
 ```{r}
 #| eval: false
-
 orderbook <- cbind(messages_raw, orderbook_aggregated)
 
 market_open = 34200
@@ -245,14 +242,12 @@ market_close = 57600
 
 orderbook <- orderbook[ts >= market_open & ts <= market_close & !crossed_quotes]
 orderbook[, crossed_quotes := NULL]
-
 ```
 
 Cleaning LOBSTER data requires a few targeted steps. First, we remove observations that fall within trading halt periods — type-7 messages signal the start and end of each halt, and any events between them should be excluded.
 
 ```{r}
 #| eval: false
-
 # Step 1: Detect trading halt timestamps
 halt_ts <- orderbook[
   type == 7 & direction == -1 & m_price %in% c(-1 / 10000, 1 / 10000),
@@ -273,14 +268,12 @@ if (length(halt_ts) >= 2) {
     ]
   }
 }
-
 ```
 
 Opening and closing auction messages (type 6) can overlap with regular trading hours and appear in the NASDAQ message feed. The next filter trims observations to the continuous trading window and drops type-6 and type-7 messages entirely.
 
 ```{r}
 #| eval: false
-
 # Step 2: Identify auction boundaries
 opening_auction <- orderbook[type == 6 & order_id == -1, ts]
 closing_auction <- orderbook[type == 6 & order_id == -2, ts]
@@ -295,14 +288,12 @@ if (length(closing_auction) != 1) {
 # Step 3: Filter by auction window and remove types 6 and 7
 orderbook <- orderbook[ts > opening_auction & ts < closing_auction]
 orderbook <- orderbook[!(type %in% c(6, 7))]
-
 ```
 
 Large trades that sweep multiple order book levels are recorded as several messages sharing an identical timestamp. We aggregate these into single trade records and infer trade direction by comparing the execution price to the lagged midquote.
 
 ```{r}
 #| eval: false
-
 # Step 4: Extract trades
 trades <- orderbook[type %in% c(4, 5), .SD, .SDcols = ts:midquote]
 
@@ -330,7 +321,6 @@ Finally, I aggregate the trades and merge with the last snapshot of each group.
 
 ```{r}
 #| eval: false
-
 # Step 8: Aggregate trades
 trade_aggregated <- trades[,
   .(
@@ -407,13 +397,14 @@ orderbook_aggregated |> write_parquet(file_name)
 ```{r}
 #| echo: false
 library(arrow)
-orderbook_aggregated <- read_parquet("blog/hf-and-lobster/processed_SPY_2010-05-06.parquet")
 
+orderbook_aggregated <- read_parquet(
+  "blog/hf-and-lobster/processed_SPY_2010-05-06.parquet"
+)
 date <- as.Date("2010-05-06")
 ```
 
 So, what happened on May 6th, 2010? In a matter of minutes, stock indices including the S&P 500, Dow Jones Industrial Average, and Nasdaq Composite collapsed and rebounded. The chart below shows how quoted depth within 5 basis points of the midquote suddenly vanished (in millions of USD at the opening price), spreads skyrocketed, and the SPY midquote plummeted by roughly 9%. Prices recovered quickly, but depth remained alarmingly thin.
-
 
 ```{r}
 opening_price <- orderbook_aggregated |> head(1) |> pull(midquote)
@@ -433,5 +424,4 @@ ts_interval<=as.POSIXct(glue::glue("{date} 15:00:00"), tz = "UTC")) |>
 ```
 
 The cleaning pipeline above transforms raw LOBSTER files into a compact, analysis-ready dataset. In the [companion blog post](../hf-and-hugging-face/index.qmd), we describe how we applied this pipeline to the full 2007--2025 LOBSTER history and made the resulting 5-second aggregated data for SPY freely available via `tidyfinance::download_data("hf")`.
-
 
