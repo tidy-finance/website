@@ -1,13 +1,14 @@
 ---
 title: "lobsteR package and high-frequency data"
 author: Stefan Voigt
-date: 2025-02-01
+date: 2025-03-15
 description: Introducing the lobsteR package and tidy cleaning procedures in R for LOBSTER high-frequency data
 categories: 
   - R
   - Data
   - Market microstructure
 image: logo.png
+image-alt: "Logo of the lobsteR R package for downloading and cleaning LOBSTER high-frequency order book data"
 execute: 
   warning: false
 ---
@@ -17,17 +18,16 @@ Recently, [Nikolaus Hautsch](https://homepage.univie.ac.at/nikolaus.hautsch/), [
 
 As part of our research, we developed a novel R package, [lobsteR](https://voigtstefan.github.io/lobsteR/), to request, download, and clean LOBSTER data. The package is now available on CRAN and GitHub. We also made cleaned 5-second trading and liquidity information on SPY available for everyone to use.
 
-This is part one of two blog posts in which we announce and explain these two major updates to the [tidy-finance.org](www.tidy-finance.org) ecosystem.
+This is part one of two blog posts in which we announce and explain these two major updates to the [tidy-finance.org](https://tidy-finance.org) ecosystem.
 
 1. `lobsteR` is a novel R package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package. 
 2. Seamless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
 
-To connect the do
-ts between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [LOBSTER](https://lobsterdata.com/). 
+To connect the dots between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [LOBSTER](https://lobsterdata.com/). 
 
 ## The `lobsteR` package
 
-The goal of [lobsteR](https://voigtstefan.github.io/lobsteR/) is to provide a tidy framework to request data from lobsterdata.com, to download, unzip, and clean the data. The package focuses on the core functionalities required to get [LOBSTER](lobsterdata.com) data ready fast. 
+The goal of [lobsteR](https://voigtstefan.github.io/lobsteR/) is to provide a tidy framework to request data from [LOBSTER](https://lobsterdata.com/), to download, unzip, and clean the data. The package focuses on the core functionalities required to get LOBSTER data ready fast.
 
 You can install `lobsteR` from CRAN with:
 ```{r}
@@ -46,9 +46,9 @@ pak::pak("voigtstefan/lobsteR")
 library(lobsteR)
 ```
 
-[LOBSTER](lobsterdata.com) reconstructs the complete history of limit order book snapshots from NASDAQ exchange data for all assets traded on the exchange, starting from June 27, 2006. For each trading day, [LOBSTER](lobsterdata.com) delivers two files: a message file with nanosecond-timestamped records of every order book event, and an order book snapshot file capturing the state of the book after each event. This level of granularity offers unprecedented insights into the inner workings of some of the world's most actively traded assets.
+[LOBSTER](https://lobsterdata.com/) reconstructs the complete history of limit order book snapshots from NASDAQ exchange data for all assets traded on the exchange, starting from June 27, 2006. For each trading day, [LOBSTER](https://lobsterdata.com/) delivers two files: a message file with nanosecond-timestamped records of every order book event, and an order book snapshot file capturing the state of the book after each event. This level of granularity offers unprecedented insights into the inner workings of some of the world's most actively traded assets.
 
-With `lobsteR` you can connect to [LOBSTER](lobsterdata.com) using your own credentials.
+With `lobsteR` you can connect to [LOBSTER](https://lobsterdata.com/) using your own credentials.
 
 ```{r}
 #| eval: false
@@ -133,7 +133,7 @@ level <- available_files |> head(1) |> pull(level)
 date <-  available_files |> head(1) |> pull(date)
 ```
 
-I read the `.csv` files with `data.table` rather than a tidyverse reader — not because I am a particularly big fan of `data.table`, but because `fread` is substantially faster for the large files LOBSTER produces. Two data issues need to be resolved upfront:
+I read the `.csv` files with `data.table::fread` rather than a tidyverse reader because `fread` is substantially faster for the large files LOBSTER produces. Two data issues need to be resolved upfront:
 
 1. LOBSTER reports all prices as integer Dollar price times 10,000.
 2. Unoccupied price levels (when the requested depth exceeds the actual order book depth) are filled with sentinel values and should be set to `NA`.
@@ -364,7 +364,7 @@ orderbook[, `:=`(
 )]
 ```
 
-After cleaning, more than 11 million observations remain for this single trading day. To visualize the flash crash, I aggregate to a 1-second grid: each message is assigned to a `ts_minute` interval and summary statistics — midquote, spread, depth, and volume — are computed per interval, time-weighted by the duration each state persisted (`ts_latency`).
+After cleaning, more than 11 million observations remain for this single trading day. To visualize the flash crash, I aggregate to a 1-second grid: each message is assigned to a `ts_interval` and summary statistics — midquote, spread, depth, and volume — are computed per interval, time-weighted by the duration each state persisted (`ts_latency`).
 
 ```{r}
 #| eval: false
@@ -378,7 +378,7 @@ orderbook[, `:=`(
     as.numeric(shift(ts, type = "lead")) - as.numeric(ts),
     0
   ),
-  ts_minute = ceiling_date(
+  ts_interval = ceiling_date(
     as.POSIXct(ts, origin = date, tz = "UTC"),
     aggregation_frequency
   ) # messages from 10:30:00 - 10:34:59.xx belong into 10:35:00
@@ -397,7 +397,7 @@ orderbook_aggregated <- orderbook[,
     depth5_ask = weighted.mean(depth5_ask, ts_latency, na.rm = TRUE),
     spread = weighted.mean(spread, ts_latency, na.rm = TRUE)
   ),
-  by = ts_minute
+  by = ts_interval
 ]
 
 file_name <- glue::glue("processed_{ticker}_{date}.parquet")
@@ -418,22 +418,20 @@ So, what happened on May 6th, 2010? In a matter of minutes, stock indices includ
 ```{r}
 opening_price <- orderbook_aggregated |> head(1) |> pull(midquote)
 
-orderbook_aggregated |> 
-  filter(ts_minute>=as.POSIXct(glue::glue("{date} 14:35:00"), tz = "UTC"),
-ts_minute<=as.POSIXct(glue::glue("{date} 15:00:00"), tz = "UTC")) |>
+orderbook_aggregated |>
+  filter(ts_interval>=as.POSIXct(glue::glue("{date} 14:35:00"), tz = "UTC"),
+ts_interval<=as.POSIXct(glue::glue("{date} 15:00:00"), tz = "UTC")) |>
   as_tibble() |>
-  mutate(across(contains("depth5"), ~.x * opening_price / 1000000)) |>  
-  select(ts = ts_minute, `Midquote (USD)` = midquote, `Spread (bp)` = spread, `Depth bid (mUSD)` = depth5_bid, `Depth ask (mUSD)` = depth5_ask) |>
+  mutate(across(contains("depth5"), ~.x * opening_price / 1000000)) |>
+  select(ts = ts_interval, `Midquote (USD)` = midquote, `Spread (bp)` = spread, `Depth bid (mUSD)` = depth5_bid, `Depth ask (mUSD)` = depth5_ask) |>
   pivot_longer(-ts) |>
-  ggplot(aes(x = ts, y = value)) + 
+  ggplot(aes(x = ts, y = value)) +
   geom_line() +
   facet_wrap(name~., ncol = 1, scales ="free_y") +
   theme_minimal() +
   labs(x = NULL, y = NULL, title = "SPY trading and order book activity on May 6th, 2010")
 ```
 
-
-
-
+The cleaning pipeline above transforms raw LOBSTER files into a compact, analysis-ready dataset. In the [companion blog post](../hf-and-hugging-face/index.qmd), we describe how we applied this pipeline to the full 2007--2025 LOBSTER history and made the resulting 5-second aggregated data for SPY freely available via `tidyfinance::download_data("hf")`.
 
 
