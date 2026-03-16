@@ -318,7 +318,7 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#downloading-data" id="toc-downloading-data" class="nav-link active" data-scroll-target="#downloading-data">Downloading Data</a></li>
+  <li><a href="#loading-data" id="toc-loading-data" class="nav-link active" data-scroll-target="#loading-data">Loading Data</a></li>
   <li><a href="#computing-returns" id="toc-computing-returns" class="nav-link" data-scroll-target="#computing-returns">Computing Returns</a></li>
   <li><a href="#scaling-up-the-analysis" id="toc-scaling-up-the-analysis" class="nav-link" data-scroll-target="#scaling-up-the-analysis">Scaling Up the Analysis</a></li>
   <li><a href="#different-frequencies" id="toc-different-frequencies" class="nav-link" data-scroll-target="#different-frequencies">Different Frequencies</a></li>
@@ -363,76 +363,33 @@ Note
 <p>You are reading the work-in-progress version of <strong>Tidy Finance with Stata</strong>. If you discover an error or have a suggestion, please consider opening an <a href="https://github.com/tidy-finance/website/issues">issue</a>.</p>
 </div>
 </div>
-<p>The main aim of this chapter is to familiarize yourself with Stata for working with stock market data. We focus on downloading and visualizing stock data from Yahoo Finance.</p>
-<p>At the start of each session, we ensure we have the required Stata packages installed. Throughout this chapter, we use several user-written commands that extend Stata’s functionality for financial data analysis.</p>
-<p>You typically have to install a package once before you can use it. In case you have not done this yet, you can install packages from SSC or GitHub. For downloading stock data from Yahoo Finance, we’ll use a combination of Stata’s Python integration and potentially user-written commands.</p>
-<div id="b2f532e0" class="cell" data-execution_count="1">
+<p>The main aim of this chapter is to familiarize yourself with Stata for working with stock market data. We focus on analyzing and visualizing stock data from Yahoo Finance.</p>
+<p>At the start of each Stata script, we usually want to clear the memory and set more off …</p>
+<div id="81735228" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">clear</span> <span class="ot">all</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">set</span> <span class="kw">more</span> <span class="kw">off</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <style>div.jp-Notebook .datagrid-container {min-height: 448px; }</style>
 </div>
 </div>
-<section id="downloading-data" class="level2">
-<h2 class="anchored" data-anchor-id="downloading-data">Downloading Data</h2>
-<p>We first download daily prices for one stock symbol, e.g., the Apple stock (<em>AAPL</em>), directly from the data provider Yahoo Finance. Since Stata doesn’t have a native Yahoo Finance connector, we have several options: use Stata’s Python integration, use a user-written command, or import pre-downloaded CSV files.</p>
-<p>In the following code, we demonstrate using Stata’s Python integration to download data. We request daily data from the beginning of 2000 to the end of 2024, which is a period of more than 20 years.</p>
-<div id="dd18413a" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>python:</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>import pandas <span class="kw">as</span> pd</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>import numpy <span class="kw">as</span> np</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>import tidyfinance <span class="kw">as</span> tf</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>from sfi import Data, Macro</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>prices = tf.download_data(</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  domain=<span class="st">"stock_prices"</span>, </span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  symbols=<span class="st">"AAPL"</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  start_date=<span class="st">"2000-01-01"</span>, </span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  end_date=<span class="st">"2024-12-31"</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>n = len(prices)</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>Data.setObsTotal(n)</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>Data.addVarStr(<span class="st">"date_str"</span>, 10)</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>Data.addVarStr(<span class="st">"symbol"</span>, 5)</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"open"</span>)</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"high"</span>)</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"low"</span>)</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"close"</span>)</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"volume"</span>)</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"adjusted_close"</span>)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"date_str"</span>, i, str(prices['date'].iloc[i].<span class="fu">date</span>()))</span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"symbol"</span>, i, str(prices['symbol'].iloc[i]))</span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"open"</span>, i, <span class="kw">float</span>(prices['open'].iloc[i]))</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"high"</span>, i, <span class="kw">float</span>(prices['high'].iloc[i]))</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"low"</span>, i, <span class="kw">float</span>(prices['low'].iloc[i]))</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"close"</span>, i, <span class="kw">float</span>(prices['close'].iloc[i]))</span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"volume"</span>, i, <span class="kw">float</span>(prices['volume'].iloc[i]))</span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"adjusted_close"</span>, i, <span class="kw">float</span>(prices['adjusted_close'].iloc[i]))</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="fu">date</span> = <span class="fu">date</span>(date_str, <span class="st">"YMD"</span>)</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="kw">format</span> <span class="fu">date</span> %td</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a><span class="kw">drop</span> date_str</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="kw">order</span> symbol <span class="fu">date</span> open high low <span class="kw">close</span> adjusted_close volume</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a><span class="kw">describe</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section id="loading-data" class="level2">
+<h2 class="anchored" data-anchor-id="loading-data">Loading Data</h2>
+<p>Stata unforunately has limited capabilities to download data directyl from online sources. We rather use the existing tidyfinance R package to download data and store it as DTA files.</p>
+<div id="a634a6cd" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/prices_daily_aapl.dta"</span>, <span class="kw">replace</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="kw">order</span> symbol <span class="fu">date</span> open high low <span class="kw">close</span> adjusted_close volume</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="kw">describe</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
-
-Contains data
+Contains data from data-stata/prices_daily_aapl.dta
  Observations:         6,288                  
-    Variables:             8                  
+    Variables:             8                  16 Mar 2026 12:06
 -------------------------------------------------------------------------------
 Variable      Storage   Display    Value
     name         type    format    label      Variable label
 -------------------------------------------------------------------------------
-symbol          str5    %9s                   
-date            float   %td                   
+symbol          str4    %-9s                  
+date            double  %td                   
 open            double  %10.0g                
 high            double  %10.0g                
 low             double  %10.0g                
@@ -440,8 +397,7 @@ close           double  %10.0g
 adjusted_close  double  %10.0g                
 volume          double  %10.0g                
 -------------------------------------------------------------------------------
-Sorted by: 
-     Note: Dataset has changed since last saved.</code></pre>
+Sorted by: </code></pre>
 </div>
 </div>
 <p>The downloaded data contains daily market data with self-explanatory columns: <code>symbol</code>, <code>date</code>, the daily <code>volume</code> (in the number of traded shares), the market prices at the <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>, and the <code>adjusted_close</code> price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.</p>
@@ -467,24 +423,23 @@ Figure&nbsp;1: Prices are in USD, adjusted for dividend payments and stock split
 <section id="computing-returns" class="level2">
 <h2 class="anchored" data-anchor-id="computing-returns">Computing Returns</h2>
 <p>Instead of analyzing prices, we compute daily returns defined as <span class="math inline">\(r_t = p_t / p_{t-1} - 1\)</span>, where <span class="math inline">\(p_t\)</span> is the adjusted price at the end of day <span class="math inline">\(t\)</span>. In that context, indexing with <code>[_n-1]</code> is helpful by returning the previous value.</p>
-<div id="b3436cc1" class="cell" data-execution_count="4">
+<div id="3b595068" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">sort</span> <span class="fu">date</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> ret = adjusted_close / adjusted_close[<span class="dt">_n</span>-1] - 1</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> symbol <span class="fu">date</span> ret</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="kw">describe</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">describe</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1 missing value generated)
 
-Contains data
+Contains data from data-stata/prices_daily_aapl.dta
  Observations:         6,288                  
-    Variables:             3                  
+    Variables:             3                  16 Mar 2026 12:06
 -------------------------------------------------------------------------------
 Variable      Storage   Display    Value
     name         type    format    label      Variable label
 -------------------------------------------------------------------------------
-symbol          str5    %9s                   
-date            float   %td                   
+symbol          str4    %-9s                  
+date            double  %td                   
 ret             float   %9.0g                 
 -------------------------------------------------------------------------------
 Sorted by: date
@@ -493,7 +448,7 @@ Sorted by: date
 </div>
 <p>The resulting dataset has three columns, the last of which contains the daily returns (<code>ret</code>). Note that the first entry naturally contains a missing value (<code>.</code>) because there is no previous price. Obviously, the use of <code>[_n-1]</code> would be meaningless if the time series is not ordered by ascending dates. The command <code>sort</code> provides a convenient way to order observations in the correct way for our application. If you want to order observations by descending values, you could use <code>gsort -ret</code>. Always check that your data has the desired structure before using lag operators.</p>
 <p>For the upcoming examples, we remove missing values as these would require separate treatment for many applications. For example, missing values can affect sums and averages by reducing the number of valid data points if not properly accounted for. In general, always ensure you understand why missing values occur and carefully examine if you can simply get rid of these observations.</p>
-<div id="d16e6f51" class="cell" data-execution_count="5">
+<div id="e8d55327" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">drop</span> <span class="kw">if</span> <span class="fu">missing</span>(ret)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1 observation deleted)</code></pre>
@@ -510,7 +465,7 @@ Sorted by: date
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">""</span>) <span class="co">///</span></span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">xlabel</span>(, <span class="kw">format</span>(%9.2f))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>(bin=100, start=-.51869202, width=.00657741)</code></pre>
+<pre><code>(bin=100, start=-.51869208, width=.00657742)</code></pre>
 </div>
 <div class="cell-output cell-output-display">
 <div id="fig-101" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Distribution of daily Apple stock returns in percent. The figure shows a histogram of daily returns. The range indicates a few large negative values, while the remaining returns are distributed around zero. The vertical line indicates that the historical five percent quantile of daily returns was around negative three percent.">
@@ -526,29 +481,29 @@ Figure&nbsp;2: The dotted vertical line indicates the historical five percent qu
 </div>
 </div>
 <p>Here, <code>bins(100)</code> determines the number of bins used in the illustration and, hence, implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the <code>xline()</code> option to add a dashed line that indicates the historical five percent quantile of the daily returns. Before proceeding with <em>any</em> data, a typical task is to compute and analyze the summary statistics for the main variables of interest.</p>
-<div id="16897a4c" class="cell" data-execution_count="7">
+<div id="96a66781" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">summarize</span> ret, <span class="kw">detail</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
                              ret
 -------------------------------------------------------------
       Percentiles      Smallest
- 1%    -.0625777       -.518692
- 5%     -.035905      -.1791949
-10%    -.0244798      -.1717124       Obs               6,287
-25%    -.0098355       -.158088       Sum of wgt.       6,287
+ 1%     -.062578      -.5186921
+ 5%    -.0359051      -.1791951
+10%    -.0244799      -.1717128       Obs               6,287
+25%    -.0098359       -.158088       Sum of wgt.       6,287
 
-50%     .0009476                      Mean           .0012173
+50%     .0009477                      Mean           .0012173
                         Largest       Std. dev.      .0244037
-75%     .0126837       .1285666
-90%     .0265984       .1315727       Variance       .0005955
-95%     .0385078       .1368585       Skewness      -1.469063
-99%     .0678064       .1390493       Kurtosis       39.62447</code></pre>
+75%     .0126839        .128567
+90%     .0265981       .1315726       Variance       .0005955
+95%     .0385079       .1368582       Skewness      -1.469064
+99%     .0678065       .1390498       Kurtosis       39.62449</code></pre>
 </div>
 </div>
 <p>We see that the maximum <em>daily</em> return was substantial. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.</p>
 <p>You can also compute these summary statistics for each year individually by using <code>bysort</code>. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the year variable. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.</p>
-<div id="ab6fc364" class="cell" data-execution_count="8">
+<div id="d9d96a9b" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="fu">year</span> = <span class="fu">year</span>(<span class="fu">date</span>)</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="kw">preserve</span></span>
@@ -566,35 +521,35 @@ Figure&nbsp;2: The dotted vertical line indicates the historical five percent qu
   +----------------------------------------------------+
   | year   daily_~an   daily_sd   daily_min   daily_~x |
   |----------------------------------------------------|
-  | 2000   -.0034569   .0549403    -.518692   .1368585 |
-  | 2001    .0023291   .0393377   -.1717124   .1285666 |
-  | 2002   -.0012124   .0305259   -.1503716   .0845584 |
-  | 2003    .0018569   .0233596     -.08142   .1134915 |
-  | 2004    .0047023   .0254697   -.0557849   .1315727 |
+  | 2000   -.0034569   .0549403   -.5186921   .1368582 |
+  | 2001    .0023291   .0393377   -.1717128    .128567 |
+  | 2002   -.0012124   .0305259    -.150372   .0845585 |
+  | 2003    .0018569   .0233595   -.0814203    .113492 |
+  | 2004    .0047023   .0254697   -.0557848   .1315726 |
   |----------------------------------------------------|
-  | 2005      .00349   .0244782   -.0921051   .0911673 |
-  | 2006    .0009495   .0242648   -.0633266   .1182997 |
-  | 2007     .003664   .0237573   -.0702059   .1053589 |
-  | 2008   -.0026458   .0366656   -.1791949   .1390493 |
-  | 2009    .0038188   .0213688   -.0501639   .0675916 |
+  | 2005      .00349   .0244782    -.092105   .0911674 |
+  | 2006    .0009495   .0242648   -.0633261   .1182992 |
+  | 2007     .003664   .0237574   -.0702063   .1053591 |
+  | 2008   -.0026458   .0366656   -.1791951   .1390498 |
+  | 2009    .0038188   .0213689   -.0501642   .0675917 |
   |----------------------------------------------------|
-  | 2010    .0018318   .0168564   -.0495987    .076868 |
-  | 2011    .0010398   .0165394   -.0559394   .0588885 |
-  | 2012    .0012987   .0185663   -.0643569   .0887412 |
-  | 2013    .0004717   .0179865   -.1235576   .0513614 |
-  | 2014    .0014465   .0136429   -.0799275   .0819824 |
+  | 2010    .0018318   .0168563   -.0495988   .0768675 |
+  | 2011    .0010398   .0165395   -.0559395   .0588886 |
+  | 2012    .0012987   .0185663   -.0643566   .0887411 |
+  | 2013    .0004717   .0179865   -.1235579   .0513614 |
+  | 2014    .0014465   .0136429   -.0799268   .0819821 |
   |----------------------------------------------------|
-  | 2015    .0000199   .0168429   -.0611631   .0573546 |
-  | 2016    .0005747   .0147017   -.0657066   .0649628 |
-  | 2017    .0016366   .0110906   -.0387768   .0609807 |
-  | 2018   -.0000573   .0181058   -.0663306   .0704219 |
-  | 2019    .0026646   .0164656   -.0996073   .0683342 |
+  | 2015    .0000199   .0168429   -.0611628   .0573551 |
+  | 2016    .0005747   .0147017   -.0657062   .0649634 |
+  | 2017    .0016366   .0110905   -.0387769   .0609805 |
+  | 2018   -.0000573   .0181058   -.0663306   .0704216 |
+  | 2019    .0026646   .0164656   -.0996077   .0683344 |
   |----------------------------------------------------|
-  | 2020    .0028069   .0293865   -.1286469   .1198083 |
-  | 2021    .0013057   .0158127   -.0416734   .0538514 |
-  | 2022   -.0009696   .0224866   -.0586793   .0889746 |
-  | 2023     .001678   .0127879     -.04802   .0469269 |
-  | 2024    .0011971   .0143064   -.0481671   .0726491 |
+  | 2020    .0028069   .0293866    -.128647   .1198084 |
+  | 2021    .0013057   .0158127   -.0416737    .053851 |
+  | 2022   -.0009696   .0224866   -.0586795   .0889745 |
+  | 2023     .001678   .0127879   -.0480201    .046927 |
+  | 2024    .0011971   .0143064   -.0481669   .0726491 |
   +----------------------------------------------------+
 
 
@@ -606,88 +561,17 @@ Figure&nbsp;2: The dotted vertical line indicates the historical five percent qu
 <h2 class="anchored" data-anchor-id="scaling-up-the-analysis">Scaling Up the Analysis</h2>
 <p>As a next step, we generalize the previous code so that all computations can handle an arbitrary number of symbols (e.g., all constituents of an index). Following tidy principles, it is quite easy to download the data, plot the price time series, and tabulate the summary statistics for an arbitrary number of assets.</p>
 <p>This is where the power of Stata’s data management starts: Panel data structures make it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any number of symbols, e.g., all current constituents of the Dow Jones Industrial Average index, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once.</p>
-<div id="fa9a1363" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">clear</span> <span class="ot">all</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>python:</span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>import pandas <span class="kw">as</span> pd</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>import tidyfinance <span class="kw">as</span> tf</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>from sfi import Data</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>symbols = tf.download_data(</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  domain=<span class="st">"constituents"</span>, </span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">index</span>=<span class="st">"Dow Jones Industrial Average"</span></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>prices = tf.download_data(</span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>  domain=<span class="st">"stock_prices"</span>,</span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>  symbols=symbols['symbol'].tolist(),</span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>  start_date=<span class="st">"2000-01-01"</span>,</span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>  end_date=<span class="st">"2023-12-31"</span></span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>n = len(prices)</span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>Data.setObsTotal(n)</span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>Data.addVarStr(<span class="st">"symbol"</span>, 10)</span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a>Data.addVarStr(<span class="st">"date_str"</span>, 10)</span>
-<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"open"</span>)</span>
-<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"high"</span>)</span>
-<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"low"</span>)</span>
-<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"close"</span>)</span>
-<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"volume"</span>)</span>
-<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>Data.addVarDouble(<span class="st">"adjusted_close"</span>)</span>
-<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a><span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(n):</span>
-<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"symbol"</span>, i, str(prices['symbol'].iloc[i]))</span>
-<span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"date_str"</span>, i, str(prices['date'].iloc[i].<span class="fu">date</span>()))</span>
-<span id="cb15-35"><a href="#cb15-35" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"open"</span>, i, <span class="kw">float</span>(prices['open'].iloc[i]))</span>
-<span id="cb15-36"><a href="#cb15-36" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"high"</span>, i, <span class="kw">float</span>(prices['high'].iloc[i]))</span>
-<span id="cb15-37"><a href="#cb15-37" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"low"</span>, i, <span class="kw">float</span>(prices['low'].iloc[i]))</span>
-<span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"close"</span>, i, <span class="kw">float</span>(prices['close'].iloc[i]))</span>
-<span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"volume"</span>, i, <span class="kw">float</span>(prices['volume'].iloc[i]))</span>
-<span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a>    Data.storeAt(<span class="st">"adjusted_close"</span>, i, <span class="kw">float</span>(prices['adjusted_close'].iloc[i]))</span>
-<span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-42"><a href="#cb15-42" aria-hidden="true" tabindex="-1"></a><span class="kw">end</span></span>
-<span id="cb15-43"><a href="#cb15-43" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-44"><a href="#cb15-44" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="fu">date</span> = <span class="fu">date</span>(date_str, <span class="st">"YMD"</span>)</span>
-<span id="cb15-45"><a href="#cb15-45" aria-hidden="true" tabindex="-1"></a><span class="kw">format</span> <span class="fu">date</span> %td</span>
-<span id="cb15-46"><a href="#cb15-46" aria-hidden="true" tabindex="-1"></a><span class="kw">drop</span> date_str</span>
-<span id="cb15-47"><a href="#cb15-47" aria-hidden="true" tabindex="-1"></a><span class="kw">order</span> symbol <span class="fu">date</span> open high low <span class="kw">close</span> adjusted_close volume</span>
-<span id="cb15-48"><a href="#cb15-48" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="st">"data-stata/prices_daily.dta"</span>, <span class="kw">replace</span></span>
-<span id="cb15-49"><a href="#cb15-49" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-50"><a href="#cb15-50" aria-hidden="true" tabindex="-1"></a><span class="kw">describe</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-file data-stata/prices_daily.dta saved
-
-Contains data from data-stata/prices_daily.dta
- Observations:       177,925                  
-    Variables:             8                  3 Feb 2026 20:36
--------------------------------------------------------------------------------
-Variable      Storage   Display    Value
-    name         type    format    label      Variable label
--------------------------------------------------------------------------------
-symbol          str10   %10s                  
-date            float   %td                   
-open            double  %10.0g                
-high            double  %10.0g                
-low             double  %10.0g                
-close           double  %10.0g                
-adjusted_close  double  %10.0g                
-volume          double  %10.0g                
--------------------------------------------------------------------------------
-Sorted by: </code></pre>
+<p>We again import data that we have downloaded before.</p>
+<div id="c347e0bd" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/prices_daily.dta"</span>, <span class="kw">replace</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-</div>
-<p>Conveniently, <code>tidyfinance</code> provides the functionality to get all stock prices from an index for a specific point in time with a single call.</p>
 <p>The resulting dataset contains daily observations for all different stocks in the Dow Jones index. <a href="#fig-102" class="quarto-xref">Figure&nbsp;3</a> illustrates the time series of the downloaded <em>adjusted</em> prices for each of the constituents of the Dow index overlayed on a single plot.</p>
 <div id="cell-fig-102" class="cell" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">encode</span> symbol, <span class="kw">gen</span>(symbol_id)</span>
-<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>xtset symbol_id <span class="fu">date</span></span>
-<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="kw">xtline</span> adjusted_close, overlay <span class="bn">legend</span>(<span class="kw">off</span>) <span class="co">///</span></span>
-<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Stock prices of Dow Jones index constituents"</span>) <span class="co">///</span></span>
-<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">""</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="kw">encode</span> symbol, <span class="kw">gen</span>(symbol_id)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>xtset symbol_id <span class="fu">date</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="kw">xtline</span> adjusted_close, overlay <span class="bn">legend</span>(<span class="kw">off</span>) <span class="co">///</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Stock prices of Dow Jones index constituents"</span>) <span class="co">///</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">""</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
 Panel variable: symbol_id (unbalanced)
@@ -709,18 +593,20 @@ Figure&nbsp;3: Prices in USD, adjusted for dividend payments and stock splits.
 </div>
 <p>Do you notice the differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to use panel data commands. Of course, there are simply too many lines on the overlay graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrary number of subjects quite well.</p>
 <p>The same holds for stock returns. Before computing the returns, we use <code>bysort symbol</code> such that the return calculation is performed for each symbol individually. The same logic also applies to the computation of summary statistics: <code>bysort symbol</code> is the key to aggregating the time series into symbol-specific variables of interest.</p>
-<div id="9322c375" class="cell" data-execution_count="11">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol (<span class="fu">date</span>): <span class="kw">gen</span> ret = adjusted_close / adjusted_close[<span class="dt">_n</span>-1] - 1</span>
-<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> symbol <span class="fu">date</span> ret</span>
-<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="kw">drop</span> <span class="kw">if</span> <span class="fu">missing</span>(ret)</span>
-<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="st">"data-stata/returns_daily.dta"</span>, <span class="kw">replace</span></span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="kw">preserve</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="kw">collapse</span> (<span class="kw">mean</span>) daily_mean=ret (<span class="fu">sd</span>) daily_sd=ret <span class="co">///</span></span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>         (<span class="fu">min</span>) daily_min=ret (<span class="fu">max</span>) daily_max=ret, <span class="kw">by</span>(symbol)</span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="ot">list</span> symbol daily_mean daily_sd daily_min daily_max, <span class="kw">noobs</span> abbreviate(12)</span>
-<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="kw">restore</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>We are using temporary files for intermediate data because we don’t want to pollute our project folder with unnecessary files. This is a result of Stata’s key limitation of only beaing able to hold one data set in memory at the same time.</p>
+<div id="0fd320aa" class="cell" data-execution_count="11">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol (<span class="fu">date</span>): <span class="kw">gen</span> ret = adjusted_close / adjusted_close[<span class="dt">_n</span>-1] - 1</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> symbol <span class="fu">date</span> ret</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="kw">drop</span> <span class="kw">if</span> <span class="fu">missing</span>(ret)</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> returns_daily</span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`returns_daily'</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a><span class="kw">preserve</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a><span class="kw">collapse</span> (<span class="kw">mean</span>) daily_mean=ret (<span class="fu">sd</span>) daily_sd=ret <span class="co">///</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>         (<span class="fu">min</span>) daily_min=ret (<span class="fu">max</span>) daily_max=ret, <span class="kw">by</span>(symbol)</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a><span class="ot">list</span> symbol daily_mean daily_sd daily_min daily_max, <span class="kw">noobs</span> abbreviate(12)</span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a><span class="kw">restore</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(Note: Below code run with echo to enable preserve/restore functionality.)
 
@@ -729,7 +615,9 @@ Figure&nbsp;3: Prices in USD, adjusted for dividend payments and stock splits.
 
 (30 observations deleted)
 
-file data-stata/returns_daily.dta saved
+
+file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St26268.00000a saved
+    as .dta format
 
 
 
@@ -737,41 +625,41 @@ file data-stata/returns_daily.dta saved
   +--------------------------------------------------------+
   | symbol   daily_mean   daily_sd   daily_min   daily_max |
   |--------------------------------------------------------|
-  |   AAPL     .0012181   .0247352    -.518692    .1390495 |
-  |   AMGN     .0004931   .0194263   -.1341241    .1510205 |
-  |   AMZN      .001073    .031528   -.2476607    .3447136 |
-  |    AXP     .0005436    .022702   -.1759496    .2188221 |
-  |     BA     .0006285   .0221708   -.2384841    .2431861 |
+  | AAPL       .0012181   .0247352    -.518692    .1390491 |
+  | AMGN       .0004931   .0194263   -.1341241    .1510209 |
+  | AMZN        .001073    .031528   -.2476607    .3447136 |
+  | AXP        .0005436    .022702   -.1759498    .2188226 |
+  | BA         .0006285   .0221708   -.2384841    .2431861 |
   |--------------------------------------------------------|
-  |    CAT     .0007241   .0202978   -.1451755    .1472297 |
-  |    CRM     .0011896   .0265993   -.2714819     .260449 |
-  |   CSCO     .0003222   .0233581   -.1621072    .2438836 |
-  |    CVX     .0005106   .0175301   -.2212475    .2274072 |
-  |    DIS     .0004137   .0193803   -.1836302    .1597222 |
+  | CAT        .0007241   .0202978   -.1451751    .1472293 |
+  | CRM        .0011896   .0265993    -.271482    .2604487 |
+  | CSCO       .0003222   .0233581   -.1621071    .2438842 |
+  | CVX        .0005106   .0175302   -.2212478    .2274069 |
+  | DIS        .0004137   .0193803   -.1836298     .159722 |
   |--------------------------------------------------------|
-  |     GS     .0005568   .0228646   -.1895958     .264679 |
-  |     HD     .0005438   .0191592   -.2873564     .140667 |
-  |    HON     .0004967   .0191035   -.1736692    .2822295 |
-  |    IBM     .0002966   .0163122   -.1554204    .1202328 |
-  |    JNJ     .0003787   .0121364   -.1584557    .1222912 |
+  | GS         .0005568   .0228646   -.1895962    .2646782 |
+  | HD         .0005438   .0191592   -.2873564    .1406664 |
+  | HON        .0004967   .0191035   -.1736693      .28223 |
+  | IBM        .0002966   .0163122   -.1554204    .1202326 |
+  | JNJ        .0003787   .0121364   -.1584561    .1222924 |
   |--------------------------------------------------------|
-  |    JPM     .0006059   .0238462   -.2072745    .2509675 |
-  |     KO     .0003183    .013062   -.1006097    .1387947 |
-  |    MCD     .0005361   .0145301   -.1587537    .1812544 |
-  |    MMM     .0003632   .0151373   -.1294507    .1259862 |
-  |    MRK     .0003714   .0166078   -.2678061    .1303294 |
+  | JPM        .0006059   .0238462   -.2072746    .2509674 |
+  | KO         .0003183    .013062   -.1006106    .1387949 |
+  | MCD        .0005361   .0145301   -.1587535    .1812543 |
+  | MMM        .0003632   .0151373   -.1294502    .1259862 |
+  | MRK        .0003714   .0166078   -.2678059    .1303295 |
   |--------------------------------------------------------|
-  |   MSFT     .0005734    .019255   -.1559778    .1956521 |
-  |    NKE     .0007083   .0193034   -.1981272    .1553142 |
-  |   NVDA     .0017487   .0375833   -.3523358    .4241472 |
-  |     PG     .0003615   .0132529   -.3023592    .1200904 |
-  |    SHW     .0008602   .0179564   -.2078788    .1525693 |
+  | MSFT       .0005734    .019255   -.1559776    .1956516 |
+  | NKE        .0007083   .0193034   -.1981266    .1553139 |
+  | NVDA       .0017487   .0375833   -.3523361    .4241477 |
+  | PG         .0003615   .0132529   -.3023588    .1200904 |
+  | SHW        .0008602   .0179564   -.2078782    .1525701 |
   |--------------------------------------------------------|
-  |    TRV     .0005553   .0181391   -.2080036    .2555562 |
-  |    UNH     .0009483   .0195592   -.1863617    .3475502 |
-  |      V     .0009328   .0185385   -.1364343    .1499734 |
-  |     VZ     .0002382   .0150844   -.1184611    .1463237 |
-  |    WMT     .0003229    .014832   -.1137576    .1170849 |
+  | TRV        .0005553   .0181391   -.2080036    .2555554 |
+  | UNH        .0009483   .0195592   -.1863618      .34755 |
+  | V          .0009328   .0185385   -.1364349    .1499738 |
+  | VZ         .0002382   .0150844   -.1184619    .1463236 |
+  | WMT        .0003229    .014832   -.1137574    .1170849 |
   +--------------------------------------------------------+
 
 
@@ -784,54 +672,58 @@ file data-stata/returns_daily.dta saved
 <h2 class="anchored" data-anchor-id="different-frequencies">Different Frequencies</h2>
 <p>Financial data often exists at different frequencies due to varying reporting schedules, trading calendars, and economic data releases. For example, stock prices are typically recorded daily, while macroeconomic indicators such as GDP or inflation are reported monthly or quarterly. Additionally, some datasets are recorded only when transactions occur, resulting in irregular timestamps. To compare data meaningfully, we have to align different frequencies appropriately. For example, to compare returns across different frequencies, we use annualization techniques.</p>
 <p>So far, we have worked with daily returns, but we can easily convert our data to other frequencies. Let’s create monthly returns from our daily data:</p>
-<div id="2e3a0caf" class="cell" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> monthly_date = <span class="fu">mofd</span>(<span class="fu">date</span>)</span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="kw">format</span> monthly_date %tm</span>
-<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">gen</span> temp = 1 + ret</span>
-<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">gen</span> ret_monthly = <span class="fu">exp</span>(<span class="kw">sum</span>(<span class="fu">ln</span>(temp))) - 1</span>
-<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">keep</span> <span class="kw">if</span> <span class="dt">_n</span> == _N</span>
-<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> symbol monthly_date ret_monthly</span>
-<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> monthly_date <span class="fu">date</span></span>
-<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="st">"data-stata/returns_monthly.dta"</span>, <span class="kw">replace</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="f7d915a5" class="cell" data-execution_count="12">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> monthly_date = <span class="fu">mofd</span>(<span class="fu">date</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="kw">format</span> monthly_date %tm</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">gen</span> temp = 1 + ret</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">gen</span> ret_monthly = <span class="fu">exp</span>(<span class="kw">sum</span>(<span class="fu">ln</span>(temp))) - 1</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="kw">bysort</span> symbol monthly_date: <span class="kw">keep</span> <span class="kw">if</span> <span class="dt">_n</span> == _N</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> symbol monthly_date ret_monthly</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> monthly_date <span class="fu">date</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> returns_monthly</span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`returns_monthly'</span>, <span class="kw">replace</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(169,406 observations deleted)
-file data-stata/returns_monthly.dta saved</code></pre>
+(file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St26268.00000d not
+    found)
+file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St26268.00000d saved
+    as .dta format</code></pre>
 </div>
 </div>
 <p>To visualize how return characteristics change across different frequencies, we can compare histograms as in <a href="#fig-103" class="quarto-xref">Figure&nbsp;4</a>:</p>
 <div id="cell-fig-103" class="cell" data-execution_count="13">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/returns_daily.dta"</span>, <span class="kw">clear</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> <span class="kw">if</span> symbol == <span class="st">"AAPL"</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="kw">frequency</span> = <span class="st">"Daily"</span></span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> ret <span class="fu">return</span></span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> <span class="fu">daily</span></span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`daily'</span></span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/returns_monthly.dta"</span>, <span class="kw">clear</span></span>
-<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> <span class="kw">if</span> symbol == <span class="st">"AAPL"</span></span>
-<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="kw">frequency</span> = <span class="st">"Monthly"</span></span>
-<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> ret_monthly <span class="fu">return</span></span>
-<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> <span class="fu">monthly</span></span>
-<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`monthly'</span></span>
-<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="ot">`daily'</span>, <span class="kw">clear</span></span>
-<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a><span class="kw">append</span> <span class="kw">using</span> <span class="ot">`monthly'</span></span>
-<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">histogram</span> <span class="fu">return</span> <span class="kw">if</span> <span class="kw">frequency</span> == <span class="st">"Daily"</span>, bins(50) <span class="kw">color</span>(<span class="bn">blue</span>%50)) <span class="co">///</span></span>
-<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>       (<span class="kw">histogram</span> <span class="fu">return</span> <span class="kw">if</span> <span class="kw">frequency</span> == <span class="st">"Monthly"</span>, bins(50) <span class="kw">color</span>(<span class="kw">red</span>%50)), <span class="co">///</span></span>
-<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">by</span>(<span class="kw">frequency</span>, <span class="bn">cols</span>(2) <span class="kw">note</span>(<span class="st">""</span>) <span class="bn">title</span>(<span class="st">"Distribution of Apple returns across different frequencies"</span>)) <span class="co">///</span></span>
-<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>    <span class="bn">legend</span>(<span class="kw">off</span>) <span class="co">///</span></span>
-<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">""</span>) <span class="co">///</span></span>
-<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">xlabel</span>(, <span class="kw">format</span>(%9.2f))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/returns_daily.dta"</span>, <span class="kw">clear</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> <span class="kw">if</span> symbol == <span class="st">"AAPL"</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="kw">frequency</span> = <span class="st">"Daily"</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> ret <span class="fu">return</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> <span class="fu">daily</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`daily'</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/returns_monthly.dta"</span>, <span class="kw">clear</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="kw">keep</span> <span class="kw">if</span> symbol == <span class="st">"AAPL"</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> <span class="kw">frequency</span> = <span class="st">"Monthly"</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a><span class="kw">rename</span> ret_monthly <span class="fu">return</span></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a><span class="kw">tempfile</span> <span class="fu">monthly</span></span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a><span class="kw">save</span> <span class="ot">`monthly'</span></span>
+<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="ot">`daily'</span>, <span class="kw">clear</span></span>
+<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a><span class="kw">append</span> <span class="kw">using</span> <span class="ot">`monthly'</span></span>
+<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">histogram</span> <span class="fu">return</span> <span class="kw">if</span> <span class="kw">frequency</span> == <span class="st">"Daily"</span>, bins(50) <span class="kw">color</span>(<span class="bn">blue</span>%50)) <span class="co">///</span></span>
+<span id="cb22-19"><a href="#cb22-19" aria-hidden="true" tabindex="-1"></a>       (<span class="kw">histogram</span> <span class="fu">return</span> <span class="kw">if</span> <span class="kw">frequency</span> == <span class="st">"Monthly"</span>, bins(50) <span class="kw">color</span>(<span class="kw">red</span>%50)), <span class="co">///</span></span>
+<span id="cb22-20"><a href="#cb22-20" aria-hidden="true" tabindex="-1"></a>    <span class="kw">by</span>(<span class="kw">frequency</span>, <span class="bn">cols</span>(2) <span class="kw">note</span>(<span class="st">""</span>) <span class="bn">title</span>(<span class="st">"Distribution of Apple returns across different frequencies"</span>)) <span class="co">///</span></span>
+<span id="cb22-21"><a href="#cb22-21" aria-hidden="true" tabindex="-1"></a>    <span class="bn">legend</span>(<span class="kw">off</span>) <span class="co">///</span></span>
+<span id="cb22-22"><a href="#cb22-22" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">""</span>) <span class="co">///</span></span>
+<span id="cb22-23"><a href="#cb22-23" aria-hidden="true" tabindex="-1"></a>    <span class="kw">xlabel</span>(, <span class="kw">format</span>(%9.2f))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(171,859 observations deleted)
-file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St75510.00000g saved
+file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St26268.00000f saved
     as .dta format
 (8,201 observations deleted)
-file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St75510.00000h saved
+file /var/folders/g1/87g_4bg57y97pcsk73ydb99c0000gn/T//St26268.00000g saved
     as .dta format
 (variable frequency was str5, now str7 to accommodate using data's values)</code></pre>
 </div>
@@ -853,15 +745,15 @@ Figure&nbsp;4: Returns are based on prices adjusted for dividend payments and st
 <h2 class="anchored" data-anchor-id="other-forms-of-data-aggregation">Other Forms of Data Aggregation</h2>
 <p>Of course, aggregation across variables other than <code>symbol</code> or <code>date</code> can also make sense. For instance, suppose you are interested in answering questions like: Are days with high aggregate trading volume likely followed by days with high aggregate trading volume? To provide some initial analysis on this question, we take the downloaded data and compute aggregate daily trading volume for all Dow index constituents in USD. Recall that the column <code>volume</code> is denoted in the number of traded shares. Thus, we multiply the trading volume with the daily adjusted closing price to get a proxy for the aggregate trading volume in USD. Scaling by <code>1e9</code> denotes daily trading volume in billion USD.</p>
 <div id="cell-fig-104" class="cell" data-execution_count="14">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/prices_daily"</span>, <span class="kw">clear</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> trading_volume_usd = volume * adjusted_close</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="kw">collapse</span> (<span class="kw">sum</span>) trading_volume = trading_volume_usd, <span class="kw">by</span>(<span class="fu">date</span>)</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a><span class="kw">replace</span> trading_volume = trading_volume / 1e9</span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">line</span> trading_volume <span class="fu">date</span>), <span class="co">///</span></span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Aggregate daily trading volume of Dow Jones index constituents"</span>) <span class="co">///</span></span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">"Billion USD"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="st">"data-stata/prices_daily.dta"</span>, <span class="kw">clear</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> trading_volume_usd = volume * adjusted_close</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a><span class="kw">collapse</span> (<span class="kw">sum</span>) trading_volume = trading_volume_usd, <span class="kw">by</span>(<span class="fu">date</span>)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a><span class="kw">replace</span> trading_volume = trading_volume / 1e9</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">line</span> trading_volume <span class="fu">date</span>), <span class="co">///</span></span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Aggregate daily trading volume of Dow Jones index constituents"</span>) <span class="co">///</span></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">""</span>) <span class="bn">ytitle</span>(<span class="st">"Billion USD"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(6,037 real changes made)</code></pre>
 </div>
@@ -880,15 +772,15 @@ Figure&nbsp;5: Total daily trading volume in billion USD.
 </div>
 <p><a href="#fig-104" class="quarto-xref">Figure&nbsp;5</a> indicates a clear upward trend in aggregated daily trading volume. In particular, since the outbreak of the COVID-19 pandemic, markets have processed substantial trading volumes. One way to illustrate the persistence of trading volume would be to plot volume on day <span class="math inline">\(t\)</span> against volume on day <span class="math inline">\(t-1\)</span> as in the example below. In <a href="#fig-105" class="quarto-xref">Figure&nbsp;6</a>, we add a dotted 45°-line to indicate a hypothetical one-to-one relation, addressing potential differences in the axes’ scales.</p>
 <div id="cell-fig-105" class="cell" data-execution_count="15">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="kw">sort</span> <span class="fu">date</span></span>
-<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> lag_trading_volume = trading_volume[<span class="dt">_n</span>-1]</span>
-<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">scatter</span> trading_volume lag_trading_volume, msize(tiny)) <span class="co">///</span></span>
-<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>       (<span class="kw">function</span> <span class="fu">y</span>=x, <span class="kw">range</span>(0 150) lpattern(<span class="kw">dash</span>)), <span class="co">///</span></span>
-<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Persistence in daily trading volume of Dow Jones index constituents"</span>) <span class="co">///</span></span>
-<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">"Previous day aggregate trading volume (Billion USD)"</span>) <span class="co">///</span></span>
-<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>    <span class="bn">ytitle</span>(<span class="st">"Aggregate trading volume (Billion USD)"</span>) <span class="co">///</span></span>
-<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="bn">legend</span>(<span class="kw">off</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode stata code-with-copy"><code class="sourceCode stata"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">sort</span> <span class="fu">date</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="kw">gen</span> lag_trading_volume = trading_volume[<span class="dt">_n</span>-1]</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="kw">twoway</span> (<span class="kw">scatter</span> trading_volume lag_trading_volume, msize(tiny)) <span class="co">///</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>       (<span class="kw">function</span> <span class="fu">y</span>=x, <span class="kw">range</span>(0 150) lpattern(<span class="kw">dash</span>)), <span class="co">///</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>    <span class="bn">title</span>(<span class="st">"Persistence in daily trading volume of Dow Jones index constituents"</span>) <span class="co">///</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    <span class="bn">xtitle</span>(<span class="st">"Previous day aggregate trading volume (Billion USD)"</span>) <span class="co">///</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>    <span class="bn">ytitle</span>(<span class="st">"Aggregate trading volume (Billion USD)"</span>) <span class="co">///</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>    <span class="bn">legend</span>(<span class="kw">off</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>(1 missing value generated)</code></pre>
 </div>
@@ -905,20 +797,10 @@ Figure&nbsp;6: Total daily trading volume in billion USD.
 </div>
 </div>
 </div>
-<p>Do you understand where the message about missing values comes from when creating the lag? Purely eye-balling reveals that days with high trading volume are often followed by similarly high trading volume days.</p>
 </section>
 <section id="key-takeaways" class="level2">
 <h2 class="anchored" data-anchor-id="key-takeaways">Key Takeaways</h2>
-<ul>
-<li>You can use Stata’s data management commands and Python integration to efficiently analyze stock market data.</li>
-<li>The <code>tidyfinance</code> Python package allows seamless downloading of historical stock prices and index data directly from Yahoo Finance.</li>
-<li>Panel data structures in Stata enable efficient analysis of financial data across multiple securities.</li>
-<li>Adjusted stock prices provide a more accurate reflection of investor returns by accounting for dividends and stock splits.</li>
-<li>Summary statistics such as mean, standard deviation, and quantiles offer insights into stock return behavior over time.</li>
-<li>Visualizations created with Stata’s graphics commands help identify trends, volatility, and return distributions in financial time series.</li>
-<li>Stata’s <code>bysort</code> and <code>collapse</code> commands make it easy to scale financial analyses from a single stock to entire indices like the Dow Jones or S&amp;P 500.</li>
-<li>Consistent workflows form the foundation for advanced financial analysis.</li>
-</ul>
+<p>…</p>
 </section>
 <section id="exercises" class="level2">
 <h2 class="anchored" data-anchor-id="exercises">Exercises</h2>
