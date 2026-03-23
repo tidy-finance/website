@@ -216,7 +216,6 @@ factors_ff3_monthly = (pd.read_parquet("data-python/factors_ff3_monthly.parquet"
 crsp_monthly = (crsp_monthly
     .merge(factors_ff3_monthly, how="left", on="date")
     .assign(ret_excess=lambda x: x["ret"]-x["risk_free"])
-    .assign(ret_excess=lambda x: x["ret_excess"].clip(lower=-1))
     .drop(columns=["risk_free"])
 )
 ```
@@ -404,65 +403,55 @@ There is a solution to this challenge. As with many *big data* problems, you can
 factors_ff3_daily = pd.read_parquet("data-python/factors_ff3_daily.parquet")
 
 permnos = pd.read_sql(
-    sql="SELECT DISTINCT permno FROM crsp.stksecurityinfohist", 
+    sql="SELECT DISTINCT permno FROM crsp.stksecurityinfohist",
     con=wrds,
-    dtype={"permno": int}
+    dtype={"permno": int},
 )
 
 permnos = list(permnos["permno"].astype(str))
-  
-batch_size = 500
-batches = np.ceil(len(permnos)/batch_size).astype(int)
 
-for j in range(1, batches+1):  
-    
+batch_size = 500
+batches = np.ceil(len(permnos) / batch_size).astype(int)
+
+for j in range(1, batches + 1):
     permno_batch = permnos[
-        ((j-1)*batch_size):(min(j*batch_size, len(permnos)))
+        ((j - 1) * batch_size) : (min(j * batch_size, len(permnos)))
     ]
-    
-    permno_batch_formatted = (
-        ", ".join(f"'{permno}'" for permno in permno_batch)
-    )
+
+    permno_batch_formatted = ", ".join(f"'{permno}'" for permno in permno_batch)
     permno_string = f"({permno_batch_formatted})"
-    
+
     crsp_daily_sub_query = (
         "SELECT dsf.permno, dlycaldt AS date, dlyret AS ret "
         "FROM crsp.dsf_v2 AS dsf "
         "INNER JOIN crsp.stksecurityinfohist AS ssih "
         "ON dsf.permno = ssih.permno AND "
-            "ssih.secinfostartdt <= dsf.dlycaldt AND "
-            "dsf.dlycaldt <= ssih.secinfoenddt "
+        "ssih.secinfostartdt <= dsf.dlycaldt AND "
+        "dsf.dlycaldt <= ssih.secinfoenddt "
         f"WHERE dsf.permno IN {permno_string} "
-            f"AND dlycaldt BETWEEN '{start_date}' AND '{end_date}' "
-                "AND ssih.sharetype = 'NS' "
-                "AND ssih.securitytype = 'EQTY' "  
-                "AND ssih.securitysubtype = 'COM' " 
-                "AND ssih.usincflg = 'Y' " 
-                "AND ssih.issuertype in ('ACOR', 'CORP') " 
-                "AND ssih.primaryexch in ('N', 'A', 'Q') "
-                "AND ssih.conditionaltype in ('RW', 'NW') "
-                "AND ssih.tradingstatusflg = 'A'"
+        f"AND dlycaldt BETWEEN '{start_date}' AND '{end_date}' "
+        "AND ssih.sharetype = 'NS' "
+        "AND ssih.securitytype = 'EQTY' "
+        "AND ssih.securitysubtype = 'COM' "
+        "AND ssih.usincflg = 'Y' "
+        "AND ssih.issuertype in ('ACOR', 'CORP') "
+        "AND ssih.primaryexch in ('N', 'A', 'Q') "
+        "AND ssih.conditionaltype in ('RW', 'NW') "
+        "AND ssih.tradingstatusflg = 'A'"
     )
-        
-    crsp_daily_sub = (pd.read_sql_query(
+
+    crsp_daily_sub = pd.read_sql_query(
         sql=crsp_daily_sub_query,
         con=wrds,
         dtype={"permno": int},
-        parse_dates={"date"}
-        )
-        .dropna()
-    )
+        parse_dates={"date"},
+    ).dropna()
 
     if not crsp_daily_sub.empty:
-        
-        crsp_daily_sub = (crsp_daily_sub
-            .merge(factors_ff3_daily[["date", "risk_free"]], 
-                on="date", how="left")
-            .assign(
-            ret_excess = lambda x: 
-                ((x["ret"] - x["risk_free"]).clip(lower=-1)),
-                batch = j
+        crsp_daily_sub = (crsp_daily_sub.merge(
+                factors_ff3_daily[["date", "risk_free"]], on="date", how="left"
             )
+            .assign(ret_excess=lambda x: x["ret"] - x["risk_free"], batch=j)
             .get(["batch", "permno", "date", "ret_excess"])
         )
 
@@ -471,10 +460,10 @@ for j in range(1, batches+1):
             table,
             root_path="data-python/crsp_daily",
             partition_cols=["permno"],
-            existing_data_behavior="overwrite_or_ignore"
+            existing_data_behavior="overwrite_or_ignore",
         )
-                
-    print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
+
+    print(f"Batch {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
 ```
 
 The choice of partitioning strategy depends on your intended analysis. Partitioning by `permno` as above is efficient when you need to parallelize computations at the firm level or frequently query data for specific stocks, since only the relevant partition files are read. However, this creates many small files, which introduces overhead when reading the entire dataset. If your analysis primarily involves cross-sectional operations on specific dates, partitioning by `date` or `year` would be more efficient. Alternatively, you can skip partitioning entirely and store the data as fewer large files, which minimizes file-open overhead for full scans while still allowing filtering on any column—though without the benefit of partition pruning.
@@ -656,9 +645,9 @@ crsp_monthly.to_parquet("data-python/crsp_monthly.parquet")
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}
 
 ```{python}
-# | label: fig-215
-# | fig-cap: "The figure shows the end-of-year share of securities with book equity values by listing exchange."
-# | fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
+#| label: fig-215
+#| fig-cap: "The figure shows the end-of-year share of securities with book equity values by listing exchange."
+#| fig-alt: "Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat."
 share_with_be = (crsp_monthly
     .assign(year=lambda x: pd.DatetimeIndex(x["date"]).year)
     .sort_values("date")
