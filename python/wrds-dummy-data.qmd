@@ -226,18 +226,16 @@ compustat_pseudo.to_parquet("data-python/compustat_annual.parquet")
 The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`. \index{Data!CRSP}
 
 ```{python}
-crsp_monthly_pseudo = (stock_panel_monthly
-    .assign(
+crsp_monthly_pseudo = (
+    stock_panel_monthly.assign(
         ret=lambda x: np.fmax(np.random.normal(size=len(x)), -1),
-        ret_excess=lambda x: (
-            np.fmax(x["ret"] - np.random.uniform(0, 0.0025, len(x)), -1)
-        ),
+        ret_excess=lambda x: x["ret"] - np.random.uniform(0, 0.0025, len(x)),
         shrout=1000 * np.random.uniform(1, 50, len(stock_panel_monthly)),
         altprc=np.random.uniform(0, 1000, len(stock_panel_monthly)),
     )
     .assign(mktcap=lambda x: x["shrout"] * x["altprc"])
     .sort_values(by=["permno", "date"])
-    .assign(mktcap_lag=lambda x: (x.groupby("permno")["mktcap"].shift(1)))
+    .assign(mktcap_lag=lambda x: x.groupby("permno")["mktcap"].shift(1))
     .reset_index(drop=True)
 )
 
