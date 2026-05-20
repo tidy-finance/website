@@ -1,0 +1,310 @@
+# WRDS Pseudo Data
+
+In this appendix chapter, we alleviate the constraints of readers who do not have access to WRDS and hence cannot run the code that we provide. We show how to create a pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this pseudo data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md).
+
+We deliberately use the pseudo label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does not contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books.
+
+To generate the pseudo data, we use the following packages:
+
+``` r
+library(tidyverse)
+library(arrow)
+```
+
+We store the data in the folder `data-r`. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
+
+``` r
+if (!dir.exists("data-r")) {
+  dir.create("data-r")
+}
+```
+
+Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over ten years that we then use to create yearly, monthly, and daily data, respectively.
+
+``` r
+set.seed(1234)
+
+start_date <- as.Date("2003-01-01")
+end_date <- as.Date("2022-12-31")
+
+time_series_years <- seq(year(start_date), year(end_date), 1)
+time_series_months <- seq(start_date, end_date, "1 month")
+time_series_days <- seq(start_date, end_date, "1 day")
+```
+
+## Create Stock Pseudo Data
+
+Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original data, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data.
+
+``` r
+number_of_stocks <- 100
+
+industries <- tibble(
+  industry = c(
+    "Agriculture",
+    "Construction",
+    "Finance",
+    "Manufacturing",
+    "Mining",
+    "Public",
+    "Retail",
+    "Services",
+    "Transportation",
+    "Utilities",
+    "Wholesale"
+  ),
+  n = c(81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 457, 904),
+  prob = c(
+    0.00319,
+    0.0113,
+    0.185,
+    0.339,
+    0.0508,
+    0.0779,
+    0.0620,
+    0.169,
+    0.0493,
+    0.0180,
+    0.0357
+  )
+)
+
+exchanges <- exchanges <- tibble(
+  exchange = c("AMEX", "NASDAQ", "NYSE"),
+  n = c(2893, 17236, 5553),
+  prob = c(0.113, 0.671, 0.216)
+)
+
+stock_identifiers <- 1:number_of_stocks |>
+  map_df(
+    function(x) {
+      tibble(
+        permno = x,
+        gvkey = as.character(x + 10000),
+        exchange = sample(exchanges$exchange, 1, prob = exchanges$prob),
+        industry = sample(industries$industry, 1, prob = industries$prob)
+      ) |>
+        mutate(
+          exchcd = case_when(
+            exchange == "NYSE" ~ sample(c(1, 31), n()),
+            exchange == "AMEX" ~ sample(c(2, 32), n()),
+            exchange == "NASDAQ" ~ sample(c(3, 33), n())
+          ),
+          siccd = case_when(
+            industry == "Agriculture" ~ sample(1:999, n()),
+            industry == "Mining" ~ sample(1000:1499, n()),
+            industry == "Construction" ~ sample(1500:1799, n()),
+            industry == "Manufacturing" ~ sample(1800:3999, n()),
+            industry == "Transportation" ~ sample(4000:4899, n()),
+            industry == "Utilities" ~ sample(4900:4999, n()),
+            industry == "Wholesale" ~ sample(5000:5199, n()),
+            industry == "Retail" ~ sample(5200:5999, n()),
+            industry == "Finance" ~ sample(6000:6799, n()),
+            industry == "Services" ~ sample(7000:8999, n()),
+            industry == "Public" ~ sample(9000:9999, n())
+          )
+        )
+    }
+  )
+```
+
+Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `pseudo_years`. The `expand_grid()` function ensures that we get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
+
+Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we use the `expand_grid()` function to combine `stock_identifiers` with a new table that has the `date` variable from `pseudo_months`. After merging, we select the columns `permno`, `gvkey`, `date`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
+
+Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `pseudo_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
+
+``` r
+stock_panel_yearly <- expand_grid(
+  stock_identifiers,
+  tibble(year = time_series_years)
+) |>
+  select(gvkey, year)
+
+stock_panel_monthly <- expand_grid(
+  stock_identifiers,
+  tibble(date = time_series_months)
+) |>
+  select(permno, gvkey, date, siccd, industry, exchcd, exchange)
+
+stock_panel_daily <- expand_grid(
+  stock_identifiers,
+  tibble(date = time_series_days)
+) |>
+  select(permno, date)
+```
+
+### Pseudo `beta` table
+
+We then proceed to create pseudo beta values for our `stock_panel_monthly` table. We generate monthly beta values `beta_monthly` using the `rnorm()` function with a mean and standard deviation of 1. For daily beta values `beta_daily`, we take the pseudo monthly beta and add a small random noise to it. This noise is generated again using the `rnorm()` function, but this time we divide the random values by 100 to ensure they are small deviations from the monthly beta.
+
+``` r
+beta_pseudo <- stock_panel_monthly |>
+  mutate(
+    beta_monthly = rnorm(n(), mean = 1, sd = 1),
+    beta_daily = beta_monthly + rnorm(n()) / 100
+  )
+
+write_parquet(beta_pseudo, "data-r/beta.parquet")
+```
+
+### Pseudo `compustat_annual` table
+
+To create pseudo firm characteristics, we take all columns from the `compustat_annual` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case.
+
+``` r
+relevant_columns <- c(
+  "seq",
+  "ceq",
+  "at",
+  "lt",
+  "txditc",
+  "txdb",
+  "itcb",
+  "pstkrv",
+  "pstkl",
+  "pstk",
+  "capx",
+  "oancf",
+  "sale",
+  "cogs",
+  "xint",
+  "xsga",
+  "be",
+  "op",
+  "at_lag",
+  "inv"
+)
+
+commands <- unlist(
+  map(
+    relevant_columns,
+    ~ rlang::exprs(!!..1 := runif(n()))
+  )
+)
+
+compustat_pseudo <- stock_panel_yearly |>
+  mutate(
+    datadate = ymd(str_c(year, "12", "31")),
+    !!!commands
+  )
+
+write_parquet(compustat_pseudo, "data-r/compustat_annual.parquet")
+```
+
+### Pseudo `crsp_monthly` table
+
+The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `altprc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `altprc`.
+
+``` r
+crsp_monthly_pseudo <- stock_panel_monthly |>
+  mutate(
+    ret = pmax(rnorm(n()), -1),
+    ret_excess = ret - runif(n(), 0, 0.0025),
+    shrout = runif(n(), 1, 50) * 1000,
+    altprc = runif(n(), 0, 1000),
+    mktcap = shrout * altprc
+  ) |>
+  group_by(permno) |>
+  arrange(date) |>
+  mutate(mktcap_lag = lag(mktcap)) |>
+  ungroup()
+
+write_parquet(crsp_monthly_pseudo, "data-r/crsp_monthly.parquet")
+```
+
+### Pseudo `crsp_daily` table
+
+The `crsp_daily` table only contains a `date` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.
+
+``` r
+crsp_daily_pseudo <- stock_panel_daily |>
+  mutate(
+    ret_excess = pmax(rnorm(n()), -1)
+  )
+
+write_parquet(crsp_daily_pseudo, "data-r/crsp_daily.parquet")
+```
+
+## Create Bond Pseudo Data
+
+Lastly, we move to the bond data that we use in our books.
+
+### Pseudo `fisd` data
+
+To create pseudo data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`.
+
+``` r
+number_of_bonds <- 100
+
+fisd_pseudo <- 1:number_of_bonds |>
+  map_df(
+    function(x) {
+      tibble(
+        complete_cusip = str_to_upper(
+          str_c(
+            sample(c(letters, 0:9), 12, replace = TRUE),
+            collapse = ""
+          )
+        ),
+      )
+    }
+  ) |>
+  mutate(
+    maturity = sample(time_series_days, n(), replace = TRUE),
+    offering_amt = sample(seq(1:100) * 100000, n(), replace = TRUE),
+    offering_date = maturity - sample(seq(1:25) * 365, n(), replace = TRUE),
+    dated_date = offering_date - sample(-10:10, n(), replace = TRUE),
+    interest_frequency = sample(c(0, 1, 2, 4, 12), n(), replace = TRUE),
+    coupon = sample(seq(0, 2, by = 0.1), n(), replace = TRUE),
+    last_interest_date = pmax(maturity, offering_date, dated_date),
+    issue_id = row_number(),
+    issuer_id = sample(1:250, n(), replace = TRUE),
+    sic_code = as.character(sample(seq(1:9) * 1000, n(), replace = TRUE))
+  )
+
+write_parquet(fisd_pseudo, "data-r/fisd.parquet")
+```
+
+### Pseudo `trace_enhanced` data
+
+Finally, we create a pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book.
+
+``` r
+start_date <- as.Date("2014-01-01")
+end_date <- as.Date("2016-11-30")
+
+bonds_panel <- expand_grid(
+  fisd_pseudo |>
+    select(cusip_id = complete_cusip),
+  tibble(
+    trd_exctn_dt = seq(start_date, end_date, "1 day")
+  )
+)
+
+trace_enhanced_pseudo <- bind_rows(
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel
+) |>
+  mutate(
+    trd_exctn_tm = str_c(
+      sample(0:24, n(), replace = TRUE),
+      ":",
+      sample(0:60, n(), replace = TRUE),
+      ":",
+      sample(0:60, n(), replace = TRUE)
+    ),
+    rptd_pr = runif(n(), 10, 200),
+    entrd_vol_qt = sample(1:20, n(), replace = TRUE) * 1000,
+    yld_pt = runif(n(), -10, 10),
+    rpt_side_cd = sample(c("B", "S"), n(), replace = TRUE),
+    cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
+  )
+
+write_parquet(trace_enhanced_pseudo, "data-r/trace_enhanced.parquet")
+```
+
+As stated in the introduction, the data does *not* contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout this book.

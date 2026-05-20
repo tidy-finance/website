@@ -1,0 +1,27 @@
+# Support Tidy Finance
+
+Tidy Finance is and will remain an open-source project. We are grateful for all the support we have received so far. Of course, we do not force anybody to support us, but every gesture is very much appreciated. We have three options if you want to give something back and support our efforts. Moreover, most options come at no additional cost to you, i.e., they just increase our share of the pie. Who does not appreciate a little more pie?
+
+## Get your copy of the books
+
+You can read the free online versions of Tidy Finance on this website. However, you can also get your own physical copies! The books come with many perks, such as the joy of holding something in your hand, a fresh smell, and it certainly looks good in your library. If you decide to buy your own copies, please consider using our affiliate link from Routledge for [Tidy Finance with R](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349) and [Tidy Finance with Python](https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418). No extra cost to you, just some pie for us.
+
+Note that some affiliate links track your behavior on the site and can be flagged as suspicious by your browser. We exclusively use the official paths provided by the respective vendor. Alternatively, our books are also available on Amazon and other retailers.
+
+[![](assets/img/cover-book-r.jpg)](https://www.jdoqocy.com/click-100765519-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-R%2FVoigt-Weiss-Scheuch%2Fp%2Fbook%2F9781032389349) [![](assets/img/cover-book-python.jpg)](https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418)
+
+## Spread the word
+
+The project grows with the attention it receives from the community. Therefore, making people aware of Tidy Finance is a great way to support it. There are certainly many possibilities how you can spread the word. For example, you could
+
+- [Contribute](contribute.llms.md) to the Tidy Finance blog
+- Cite [Tidy Finance with R](r/index.llms.md#license) or [Tidy Finance with Python](python/index.llms.md#license) in one of your projects
+- Use Tidy Finance as a teaching resource and let us know
+- Connect with us and share posts about Tidy Finance via social media
+- You can also buy [Tidy Finance Swag](https://www.etsy.com/shop/tidyswag/?etsrc=sdt&utm_source=tidy-finance.org)
+
+These are just a few suggestions, yet highly effective. In any case, we rely on your support to share Tidy Finance within your own community.
+
+## Buy us a coffee
+
+Every task requires some fuel. In particular, one key ingredient to completing the mental efforts that culminate in Tidy Finance is, of course, coffee. Hence, if you appreciate Tidy Finance, let us have a coffee. We are grateful for every small contribution to sustain our caffeine levels. Moreover, higher caffeine levels positively correlate with new content on Tidy Finance. It is a win-win situation!

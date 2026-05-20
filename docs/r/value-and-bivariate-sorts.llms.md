@@ -1,0 +1,250 @@
+# Value and Bivariate Sorts
+
+> **NOTE:**
+>
+> You are reading **Tidy Finance with R**. You can find the equivalent chapter for the sibling **Tidy Finance with Python** [here](../python/value-and-bivariate-sorts.llms.md).
+
+In this chapter, we extend univariate portfolio analysis to bivariate sorts, which means we assign stocks to portfolios based on two characteristics. Bivariate sorts are regularly used in the academic asset pricing literature and are the basis for the factors in the Fama-French three-factor model. However, some scholars also use sorts with three grouping variables. Conceptually, portfolio sorts are easily applicable in higher dimensions.
+
+We form portfolios on firm size and the book-to-market ratio. To calculate book-to-market ratios, accounting data is required, which necessitates additional steps during portfolio formation. In the end, we demonstrate how to form portfolios on two sorting variables using so-called independent and dependent portfolio sorts.
+
+The current chapter relies on this set of R packages.
+
+``` r
+library(tidyverse)
+library(arrow)
+```
+
+## Data Preparation
+
+First, we load the necessary data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md).
+
+``` r
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+  select(
+    permno,
+    gvkey,
+    date,
+    ret_excess,
+    mktcap,
+    mktcap_lag,
+    exchange
+  ) |>
+  drop_na()
+```
+
+Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.
+
+``` r
+book_equity <- read_parquet("data-r/compustat_annual.parquet") |>
+  select(gvkey, datadate, be) |>
+  drop_na() |>
+  mutate(date = floor_date(ymd(datadate), "month"))
+```
+
+## Book-to-Market Ratio
+
+A fundamental problem in handling accounting data is the *look-ahead bias*; we must not include data in forming a portfolio that is not public knowledge at the time. Of course, researchers have more information when looking into the past than agents had at that moment. However, abnormal excess returns from a trading strategy should not rely on an information advantage because the differential cannot be the result of informed agents’ trades. Hence, we have to lag accounting information.
+
+As in the previous chapter, we continue to lag firm size by one month. Then, we compute the book-to-market ratio, which relates a firm’s book equity to its market equity. Firms with high (low) book-to-market ratio are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.[^1]
+
+Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fill()`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `group_by()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
+
+``` r
+size <- crsp_monthly |>
+  mutate(sorting_date = date %m+% months(1)) |>
+  select(permno, sorting_date, size = mktcap)
+
+bm <- book_equity |>
+  inner_join(crsp_monthly, join_by(gvkey, date)) |>
+  mutate(
+    bm = be / mktcap,
+    sorting_date = date %m+% months(6),
+    accounting_date = sorting_date
+  ) |>
+  select(permno, gvkey, sorting_date, accounting_date, bm)
+
+data_for_sorts <- crsp_monthly |>
+  left_join(
+    bm,
+    join_by(permno, gvkey, date == sorting_date)
+  ) |>
+  left_join(
+    size,
+    join_by(permno, date == sorting_date)
+  ) |>
+  select(
+    permno,
+    gvkey,
+    date,
+    ret_excess,
+    mktcap_lag,
+    size,
+    bm,
+    exchange,
+    accounting_date
+  )
+
+data_for_sorts <- data_for_sorts |>
+  arrange(permno, gvkey, date) |>
+  group_by(permno, gvkey) |>
+  fill(bm, accounting_date) |>
+  ungroup() |>
+  filter(accounting_date > date %m-% months(12)) |>
+  select(-accounting_date) |>
+  drop_na()
+```
+
+The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function allowing for the specification of exchanges to use for the breakpoints. Additionally, we reintroduce the argument `sorting_variable` into the function for defining different sorting variables.
+
+``` r
+assign_portfolio <- function(
+  data,
+  sorting_variable,
+  n_portfolios,
+  exchanges
+) {
+  breakpoints <- data |>
+    filter(exchange %in% exchanges) |>
+    pull({{ sorting_variable }}) |>
+    quantile(
+      probs = seq(0, 1, length.out = n_portfolios + 1),
+      na.rm = TRUE,
+      names = FALSE
+    )
+
+  assigned_portfolios <- data |>
+    mutate(
+      portfolio = findInterval(
+        pick(everything()) |>
+          pull({{ sorting_variable }}),
+        breakpoints,
+        all.inside = TRUE
+      )
+    ) |>
+    pull(portfolio)
+
+  assigned_portfolios
+}
+```
+
+Note that the `tidyfinance` package also provides an `assing_portfolio()` function, albeit with more flexibility. For ease of exposition, we continue to use the function that we just defined.
+
+After these data preparation steps, we present bivariate portfolio sorts on an independent and dependent basis.
+
+## Independent Sorts
+
+Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms. The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
+
+To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_size`, respectively. Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
+
+``` r
+value_portfolios <- data_for_sorts |>
+  group_by(date) |>
+  mutate(
+    portfolio_bm = assign_portfolio(
+      data = pick(everything()),
+      sorting_variable = "bm",
+      n_portfolios = 5,
+      exchanges = c("NYSE")
+    ),
+    portfolio_size = assign_portfolio(
+      data = pick(everything()),
+      sorting_variable = "size",
+      n_portfolios = 5,
+      exchanges = c("NYSE")
+    )
+  ) |>
+  group_by(date, portfolio_bm, portfolio_size) |>
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag),
+    .groups = "drop"
+  )
+```
+
+Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher’s choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.
+
+``` r
+value_premium <- value_portfolios |>
+  group_by(date, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
+  summarize(
+    value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+      ret[portfolio_bm == min(portfolio_bm)]
+  ) |>
+  summarize(
+    value_premium = mean(value_premium)
+  )
+```
+
+The resulting monthly value premium is 0.41 percent with an annualized return of 5 percent.
+
+## Dependent Sorts
+
+In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable. In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts guarantee that portfolios have roughly equal numbers of stocks when breakpoints are computed from all exchanges. However, if breakpoints are based only on NYSE stocks, portfolio counts will generally be uneven — reflecting the large presence of small-cap stocks on NASDAQ and AMEX (see Exercise below).
+
+To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "size"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
+
+``` r
+value_portfolios <- data_for_sorts |>
+  group_by(date) |>
+  mutate(
+    portfolio_size = assign_portfolio(
+      data = pick(everything()),
+      sorting_variable = "size",
+      n_portfolios = 5,
+      exchanges = c("NYSE")
+    )
+  ) |>
+  group_by(date, portfolio_size) |>
+  mutate(
+    portfolio_bm = assign_portfolio(
+      data = pick(everything()),
+      sorting_variable = "bm",
+      n_portfolios = 5,
+      exchanges = c("NYSE")
+    )
+  ) |>
+  group_by(date, portfolio_size, portfolio_bm) |>
+  summarize(
+    ret = weighted.mean(ret_excess, mktcap_lag),
+    .groups = "drop"
+  )
+
+value_premium <- value_portfolios |>
+  group_by(date, portfolio_bm) |>
+  summarize(ret = mean(ret), .groups = "drop_last") |>
+  summarize(
+    value_premium = ret[portfolio_bm == max(portfolio_bm)] -
+      ret[portfolio_bm == min(portfolio_bm)]
+  ) |>
+  summarize(
+    value_premium = mean(value_premium)
+  )
+```
+
+The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.3 percent per year.
+
+Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
+
+## Key Takeaways
+
+- Bivariate portfolio sorts assign stocks based on two characteristics, such as firm size and book-to-market ratio, to better capture return patterns in asset pricing.
+- Independent sorts treat each variable separately, while dependent sorts condition the second sort on the first.
+- Proper handling of accounting data, especially lagging the book-to-market ratio, is essential to avoid look-ahead bias and ensure valid backtesting.
+- Value premiums are derived by comparing returns of high versus low book-to-market portfolios, with results sensitive to sorting choices and weighting schemes.
+
+## Exercises
+
+1.  Calculate the number of stocks in each size–value portfolio under two scenarios: (i) breakpoints based on all exchanges (NYSE, AMEX, NASDAQ) and (ii) breakpoints based on NYSE stocks only. Compare the portfolio counts between the two methods and explain the differences.
+2.  In [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md), we examine the distribution of market equity. Repeat this analysis for book equity and the book-to-market ratio (alongside a plot of the breakpoints, i.e., deciles).
+3.  When we investigate the portfolios, we focus on the returns exclusively. However, it is also of interest to understand the characteristics of the portfolios. Write a function to compute the average characteristics for size and book-to-market across the 25 independently and dependently sorted portfolios.
+4.  As for the size premium, also the value premium constructed here does not follow Fama and French ([1993](#ref-Fama1993)). Implement a p-hacking setup as in [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md) to find a premium that comes closest to their HML premium.
+
+## References
+
+Fama, Eugene F., and Kenneth R. French. 1993. “Common risk factors in the returns on stocks and bonds.” *Journal of Financial Economics* 33 (1): 3–56. <https://doi.org/10.1016/0304-405X(93)90023-5>.
+
+## Footnotes
+
+[^1]: The definition of a time lag is another choice a researcher has to make, similar to breakpoint choices as we describe in [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md).

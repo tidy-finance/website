@@ -1,0 +1,382 @@
+# TRACE and FISD
+
+> **NOTE:**
+>
+> You are reading **Tidy Finance with R**. You can find the equivalent chapter for the sibling **Tidy Finance with Python** [here](../python/trace-and-fisd.llms.md).
+
+In this chapter, we dive into the US corporate bond market. Bond markets are far more diverse than stock markets, as most issuers have multiple bonds outstanding simultaneously with potentially very different indentures. This market segment is exciting due to its size (roughly 10 trillion USD outstanding), heterogeneity of issuers (as opposed to government bonds), market structure (mostly over-the-counter trades), and data availability. We introduce how to use bond characteristics from FISD and trade reports from TRACE and provide code to download and clean TRACE in R.
+
+Many researchers study liquidity in the US corporate bond market O’Hara and Zhou ([2021](#ref-Ohara2021)). We do not cover bond returns here, but you can compute them from TRACE data. Instead, we refer to studies on the topic such as Bessembinder et al. ([2008](#ref-Bessembinder2008)), Bai et al. ([2019](#ref-bai2019)), and Kelly et al. ([2021](#ref-kelly2020)) and a survey by Huang and Shi ([2021](#ref-Huang2021)). Moreover, WRDS includes bond returns computed from TRACE data at a monthly frequency.
+
+The current chapter relies on this set of R packages.
+
+``` r
+library(tidyverse)
+library(tidyfinance)
+library(dbplyr)
+library(arrow)
+library(RPostgres)
+```
+
+Compared to previous chapters, we load the `devtools` package ([Wickham et al. 2022](#ref-devtools)) to source code that we provided to the public via [gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists)
+
+## Bond Data from WRDS
+
+Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md).
+
+``` r
+wrds <- dbConnect(
+  Postgres(),
+  host = "wrds-pgdata.wharton.upenn.edu",
+  dbname = "wrds",
+  port = 9737,
+  sslmode = "require",
+  user = Sys.getenv("WRDS_USER"),
+  password = Sys.getenv("WRDS_PASSWORD")
+)
+```
+
+## Mergent FISD
+
+For research on US corporate bonds, the Mergent Fixed Income Securities Database (FISD) is the primary resource for bond characteristics. There is a [detailed manual](https://wrds-www.wharton.upenn.edu/documents/1364/FixedIncome_Securities_Master_Database_User_Guide_v4.pdf) on WRDS, so we only cover the necessary subjects here. FISD data comes in two main variants, namely, centered on issuers or issues. In either case, the most useful identifiers are [CUSIPs.](https://www.cusip.com/index.html) 9-digit CUSIPs identify securities issued by issuers. The issuers can be identified from the first six digits of a security CUSIP, which is also called 6-digit CUSIP. Both stocks and bonds have CUSIPs. This connection would, in principle, allow matching them easily, but due to changing issuer details, this approach only yields small coverage.
+
+We use the issue-centered version of FISD to identify the subset of US corporate bonds that meet the standard criteria ([Bessembinder et al. 2006](#ref-bessembinder2006)). The WRDS table `fisd_mergedissue` contains most of the information we need on a 9-digit CUSIP level. Due to the diversity of corporate bonds, details in the indenture vary significantly. We focus on common bonds that make up the majority of trading volume in this market without diverging too much in indentures.
+
+The following chunk connects to the data and selects the bond sample to remove certain bond types that are less commonly used (see, e.g., [Dick-Nielsen et al. 2012](#ref-Dick2012); [O’Hara and Zhou 2021](#ref-Ohara2021), among many others). In particular, we use the filters listed below. Note that we also treat missing values in these flags.
+
+1.  Keep only senior bonds (`security_level = 'SEN'`).
+2.  Exclude bonds which are secured lease obligations (`slob = 'N' OR slob IS NULL`).
+3.  Exclude secured bonds (`security_pledge IS NULL`).
+4.  Exclude asset-backed bonds (`asset_backed = 'N' OR asset_backed IS NULL`).
+5.  Exclude defeased bonds (`(defeased = 'N' OR defeased IS NULL) AND defeased_date IS NULL`).
+6.  Keep only the bond types US Corporate Debentures (`'CDEB'`), US Corporate Medium Term Notes (`'CMTN'`), US Corporate Zero Coupon Notes and Bonds (`'CMTZ'`, `'CZ'`), and US Corporate Bank Note (`'USBN'`).
+7.  Exclude bonds that are payable in kind (`(pay_in_kind != 'Y' OR pay_in_kind IS NULL) AND pay_in_kind_exp_date IS NULL`).
+8.  Exclude foreign (`yankee == "N" OR is.na(yankee)`) and Canadian issuers (`canadian = 'N' OR canadian IS NULL`).
+9.  Exclude bonds denominated in foreign currency (`foreign_currency = 'N'`).
+10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and annual, semi-annual, quarterly, or monthly interest frequencies.
+11. Exclude bonds that were issued under SEC Rule 144A (`rule_144a = 'N'`).
+12. Exlcude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
+13. Exclude defaulted bonds (`defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL`).
+14. Exclude convertible (`convertible = 'N'`), putable (`putable = 'N' OR putable IS NULL`), exchangeable (`exchangeable = 'N' OR exchangeable IS NULL`), perpetual (`perpetual = 'N'`), or preferred bonds (`preferred_security = 'N' OR preferred_security IS NULL`).
+15. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
+
+``` r
+fisd_mergedissue_db <- tbl(wrds, I("fisd.fisd_mergedissue"))
+
+fisd <- fisd_mergedissue_db |>
+  filter(
+    security_level == "SEN",
+    slob == "N" | is.na(slob),
+    is.na(security_pledge),
+    asset_backed == "N" | is.na(asset_backed),
+    defeased == "N" | is.na(defeased),
+    is.na(defeased_date),
+    bond_type %in%
+      c(
+        "CDEB",
+        "CMTN",
+        "CMTZ",
+        "CZ",
+        "USBN"
+      ),
+    pay_in_kind != "Y" | is.na(pay_in_kind),
+    is.na(pay_in_kind_exp_date),
+    yankee == "N" | is.na(yankee),
+    canadian == "N" | is.na(canadian),
+    foreign_currency == "N",
+    coupon_type %in%
+      c(
+        "F",
+        "Z"
+      ),
+    is.na(fix_frequency),
+    coupon_change_indicator == "N",
+    interest_frequency %in%
+      c(
+        "0",
+        "1",
+        "2",
+        "4",
+        "12"
+      ),
+    rule_144a == "N",
+    private_placement == "N" | is.na(private_placement),
+    defaulted == "N",
+    is.na(filing_date),
+    is.na(settlement),
+    convertible == "N",
+    is.na(exchange),
+    putable == "N" | is.na(putable),
+    unit_deal == "N" | is.na(unit_deal),
+    exchangeable == "N" | is.na(exchangeable),
+    perpetual == "N",
+    preferred_security == "N" | is.na(preferred_security)
+  ) |>
+  select(
+    complete_cusip,
+    maturity,
+    offering_amt,
+    offering_date,
+    dated_date,
+    interest_frequency,
+    coupon,
+    last_interest_date,
+    issue_id,
+    issuer_id
+  ) |>
+  collect()
+```
+
+We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms’ bonds. We match the data by `issuer_id`.
+
+``` r
+fisd_mergedissuer_db <- tbl(wrds, I("fisd.fisd_mergedissuer"))
+
+fisd_issuer <- fisd_mergedissuer_db |>
+  select(issuer_id, sic_code, country_domicile) |>
+  collect()
+
+fisd <- fisd |>
+  inner_join(fisd_issuer, join_by(issuer_id)) |>
+  filter(country_domicile == "USA") |>
+  select(-country_domicile)
+```
+
+To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
+
+``` r
+download_data("wrds_fisd")
+```
+
+Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
+
+``` r
+write_parquet(fisd, "data-r/fisd.parquet")
+```
+
+The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms (e.g., [Handler et al. 2021](#ref-handler2021)). Moreover, FISD also provides information on bond ratings. We do not need either here.
+
+## TRACE
+
+The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE). In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants: standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties’ roles and the direction of the trade report. These items become essential in cleaning the messages.
+
+Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by Dick-Nielsen ([2009](#ref-Dick2009)) in detail, and Dick-Nielsen ([2014](#ref-Dick2014)) shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
+
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.
+
+``` r
+fisd_cusips <- fisd |>
+  pull(complete_cusip)
+
+fisd_parts <- split(
+  fisd_cusips,
+  rep(1:10, length.out = length(fisd_cusips))
+)
+```
+
+Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches. Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
+
+``` r
+batches <- length(fisd_parts)
+
+for (j in 1:batches) {
+  trace_enhanced <- download_data(
+    type = "wrds_trace_enhanced",
+    cusips = fisd_parts[[j]],
+    start_date = ymd("2014-01-01"),
+    end_date = ymd("2016-11-30")
+  )
+
+  trace_enhanced |>
+    group_by(batch = j) |>
+    write_dataset("data-r/trace_enhanced", partitioning = "batch")
+
+  message(
+    "Batch ",
+    j,
+    " out of ",
+    batches,
+    " done (",
+    round(j / batches, 2) * 100,
+    "%)\n"
+  )
+}
+```
+
+If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
+
+``` r
+download_data(
+  "wrds_trace_enhanced",
+  cusips = c("00101JAH9"),
+  start_date = "2019-01-01",
+  end_date = "2021-12-31"
+)
+```
+
+## Insights into Corporate Bonds
+
+While many news outlets readily provide information on stocks and the underlying firms, corporate bonds are not covered frequently. Additionally, the TRACE database contains trade-level information, potentially new to students. Therefore, we provide you with some insights by showing some summary statistics.
+
+We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016.
+
+``` r
+bonds_outstanding <- expand_grid(
+  "date" = seq(ymd("2014-01-01"), ymd("2016-11-30"), by = "quarter"),
+  "complete_cusip" = fisd$complete_cusip
+) |>
+  left_join(
+    fisd |>
+      select(complete_cusip, offering_date, maturity),
+    join_by(complete_cusip)
+  ) |>
+  mutate(
+    offering_date = floor_date(offering_date),
+    maturity = floor_date(maturity)
+  ) |>
+  filter(date >= offering_date & date <= maturity) |>
+  count(date) |>
+  mutate(type = "Outstanding")
+```
+
+Next, we look at the bonds traded each quarter in the same period. Notice that we do not have to load the complete TRACE table from our dataset into memory to perform the simple aggregation. Arrow’s `open_dataset()` creates a lazy query plan that pushes all the filtering and aggregation down to its backend engine, reading only the necessary columns from Parquet and returning just the small summarized result to our session when we call `collect()`.
+
+``` r
+trace_enhanced <- open_dataset("data-r/trace_enhanced")  
+
+bonds_traded <- trace_enhanced |>
+  mutate(date = floor_date(trd_exctn_dt, "quarters")) |>
+  group_by(date) |>
+  summarize(n = n_distinct(cusip_id), type = "Traded", .groups = "drop") |> 
+  collect()
+```
+
+Finally, we plot the two time series in [Figure 1](#fig-401).
+
+``` r
+bonds_outstanding |>
+  bind_rows(bonds_traded) |>
+  ggplot(aes(
+    x = date,
+    y = n,
+    color = type,
+    linetype = type
+  )) +
+  geom_line() +
+  labs(
+    x = NULL,
+    y = NULL,
+    color = NULL,
+    linetype = NULL,
+    title = "Number of bonds outstanding and traded each quarter"
+  )
+```
+
+[![Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016.](trace-and-fisd_files/figure-html/fig-401-1.png)](trace-and-fisd_files/figure-html/fig-401-1.png "Figure 1: The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.")
+
+Figure 1: The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.
+
+We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60 percent. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).
+
+``` r
+fisd |>
+  mutate(
+    maturity = as.numeric(maturity - offering_date) / 365,
+    offering_amt = offering_amt / 10^3
+  ) |>
+  pivot_longer(
+    cols = c(maturity, coupon, offering_amt),
+    names_to = "measure"
+  ) |>
+  drop_na() |>
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q50 = quantile(value, 0.50),
+    q95 = quantile(value, 0.95),
+    max = max(value)
+  )
+```
+
+    # A tibble: 3 × 8
+      measure        mean     sd    min   q05    q50    q95    max
+      <chr>         <dbl>  <dbl>  <dbl> <dbl>  <dbl>  <dbl>  <dbl>
+    1 coupon         5.96   2.63  0     2       5.98   10      39 
+    2 maturity       9.48   8.99 -6.24  1.03    7.04   30.0   101.
+    3 offering_amt 362.   557.    0.001 0.608 150    1250   15000 
+
+We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6 percent in coupons.
+
+Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
+
+``` r
+trace_enhanced |>
+  group_by(trd_exctn_dt) |>
+  summarize(
+    trade_size = sum(entrd_vol_qt * rptd_pr / 100) / 10^6,
+    trade_number = n(),
+    .groups = "drop"
+  ) |>
+  collect() |> 
+  pivot_longer(cols = c(trade_size, trade_number), names_to = "measure") |>
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q50 = quantile(value, 0.50),
+    q95 = quantile(value, 0.95),
+    max = max(value)
+  )
+```
+
+    # A tibble: 2 × 8
+      measure        mean    sd   min    q05    q50    q95    max
+      <chr>         <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
+    1 trade_number 25914. 5444. 439   17844. 26051  34383. 40839 
+    2 trade_size   12968. 3577.  17.2  6128. 13421. 17850. 21312.
+
+On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
+
+## Key Takeaways
+
+- The US corporate bond market is large, diverse, and primarily trades over-the-counter, making it an important yet complex subject of financial research.
+- The Mergent FISD database on WRDS provides detailed bond characteristics, which are essential for selecting a representative sample of US corporate bonds.
+- Enhanced TRACE data includes uncapped trade volumes and dealer roles, offering valuable insights into bond market liquidity and trade execution.
+- Cleaning TRACE data is crucial, as trades may be corrected or canceled shortly after reporting, but automated functions in the `tidyfinance` R package simplify this task.
+
+## Exercises
+
+1.  Compute the amount outstanding across all bonds over time. Make sure to subtract all matured bonds. How would you describe the resulting plot?
+2.  Compute the number of days each bond is traded (accounting for the bonds’ maturities and issuances). Start by looking at the number of bonds traded each day in a graph similar to the one above. How many bonds trade on more than 75 percent of trading days?
+3.  WRDS provides more information from Mergent FISD such as ratings in the table `fisd_ratings`. Download the ratings table and plot the distribution of ratings for the different rating providers. How would you map the different providers to a common numeric rating scale?
+
+## References
+
+Bai, Jennie, Turan G Bali, and Quan Wen. 2019. “Common risk factors in the cross-section of corporate bond returns.” *Journal of Financial Economics* 131 (3): 619–42. <https://doi.org/10.1016/j.jfineco.2018.08.002>.
+
+Bessembinder, Hendrik, Kathleen M Kahle, William F Maxwell, and Danielle Xu. 2008. “Measuring abnormal bond performance.” *Review of Financial Studies* 22 (10): 4219–58. <https://doi.org/10.1093/rfs/hhn105>.
+
+Bessembinder, Hendrik, William Maxwell, and Kumar Venkataraman. 2006. “Market transparency, liquidity externalities, and institutional trading costs in corporate bonds.” *Journal of Financial Economics* 82 (2): 251–88. <https://doi.org/10.1016/j.jfineco.2005.10.002>.
+
+Dick-Nielsen, Jens. 2009. “Liquidity biases in TRACE.” *The Journal of Fixed Income* 19 (2): 43–55. <https://doi.org/10.3905/jfi.2009.19.2.043>.
+
+Dick-Nielsen, Jens. 2014. “How to clean enhanced TRACE data.” *Working Paper*. <https://ssrn.com/abstract=2337908>.
+
+Dick-Nielsen, Jens, Peter Feldhütter, and David Lando. 2012. “Corporate bond liquidity before and after the onset of the subprime crisis.” *Journal of Financial Economics* 103 (3): 471–92. <https://doi.org/10.1016/j.jfineco.2014.06.001>.
+
+Edwards, Amy K., Lawrence E. Harris, and Michael S. Piwowar. 2007. “Corporate bond market transaction costs and transparency.” *The Journal of Finance* 62 (3): 1421–51. <https://doi.org/10.1111/j.1540-6261.2007.01240.x>.
+
+Handler, Lukas, Rainer Jankowitsch, and Patrick Weiss. 2021. “Covenant prices of US corporate bonds.” *Working Paper*. <https://dx.doi.org/10.2139/ssrn.3827385>.
+
+Huang, Jing-Zhi, and Zhan Shi. 2021. “What do we know about corporate bond returns?” *Annual Review of Financial Economics* 13 (1): 363–99. <https://doi.org/10.1146/annurev-financial-110118-123129>.
+
+Kelly, Bryan T., Diogo Palhares, and Seth Pruitt. 2021. “Modeling corporate bond returns.” *Working Paper*. <https://dx.doi.org/10.2139/ssrn.3720789>.
+
+O’Hara, Maureen, and Xing Alex Zhou. 2021. “Anatomy of a liquidity crisis: Corporate bonds in the COVID-19 crisis.” *Journal of Financial Economics* 142 (1): 46–68. <https://doi.org/10.1016/j.jfineco.2021.05.052>.
+
+Wickham, Hadley, Jim Hester, Winston Chang, and Jennifer Bryan. 2022. *devtools: Tools to make developing R packages easier*. <https://devtools.r-lib.org/>.

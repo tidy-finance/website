@@ -1,0 +1,162 @@
+# Tidy Finance with Python
+
+# Preface
+
+[![](../assets/img/cover-book-python.jpg)](../support.llms.md)
+
+This website is the online version of Tidy Finance with Python, a book soon available via Chapman & Hall/CRC. The book is the result of a joint effort of [Christoph Scheuch](https://christophscheuch.github.io/?utm_source=tidy-finance.org), [Stefan Voigt](https://voigtstefan.me/?utm_source=tidy-finance.org), [Patrick Weiss](https://sites.google.com/view/patrick-weiss?utm_source=tidy-finance.org), and [Christoph Frey](https://sites.google.com/site/christophfrey/?utm_source=tidy-finance.org).
+
+We are grateful for any kind of feedback on *every* aspect of the book. So please get in touch with us via <contact@tidy-finance.org> if you spot typos, discover any issues that deserve more attention, or if you have suggestions for additional chapters and sections. Additionally, let us know if you found the text helpful. We look forward to hearing from you!
+
+> **NOTE:**
+>
+> Buy our book *Tidy Finance with Python* via your preferred vendor or support us with coffee [here](../support.llms.md).
+
+## Why Does This Book Exist?
+
+Over our academic careers, we are continuously surprised by the lack of publicly available code for seminal papers or even textbooks in finance. This opaqueness and secrecy is particularly costly for young, aspiring financial economists. To tackle this issue, we started working on *Tidy Finance* to lift the curtain on reproducible finance. These efforts resulted in the book [Tidy Finance with R](../r/index.llms.md) ([Scheuch et al. 2023](#ref-scheuch2023)), which provides a fully transparent code base in R for many common financial applications.
+
+Since the book’s publication, we received great feedback from students and teachers alike. However, one of the most common comments was that many interested coders are constrained and have to use Python in their institutions. We really love R for data analysis tasks, but we acknowledge the flexibility and popularity of Python. Hence, we decided to increase our team of authors with a Python expert and extend Tidy Finance to another programming language following the same tidy principles.
+
+## Who Should Read This Book?
+
+We write this book for three audiences:
+
+- Students who want to acquire the basic tools required to conduct financial research ranging from the undergraduate to graduate level. The book’s structure is simple enough such that the material is sufficient for self-study purposes.
+- Instructors who look for materials to teach courses in empirical finance or financial economics. We choose a wide range of topics, from data handling and factor replication to portfolio allocation and option pricing, to offer something for every course and study focus. We provide plenty of examples and focus on intuitive explanations that can easily be adjusted or expanded. At the end of each chapter, we provide exercises that we hope inspire students to dig deeper.
+- Practitioners like portfolio managers who like to validate and implement trading ideas or data analysts or statisticians who work with financial data and who need practical tools to succeed.
+
+## What Will You Learn?
+
+The book is divided into five parts:
+
+- The first part helps you to set up your Python development environment and introduces you to essential programming concepts around which our approach to Tidy Finance revolves.
+- The second part provides tools to organize your data and prepare the most common datasets used in financial research. Although many important data are behind paywalls, we start by describing different open-source data and how to download them. We then move on to prepare two of the most popular datasets in financial research: CRSP and Compustat. Then, we cover corporate bond data from TRACE. We reuse the data from these chapters in all subsequent chapters. The last chapter of this part contains an overview of common alternative data providers for which direct access via R packages exists.
+- The third part deals with key concepts of empirical asset pricing, such as beta estimation, portfolio sorts, performance analysis, and asset pricing regressions.
+- In the fourth part, we apply linear models to panel data and machine learning methods to problems in factor selection and option pricing.
+- The last part provides approaches for portfolio optimization and backtesting procedures.
+
+Each chapter is self-contained and can be read individually. Yet, the data chapters provide an important background necessary for data management in all other chapters.
+
+## What Won’t You Learn?
+
+This book is about empirical work. We believe that our comparative advantage is to provide a thorough implementation of typical approaches such as portfolio sorts, backtesting procedures, regressions, machine learning methods, or other related topics in empirical finance. While we assume only basic knowledge of statistics and econometrics, we do not provide detailed treatments of the underlying theoretical models or methods applied in this book. Instead, you find references to the seminal academic work in journal articles or textbooks for more detailed treatments. Moreover, although we enrich our implementations by discussing the nitty-gritty choices you face while conducting empirical analyses, we refrain from deriving theoretical models or extensively discussing the statistical properties of well-established tools.
+
+In addition, we also do not explain all the functionalities and details about the Python functions we use. We only delve into the empirical research focus and data transformation logic and want to refer attentive readers to consult the package documentations for more information. In other words, this is not a book to learn Python from scratch. It is a book on how to use Python as a tool to produce consistent and replicable empirical results.
+
+That being said, our book is close in spirit to other books that provide fully reproducible code for financial applications. We view them as complementary to our work and want to highlight the differences:
+
+- Hilpisch ([2018](#ref-Hilpisch2018)) is a great introduction to the power of Python for financial applications. It does a great job explaining the basics of the Python language, its programming structure, and packages like `pandas`, `SciPy`, and `numpy` and uses these methods for actual applications. The book and a series of [follow-up books](https://home.tpq.io/books/) from the same author about financial data science, artificial intelligence, and algorithmic trading primarily target practitioners and have a hands-on focus. Our book, in contrast, emphasizes reproducibility and starts with the applications right away to utilize Python as the tool to perform data transformations and statistical analysis. Hence, we clearly focus on state-of-the-art applications for academic research in finance. Thus, we fill a niche that allows aspiring researchers or instructors to rely on a well-designed code base.
+- Furthermore, Weiming ([2019](#ref-Weiming2019)) and Kelliher ([2022](#ref-Kelliher2022)) are comprehensive introductions to quantitative finance with a greater focus on option pricing, quantitative modeling for various markets besides equity, and algorithmic trading. Again, these books are primarily written for finance professionals to introduce Python or enhance their Python knowledge.
+- Coqueret and Guida ([2023](#ref-Coqueret2023)) constitutes a great compendium to our book concerning applications related to return prediction and portfolio formation. The book primarily targets practitioners and has a hands-on focus. Our book, in contrast, relies on the typical databases used in financial research and focuses on the preparation of such datasets for academic applications. In addition, our chapter on machine learning focuses on factor selection instead of return prediction.
+
+Although we emphasize the importance of reproducible workflow principles, we do not provide introductions to some of the core tools that we relied on to create and maintain this book:
+
+- Version control systems such as [Git](https://git-scm.com/) are vital in managing any programming project. Originally designed to organize the collaboration of software developers, even solo data analysts will benefit from adopting version control. Git also makes it simple to publicly share code and allow others to reproduce your findings. We refer to Bryan ([2022](#ref-Bryan2022)) for a gentle introduction to the (sometimes painful) life with Git.
+- Good communication of results is a key ingredient to reproducible and transparent research. To compile this book, we heavily draw on a suite of fantastic open-source tools. First, Kibirige ([2023](#ref-plotnine)) provides a highly customizable yet easy-to-use system for creating data visualizations based on the Grammar of Graphics ([Wilkinson 2012](#ref-Wilkinson2012)). Second, in our daily work and to compile this book, we used Quarto, an open-source scientific and technical publishing system described in Allaire et al. ([2023](#ref-AllaireQuarto2022)). Markdown documents are fully reproducible and support static and dynamic output formats. We do not provide introductions to these tools, as the resources above already provide easily accessible tutorials.
+- Good writing is also important for the presentation of findings. We neither claim to be experts in this domain nor do we try to sound particularly academic. On the contrary, we deliberately use a more colloquial language to describe all the methods and results presented in this book in order to allow our readers to relate more easily to the rather technical content. For those who desire more guidance with respect to formal academic writing for financial economics, we recommend Kiesling ([2003](#ref-Kiesling2003)), Cochrane ([2005](#ref-Cochrane2005)), and Jacobsen ([2014](#ref-Jacobsen2014)), who all provide essential tips (condensed to a few pages).
+
+## Why Tidy?
+
+As you start working with data, you quickly realize that you spend a lot of time reading, cleaning, and transforming your data. In fact, it is often said that more than 80 percent of data analysis is spent on preparing data. By *tidying data*, we want to structure datasets to facilitate further analyses. As Wickham ([2014](#ref-Wickham2014)) puts it:
+
+> \[T\]idy datasets are all alike, but every messy dataset is messy in its own way. Tidy datasets provide a standardized way to link the structure of a dataset (its physical layout) with its semantics (its meaning).
+
+In its essence, tidy data follows these three principles:
+
+1.  Every column is a variable.
+2.  Every row is an observation.
+3.  Every cell is a single value.
+
+Throughout this book, we try to follow these principles as best as possible. If you want to learn more about tidy data principles in an informal manner, we refer you to [this vignette](https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html) as part of Wickham and Girlich ([2022](#ref-tidyr)).
+
+In addition to the data layer, there are also tidy coding principles outlined in [the tidy tools manifesto](https://tidyverse.tidyverse.org/articles/manifesto.html) that we try to follow:
+
+1.  Reuse existing data structures.
+2.  Compose simple functions.
+3.  Embrace functional programming.
+4.  Design for humans.
+
+## Why Python?
+
+Python ([Python Software Foundation 2023](#ref-python)) is an open-source, general-purpose, high-level programming language widely used across various industries. Python is prevalent for data science according to the Python Developers Survey ([Foundation and JetBrains 2022](#ref-pythonsurvey)), particularly for financial applications. Similar to R, the Python community values readable and straightforward code. Thus, Python is an excellent choice for first-time programmers. At the same time, experienced researchers in financial economics and analysts benefit from the wide range of possibilities to express complex ideas with concise and understandable code. Some of the highlights of Python include:
+
+- Open-source: Python uses a source license, making it usable and distributable for academic and commercial use.
+- Flexibility: Python’s extensive ecosystem of standard libraries and community-contributed modules allows for all kinds of unique projects. It seamlessly integrates various data sources and APIs, facilitating efficient data retrieval and processing.
+- Versatility: Python is a cross-platform, multipurpose language that can be used to write fast low-level executable code, large applications, and even graphical user interfaces (GUI).
+- Speed: Python is fast. In addition, parallelization is straightforward to implement in order to tackle big data problems without hassle.
+- Robustness: Python provides robust tools for data manipulation, analysis, and visualization, which are crucial components in finance research.
+- Importance: The language’s active community support and continuous development ensure access to cutting-edge technologies and methodologies. Learning Python enhances one’s ability to conduct sophisticated financial analysis, making it a valuable skill for professionals across diverse fields.
+
+The so-called *Zen of Python* by Tim Peters summarizes its major syntax guidelines for structured, tidy, and human-readable code. It is easily accessible in every Python environment through:
+
+``` python
+import this
+```
+
+Python comes in many flavors, and endless external packages extend the possibilities for conducting financial research. Any code we provide echoes some arguably subjective decisions we have taken to comply with our idea of what Tidy Finance comprises: Code should not simply yield the correct output but should be easy to read. Therefore, we advocate using chaining, which is the practice of calling multiple methods in a sequence, each operating on the result of the previous step.
+
+Further, the entire book rests on tidy data, which we handle with a small set of powerful packages proven effective: `pandas` and `numpy`. Regarding visualization (which we deem highly relevant to provide a fundamentally human-centered experience), we follow the Grammars of Graphics’ philosophical framework ([Wilkinson 2012](#ref-Wilkinson2012)), which has been carefully implemented using `plotnine`.
+
+Arguably, neither chaining commands nor using the Grammar of Graphics can be considered mainstream within the Python ecosystem for financial research (yet). We believe in the value of the workflows we teach and practice on a daily basis. Therefore, we also believe that adopting such coding principles will dramatically increase in the near future. For more information on why Python is great, we refer to Hilpisch ([2018](#ref-Hilpisch2018)).
+
+## About the Authors
+
+- [**Christoph Scheuch**](https://christophscheuch.github.io/) is an independent data science and business intelligence expert, currently serving as an external lecturer at Humboldt University of Berlin and as a summer school instructor at the Barcelona School of Economics. Previously, he was the Head of AI, Director of Product, and Head of BI & Data Science at the social trading platform [wikifolio.com](https://www.wikifolio.com/). He also was an external lecturer at the [Vienna University of Economics and Business (WU)](https://www.wu.ac.at/en/), where he obtained his PhD in finance as part of the [Vienna Graduate School of Finance (VGSF)](https://www.vgsf.ac.at/).
+- [Stefan Voigt](https://voigtstefan.me/) is an Assistant Professor of Finance at the [Department of Economics at the University in Copenhagen](https://www.economics.ku.dk/) and a research fellow at the [Danish Finance Institute.](https://danishfinanceinstitute.dk/) His research focuses on blockchain technology, high-frequency trading, and financial econometrics. Stefan’s research has been published in the leading finance and econometrics journals and he received the Danish Finance Institute Teaching Award 2022 for his courses for students and practitioners on empirical finance based on Tidy Finance.  
+- [Patrick Weiss](https://sites.google.com/view/patrick-weiss) is an Assistant Professor of Finance at [Reykjavik University](https://en.ru.is) and an external lecturer at the [Vienna University of Economics and Business.](https://www.wu.ac.at/en/) His research activity centers around the intersection of empirical asset pricing and corporate finance, with his research appearing in leading journals in financial economics. Patrick is especially passionate about empirical asset pricing and strives to understand the impact of methodological uncertainty on research outcomes.
+- [Christoph Frey](https://sites.google.com/site/christophfrey/) is a Quantitative Researcher and Portfolio Manager at a family office in Hamburg and Research Fellow at the [Centre for Financial Econometrics, Asset Markets and Macroeconomic Policy](https://www.lancaster.ac.uk/lums/research/areas-of-expertise/centre-for-financial-econometrics-asset-markets-and-macroeconomic-policy/) at Lancaster University. Prior to this, he was the leading quantitative researcher for systematic multi-asset strategies at [Berenberg Bank](https://www.berenberg.de/) and worked as an Assistant Professor at the [Erasmus Universiteit Rotterdam](https://www.eur.nl/). Christoph published research on Bayesian Econometrics and specializes in financial econometrics and portfolio optimization problems.
+
+## License
+
+This book is licensed to you under [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). The code samples in this book are licensed under [Creative Commons CC0 1.0 Universal (CC0 1.0), i.e., public domain](https://creativecommons.org/publicdomain/zero/1.0/). You can cite the Python project as follows:
+
+> Scheuch, C., Voigt, S., Weiss, P., & Frey, C. (2024). Tidy Finance with Python (1st ed.). Chapman and Hall/CRC <https://www.tidy-finance.org>
+
+You can also use the following BibTeX entry:
+
+``` bibtex
+@book{Scheuch2024,
+  title = {Tidy Finance with Python},
+  author = {Scheuch, Christoph and Voigt, Stefan and Weiss, Patrick and Frey, Christoph},
+  year = {2024},
+  publisher = {Chapman and Hall/CRC},
+  edition = {1st},
+  url = {https://tidy-finance.org/python},
+  doi = {https://doi.org/10.1201/9781032684307}
+}
+```
+
+## References
+
+Allaire, J. J., Charles Teague, Carlos Scheidegger, Yihui Xie, and Christophe Dervieux. 2023. *Quarto*. [Https://github.com/quarto-dev/quarto-cli](https://github.com/quarto-dev/quarto-cli). <https://doi.org/10.5281/zenodo.5960048>.
+
+Bryan, Jennifer. 2022. *Happy Git and GitHub for the useR*. [Https://github.com/jennybc/happy-git-with-r](https://github.com/jennybc/happy-git-with-r).
+
+Cochrane, John H. 2005. “Writing tips for PhD students.” *Note*. <https://www.johnhcochrane.com/research-all/writing-tips-for-phd-studentsnbsp>.
+
+Coqueret, Guillaume, and Tony Guida. 2023. *Machine learning for factor investing: Python version*. Chapman; Hall/CRC. <https://www.mlfactor.com/>.
+
+Foundation, Python Software, and JetBrains. 2022. *Python Developers Survey 2022 Results*. [Https://lp.jetbrains.com/python-developers-survey-2022/](https://lp.jetbrains.com/python-developers-survey-2022/).
+
+Hilpisch, Yves. 2018. *Python for Finance*. Second. O’Reilly Media, Inc. <https://www.oreilly.com/library/view/python-for-finance/9781492024323/>.
+
+Jacobsen, Ben. 2014. “Some research and writing tips.” *Note*. <https://albertjmenkveld.com/text/Jacobsen14.pdf>.
+
+Kelliher, Chris. 2022. *Quantitative Finance with Python*. 1st ed. Chapman; Hall/CRC. https://doi.org/<https://doi.org/10.1201/9781003180975>.
+
+Kibirige, Hassan. 2023. *Plotnine: An Implementation of the Grammar of Graphics in Python*. [Https://pypi.org/project/plotnine/](https://pypi.org/project/plotnine/).
+
+Kiesling, Lynne. 2003. “Writing tips for economics (and pretty much anything else).” *Note*. <https://nuwrite.northwestern.edu/communities/social-sciences/economics/docs/writing-advice-for-papers-in-economics/Kiesling%20writingguidelines.pdf>.
+
+Python Software Foundation. 2023. *Python Language Reference, Version 3.10.11*.
+
+Scheuch, Christoph, Stefan Voigt, and Patrick Weiss. 2023. *Tidy Finance with R*. 1st ed. Chapman; Hall/CRC. https://doi.org/<https://doi.org/10.1201/b23237>.
+
+Weiming, James Ma. 2019. *Mastering Python for Finance*. 2nd ed. Packt. https://doi.org/<https://www.packtpub.com/product/mastering-python-for-finance-second-edition/9781789346466>.
+
+Wickham, Hadley. 2014. “Tidy data.” *Journal of Statistical Software* 59 (1): 1–23. <https://doi.org/10.18637/jss.v059.i10>.
+
+Wickham, Hadley, and Maximilian Girlich. 2022. *tidyr: Tidy messy data*. <https://CRAN.R-project.org/package=tidyr>.
+
+Wilkinson, Leland. 2012. *The grammar of graphics*. Springer.
