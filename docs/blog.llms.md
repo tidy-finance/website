@@ -134,18 +134,6 @@ Christoph Scheuch
 
 Oct 2, 2023
 
-![A 3D computer-rendered image of a stylized company building on a screen in the middle of a room. Created with DALL-E 2.](./blog/tidy-finance-dummy-data/thumbnail.png)
-
-##### Dummy Data for Tidy Finance Readers without Access to WRDS
-
-12 min
-
-R code to generate dummy data that can be used to run the code chunks in Tidy Finance with R
-
-Christoph Scheuch
-
-Sep 26, 2023
-
 ![A 3D computer-rendered image of a stylized bar with the name BOND on a street in the style of New York of the 1960s.](./blog/convert-raw-trace-data/thumbnail.png)
 
 ##### Convert Raw TRACE Data to a Local SQLite Database
@@ -217,6 +205,8 @@ You can learn Tidy Finance and support Ukraine at the same time
 Patrick Weiss
 
 Nov 19, 2022
+
+![](./blog/user-conference-2022/thumbnail.png)
 
 ##### Tidy Finance at the useR!2022 Conference
 
