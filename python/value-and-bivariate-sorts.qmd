@@ -47,7 +47,7 @@ book_equity = (pl.read_parquet("data-python/compustat_annual.parquet")
     .select(["gvkey", "datadate", "be"])
     .drop_nulls()
     .with_columns(
-        date=pl.col("datadate").cast(pl.Datetime("ns")).dt.truncate("1mo")
+        date=pl.col("datadate").dt.truncate("1mo")
     )
 )
 ```
@@ -115,6 +115,10 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
       method="linear"
     )
     breakpoints = np.unique(breakpoints)
+    if breakpoints.size < 2:
+        # Degenerate group (e.g., a single stock): no interior breakpoints,
+        # so all observations end up in a single portfolio
+        breakpoints = np.array([-np.inf, np.inf])
     breakpoints[0] = -np.inf
     breakpoints[-1] = np.inf
 
@@ -192,36 +196,48 @@ In the previous exercise, we assigned the portfolios without considering the sec
 To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable="me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{python}
-value_portfolios = (data_for_sorts
-    .group_by("date")
-    .map_groups(lambda x: x.with_columns(
-        portfolio_size=assign_portfolio(
-            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
-        )
+value_portfolios = (
+    data_for_sorts.group_by("date")
+    .map_groups(
+        lambda x: x.with_columns(
+            portfolio_size=assign_portfolio(
+                data=x,
+                sorting_variable="size",
+                n_portfolios=5,
+                exchanges=["NYSE"],
+            )
         )
     )
     .group_by("date", "portfolio_size")
-    .map_groups(lambda x: x.with_columns(
-        portfolio_bm=assign_portfolio(
-            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
-        )
+    .map_groups(
+        lambda x: x.with_columns(
+            portfolio_bm=assign_portfolio(
+                data=x,
+                sorting_variable="bm",
+                n_portfolios=5,
+                exchanges=["NYSE"],
+            )
         )
     )
     .group_by(["date", "portfolio_bm", "portfolio_size"])
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
-            / pl.col("mktcap_lag").sum()
+        / pl.col("mktcap_lag").sum()
     )
 )
 
-value_premium = (value_portfolios
-    .group_by(["date", "portfolio_bm"])
+value_premium = (
+    value_portfolios.group_by(["date", "portfolio_bm"])
     .agg(ret=pl.col("ret").mean())
     .group_by("date")
     .agg(
         value_premium=(
-            pl.col("ret").filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").max()).mean() -
-            pl.col("ret").filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").min()).mean()
+            pl.col("ret")
+            .filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").max())
+            .mean()
+            - pl.col("ret")
+            .filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").min())
+            .mean()
         )
     )
     .select(pl.col("value_premium").mean())

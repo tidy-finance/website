@@ -114,9 +114,13 @@ def assign_portfolio(data, sorting_variable, percentiles):
 
     assigned_portfolios = (data
       .select(pl.col(sorting_variable)
-        .cut(list(breakpoints[1:-1]), left_closed=True)
-        .to_physical()
-        .add(1)
+        .cut(
+            list(breakpoints[1:-1]),
+            labels=[str(i) for i in range(1, len(breakpoints))],
+            left_closed=True
+        )
+        .cast(pl.String)
+        .cast(pl.Int64)
         .alias("portfolio")
       )
       .get_column("portfolio")
@@ -240,7 +244,7 @@ portfolios = (sorting_variables
         portfolio_size=assign_portfolio(x, "size", [0, 0.5, 1])
         )
     )
-    .group_by(["sorting_date", "portfolio_size"])
+    .group_by("sorting_date", "portfolio_size")
     .map_groups(lambda x: x
         .with_columns(
         portfolio_bm=assign_portfolio(x, "bm", [0, 0.3, 0.7, 1]),
