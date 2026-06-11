@@ -79,10 +79,11 @@ The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages
 To get started, we load the required packages and data. The main focus is on the workflow behind the `scikit-learn` [@scikit-learn] package collection. 
 
 ```{python}
+import polars as pl
 import pandas as pd
 import numpy as np
 
-from plotnine import * 
+from plotnine import *
 from mizani.formatters import percent_format, date_format
 from itertools import product
 from sklearn.model_selection import (
@@ -114,41 +115,45 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 In line with many existing papers, we use monthly portfolio returns from ten different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macroeconomic predictors}\index{Data!Industry portfolios}
 
 ```{python, eval = TRUE}
-factors_ff3_monthly = pd.read_parquet(
-    "data-python/factors_ff3_monthly.parquet"
-).add_prefix("factor_ff_")
+factors_ff3_monthly = (
+    pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .rename(lambda c: f"factor_ff_{c}")
+)
 
-factors_q_monthly = pd.read_parquet(
-    "data-python/factors_q_monthly.parquet"
-).add_prefix("factor_q_")
+factors_q_monthly = (
+    pl.read_parquet("data-python/factors_q_monthly.parquet")
+    .rename(lambda c: f"factor_q_{c}")
+)
 
-macro_predictors = pd.read_parquet(
-    "data-python/macro_predictors.parquet"
-).add_prefix("macro_")
+macro_predictors = (
+    pl.read_parquet("data-python/macro_predictors.parquet")
+    .rename(lambda c: f"macro_{c}")
+)
 
-industries_ff_monthly = pd.read_parquet(
-    "data-python/industries_ff_monthly.parquet"
-).melt(id_vars="date", var_name="industry", value_name="ret")
+industries_ff_monthly = (
+    pl.read_parquet("data-python/industries_ff_monthly.parquet")
+    .unpivot(index="date", variable_name="industry", value_name="ret")
+)
 ```
 
 We combine all the monthly observations into one dataframe.
 
 ```{python}
 data = (industries_ff_monthly
-  .merge(factors_ff3_monthly, 
-         how="left", left_on="date", right_on="factor_ff_date")
-  .merge(factors_q_monthly, 
-         how="left", left_on="date", right_on="factor_q_date")
-  .merge(macro_predictors, 
-         how="left", left_on="date", right_on="macro_date") 
-  .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_risk_free"]) 
-  .drop(columns=["ret", "factor_ff_date", "factor_q_date", "macro_date"])
-  .dropna()
+  .join(factors_ff3_monthly,
+        how="left", left_on="date", right_on="factor_ff_date")
+  .join(factors_q_monthly,
+        how="left", left_on="date", right_on="factor_q_date")
+  .join(macro_predictors,
+        how="left", left_on="date", right_on="macro_date")
+  .with_columns(ret_excess=pl.col("ret") - pl.col("factor_ff_risk_free"))
+  .drop("ret")
+  .drop_nulls()
 )
 ```
 
 Our data contains `{python} len(data.columns)-2` columns of regressors with the `{python} len(macro_predictors.columns) - 1` macro-variables and `{python} len(factors_ff3_monthly.columns) + len(factors_q_monthly.columns)-2` factor returns for each month. 
-@fig-1401 provides summary statistics for the `{python} len(industries_ff_monthly["industry"].value_counts())` monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries. \index{Graph!Box plot}
+@fig-1401 provides summary statistics for the `{python} industries_ff_monthly["industry"].n_unique()` monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries. \index{Graph!Box plot}
 
 ```{python}
 #| label: fig-1401
@@ -187,22 +192,20 @@ We hence perform the following pre-processing steps:
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
 
-Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. Also note that we use the `zip()` function to pair each element from `column_names` with its corresponding list of values from `new_column_values`, creating tuples, and then convert these tuples into a dictionary using `dict()` from which we create a dataframe.
+Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Because `scikit-learn` operates on `pandas` objects, we convert the data frame with `to_pandas()` at the boundary before feeding it into the modeling pipeline.
 
 ```{python}
-macro_variables = data.filter(like="macro").columns
-factor_variables = data.filter(like="factor").columns
+macro_variables = [c for c in data.columns if c.startswith("macro")]
+factor_variables = [c for c in data.columns if c.startswith("factor")]
 
 column_combinations = list(product(macro_variables, factor_variables))
 
-new_column_values = []
-for macro_column, factor_column in column_combinations:
-    new_column_values.append(data[macro_column] * data[factor_column])
+interaction_terms = [
+    (pl.col(macro_column) * pl.col(factor_column)).alias(" x ".join((macro_column, factor_column)))
+    for macro_column, factor_column in column_combinations
+]
 
-column_names = [" x ".join(t) for t in column_combinations]
-new_columns = pd.DataFrame(dict(zip(column_names, new_column_values)))
-
-data = pd.concat([data, new_columns], axis=1)
+data = data.with_columns(interaction_terms).to_pandas()
 
 preprocessor = ColumnTransformer(
   transformers=[
@@ -292,7 +295,7 @@ predicted_values_figure = (
       x="", y="", color="", linetype="",
       title="Monthly realized and fitted manufacturing risk premia"
     )
-  + scale_x_datetime(date_breaks="5 years", date_labels="%Y")
+  + scale_x_date(date_breaks="5 years", date_labels="%Y")
   + scale_y_continuous(labels=percent_format())
 )
 predicted_values_figure.show()

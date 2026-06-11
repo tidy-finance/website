@@ -37,7 +37,7 @@ We make a few simplifying assumptions due to the diverse nature of businesses, w
 In this chapter, we rely on the following packages to build a simple DCF analysis:
 
 ```{python}
-import pandas as pd
+import polars as pl
 import numpy as np
 import statsmodels.formula.api as smf
 
@@ -63,13 +63,13 @@ Before we can perform a DCF analysis, we need historical financial data to infor
 ```{python}
 symbol = "MSFT"
 
-income_statements = fmp_get(
+income_statements = pl.from_pandas(fmp_get(
   "income-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
-)
+))
 
-cash_flow_statements = fmp_get(
+cash_flow_statements = pl.from_pandas(fmp_get(
   "cash-flow-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
-)
+))
 ```
 
 Our analysis centers on Free Cash Flow (FCF), which represents the cash available to all investors after the company has covered its operational needs and capital investments.\index{Free Cash Flow} We calculate FCF using the following formula:
@@ -88,30 +88,30 @@ We can implement this calculation by combining and transforming our financial st
 
 ```{python}
 dcf_data = (income_statements
-  .assign(
-    fiscal_year=lambda x: x["fiscal_year"].astype(int),
-    ebit=lambda x: x["net_income"] + x["income_tax_expense"] + x["interest_expense"] - x["interest_income"]
+  .with_columns(
+    fiscal_year=pl.col("fiscal_year").cast(pl.Int64),
+    ebit=pl.col("net_income") + pl.col("income_tax_expense") + pl.col("interest_expense") - pl.col("interest_income")
   )
-  .get(["fiscal_year", "ebit", "revenue", "depreciation_and_amortization", "income_tax_expense"])
-  .rename(columns={
+  .select(["fiscal_year", "ebit", "revenue", "depreciation_and_amortization", "income_tax_expense"])
+  .rename({
       "fiscal_year": "year",
       "income_tax_expense": "taxes"
   })
-  .merge(
+  .join(
     (cash_flow_statements
-      .get(["fiscal_year", "change_in_working_capital", "capital_expenditure"])
-      .assign(fiscal_year=lambda x: x["fiscal_year"].astype(int))
-      .rename(columns={
+      .select(["fiscal_year", "change_in_working_capital", "capital_expenditure"])
+      .with_columns(fiscal_year=pl.col("fiscal_year").cast(pl.Int64))
+      .rename({
         "fiscal_year": "year",
         "change_in_working_capital": "delta_working_capital",
         "capital_expenditure": "capex"
       })
     ), on="year", how="left"
   )
-  .assign(
-    fcf=lambda x: x["ebit"] + x["depreciation_and_amortization"] - x["taxes"] + x["delta_working_capital"] - x["capex"]
+  .with_columns(
+    fcf=pl.col("ebit") + pl.col("depreciation_and_amortization") - pl.col("taxes") + pl.col("delta_working_capital") - pl.col("capex")
   )
-  .sort_values("year")
+  .sort("year")
 )
 ```
 
@@ -126,24 +126,24 @@ First, we express each FCF component as a ratio relative to revenue. This standa
 #| fig-cap: "Ratios are based on financial statements provided through the FMP API." 
 #| fig-alt: "Title: Key forecast ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis."
 dcf_data = (dcf_data
-  .assign(
-    revenue_growth=lambda x: x["revenue"] / x["revenue"].shift(1) - 1,
-    operating_margin=lambda x: x["ebit"] / x["revenue"],
-    da_margin=lambda x: x["depreciation_and_amortization"] / x["revenue"],
-    taxes_to_revenue=lambda x: x["taxes"] / x["revenue"],
-    delta_working_capital_to_revenue=lambda x: x["delta_working_capital"] / x["revenue"],
-    capex_to_revenue=lambda x: x["capex"] / x["revenue"]
+  .with_columns(
+    revenue_growth=pl.col("revenue") / pl.col("revenue").shift(1) - 1,
+    operating_margin=pl.col("ebit") / pl.col("revenue"),
+    da_margin=pl.col("depreciation_and_amortization") / pl.col("revenue"),
+    taxes_to_revenue=pl.col("taxes") / pl.col("revenue"),
+    delta_working_capital_to_revenue=pl.col("delta_working_capital") / pl.col("revenue"),
+    capex_to_revenue=pl.col("capex") / pl.col("revenue")
   )
 )
 
 dcf_data_long = (dcf_data
-  .melt(
-    id_vars="year",
-    value_vars=[
+  .unpivot(
+    index="year",
+    on=[
       "operating_margin", "da_margin", "taxes_to_revenue",
       "delta_working_capital_to_revenue", "capex_to_revenue"
     ],
-    var_name="name",
+    variable_name="name",
     value_name="value"
   )
 )
@@ -175,7 +175,7 @@ We demonstrate this forecasting approach in @fig-501. Note that our forecast rat
 #| label: fig-501
 #| fig-cap: "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined." 
 #| fig-alt: "Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis."
-forecast_ratios = pd.DataFrame({
+forecast_ratios = pl.DataFrame({
     "year": [2026, 2027, 2028, 2029, 2030],
     "operating_margin": [0.41, 0.42, 0.43, 0.44, 0.45],
     "da_margin": [0.09, 0.09, 0.09, 0.09, 0.09],
@@ -183,25 +183,25 @@ forecast_ratios = pd.DataFrame({
     "delta_working_capital_to_revenue": [0.001, 0.001, 0.001, 0.001, 0.001],
     "capex_to_revenue": [-0.2, -0.22, -0.2, -0.18, -0.16]
 })
-forecast_ratios["type"] = "Forecast"
+forecast_ratios = forecast_ratios.with_columns(type=pl.lit("Forecast"))
 
-dcf_data["type"] = "Realized"
-dcf_data = pd.concat([dcf_data, forecast_ratios], ignore_index=True)
+dcf_data = dcf_data.with_columns(type=pl.lit("Realized"))
+dcf_data = pl.concat([dcf_data, forecast_ratios], how="diagonal")
 
 dcf_data_long = (dcf_data
-  .melt(
-    id_vars=["year", "type"],
-    value_vars=[
+  .unpivot(
+    index=["year", "type"],
+    on=[
       "operating_margin", "da_margin", "taxes_to_revenue",
       "delta_working_capital_to_revenue", "capex_to_revenue"
     ],
-    var_name="name",
+    variable_name="name",
     value_name="value"
   )
 )
 
-dcf_data_long["type"] = pd.Categorical(
-  dcf_data_long["type"], categories=["Realized", "Forecast"]
+dcf_data_long = dcf_data_long.with_columns(
+  type=pl.col("type").cast(pl.Enum(["Realized", "Forecast"]))
 )
 
 ratios_forecast_figure = (
@@ -226,7 +226,7 @@ The final step in our FCF forecast is projecting revenue growth. While there are
 We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) database as our baseline. The WEO provides comprehensive economic projections, though it is important to note that these forecasts are periodically revised as new data becomes available.\index{Data!IMF WEO} We manually collect these forecasts and store them in a tibble.
 
 ```{python}
-gdp_growth = pd.DataFrame({
+gdp_growth = pl.DataFrame({
   "year": list(range(2021, 2031)),
   "gdp_growth": [
     0.06055, 0.02512, 0.02887, 0.02765, 0.02153,
@@ -235,23 +235,27 @@ gdp_growth = pd.DataFrame({
 })
 
 dcf_data = (dcf_data
-  .merge(gdp_growth, on="year", how="left")
+  .join(gdp_growth, on="year", how="left")
 )
 ```
 
 Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling} Let us estimate the model with historical data.
 
 ```{python}
-revenue_growth_model = smf.ols("revenue_growth ~ gdp_growth", data=dcf_data).fit().params
+revenue_growth_model = smf.ols(
+  "revenue_growth ~ gdp_growth", data=dcf_data.to_pandas()
+).fit().params
 
 dcf_data = (dcf_data
-  .assign(
-    revenue_growth_modeled=lambda x: (
-      revenue_growth_model["Intercept"] + revenue_growth_model["gdp_growth"] * x["gdp_growth"]
-    ),
-    revenue_growth=lambda x: (
-      np.where(x["type"] == "Forecast", x["revenue_growth_modeled"], x["revenue_growth"])
+  .with_columns(
+    revenue_growth_modeled=(
+      revenue_growth_model["Intercept"] + revenue_growth_model["gdp_growth"] * pl.col("gdp_growth")
     )
+  )
+  .with_columns(
+    revenue_growth=pl.when(pl.col("type") == "Forecast")
+      .then(pl.col("revenue_growth_modeled"))
+      .otherwise(pl.col("revenue_growth"))
   )
 )
 ```
@@ -263,17 +267,17 @@ The model estimates two parameters: (i) an intercept that captures the company's
 #| fig-cap: "Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts." 
 #| fig-alt: "Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis."
 revenue_growth = (dcf_data
-  .query("year >= 2021")
-  .melt(
-    id_vars=["year", "type"],
-    value_vars=["revenue_growth", "gdp_growth"], 
-    var_name="name",
+  .filter(pl.col("year") >= 2021)
+  .unpivot(
+    index=["year", "type"],
+    on=["revenue_growth", "gdp_growth"],
+    variable_name="name",
     value_name="value"
   )
 )
 
-revenue_growth["type"] = pd.Categorical(
-  revenue_growth["type"], categories=["Realized", "Forecast"]
+revenue_growth = revenue_growth.with_columns(
+  type=pl.col("type").cast(pl.Enum(["Realized", "Forecast"]))
 )
 
 revenue_growth_figure = (
@@ -298,17 +302,23 @@ While more sophisticated approaches exist (e.g., proprietary analyst forecasts o
 With all components in place - revenue growth projections and forecast ratios - we can now calculate our FCF forecasts. We must first convert our growth rates into revenue projections and then apply our forecast ratios to compute each FCF component.\index{Free Cash Flow!Computation}
 
 ```{python}
-dcf_data.loc[0, "revenue_growth"] = 0
-dcf_data["revenue"] = dcf_data["revenue"].iloc[0] * (1 + dcf_data["revenue_growth"]).cumprod()
-
 dcf_data = (dcf_data
-  .assign(
-    ebit=lambda x: x["operating_margin"] * x["revenue"],
-    depreciation_and_amortization=lambda x: x["da_margin"] * x["revenue"],
-    taxes=lambda x: x["taxes_to_revenue"] * x["revenue"],
-    delta_working_capital=lambda x: x["delta_working_capital_to_revenue"] * x["revenue"],
-    capex=lambda x: x["capex_to_revenue"] * x["revenue"],
-    fcf=lambda x: x["ebit"] + x["depreciation_and_amortization"] - x["taxes"] + x["delta_working_capital"] - x["capex"]
+  .sort("year")
+  .with_columns(
+    revenue_growth=pl.col("revenue_growth").fill_null(0)
+  )
+  .with_columns(
+    revenue=pl.col("revenue").first() * (1 + pl.col("revenue_growth")).cum_prod()
+  )
+  .with_columns(
+    ebit=pl.col("operating_margin") * pl.col("revenue"),
+    depreciation_and_amortization=pl.col("da_margin") * pl.col("revenue"),
+    taxes=pl.col("taxes_to_revenue") * pl.col("revenue"),
+    delta_working_capital=pl.col("delta_working_capital_to_revenue") * pl.col("revenue"),
+    capex=pl.col("capex_to_revenue") * pl.col("revenue"),
+  )
+  .with_columns(
+    fcf=pl.col("ebit") + pl.col("depreciation_and_amortization") - pl.col("taxes") + pl.col("delta_working_capital") - pl.col("capex")
   )
 )
 ```
@@ -352,7 +362,7 @@ Let us implement the Perpetuity Growth Model:
 def compute_terminal_value(last_fcf, growth_rate, discount_rate):
     return last_fcf * (1 + growth_rate) / (discount_rate - growth_rate)
 
-last_fcf = dcf_data['fcf'].iloc[-1]
+last_fcf = dcf_data["fcf"][-1]
 terminal_value = compute_terminal_value(
   last_fcf, growth_rate=0.04, discount_rate=0.08
 )
@@ -391,18 +401,20 @@ response = requests.get(url)
 with open("wacc.xls", "wb") as file:
     file.write(response.content)
     
-wacc_raw = pd.read_excel("wacc.xls", sheet_name=1, skiprows=18)
+wacc_raw = pl.read_excel(
+  "wacc.xls", sheet_id=2, read_options={"header_row": 18}
+)
 
 import os
 os.remove("wacc.xls")
 
-wacc = wacc_raw.loc[
-  wacc_raw["Industry Name"] == "Computer Services", "Cost of Capital"
-].values[0]
+wacc = wacc_raw.filter(
+  pl.col("Industry Name") == "Computer Services"
+)["Cost of Capital"][0]
 ```
 
 ::: {.callout-tip}
-You need the `xlrd` package to use `pd.read_excel()`, so make sure to install it via, e.g., `pip install xlrd`
+You need the `fastexcel` package to use `pl.read_excel()`, so make sure to install it via, e.g., `pip install fastexcel`
 :::
 
 ## Computing Enterprise Value
@@ -422,7 +434,7 @@ where $T$ is the length of our forecast period. Let us implement this calculatio
 
 ```{python}
 def compute_dcf(wacc, growth_rate):
-    free_cash_flow = dcf_data["fcf"].values
+    free_cash_flow = dcf_data["fcf"].to_numpy()
     last_fcf = free_cash_flow[-1]
     terminal_value = compute_terminal_value(last_fcf, growth_rate, wacc)
     
@@ -457,14 +469,16 @@ Let us implement a sensitivity analysis that varies these two parameters:
 wacc_range = np.arange(0.06, 0.08 + 0.01, 0.01)
 growth_rate_range = np.arange(0.02, 0.04 + 0.01, 0.01)
 
-sensitivity = pd.DataFrame(
-  product(wacc_range, growth_rate_range),
-  columns=["wacc", "growth_rate"]
+sensitivity = pl.DataFrame(
+  list(product(wacc_range, growth_rate_range)),
+  schema=["wacc", "growth_rate"],
+  orient="row"
 )
 
-sensitivity["value"] = (sensitivity
-  .apply(
-    lambda x: np.round(compute_dcf(x["wacc"], x["growth_rate"]) / 1e9, 0), axis=1
+sensitivity = sensitivity.with_columns(
+  value=pl.struct(["wacc", "growth_rate"]).map_elements(
+    lambda x: np.round(compute_dcf(x["wacc"], x["growth_rate"]) / 1e9, 0),
+    return_dtype=pl.Float64
   )
 )
 

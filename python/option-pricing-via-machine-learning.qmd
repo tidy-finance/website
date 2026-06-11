@@ -22,7 +22,7 @@ ML algorithms build a model based on training data in order to make predictions 
 Throughout this chapter, we need the following Python packages.
 
 ```{python}
-import pandas as pd 
+import polars as pl
 import numpy as np
 
 from plotnine import *
@@ -126,20 +126,24 @@ r = np.arange(0, 0.051, 0.01)
 T = np.arange(3 / 12, 2.01, 1 / 12)
 sigma = np.arange(0.1, 0.81, 0.1)
 
-option_prices = pd.DataFrame(
-    product(S, K, r, T, sigma), columns=["S", "K", "r", "T", "sigma"]
+option_prices = pl.DataFrame(
+    list(product(S, K, r, T, sigma)),
+    schema=["S", "K", "r", "T", "sigma"],
+    orient="row",
 )
 
-option_prices["black_scholes"] = black_scholes_price(
-    option_prices["S"].values,
-    option_prices["K"].values,
-    option_prices["r"].values,
-    option_prices["T"].values,
-    option_prices["sigma"].values,
+option_prices = option_prices.with_columns(
+    black_scholes=black_scholes_price(
+        option_prices["S"].to_numpy(),
+        option_prices["K"].to_numpy(),
+        option_prices["r"].to_numpy(),
+        option_prices["T"].to_numpy(),
+        option_prices["sigma"].to_numpy(),
+    )
 )
 
-option_prices = option_prices.assign(
-    observed_price=lambda x: (x["black_scholes"] + np.random.normal(scale=0.15))
+option_prices = option_prices.with_columns(
+    observed_price=pl.col("black_scholes") + np.random.normal(scale=0.15)
 )
 ```
 
@@ -149,7 +153,7 @@ Next, we split the data into a training set (which contains 1 percent of all the
 
 ```{python}
 train_data, test_data = train_test_split(
-    option_prices, test_size=0.01, random_state=random_state
+    option_prices.to_pandas(), test_size=0.01, random_state=random_state
 )
 ```
 
@@ -274,22 +278,17 @@ test_X = test_data.get(["S", "K", "r", "T", "sigma"])
 test_y = test_data.get("observed_price")
 
 predictive_performance = (
-    pd.concat(
-        [
-            test_data.reset_index(drop=True),
-            pd.DataFrame(
-                {
-                    "Random forest": rf_fit.predict(test_X),
-                    "Single layer": nnet_fit.predict(test_X),
-                    "Deep NN": deepnnet_fit.predict(test_X),
-                    "Lasso": lm_fit.predict(test_X),
-                }
-            ),
-        ],
-        axis=1,
+    pl.from_pandas(test_data)
+    .with_columns(
+        **{
+            "Random forest": rf_fit.predict(test_X),
+            "Single layer": nnet_fit.predict(test_X),
+            "Deep NN": deepnnet_fit.predict(test_X),
+            "Lasso": lm_fit.predict(test_X),
+        }
     )
-    .melt(
-        id_vars=[
+    .unpivot(
+        index=[
             "S",
             "K",
             "r",
@@ -298,12 +297,13 @@ predictive_performance = (
             "black_scholes",
             "observed_price",
         ],
-        var_name="Model",
+        on=["Random forest", "Single layer", "Deep NN", "Lasso"],
+        variable_name="Model",
         value_name="Predicted",
     )
-    .assign(
-        moneyness=lambda x: x["S"] - x["K"],
-        pricing_error=lambda x: np.abs(x["Predicted"] - x["black_scholes"]),
+    .with_columns(
+        moneyness=pl.col("S") - pl.col("K"),
+        pricing_error=(pl.col("Predicted") - pl.col("black_scholes")).abs(),
     )
 )
 ```

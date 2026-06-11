@@ -23,9 +23,7 @@ Typically, this investment regression uses quarterly balance sheet data provided
 The current chapter relies on the following set of Python packages. 
 
 ```{python}
-import pandas as pd
-import numpy as np
-import datetime as dt
+import polars as pl
 import pyfixest as pf
 ```
 
@@ -37,13 +35,14 @@ We use CRSP and annual Compustat as data sources from our Parquet files introduc
 
 ```{python}
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["gvkey", "date", "mktcap"])
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["gvkey", "date", "mktcap"])
+    .with_columns(date=pl.col("date").cast(pl.Date))
 )
 
 compustat_annual = (
-    pd.read_parquet("data-python/compustat_annual.parquet")
-    .get(["datadate", "gvkey", "year", "at", "be", "capx", "oancf", "txdb"])
+    pl.read_parquet("data-python/compustat_annual.parquet")
+    .select(["datadate", "gvkey", "year", "at", "be", "capx", "oancf", "txdb"])
 )
 ```
 
@@ -51,25 +50,23 @@ The classical investment regressions model is the capital investment of a firm a
 
 ```{python}
 data_investment = (compustat_annual
-    .assign(
-        date=lambda x: (
-        pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()
-        )
+    .with_columns(
+        date=pl.col("datadate").cast(pl.Date).dt.truncate("1mo")
     )
-    .merge(compustat_annual
-            .get(["gvkey", "year", "at"])
-            .rename(columns={"at": "at_lag"})
-            .assign(year=lambda x: x["year"]+1), 
+    .join(compustat_annual
+            .select(["gvkey", "year", "at"])
+            .rename({"at": "at_lag"})
+            .with_columns(year=pl.col("year")+1),
             on=["gvkey", "year"], how="left")
-    .query("at > 0 and at_lag > 0")
-    .assign(investment=lambda x: x["capx"]/x["at_lag"],
-            cash_flows=lambda x: x["oancf"]/x["at_lag"])                   
+    .filter((pl.col("at") > 0) & (pl.col("at_lag") > 0))
+    .with_columns(investment=pl.col("capx")/pl.col("at_lag"),
+                  cash_flows=pl.col("oancf")/pl.col("at_lag"))
 )
 
 data_investment = (data_investment
-    .merge(data_investment.get(["gvkey", "year", "investment"])
-            .rename(columns={"investment": "investment_lead"})
-            .assign(year=lambda x: x["year"]-1), 
+    .join(data_investment.select(["gvkey", "year", "investment"])
+            .rename({"investment": "investment_lead"})
+            .with_columns(year=pl.col("year")-1),
             on=["gvkey", "year"], how="left")
 )
 ```
@@ -78,36 +75,38 @@ Tobin's q is the ratio of the market value of capital to its replacement costs.\
 
 ```{python}
 data_investment = (data_investment
-    .merge(crsp_monthly, on=["gvkey", "date"], how="left")
-    .assign(
-        tobins_q=lambda x: (
-        (x["mktcap"]+x["at"]-x["be"]+x["txdb"])/x["at"]
+    .join(crsp_monthly, on=["gvkey", "date"], how="left")
+    .with_columns(
+        tobins_q=(
+        (pl.col("mktcap")+pl.col("at")-pl.col("be")+pl.col("txdb"))/pl.col("at")
         )
     )
-    .get(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
-    .dropna()
+    .select(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
+    .drop_nulls()
 )
 ```
 
-As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.^[Note that in `pandas`, when you index a dataframee, you receive a reference to the original dataframee. Consequently, modifying a subset will directly impact the initial dataframee. To prevent unintended changes to the original dataframee, it is advisable to use the `copy()` method as we do here in the `winsorize` function.]
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.^[Note that `polars` operations never modify a data frame in place; every expression returns a new data frame. Our `winsorize` function therefore returns a `polars` expression that we apply via `with_columns()`, so the original data frame is never altered unintentionally.]
 
 ```{python}
-def winsorize(x, cut):
-    """Winsorize returns at cut level."""
-    
-    tmp_x = x.copy()
-    upper_quantile=np.nanquantile(tmp_x, 1 - cut)
-    lower_quantile=np.nanquantile(tmp_x, cut)
-    tmp_x[tmp_x > upper_quantile]=upper_quantile
-    tmp_x[tmp_x < lower_quantile]=lower_quantile
-    
-    return tmp_x
+def winsorize(col, cut):
+    """Winsorize a column at cut level."""
+
+    x = pl.col(col)
+    upper_quantile = x.quantile(1 - cut)
+    lower_quantile = x.quantile(cut)
+    return (
+        pl.when(x > upper_quantile).then(upper_quantile)
+        .when(x < lower_quantile).then(lower_quantile)
+        .otherwise(x)
+        .alias(col)
+    )
 
 data_investment = (data_investment
-    .assign(
-        investment_lead=lambda x: winsorize(x["investment_lead"], 0.01),
-        cash_flows=lambda x: winsorize(x["cash_flows"], 0.01),
-        tobins_q=lambda x: winsorize(x["tobins_q"], 0.01)
+    .with_columns(
+        winsorize("investment_lead", 0.01),
+        winsorize("cash_flows", 0.01),
+        winsorize("tobins_q", 0.01)
     )
 )
 ```
@@ -116,13 +115,24 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 
 ```{python}
 data_investment_summary = (data_investment
-    .melt(id_vars=["gvkey", "year"], var_name="measure",
-          value_vars=["investment_lead", "cash_flows", "tobins_q"])
-    .get(["measure", "value"])
-    .groupby("measure")
-    .describe(percentiles=[0.05, 0.5, 0.95])
+    .unpivot(index=["gvkey", "year"], variable_name="measure",
+             on=["investment_lead", "cash_flows", "tobins_q"])
+    .select(["measure", "value"])
+    .group_by("measure")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05),
+        median=pl.col("value").median(),
+        q95=pl.col("value").quantile(0.95),
+        max=pl.col("value").max(),
+    )
+    .sort("measure")
+    .with_columns(pl.col(pl.Float64).round(2))
 )
-np.round(data_investment_summary, 2)
+data_investment_summary
 ```
 
 ## Fixed Effects 
@@ -136,10 +146,12 @@ $${#eq-tobin-q}
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `PanelOLS()`-function to estimate the simple model so that the output has the same structure as the other regressions below. 
 
 ```{python}
+data_investment_pd = data_investment.to_pandas()
+
 model_ols = pf.feols(
     "investment_lead ~ cash_flows + tobins_q",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_ols.summary()
 ```
@@ -160,7 +172,7 @@ To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) a
 model_fe_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_fe_firm.summary()
 ```
@@ -179,7 +191,7 @@ where $\alpha_t$ is the time fixed effect. Here you can think of higher investme
 model_fe_firmyear = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_fe_firmyear.summary()
 ```
@@ -206,13 +218,13 @@ Instead of relying on the i.i.d. assumption, we can use the `cov_type="clustered
 model_cluster_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = {"CRV1": "gvkey"},
-    data = data_investment
+    data = data_investment_pd
 )
 
 model_cluster_firmyear = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = {"CRV1": "gvkey + year"},
-    data = data_investment
+    data = data_investment_pd
 )
 ```
 
