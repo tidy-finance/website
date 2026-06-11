@@ -26,8 +26,7 @@ The FMP API’s free tier provides access to:
 Next to `fmpapi`, we use the following packages throughout this chapter:
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
 
 from fmpapi import fmp_get
 from plotnine import *
@@ -37,7 +36,7 @@ from adjustText import adjust_text
 
 > **TIP:**
 >
-> If you use `pandas`, as we do here, we recommend you to install `fmpapi` with the corresponding dependencies: `pip install fmpapi[pandas]`.
+> Because `fmp_get()` returns a `pandas` data frame when called with `to_pandas=True`, which we then convert to `polars` via `pl.from_pandas()`, we recommend you to install `fmpapi` with the corresponding dependencies: `pip install fmpapi[pandas]`.
 
 ## Balance Sheet Statements
 
@@ -89,23 +88,26 @@ While there are more details, the basic structure is exactly the same as in the 
 Let us examine Microsoft’s balance sheet statements using the `fmp_get()` function. This function requires three main arguments: The type of financial data to retrieve (`resource`), the stock ticker symbol (`symbol`), and additional parameters like periodicity and number of periods (`params`).
 
 ``` python
-fmp_get(
-  resource="balance-sheet-statement", 
-  symbol="MSFT", 
-  params={"period": "annual", "limit": 5},
-  to_pandas=True
+pl.from_pandas(
+  fmp_get(
+    resource="balance-sheet-statement",
+    symbol="MSFT",
+    params={"period": "annual", "limit": 5},
+    to_pandas=True
+  )
 )
 ```
 
-|  | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | cash_and_cash_equivalents | short_term_investments | ... | additional_paid_in_capital | accumulated_other_comprehensive_income_loss | other_total_stockholders_equity | total_stockholders_equity | total_equity | minority_interest | total_liabilities_and_total_equity | total_investments | total_debt | net_debt |
-|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| 0 | 2025-06-30 | MSFT | USD | 0000789019 | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | FY | 30242000000 | 64313000000 | ... | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 60588000000 | 30346000000 |
-| 1 | 2024-06-30 | MSFT | USD | 0000789019 | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | FY | 18315000000 | 57216000000 | ... | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 67127000000 | 48812000000 |
-| 2 | 2023-06-30 | MSFT | USD | 0000789019 | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | FY | 34704000000 | 76552000000 | ... | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 59965000000 | 25261000000 |
-| 3 | 2022-06-30 | MSFT | USD | 0000789019 | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | FY | 13931000000 | 90818000000 | ... | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 61270000000 | 47339000000 |
-| 4 | 2021-06-30 | MSFT | USD | 0000789019 | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | FY | 14224000000 | 116032000000 | ... | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 67775000000 | 53551000000 |
+shape: (5, 61)
 
-5 rows × 61 columns
+| date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | cash_and_cash_equivalents | short_term_investments | cash_and_short_term_investments | net_receivables | accounts_receivables | other_receivables | inventory | prepaids | other_current_assets | total_current_assets | property_plant_equipment_net | goodwill | intangible_assets | goodwill_and_intangible_assets | long_term_investments | tax_assets | other_non_current_assets | total_non_current_assets | other_assets | total_assets | total_payables | account_payables | other_payables | accrued_expenses | short_term_debt | capital_lease_obligations_current | tax_payables | deferred_revenue | other_current_liabilities | total_current_liabilities | long_term_debt | capital_lease_obligations_non_current | deferred_revenue_non_current | deferred_tax_liabilities_non_current | other_non_current_liabilities | total_non_current_liabilities | other_liabilities | capital_lease_obligations | total_liabilities | treasury_stock | preferred_stock | common_stock | retained_earnings | additional_paid_in_capital | accumulated_other_comprehensive_income_loss | other_total_stockholders_equity | total_stockholders_equity | total_equity | minority_interest | total_liabilities_and_total_equity | total_investments | total_debt | net_debt |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
+| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 30242000000 | 64313000000 | 94555000000 | 69905000000 | 69905000000 | 0 | 938000000 | 0 | 25733000000 | 191131000000 | 229789000000 | 119509000000 | 22604000000 | 142113000000 | 15133000000 | 0 | 40837000000 | 427872000000 | 0 | 619003000000 | 34935000000 | 27724000000 | 7211000000 | 0 | 2999000000 | 8596000000 | 0 | 64555000000 | 30133000000 | 141218000000 | 40152000000 | 60437000000 | 2710000000 | 2835000000 | 28172000000 | 134306000000 | 0 | 69033000000 | 275524000000 | 0 | 0 | 109095000000 | 237731000000 | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 112184000000 | 81942000000 |
+| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 18315000000 | 57216000000 | 75531000000 | 56924000000 | 56924000000 | 0 | 1246000000 | 0 | 26033000000 | 159734000000 | 154552000000 | 119220000000 | 27597000000 | 146817000000 | 14600000000 | 0 | 36460000000 | 352429000000 | 0 | 512163000000 | 27013000000 | 21996000000 | 5017000000 | 0 | 8942000000 | 5929000000 | 5017000000 | 57582000000 | 25820000000 | 125286000000 | 42688000000 | 40293000000 | 2602000000 | 2618000000 | 30199000000 | 118400000000 | 0 | 46222000000 | 243686000000 | 0 | 0 | 100923000000 | 173144000000 | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 97852000000 | 79537000000 |
+| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 34704000000 | 76552000000 | 111256000000 | 48688000000 | 48688000000 | 0 | 2500000000 | 0 | 21813000000 | 184257000000 | 109987000000 | 67886000000 | 9366000000 | 77252000000 | 9879000000 | 0 | 30601000000 | 227719000000 | 0 | 411976000000 | 22247000000 | 18095000000 | 4152000000 | 0 | 5247000000 | 3606000000 | 4152000000 | 50901000000 | 22148000000 | 104149000000 | 41990000000 | 28598000000 | 2912000000 | 433000000 | 27671000000 | 101604000000 | 0 | 32204000000 | 205753000000 | 0 | 0 | 93718000000 | 118848000000 | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 79441000000 | 44737000000 |
+| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 13931000000 | 90818000000 | 104749000000 | 44261000000 | 44261000000 | 0 | 3742000000 | 0 | 16932000000 | 169684000000 | 87546000000 | 67524000000 | 11298000000 | 78822000000 | 6891000000 | 0 | 21897000000 | 195156000000 | 0 | 364840000000 | 23067000000 | 19000000000 | 4067000000 | 0 | 2749000000 | 3288000000 | 4067000000 | 45538000000 | 20440000000 | 95082000000 | 47032000000 | 25331000000 | 2870000000 | 230000000 | 27753000000 | 103216000000 | 0 | 28619000000 | 198298000000 | 0 | 0 | 86939000000 | 84281000000 | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 78400000000 | 64469000000 |
+| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 14224000000 | 116032000000 | 130256000000 | 38043000000 | 38043000000 | 0 | 2636000000 | 0 | 13471000000 | 184406000000 | 70803000000 | 49711000000 | 7800000000 | 57511000000 | 5984000000 | 0 | 15075000000 | 149373000000 | 0 | 333779000000 | 17337000000 | 15163000000 | 2174000000 | 0 | 8072000000 | 2753000000 | 2174000000 | 41525000000 | 18970000000 | 88657000000 | 50074000000 | 21379000000 | 2616000000 | 198000000 | 28867000000 | 103134000000 | 0 | 24132000000 | 191791000000 | 0 | 0 | 83111000000 | 57055000000 | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 82278000000 | 68054000000 |
 
 The function returns a data frame containing detailed balance sheet information, with each row representing a different reporting period. This structured format makes it easy to analyze trends over time and calculate financial ratios. We can see how the data aligns with the balance sheet components we discussed earlier, from current assets like cash and receivables to long-term assets and various forms of liabilities and equity.
 
@@ -136,23 +138,26 @@ Figure 5: A screenshot of the income statement of Microsoft in 2023.
 We can also access this data programmatically using the FMP API:
 
 ``` python
-fmp_get(
-  resource="income-statement", 
-  symbol="MSFT", 
-  params={"period": "annual", "limit": 5},
-  to_pandas=True
+pl.from_pandas(
+  fmp_get(
+    resource="income-statement",
+    symbol="MSFT",
+    params={"period": "annual", "limit": 5},
+    to_pandas=True
+  )
 )
 ```
 
-|  | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | revenue | cost_of_revenue | ... | net_income_from_continuing_operations | net_income_from_discontinued_operations | other_adjustments_to_net_income | net_income | net_income_deductions | bottom_line_net_income | eps | eps_diluted | weighted_average_shs_out | weighted_average_shs_out_dil |
-|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| 0 | 2025-06-30 | MSFT | USD | 0000789019 | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | FY | 281724000000 | 87831000000 | ... | 101832000000 | 0 | 0 | 101832000000 | 0 | 101832000000 | 13.70 | 13.64 | 7433000000 | 7465000000 |
-| 1 | 2024-06-30 | MSFT | USD | 0000789019 | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | FY | 245122000000 | 74114000000 | ... | 88136000000 | 0 | 0 | 88136000000 | 0 | 88136000000 | 11.86 | 11.80 | 7431000000 | 7469000000 |
-| 2 | 2023-06-30 | MSFT | USD | 0000789019 | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | FY | 211915000000 | 65863000000 | ... | 72361000000 | 0 | 0 | 72361000000 | 0 | 72361000000 | 9.72 | 9.68 | 7446000000 | 7472000000 |
-| 3 | 2022-06-30 | MSFT | USD | 0000789019 | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | FY | 198270000000 | 62650000000 | ... | 72738000000 | 0 | 0 | 72738000000 | 0 | 72738000000 | 9.70 | 9.65 | 7496000000 | 7540000000 |
-| 4 | 2021-06-30 | MSFT | USD | 0000789019 | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | FY | 168088000000 | 52232000000 | ... | 61271000000 | 0 | 0 | 61271000000 | 0 | 61271000000 | 8.12 | 8.05 | 7547000000 | 7608000000 |
+shape: (5, 39)
 
-5 rows × 39 columns
+| date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | revenue | cost_of_revenue | gross_profit | research_and_development_expenses | general_and_administrative_expenses | selling_and_marketing_expenses | selling_general_and_administrative_expenses | other_expenses | operating_expenses | cost_and_expenses | net_interest_income | interest_income | interest_expense | depreciation_and_amortization | ebitda | ebit | non_operating_income_excluding_interest | operating_income | total_other_income_expenses_net | income_before_tax | income_tax_expense | net_income_from_continuing_operations | net_income_from_discontinued_operations | other_adjustments_to_net_income | net_income | net_income_deductions | bottom_line_net_income | eps | eps_diluted | weighted_average_shs_out | weighted_average_shs_out_dil |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | f64 | f64 | i64 | i64 |
+| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 281724000000 | 87831000000 | 193893000000 | 32488000000 | 7223000000 | 25654000000 | 32877000000 | 0 | 65365000000 | 153196000000 | 262000000 | 2647000000 | 2385000000 | 34153000000 | 160165000000 | 126012000000 | 2516000000 | 128528000000 | -4901000000 | 123627000000 | 21795000000 | 101832000000 | 0 | 0 | 101832000000 | 0 | 101832000000 | 13.7 | 13.64 | 7433000000 | 7465000000 |
+| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 245122000000 | 74114000000 | 171008000000 | 29510000000 | 7609000000 | 24456000000 | 32065000000 | 0 | 61575000000 | 135689000000 | 222000000 | 3157000000 | 2935000000 | 22287000000 | 133009000000 | 110722000000 | -1289000000 | 109433000000 | -1646000000 | 107787000000 | 19651000000 | 88136000000 | 0 | 0 | 88136000000 | 0 | 88136000000 | 11.86 | 11.8 | 7431000000 | 7469000000 |
+| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 211915000000 | 65863000000 | 146052000000 | 27195000000 | 7575000000 | 22759000000 | 30334000000 | 0 | 57529000000 | 123392000000 | 1026000000 | 2994000000 | 1968000000 | 13861000000 | 105140000000 | 91279000000 | -2756000000 | 88523000000 | 788000000 | 89311000000 | 16950000000 | 72361000000 | 0 | 0 | 72361000000 | 0 | 72361000000 | 9.72 | 9.68 | 7446000000 | 7472000000 |
+| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 198270000000 | 62650000000 | 135620000000 | 24512000000 | 5900000000 | 21825000000 | 27725000000 | 0 | 52237000000 | 114887000000 | 31000000 | 2094000000 | 2063000000 | 14460000000 | 100239000000 | 85779000000 | -2396000000 | 83383000000 | 333000000 | 83716000000 | 10978000000 | 72738000000 | 0 | 0 | 72738000000 | 0 | 72738000000 | 9.7 | 9.65 | 7496000000 | 7540000000 |
+| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 168088000000 | 52232000000 | 115856000000 | 20716000000 | 5107000000 | 20117000000 | 25224000000 | 0 | 45940000000 | 98172000000 | -215000000 | 2131000000 | 2346000000 | 11686000000 | 85134000000 | 73448000000 | -3532000000 | 69916000000 | 1186000000 | 71102000000 | 9831000000 | 61271000000 | 0 | 0 | 61271000000 | 0 | 61271000000 | 8.12 | 8.05 | 7547000000 | 7608000000 |
 
 In later sections, we will use income statement items to calculate important profitability ratios and examine how they compare across companies and industries. The income statement’s focus on performance complements the balance sheet’s position snapshot, providing a more complete picture of a company’s core business operations
 
@@ -179,23 +184,26 @@ Figure 7: A screenshot of the cash flow statement of Microsoft in 2023.
 Of course, we can access this data through the FMP API:
 
 ``` python
-fmp_get(
-  resource="cash-flow-statement", 
-  symbol="MSFT", 
-  params={"period": "annual", "limit": 5},
-  to_pandas=True
+pl.from_pandas(
+  fmp_get(
+    resource="cash-flow-statement",
+    symbol="MSFT",
+    params={"period": "annual", "limit": 5},
+    to_pandas=True
+  )
 )
 ```
 
-|  | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | net_income | depreciation_and_amortization | ... | net_cash_provided_by_financing_activities | effect_of_forex_changes_on_cash | net_change_in_cash | cash_at_end_of_period | cash_at_beginning_of_period | operating_cash_flow | capital_expenditure | free_cash_flow | income_taxes_paid | interest_paid |
-|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| 0 | 2025-06-30 | MSFT | USD | 0000789019 | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | FY | 101832000000 | 34153000000 | ... | -51699000000 | 63000000 | 11927000000 | 30242000000 | 18315000000 | 136162000000 | -64551000000 | 71611000000 | 0 | 0 |
-| 1 | 2024-06-30 | MSFT | USD | 0000789019 | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | FY | 88136000000 | 22287000000 | ... | -37757000000 | -210000000 | -16389000000 | 18315000000 | 34704000000 | 118548000000 | -44477000000 | 74071000000 | 0 | 0 |
-| 2 | 2023-06-30 | MSFT | USD | 0000789019 | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | FY | 72361000000 | 13861000000 | ... | -43935000000 | -194000000 | 20773000000 | 34704000000 | 13931000000 | 87582000000 | -28107000000 | 59475000000 | 0 | 0 |
-| 3 | 2022-06-30 | MSFT | USD | 0000789019 | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | FY | 72738000000 | 14460000000 | ... | -58876000000 | -141000000 | -293000000 | 13931000000 | 14224000000 | 89035000000 | -23886000000 | 65149000000 | 0 | 0 |
-| 4 | 2021-06-30 | MSFT | USD | 0000789019 | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | FY | 61271000000 | 11686000000 | ... | -48486000000 | -29000000 | 648000000 | 14224000000 | 13576000000 | 76740000000 | -20622000000 | 56118000000 | 0 | 0 |
+shape: (5, 47)
 
-5 rows × 47 columns
+| date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | net_income | depreciation_and_amortization | deferred_income_tax | stock_based_compensation | change_in_working_capital | accounts_receivables | inventory | accounts_payables | other_working_capital | other_non_cash_items | net_cash_provided_by_operating_activities | investments_in_property_plant_and_equipment | acquisitions_net | purchases_of_investments | sales_maturities_of_investments | other_investing_activities | net_cash_provided_by_investing_activities | net_debt_issuance | long_term_net_debt_issuance | short_term_net_debt_issuance | net_stock_issuance | net_common_stock_issuance | common_stock_issuance | common_stock_repurchased | net_preferred_stock_issuance | net_dividends_paid | common_dividends_paid | preferred_dividends_paid | other_financing_activities | net_cash_provided_by_financing_activities | effect_of_forex_changes_on_cash | net_change_in_cash | cash_at_end_of_period | cash_at_beginning_of_period | operating_cash_flow | capital_expenditure | free_cash_flow | income_taxes_paid | interest_paid |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
+| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 101832000000 | 34153000000 | -7056000000 | 11974000000 | -5350000000 | -10581000000 | 309000000 | 569000000 | 4353000000 | 609000000 | 136162000000 | -64551000000 | -5978000000 | -29775000000 | 25388000000 | 2317000000 | -72599000000 | -8962000000 | -3216000000 | -5746000000 | -16364000000 | -16364000000 | 2056000000 | -18420000000 | 0 | -24082000000 | -24082000000 | 0 | -2291000000 | -51699000000 | 63000000 | 11927000000 | 30242000000 | 18315000000 | 136162000000 | -64551000000 | 71611000000 | 0 | 0 |
+| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 88136000000 | 22287000000 | -4738000000 | 10734000000 | 1824000000 | -7191000000 | 1284000000 | 3545000000 | 4186000000 | 305000000 | 118548000000 | -44477000000 | -69132000000 | -17732000000 | 35669000000 | -1298000000 | -96970000000 | 575000000 | -4675000000 | 5250000000 | -15252000000 | -15252000000 | 2002000000 | -17254000000 | 0 | -21771000000 | -21771000000 | 0 | -1309000000 | -37757000000 | -210000000 | -16389000000 | 18315000000 | 34704000000 | 118548000000 | -44477000000 | 74071000000 | 0 | 0 |
+| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 72361000000 | 13861000000 | -6059000000 | 9611000000 | -2388000000 | -4087000000 | 1242000000 | -2721000000 | 3178000000 | 196000000 | 87582000000 | -28107000000 | -1670000000 | -37651000000 | 47864000000 | -3116000000 | -22680000000 | -2750000000 | -2750000000 | 0 | -20379000000 | -20379000000 | 1866000000 | -22245000000 | 0 | -19800000000 | -19800000000 | 0 | -1006000000 | -43935000000 | -194000000 | 20773000000 | 34704000000 | 13931000000 | 87582000000 | -28107000000 | 59475000000 | 0 | 0 |
+| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 72738000000 | 14460000000 | -5702000000 | 7502000000 | 446000000 | -6834000000 | -1123000000 | 2943000000 | 5460000000 | -409000000 | 89035000000 | -23886000000 | -22038000000 | -26456000000 | 44894000000 | -2825000000 | -30311000000 | -9023000000 | -9023000000 | 0 | -30855000000 | -30855000000 | 1841000000 | -32696000000 | 0 | -18135000000 | -18135000000 | 0 | -863000000 | -58876000000 | -141000000 | -293000000 | 13931000000 | 14224000000 | 89035000000 | -23886000000 | 65149000000 | 0 | 0 |
+| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 61271000000 | 11686000000 | -150000000 | 6118000000 | -936000000 | -6481000000 | -737000000 | 2798000000 | 3484000000 | -1249000000 | 76740000000 | -20622000000 | -8909000000 | -62924000000 | 65800000000 | -922000000 | -27577000000 | -3750000000 | -3750000000 | 0 | -25692000000 | -25692000000 | 1693000000 | -27385000000 | 0 | -16521000000 | -16521000000 | 0 | -2523000000 | -48486000000 | -29000000 | 648000000 | 14224000000 | 13576000000 | 76740000000 | -20622000000 | 56118000000 | 0 | 0 |
 
 In subsequent sections, we will use cash flow data to calculate important cash flow ratios that help assess a company’s liquidity, capital allocation efficiency, and overall financial sustainability. The combination of all three financial statements - balance sheet, income statement, and cash flow statement - provides a comprehensive view of a company’s financial health and performance.
 
@@ -212,25 +220,22 @@ sample = [
 
 params = {"period": "annual", "limit": 5}
 
-balance_sheet_statements = pd.concat(
-  [fmp_get(
+balance_sheet_statements = pl.concat(
+  [pl.from_pandas(fmp_get(
       resource="balance-sheet-statement", symbol=x, params=params, to_pandas=True
-    ) for x in sample],
-  ignore_index=True
+    )) for x in sample]
 )
 
-income_statements = pd.concat(
-  [fmp_get(
+income_statements = pl.concat(
+  [pl.from_pandas(fmp_get(
       resource="income-statement", symbol=x, params=params, to_pandas=True
-    ) for x in sample],
-  ignore_index=True
+    )) for x in sample]
 )
 
-cash_flow_statements = pd.concat(
-  [fmp_get(
+cash_flow_statements = pl.concat(
+  [pl.from_pandas(fmp_get(
       resource="cash-flow-statement", symbol=x, params=params, to_pandas=True
-    ) for x in sample],
-  ignore_index=True
+    )) for x in sample]
 )
 ```
 
@@ -262,12 +267,12 @@ Next, we calculate these ratios for all stocks, focusing on three major technolo
 selected_symbols = ["MSFT", "AAPL", "AMZN", "NVDA"]
 
 balance_sheet_statements = (balance_sheet_statements
-  .assign(
-    fiscal_year=lambda x: x["fiscal_year"].astype(int),
-    current_ratio=lambda x: x["total_current_assets"] / x["total_assets"],
-    quick_ratio=lambda x: (x["total_current_assets"] - x["inventory"]) / x["total_current_liabilities"],
-    cash_ratio=lambda x: x["cash_and_cash_equivalents"] / x["total_current_liabilities"],
-    label=lambda x: np.where(x["symbol"].isin(selected_symbols), x["symbol"], np.nan)
+  .with_columns(
+    fiscal_year=pl.col("fiscal_year").cast(pl.Int64),
+    current_ratio=pl.col("total_current_assets") / pl.col("total_assets"),
+    quick_ratio=(pl.col("total_current_assets") - pl.col("inventory")) / pl.col("total_current_liabilities"),
+    cash_ratio=pl.col("cash_and_cash_equivalents") / pl.col("total_current_liabilities"),
+    label=pl.when(pl.col("symbol").is_in(selected_symbols)).then(pl.col("symbol")).otherwise(None)
   )
 )
 ```
@@ -276,11 +281,11 @@ balance_sheet_statements = (balance_sheet_statements
 
 ``` python
 liquidity_ratios = (balance_sheet_statements
-  .query("fiscal_year == 2023 & label.notna()")
-  .get(["symbol", "current_ratio", "quick_ratio", "cash_ratio"])
-  .melt(id_vars=["symbol"], var_name="name", value_name="value")
-  .assign(
-    name=lambda x: x["name"].str.replace("_", " ").str.title()
+  .filter((pl.col("fiscal_year") == 2023) & pl.col("label").is_not_null())
+  .select(["symbol", "current_ratio", "quick_ratio", "cash_ratio"])
+  .unpivot(index=["symbol"], variable_name="name", value_name="value")
+  .with_columns(
+    name=pl.col("name").str.replace_all("_", " ").str.to_titlecase()
   )
 )
 
@@ -325,15 +330,15 @@ Interest coverage measures a company’s ability to meet interest payments:
 Let’s calculate these ratios for our sample of companies:
 
 ``` python
-balance_sheet_statements = balance_sheet_statements.assign(
-  debt_to_equity=lambda x: x["total_debt"] / x["total_equity"],
-  debt_to_asset=lambda x: x["total_debt"] / x["total_assets"]
+balance_sheet_statements = balance_sheet_statements.with_columns(
+  debt_to_equity=pl.col("total_debt") / pl.col("total_equity"),
+  debt_to_asset=pl.col("total_debt") / pl.col("total_assets")
 )
 
-income_statements = income_statements.assign(
-  fiscal_year=lambda x: x["fiscal_year"].astype(int),
-  interest_coverage=lambda x: x["operating_income"] / x["interest_expense"],
-  label=lambda x: np.where(x["symbol"].isin(selected_symbols), x["symbol"], np.nan)
+income_statements = income_statements.with_columns(
+  fiscal_year=pl.col("fiscal_year").cast(pl.Int64),
+  interest_coverage=pl.col("operating_income") / pl.col("interest_expense"),
+  label=pl.when(pl.col("symbol").is_in(selected_symbols)).then(pl.col("symbol")).otherwise(None)
 )
 ```
 
@@ -341,7 +346,7 @@ income_statements = income_statements.assign(
 
 ``` python
 debt_to_asset = (balance_sheet_statements
-  .query("symbol in @selected_symbols")
+  .filter(pl.col("symbol").is_in(selected_symbols))
 )
 
 debt_to_asset_figure = (
@@ -371,13 +376,15 @@ The evolution of debt-to-asset ratios among these major technology companies rev
 selected_colors = ["#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey"]
 
 debt_to_asset_comparison = (balance_sheet_statements
-  .query("fiscal_year == 2023")
+  .filter(pl.col("fiscal_year") == 2023)
 )
 
-debt_to_asset_comparison["symbol"] = pd.Categorical(
-  debt_to_asset_comparison["symbol"],
-  categories=debt_to_asset_comparison.sort_values("debt_to_asset")["symbol"],
-  ordered=True
+symbol_order = (debt_to_asset_comparison
+  .sort("debt_to_asset")["symbol"]
+  .to_list()
+)
+debt_to_asset_comparison = debt_to_asset_comparison.with_columns(
+  symbol=pl.col("symbol").cast(pl.Enum(symbol_order))
 )
 
 debt_to_asset_comparison_figure = (
@@ -406,9 +413,9 @@ Figure 10: Debt-to-asset ratios are based on financial statements provided thro
 
 ``` python
 interest_coverage = (income_statements
-  .query("fiscal_year == 2023")
-  .get(["symbol", "fiscal_year", "interest_coverage"])
-  .merge(balance_sheet_statements, on=["symbol", "fiscal_year"], how="left")
+  .filter(pl.col("fiscal_year") == 2023)
+  .select(["symbol", "fiscal_year", "interest_coverage"])
+  .join(balance_sheet_statements, on=["symbol", "fiscal_year"], how="left")
 )
 
 interest_coverage_figure = (
@@ -460,24 +467,24 @@ Here is how we can calculate these efficiency metrics across our sample of selec
 
 ``` python
 combined_statements = (balance_sheet_statements
-  .get(
-    ["symbol", "fiscal_year", "label", "current_ratio", "quick_ratio", 
-     "cash_ratio", "debt_to_equity", "debt_to_asset", "total_assets", 
+  .select(
+    ["symbol", "fiscal_year", "label", "current_ratio", "quick_ratio",
+     "cash_ratio", "debt_to_equity", "debt_to_asset", "total_assets",
      "total_equity"]
   )
-  .merge(
+  .join(
     (income_statements
-      .get(["symbol", "fiscal_year", "interest_coverage", "revenue", 
-            "cost_of_revenue", "selling_general_and_administrative_expenses", 
+      .select(["symbol", "fiscal_year", "interest_coverage", "revenue",
+            "cost_of_revenue", "selling_general_and_administrative_expenses",
             "interest_expense","gross_profit", "net_income"])
     ),
     on=["symbol", "fiscal_year"],
     how="left"
   )
-  .merge(
+  .join(
     (cash_flow_statements
-      .assign(fiscal_year=lambda x: x["fiscal_year"].astype(int))
-      .get(["symbol", "fiscal_year", "inventory", "accounts_receivables"])
+      .with_columns(fiscal_year=pl.col("fiscal_year").cast(pl.Int64))
+      .select(["symbol", "fiscal_year", "inventory", "accounts_receivables"])
     ),
     on=["symbol", "fiscal_year"],
     how="left"
@@ -485,10 +492,10 @@ combined_statements = (balance_sheet_statements
 )
 
 combined_statements = (combined_statements
-  .assign(
-    asset_turnover=lambda x: x["revenue"] / x["total_assets"],
-    inventory_turnover=lambda x: x["cost_of_revenue"] / x["inventory"],
-    receivables_turnover=lambda x: x["revenue"] / x["accounts_receivables"]
+  .with_columns(
+    asset_turnover=pl.col("revenue") / pl.col("total_assets"),
+    inventory_turnover=pl.col("cost_of_revenue") / pl.col("inventory"),
+    receivables_turnover=pl.col("revenue") / pl.col("accounts_receivables")
   )
 )
 ```
@@ -516,10 +523,10 @@ Return on Equity (ROE) measures how efficiently a company uses shareholders’ i
 The next code chunk calculates these profitability metrics for our sample of companies, allowing us to analyze how different firms convert their revenue into various levels of profit and return on investment.
 
 ``` python
-combined_statements = combined_statements.assign(
-  gross_margin=lambda x: x["gross_profit"] / x["revenue"],
-  profit_margin=lambda x: x["net_income"] / x["revenue"],
-  after_tax_roe=lambda x: x["net_income"] / x["total_equity"]
+combined_statements = combined_statements.with_columns(
+  gross_margin=pl.col("gross_profit") / pl.col("revenue"),
+  profit_margin=pl.col("net_income") / pl.col("revenue"),
+  after_tax_roe=pl.col("net_income") / pl.col("total_equity")
 )
 ```
 
@@ -527,9 +534,9 @@ combined_statements = combined_statements.assign(
 
 ``` python
 gross_margins = (combined_statements
-  .query("symbol in @selected_symbols")
+  .filter(pl.col("symbol").is_in(selected_symbols))
 )
-  
+
 gross_margins_figure = (
   ggplot(
     gross_margins,
@@ -555,7 +562,7 @@ Microsoft maintains the highest margins at 65-70%, reflecting its low-cost softw
 
 ``` python
 profit_margins = (combined_statements
-  .query("fiscal_year == 2023")
+  .filter(pl.col("fiscal_year") == 2023)
 )
 
 profit_margins_figure = (
@@ -592,43 +599,35 @@ While individual financial ratios provide specific insights, combining them offe
 
 ``` python
 financial_ratios = (combined_statements
-  .query("fiscal_year == 2023")
-  .filter(
-    items=["symbol"] + [
-      col for col in combined_statements.columns 
+  .filter(pl.col("fiscal_year") == 2023)
+  .select(
+    ["symbol"] + [
+      col for col in combined_statements.columns
       if any(x in col for x in ["ratio", "margin", "roe", "_to_", "turnover", "interest_coverage"])
     ]
   )
-  .melt(id_vars=["symbol"], var_name="name", value_name="value")
-  .assign(
-    type=lambda x: np.select(
-        [
-            x["name"].isin(["current_ratio", "quick_ratio", "cash_ratio"]),
-            x["name"].isin(["debt_to_equity", "debt_to_asset", "interest_coverage"]),
-            x["name"].isin(["asset_turnover", "inventory_turnover", "receivables_turnover"]),
-            x["name"].isin(["gross_margin", "profit_margin", "after_tax_roe"]),
-        ],
-        [
-            "Liquidity Ratios",
-            "Leverage Ratios",
-            "Efficiency Ratios",
-            "Profitability Ratios"
-        ],
-        default="Other"
-    )
+  .unpivot(index=["symbol"], variable_name="name", value_name="value")
+  .with_columns(
+    type=pl.when(pl.col("name").is_in(["current_ratio", "quick_ratio", "cash_ratio"]))
+      .then(pl.lit("Liquidity Ratios"))
+      .when(pl.col("name").is_in(["debt_to_equity", "debt_to_asset", "interest_coverage"]))
+      .then(pl.lit("Leverage Ratios"))
+      .when(pl.col("name").is_in(["asset_turnover", "inventory_turnover", "receivables_turnover"]))
+      .then(pl.lit("Efficiency Ratios"))
+      .when(pl.col("name").is_in(["gross_margin", "profit_margin", "after_tax_roe"]))
+      .then(pl.lit("Profitability Ratios"))
+      .otherwise(pl.lit("Other"))
   )
 )
 
-financial_ratios["rank"] = (financial_ratios
-  .sort_values(["type", "name", "value"], ascending=[True, True, False])
-  .groupby(["type", "name"])
-  .cumcount() + 1
+financial_ratios = financial_ratios.with_columns(
+  rank=pl.col("value").rank(method="ordinal", descending=True).over(["type", "name"])
 )
 
 final_ranks = (financial_ratios
-  .groupby(["symbol", "type"], as_index=False)
-  .agg(rank=("rank", "mean"))
-  .query("symbol in @selected_symbols")
+  .group_by(["symbol", "type"])
+  .agg(rank=pl.col("rank").mean())
+  .filter(pl.col("symbol").is_in(selected_symbols))
 )
 
 final_ranks_figure = (
@@ -665,35 +664,34 @@ The Fama-French five-factor model aims to explain stock returns by incorporating
 We can calculate these factors using the FMP API as follows. Since the free tier only supports historical data for the last couple of months, we use the earliest available data that is returned by default:
 
 ``` python
-market_cap = pd.concat(
-  [fmp_get(
+market_cap = pl.concat(
+  [pl.from_pandas(fmp_get(
       resource="historical-market-capitalization", symbol=x, to_pandas=True
-    ) for x in sample],
-  ignore_index=True
+    )) for x in sample]
 )
 
 min_date = market_cap["date"].min()
-market_cap = market_cap.loc[market_cap["date"] == min_date]
+market_cap = market_cap.filter(pl.col("date") == min_date)
 
 combined_statements_ff = (combined_statements
-  .query("fiscal_year == 2023")
-  .merge(market_cap, on="symbol", how="left")
-  .merge(
+  .filter(pl.col("fiscal_year") == 2023)
+  .join(market_cap, on="symbol", how="left")
+  .join(
     (balance_sheet_statements
-      .query("fiscal_year == 2022")
-      .get(["symbol", "total_assets"])
-      .rename(columns={"total_assets": "total_assets_lag"})
+      .filter(pl.col("fiscal_year") == 2022)
+      .select(["symbol", "total_assets"])
+      .rename({"total_assets": "total_assets_lag"})
     ),
     on="symbol", how="left"
   )
-  .assign(
-    size=lambda x: np.log(x["market_cap"]),
-    book_to_market=lambda x: x["total_equity"] / x["market_cap"],
-    operating_profitability=lambda x: (
-        (x["revenue"] - x["cost_of_revenue"] - x["selling_general_and_administrative_expenses"] - x["interest_expense"])
-        / x["total_equity"]
+  .with_columns(
+    size=pl.col("market_cap").log(),
+    book_to_market=pl.col("total_equity") / pl.col("market_cap"),
+    operating_profitability=(
+        (pl.col("revenue") - pl.col("cost_of_revenue") - pl.col("selling_general_and_administrative_expenses") - pl.col("interest_expense"))
+        / pl.col("total_equity")
     ),
-    investment=lambda x: x["total_assets"] / x["total_assets_lag"]
+    investment=pl.col("total_assets") / pl.col("total_assets_lag")
   )
 )
 ```
@@ -702,22 +700,18 @@ combined_statements_ff = (combined_statements
 
 ``` python
 factors_ranks = (combined_statements_ff
-  .get(["symbol", "size", "book_to_market", "operating_profitability", "investment"])
-  .rename(columns={
+  .select(["symbol", "size", "book_to_market", "operating_profitability", "investment"])
+  .rename({
     "size": "Size",
     "book_to_market": "Book-to-Market",
     "operating_profitability": "Profitability",
     "investment": "Investment"
   })
-  .melt(id_vars=["symbol"], var_name="name", value_name="value")
-  .assign(
-    rank=lambda x: (
-      x.sort_values(["name", "value"], ascending=[True, False])
-      .groupby("name")
-      .cumcount() + 1
-      )
+  .unpivot(index=["symbol"], variable_name="name", value_name="value")
+  .with_columns(
+    rank=pl.col("value").rank(method="ordinal", descending=True).over("name")
   )
-  .query("symbol in @selected_symbols")
+  .filter(pl.col("symbol").is_in(selected_symbols))
 )
 
 factors_ranks_figure = (
