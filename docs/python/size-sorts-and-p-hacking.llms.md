@@ -11,7 +11,7 @@ We also introduce new choices in the formation of portfolios. In particular, we 
 The chapter relies on the following set of Python packages:
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 
 from plotnine import *
@@ -27,9 +27,9 @@ Compared to previous chapters, we introduce `itertools`, which is a component of
 First, we retrieve the relevant data from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
 
 ``` python
-crsp_monthly = pd.read_parquet("data-python/crsp_monthly.parquet")
+crsp_monthly = pl.read_parquet("data-python/crsp_monthly.parquet")
 
-factors_ff3_monthly = pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+factors_ff3_monthly = pl.read_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
 ## Size Distribution
@@ -39,25 +39,30 @@ Before we build our size portfolios, we investigate the distribution of the vari
 [Figure 1](#fig-801) shows that the largest 1 percent of firms cover up to 50 percent of the total market capitalization, and holding just the 25 percent largest firms in the CRSP universe essentially replicates the market portfolio. The distribution of firm size thus implies that the largest firms of the market dominate many small firms whenever we use value-weighted benchmarks.
 
 ``` python
+def top_share(quantile):
+    total = pl.col("mktcap").sum().over("date")
+    threshold = pl.col("mktcap").quantile(quantile).over("date")
+    return (
+        pl.when(pl.col("mktcap") >= threshold)
+        .then(pl.col("mktcap"))
+        .otherwise(0)
+        .sum()
+        .over("date")
+        / total
+    )
+
 market_cap_concentration = (crsp_monthly
-    .groupby("date")
-    .apply(lambda x: x.assign(
-        top01=(x["mktcap"] >= np.quantile(x["mktcap"], 0.99)),
-        top05=(x["mktcap"] >= np.quantile(x["mktcap"], 0.95)),
-        top10=(x["mktcap"] >= np.quantile(x["mktcap"], 0.90)),
-        top25=(x["mktcap"] >= np.quantile(x["mktcap"], 0.75)))
+    .with_columns(
+        **{
+            "Largest 1%": top_share(0.99),
+            "Largest 5%": top_share(0.95),
+            "Largest 10%": top_share(0.90),
+            "Largest 25%": top_share(0.75),
+        }
     )
-    .reset_index(drop=True)
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "Largest 1%": x["mktcap"][x["top01"]].sum()/x["mktcap"].sum(),
-        "Largest 5%": x["mktcap"][x["top05"]].sum()/x["mktcap"].sum(),
-        "Largest 10%": x["mktcap"][x["top10"]].sum()/x["mktcap"].sum(),
-        "Largest 25%": x["mktcap"][x["top25"]].sum()/x["mktcap"].sum()
-        })
-    )
-    .reset_index()
-    .melt(id_vars="date", var_name="name", value_name="value")
+    .select(["date", "Largest 1%", "Largest 5%", "Largest 10%", "Largest 25%"])
+    .unique()
+    .unpivot(index="date", variable_name="name", value_name="value")
 )
 
 market_cap_concentration_figure = (
@@ -85,16 +90,10 @@ Next, firm sizes also differ across listing exchanges. The primary listings of s
 
 ``` python
 market_cap_share = (crsp_monthly
-    .groupby(["date", "exchange"])
-    .aggregate({"mktcap": "sum"})
-    .reset_index(drop=False)
-    .groupby("date")
-    .apply(lambda x:
-        x.assign(total_market_cap=lambda x: x["mktcap"].sum(),
-                share=lambda x: x["mktcap"]/x["total_market_cap"]
-                )
-        )
-    .reset_index(drop=True)
+    .group_by(["date", "exchange"])
+    .agg(mktcap=pl.col("mktcap").sum())
+    .with_columns(total_market_cap=pl.col("mktcap").sum().over("date"))
+    .with_columns(share=pl.col("mktcap") / pl.col("total_market_cap"))
 )
 
 plot_market_cap_share = (
@@ -116,74 +115,94 @@ plot_market_cap_share.draw()
 
 Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
 
-Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The function `describe()` does not include all statistics we are interested in, which is why we create the function `compute_summary()` that adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with the overall summary statistics.
+Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. The built-in `describe()` does not include all statistics we are interested in, which is why we create the function `compute_summary()` that lists the desired statistics explicitly and adds the standard deviation and the number of observations. Then, we apply it to the most current month of our CRSP data on each listing exchange. We also add a row with the overall summary statistics.
 
 The resulting table shows that firms listed on NYSE in December 2023 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 ``` python
+def summary_statistics(variable, percentiles):
+    """Build the list of summary-statistic expressions for a variable."""
+
+    stats = [
+        pl.len().alias("count"),
+        pl.col(variable).mean().alias("mean"),
+        pl.col(variable).std().alias("std"),
+        pl.col(variable).min().alias("min"),
+    ]
+    stats += [
+        pl.col(variable).quantile(p).alias(f"{int(p*100)}%") for p in percentiles
+    ]
+    stats += [pl.col(variable).max().alias("max")]
+    return stats
+
 def compute_summary(data, variable, filter_variable, percentiles):
     """Compute summary statistics for a given variable and percentiles."""
-    
+
+    stats = summary_statistics(variable, percentiles)
+
     summary = (data
-      .get([filter_variable, variable])
-      .groupby(filter_variable)
-      .describe(percentiles=percentiles)
-    ) 
-    
-    summary.columns = summary.columns.droplevel(0)
-    
-    summary_overall = (data
-      .get(variable)
-      .describe(percentiles=percentiles)
+      .group_by(filter_variable)
+      .agg(stats)
+      .sort(filter_variable)
     )
-    
-    summary.loc["Overall", :] = summary_overall
-    
-    return summary.round(0)
+
+    summary_overall = (data
+      .select(stats)
+      .with_columns(pl.lit("Overall").alias(filter_variable))
+    )
+
+    summary = pl.concat([summary, summary_overall], how="diagonal")
+
+    return summary.with_columns(pl.col(pl.Float64).round(0))
 
 compute_summary(
-    crsp_monthly[crsp_monthly["date"] == crsp_monthly["date"].max()],
+    crsp_monthly.filter(pl.col("date") == crsp_monthly["date"].max()),
     variable="mktcap",
     filter_variable="exchange",
     percentiles=[0.05, 0.5, 0.95]
 )
 ```
 
-|          | count  | mean    | std      | min  | 5%    | 50%    | 95%     | max       |
-|----------|--------|---------|----------|------|-------|--------|---------|-----------|
-| exchange |        |         |          |      |       |        |         |           |
-| AMEX     | 155.0  | 208.0   | 537.0    | 2.0  | 4.0   | 47.0   | 930.0   | 3921.0    |
-| NASDAQ   | 2382.0 | 12535.0 | 141802.0 | 1.0  | 5.0   | 310.0  | 20238.0 | 3785304.0 |
-| NYSE     | 1256.0 | 21862.0 | 63583.0  | 15.0 | 179.0 | 4048.0 | 90119.0 | 732872.0  |
-| Overall  | 3793.0 | 15120.0 | 118288.0 | 1.0  | 7.0   | 725.0  | 47107.0 | 3785304.0 |
+shape: (4, 9)
+
+| exchange  | count | mean    | std      | min  | 5%    | 50%    | 95%     | max      |
+|-----------|-------|---------|----------|------|-------|--------|---------|----------|
+| str       | u32   | f64     | f64      | f64  | f64   | f64    | f64     | f64      |
+| "AMEX"    | 154   | 195.0   | 512.0    | 2.0  | 4.0   | 47.0   | 849.0   | 3921.0   |
+| "NASDAQ"  | 2379  | 12558.0 | 141814.0 | 0.0  | 6.0   | 318.0  | 20087.0 | 3.7665e6 |
+| "NYSE"    | 1256  | 21862.0 | 63583.0  | 15.0 | 179.0 | 4049.0 | 90093.0 | 732872.0 |
+| "Overall" | 3789  | 15139.0 | 118291.0 | 0.0  | 8.0   | 730.0  | 47189.0 | 3.7665e6 |
 
 ## Univariate Size Portfolios with Flexible Breakpoints
 
 In [Univariate Portfolio Sorts](../python/univariate-portfolio-sorts.llms.md), we construct portfolios with a varying number of breakpoints and different sorting variables. Here, we extend the framework such that we compute breakpoints on a subset of the data, for instance, based on selected listing exchanges. In published asset pricing articles, many scholars compute sorting breakpoints only on NYSE-listed stocks. These NYSE-specific breakpoints are then applied to the entire universe of stocks.
 
-To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function from [Univariate Portfolio Sorts](../python/univariate-portfolio-sorts.llms.md). The exchange-specific argument then enters in the filter `data["exchanges"].isin(exchanges)`. For example, if `exchanges='NYSE'` is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges=["NYSE", "NASDAQ", "AMEX"]`, which keeps all stocks listed on either of these exchanges.
+To replicate the NYSE-centered sorting procedure, we introduce `exchanges` as an argument in our `assign_portfolio()` function from [Univariate Portfolio Sorts](../python/univariate-portfolio-sorts.llms.md). The exchange-specific argument then enters in the filter `pl.col("exchange").is_in(exchanges)`. For example, if `exchanges=["NYSE"]` is specified, only stocks listed on NYSE are used to compute the breakpoints. Alternatively, you could specify `exchanges=["NYSE", "NASDAQ", "AMEX"]`, which keeps all stocks listed on either of these exchanges.
 
 ``` python
 def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
     """Assign portfolio for a given sorting variable."""
-    
-    breakpoints = (data
-        .query(f"exchange in {exchanges}")
-        .get(sorting_variable)
-        .quantile(np.linspace(0, 1, num=n_portfolios+1), 
-                    interpolation="linear")
-        .drop_duplicates()
+
+    quantiles = np.linspace(0, 1, num=n_portfolios+1)
+    subset = data.filter(pl.col("exchange").is_in(exchanges))
+    breakpoints = [
+        subset[sorting_variable].quantile(q, interpolation="linear")
+        for q in quantiles
+    ]
+    breakpoints = sorted(set(breakpoints))
+    breakpoints[0], breakpoints[-1] = -np.inf, np.inf
+
+    assigned_portfolios = (data
+        .select(
+            pl.col(sorting_variable).cut(
+                breaks=breakpoints[1:-1],
+                labels=[str(i) for i in range(1, len(breakpoints))],
+                left_closed=True
+            ).cast(pl.String).cast(pl.Int64)
+        )
+        .to_series()
     )
-    breakpoints.iloc[[0, -1]] = [-np.inf, np.inf]
-    
-    assigned_portfolios = pd.cut(
-        data[sorting_variable],
-        bins=breakpoints,
-        labels=range(1, breakpoints.size),
-        include_lowest=True,
-        right=False
-    )
-    
+
     return assigned_portfolios
 ```
 
@@ -196,41 +215,48 @@ Apart from computing breakpoints on different samples, researchers often use dif
 We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](../python/univariate-portfolio-sorts.llms.md).
 
 ``` python
-def calculate_returns(data, value_weighted):
-    """Calculate (value-weighted) returns."""
-    
+def calculate_returns(value_weighted):
+    """Build the (value-weighted) return expression."""
+
     if value_weighted:
-      return np.average(data["ret_excess"], weights=data["mktcap_lag"])
+      return (
+          (pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+          / pl.col("mktcap_lag").sum()
+      )
     else:
-      return data["ret_excess"].mean()
-          
-def compute_portfolio_returns(n_portfolios=10, 
-                              exchanges=["NYSE", "NASDAQ", "AMEX"], 
-                              value_weighted=True, 
+      return pl.col("ret_excess").mean()
+
+def compute_portfolio_returns(n_portfolios=10,
+                              exchanges=["NYSE", "NASDAQ", "AMEX"],
+                              value_weighted=True,
                               data=crsp_monthly):
     """Compute (value-weighted) portfolio returns."""
-    
-    returns = (data
-      .groupby("date")
-      .apply(lambda x: x.assign(
-        portfolio=assign_portfolio(x, exchanges, 
-                                   "mktcap_lag", n_portfolios))
-      )
-      .reset_index(drop=True)
-      .groupby(["portfolio", "date"])
-      .apply(lambda x: x.assign(
-        ret=calculate_returns(x, value_weighted))
-      )
-      .reset_index(drop=True)
-      .groupby("date")
-      .apply(lambda x: 
-        pd.Series({"size_premium": x.loc[x["portfolio"].idxmin(), "ret"]-
-          x.loc[x["portfolio"].idxmax(), "ret"]}))
-      .reset_index(drop=True)
-      .aggregate({"size_premium": "mean"})
+
+    data_assigned = pl.concat([
+        group.with_columns(
+            portfolio=assign_portfolio(
+                group, exchanges, "mktcap_lag", n_portfolios
+            )
+        )
+        for _, group in data.group_by("date")
+    ])
+
+    portfolio_returns = (data_assigned
+      .group_by(["portfolio", "date"])
+      .agg(ret=calculate_returns(value_weighted))
     )
-    
-    return returns
+
+    size_premia = (portfolio_returns
+      .group_by("date")
+      .agg(
+        size_premium=(
+          pl.col("ret").filter(pl.col("portfolio") == pl.col("portfolio").min())
+          - pl.col("ret").filter(pl.col("portfolio") == pl.col("portfolio").max())
+        ).first()
+      )
+    )
+
+    return size_premia["size_premium"].mean()
 ```
 
 To see how the function `compute_portfolio_returns()` works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.
@@ -250,16 +276,20 @@ ret_nyse = compute_portfolio_returns(
     data=crsp_monthly
 )
 
-data = pd.DataFrame([ret_all*100, ret_nyse*100], 
-                    index=["NYSE, NASDAQ & AMEX", "NYSE"])
-data.columns = ["Premium"]
-data.round(2)
+data = pl.DataFrame({
+    "Exchanges": ["NYSE, NASDAQ & AMEX", "NYSE"],
+    "Premium": [ret_all*100, ret_nyse*100]
+})
+data.with_columns(pl.col("Premium").round(2))
 ```
 
-|                     | Premium |
-|---------------------|---------|
-| NYSE, NASDAQ & AMEX | 0.04    |
-| NYSE                | 0.13    |
+shape: (2, 2)
+
+| Exchanges             | Premium |
+|-----------------------|---------|
+| str                   | f64     |
+| "NYSE, NASDAQ & AMEX" | 0.04    |
+| "NYSE"                | 0.13    |
 
 The table shows that the size premium is more than 60 percent larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
 
@@ -281,9 +311,9 @@ exchanges = [["NYSE"], ["NYSE", "NASDAQ", "AMEX"]]
 value_weighted = [True, False]
 data = [
     crsp_monthly,
-    crsp_monthly[crsp_monthly["industry"] != "Finance"],
-    crsp_monthly[crsp_monthly["date"] < "1990-06-01"],
-    crsp_monthly[crsp_monthly["date"] >= "1990-06-01"],
+    crsp_monthly.filter(pl.col("industry") != "Finance"),
+    crsp_monthly.filter(pl.col("date") < pl.date(1990, 6, 1)),
+    crsp_monthly.filter(pl.col("date") >= pl.date(1990, 6, 1)),
 ]
 p_hacking_setup = list(
     product(n_portfolios, exchanges, value_weighted, data)
@@ -294,12 +324,11 @@ To speed the computation up, we parallelize the (many) different sorting procedu
 
 ``` python
 n_cores = cpu_count()-1
-p_hacking_results = pd.concat(
-    Parallel(n_jobs=n_cores)
-    (delayed(compute_portfolio_returns)(x, y, z, w) 
-    for x, y, z, w in p_hacking_setup)
+size_premia = Parallel(n_jobs=n_cores)(
+    delayed(compute_portfolio_returns)(x, y, z, w)
+    for x, y, z, w in p_hacking_setup
 )
-p_hacking_results = p_hacking_results.reset_index(name="size_premium")
+p_hacking_results = pl.DataFrame({"size_premium": size_premia})
 ```
 
 ## Size-Premium Variation

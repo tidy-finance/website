@@ -13,8 +13,8 @@ The approach we use here replicates the results of Seltzer et al. ([2022](#ref-S
 The current chapter relies on this set of Python packages.
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
+import datetime as dt
 import pyfixest as pf
 import pyarrow.dataset as ds
 
@@ -29,37 +29,38 @@ Compared to previous chapters, we introduce the `scipy.stats` module from the `s
 We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [TRACE and FISD](../python/trace-and-fisd.llms.md).
 
 ``` python
-fisd = (pd.read_parquet("data-python/fisd.parquet")
-    .dropna()
+fisd = (pl.read_parquet("data-python/fisd.parquet")
+    .drop_nulls()
 )
 
-trace_enhanced = (ds.dataset("data-r/trace_enhanced")
-    .to_table(columns=["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
-    .to_pandas()
-    .dropna()
+trace_enhanced = (pl.from_arrow(
+        ds.dataset("data-r/trace_enhanced")
+        .to_table(columns=["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
+    )
+    .drop_nulls()
 )
 ```
 
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries (in line with [Seltzer et al. 2022](#ref-Seltzer2022)).
 
 ``` python
-treatment_date = pd.to_datetime("2015-12-12")
+treatment_date = dt.datetime(2015, 12, 12)
+treatment_month = dt.datetime(2015, 12, 1)
 polluting_industries = [
     49, 13, 45, 29, 28, 33, 40, 20, 26, 42, 10, 53, 32, 99, 37
 ]
 
 bonds = (fisd
-    .query("offering_amt > 0 & sic_code != 'None'")
-    .assign(
-        time_to_maturity=lambda x: (x["maturity"]-treatment_date).dt.days / 365,
-        sic_code=lambda x: x["sic_code"].astype(str).str[:2].astype(int),
-        log_offering_amt=lambda x: np.log(x["offering_amt"])
+    .filter((pl.col("offering_amt") > 0) & (pl.col("sic_code") != "None"))
+    .with_columns(
+        time_to_maturity=(pl.col("maturity") - treatment_date).dt.total_days() / 365,
+        sic_code=pl.col("sic_code").cast(pl.Utf8).str.slice(0, 2).cast(pl.Int64),
+        log_offering_amt=pl.col("offering_amt").log()
     )
-    .query("time_to_maturity >= 1")
-    .rename(columns={"complete_cusip": "cusip_id"})
-    .get(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
-    .assign(polluter=lambda x: x["sic_code"].isin(polluting_industries))
-    .reset_index(drop=True)
+    .filter(pl.col("time_to_maturity") >= 1)
+    .rename({"complete_cusip": "cusip_id"})
+    .select(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
+    .with_columns(polluter=pl.col("sic_code").is_in(polluting_industries))
 )
 ```
 
@@ -67,34 +68,30 @@ Next, we aggregate the individual transactions as reported in TRACE to a monthly
 
 ``` python
 trace_enhanced = (trace_enhanced
-    .query("rptd_pr > 25")
-    .assign(weight=lambda x: x["entrd_vol_qt"]*x["rptd_pr"])
-    .assign(weighted_yield=lambda x: x["weight"]*x["yld_pt"])
+    .filter(pl.col("rptd_pr") > 25)
+    .with_columns(weight=pl.col("entrd_vol_qt")*pl.col("rptd_pr"))
+    .with_columns(weighted_yield=pl.col("weight")*pl.col("yld_pt"))
 )
 
 trace_aggregated = (trace_enhanced
-    .groupby(["cusip_id", "trd_exctn_dt"])
-    .aggregate(
-        weighted_yield_sum=("weighted_yield", "sum"),
-        weight_sum=("weight", "sum"),
-        trades=("rptd_pr", "count")
+    .group_by(["cusip_id", "trd_exctn_dt"])
+    .agg(
+        weighted_yield_sum=pl.col("weighted_yield").sum(),
+        weight_sum=pl.col("weight").sum(),
+        trades=pl.col("rptd_pr").count()
     )
-    .reset_index()
-    .assign(avg_yield=lambda x: x["weighted_yield_sum"]/x["weight_sum"])
-    .dropna(subset=["avg_yield"])
-    .query("trades >= 5")
-    .assign(trd_exctn_dt=lambda x: pd.to_datetime(x["trd_exctn_dt"]))
-    .assign(date=lambda x: x["trd_exctn_dt"]-pd.offsets.MonthBegin())
-)
-
-date_index = (trace_aggregated
-    .groupby(["cusip_id", "date"])["trd_exctn_dt"]
-    .idxmax()
+    .with_columns(avg_yield=pl.col("weighted_yield_sum")/pl.col("weight_sum"))
+    .drop_nulls("avg_yield")
+    .filter(pl.col("trades") >= 5)
+    .with_columns(trd_exctn_dt=pl.col("trd_exctn_dt").cast(pl.Datetime))
+    .with_columns(date=pl.col("trd_exctn_dt").dt.truncate("1mo"))
 )
 
 trace_aggregated = (trace_aggregated
-    .loc[date_index]
-    .get(["cusip_id", "date", "avg_yield"])
+    .sort("trd_exctn_dt")
+    .group_by(["cusip_id", "date"])
+    .last()
+    .select(["cusip_id", "date", "avg_yield"])
 )
 ```
 
@@ -102,8 +99,8 @@ By combining the bond-specific information from Mergent FISD for our bond sample
 
 ``` python
 bonds_panel = (bonds
-    .merge(trace_aggregated, how="inner", on="cusip_id")
-    .dropna()
+    .join(trace_aggregated, how="inner", on="cusip_id")
+    .drop_nulls()
 )
 ```
 
@@ -111,13 +108,10 @@ Before we can run the first regression, we need to define the `treated` indicato
 
 ``` python
 bonds_panel = (bonds_panel
-    .assign(
-        post_period=lambda x: (
-        x["date"] >= (treatment_date-pd.offsets.MonthBegin())
-        )
+    .with_columns(
+        post_period=(pl.col("date") >= treatment_month)
     )
-    .assign(treated=lambda x: x["polluter"] & x["post_period"])
-    .assign(date_cat=lambda x: pd.Categorical(x["date"], ordered=True))
+    .with_columns(treated=pl.col("polluter") & pl.col("post_period"))
 )
 ```
 
@@ -125,21 +119,35 @@ As usual, we tabulate summary statistics of the variables that enter the regress
 
 ``` python
 bonds_panel_summary = (bonds_panel
-    .melt(var_name="measure",
-            value_vars=["avg_yield", "time_to_maturity", "log_offering_amt"])
-    .groupby("measure")
-    .describe(percentiles=[0.05, 0.5, 0.95])
+    .unpivot(
+        on=["avg_yield", "time_to_maturity", "log_offering_amt"],
+        variable_name="measure"
+    )
+    .group_by("measure")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05),
+        median=pl.col("value").median(),
+        q95=pl.col("value").quantile(0.95),
+        max=pl.col("value").max(),
+    )
+    .sort("measure")
+    .with_columns(pl.col(pl.Float64).round(2))
 )
-np.round(bonds_panel_summary, 2)
+bonds_panel_summary
 ```
 
-|                  | value    |       |      |      |       |       |       |        |
-|------------------|----------|-------|------|------|-------|-------|-------|--------|
-|                  | count    | mean  | std  | min  | 5%    | 50%   | 95%   | max    |
-| measure          |          |       |      |      |       |       |       |        |
-| avg_yield        | 127540.0 | 4.08  | 4.21 | 0.06 | 1.27  | 3.38  | 8.11  | 127.97 |
-| log_offering_amt | 127540.0 | 13.27 | 0.82 | 4.64 | 12.21 | 13.22 | 14.51 | 16.52  |
-| time_to_maturity | 127540.0 | 8.55  | 8.42 | 1.01 | 1.50  | 5.81  | 27.41 | 100.70 |
+shape: (3, 9)
+
+| measure            | count  | mean  | std  | min  | q05   | median | q95   | max    |
+|--------------------|--------|-------|------|------|-------|--------|-------|--------|
+| str                | u32    | f64   | f64  | f64  | f64   | f64    | f64   | f64    |
+| "avg_yield"        | 127524 | 4.08  | 4.21 | 0.06 | 1.27  | 3.38   | 8.1   | 127.97 |
+| "log_offering_amt" | 127524 | 13.27 | 0.82 | 4.64 | 12.21 | 13.22  | 14.51 | 16.52  |
+| "time_to_maturity" | 127524 | 8.55  | 8.41 | 1.01 | 1.5   | 5.81   | 27.41 | 100.7  |
 
 ## Panel Regressions
 
@@ -151,13 +159,13 @@ The second model follows the typical DiD regression approach by including indivi
 model_without_fe = pf.feols(
     "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
     vcov = "iid",
-    data = bonds_panel
+    data = bonds_panel.to_pandas()
 )
 
 model_with_fe = pf.feols(
     "avg_yield ~ treated | cusip_id + date",
     vcov = "iid",
-    data = bonds_panel
+    data = bonds_panel.to_pandas()
 )
 
 pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
@@ -167,19 +175,19 @@ pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 |----|----|----|
 |  | \(1\) | \(2\) |
 | coef |  |  |
-| treated | 0.453\*\*\* (9.133) | 0.975\*\*\* (29.294) |
-| post_period | -0.177\*\*\* (-6.036) |  |
-| polluter | 0.486\*\*\* (15.426) |  |
-| log_offering_amt | -0.550\*\*\* (-38.994) |  |
-| time_to_maturity | 0.058\*\*\* (41.527) |  |
-| Intercept | 10.733\*\*\* (57.060) |  |
+| treated | 0.462\*\*\* (9.305) | 0.983\*\*\* (29.533) |
+| post_period | -0.174\*\*\* (-5.917) |  |
+| polluter | 0.481\*\*\* (15.279) |  |
+| log_offering_amt | -0.551\*\*\* (-38.979) |  |
+| time_to_maturity | 0.058\*\*\* (41.556) |  |
+| Intercept | 10.735\*\*\* (57.017) |  |
 | fe |  |  |
 | cusip_id | \- | x |
 | date | \- | x |
 | stats |  |  |
-| Observations | 127540 | 127195 |
+| Observations | 127524 | 127173 |
 | S.E. type | iid | iid |
-| R² | 0.032 | 0.648 |
+| R² | 0.032 | 0.647 |
 | R² Within | \- | 0.007 |
 | Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |
 
@@ -195,21 +203,22 @@ To provide such visual evidence, we revisit the simple OLS model and replace the
 model_without_fe_time = pf.feols(
     "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
     vcov = "iid",
-    data = bonds_panel.assign(date = lambda x: x["date"].astype(str))
+    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
 )
 
-model_without_fe_coefs = (pd.DataFrame({
-        "estimate": model_without_fe_time.coef(),
-        "std_error": model_without_fe_time.se()
+model_without_fe_coefs = (pl.DataFrame({
+        "term": model_without_fe_time.coef().index.to_list(),
+        "estimate": model_without_fe_time.coef().to_numpy(),
+        "std_error": model_without_fe_time.se().to_numpy()
     })
-    .reset_index(names="term")
-    .query("term.str.contains('date')")
-    .assign(
-        treatment=lambda x: x["term"].str.contains(":polluter"),
-        date=lambda x: x["term"].str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
-        ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
-        ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
+    .filter(pl.col("term").str.contains("date"))
+    .with_columns(
+        treatment=pl.col("term").str.contains(":polluter"),
+        date=pl.col("term").str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
+        ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
+    .with_columns(date=pl.col("date").str.to_datetime("%Y-%m-%d"))
 )
 
 model_without_fe_figure = (
@@ -218,18 +227,17 @@ model_without_fe_figure = (
         aes(x="date", y="estimate", color="treatment",
             linetype="treatment", shape="treatment")
     )
-    + geom_vline(xintercept=pd.to_datetime(treatment_date) -
-                pd.offsets.MonthBegin(), linetype="dashed")
+    + geom_vline(xintercept=treatment_month, linetype="dashed")
     + geom_hline(yintercept=0, linetype="dashed")
     + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
     + geom_point()
-    + guides(linetype=None)
+    + guides(linetype="none")
     + labs(
         x="", y="Yield", shape="Polluter?", color="Polluter?",
         title="Polluters respond stronger than green firms"
         )
     + scale_linetype_manual(values=["solid", "dashed"])
-    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + scale_x_date(date_breaks="1 year", date_labels="%Y")
 )
 model_without_fe_figure.show()
 ```
@@ -244,29 +252,29 @@ Instead of plotting both groups using the simple model approach, we can also use
 
 ``` python
 bonds_panel_alt = (bonds_panel
-    .assign(
-        diff_to_treatment=lambda x: (
-        np.round(
-            ((x["date"]-(treatment_date- 
-                pd.offsets.MonthBegin())).dt.days/365)*12, 0
-        ).astype(int)
+    .with_columns(
+        diff_to_treatment=(
+            ((pl.col("date")-treatment_month).dt.total_days()/365*12)
+            .round(0)
+            .cast(pl.Int64)
         )
     )
 )
 
 variables = (bonds_panel_alt
-    .get(["diff_to_treatment", "date"])
-    .drop_duplicates()
-    .sort_values("date")
-    .copy()
-    .assign(variable_name=np.nan)
-    .reset_index(drop=True)
+    .select(["diff_to_treatment", "date"])
+    .unique()
+    .sort("date")
+    .with_columns(variable_name=pl.lit(None, dtype=pl.Utf8))
 )
 ```
 
 In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects.
 
 ``` python
+bonds_panel_alt = bonds_panel_alt.to_pandas()
+variables = variables.to_pandas()
+
 formula = "avg_yield ~ 1 + "
 
 for j in range(variables.shape[0]):
@@ -298,32 +306,34 @@ model_with_fe_time = pf.feols(
 We then collect the regression results into a dataframe that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies.
 
 ``` python
-lag0_row = pd.DataFrame({
+lag0_row = pl.DataFrame({
     "term": ["lag0"],
-    "estimate": [0],
-    "std_error": [0],
-    "ci_up": [0],
-    "ci_low": [0],
+    "estimate": [0.0],
+    "std_error": [0.0],
+    "ci_up": [0.0],
+    "ci_low": [0.0],
     "diff_to_treatment": [0],
-    "date": [treatment_date - pd.offsets.MonthBegin()]
+    "date": [treatment_month]
 })
 
-model_with_fe_time_coefs = (pd.DataFrame({
-        "estimate": model_with_fe_time.coef(),
-        "std_error": model_with_fe_time.se()
+model_with_fe_time_coefs = (pl.DataFrame({
+        "term": model_with_fe_time.coef().index.to_list(),
+        "estimate": model_with_fe_time.coef().to_numpy(),
+        "std_error": model_with_fe_time.se().to_numpy()
     })
-    .reset_index(names="term")
-    .assign(
-        ci_up=lambda x: x["estimate"]+norm.ppf(0.975)*x["std_error"],
-        ci_low=lambda x: x["estimate"]+norm.ppf(0.025)*x["std_error"]
+    .with_columns(
+        ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
+        ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
-    .merge(variables, how="left", left_on="term", right_on="variable_name")
-    .drop(columns="variable_name")
+    .join(
+        pl.from_pandas(variables),
+        how="left", left_on="term", right_on="variable_name"
+    )
 )
 
-model_with_fe_time_coefs = pd.concat(
-    [model_with_fe_time_coefs, lag0_row], 
-    ignore_index=True
+model_with_fe_time_coefs = pl.concat(
+    [model_with_fe_time_coefs, lag0_row],
+    how="diagonal"
 )
 ```
 
@@ -335,7 +345,7 @@ model_with_fe_time_figure = (
         model_with_fe_time_coefs,
         aes(x="date", y="estimate")
     )
-    + geom_vline(aes(xintercept=treatment_date - pd.offsets.MonthBegin()), 
+    + geom_vline(aes(xintercept=treatment_month),
                     linetype="dashed")
     + geom_hline(aes(yintercept=0), linetype="dashed")
     + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
@@ -344,7 +354,7 @@ model_with_fe_time_figure = (
         x="", y="Yield",
         title="Polluters' yield patterns around Paris Agreement signing"
         )
-    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + scale_x_date(date_breaks="1 year", date_labels="%Y")
 )
 model_with_fe_time_figure.show()
 ```

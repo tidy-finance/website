@@ -250,8 +250,8 @@ pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
 | tobins_q | 0.007\*\*\* (57.710) | 0.011\*\*\* (83.006) | 0.010\*\*\* (76.335) |
 | Intercept | 0.042\*\*\* (130.069) |  |  |
 | fe |  |  |  |
-| gvkey | \- | x | x |
 | year | \- | \- | x |
+| gvkey | \- | x | x |
 | stats |  |  |  |
 | Observations | 133608 | 131823 | 131823 |
 | S.E. type | iid | iid | iid |
@@ -294,8 +294,8 @@ pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_
 | cash_flows | 0.017\*\*\* (19.576) | 0.017\*\*\* (11.367) | 0.017\*\*\* (9.361) |
 | tobins_q | 0.010\*\*\* (76.335) | 0.010\*\*\* (35.755) | 0.010\*\*\* (14.944) |
 | fe |  |  |  |
-| gvkey | x | x | x |
 | year | x | x | x |
+| gvkey | x | x | x |
 | stats |  |  |  |
 | Observations | 131823 | 131823 | 131823 |
 | S.E. type | iid | by: gvkey | by: gvkey+year |

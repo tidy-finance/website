@@ -21,8 +21,7 @@ Before we move to the implementation, we want to highlight that the characterist
 The current chapter relies on this set of Python packages.
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
 import statsmodels.formula.api as smf
 ```
 
@@ -32,19 +31,19 @@ We illustrate Fama and MacBeth ([1973](#ref-Fama1973)) with the monthly CRSP sam
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["permno", "gvkey", "date", "ret_excess", "mktcap"])
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["permno", "gvkey", "date", "ret_excess", "mktcap"])
 )
 
 compustat_annual = (
-    pd.read_parquet("data-python/compustat_annual.parquet")
-    .get(["datadate", "gvkey", "be"])
+    pl.read_parquet("data-python/compustat_annual.parquet")
+    .select(["datadate", "gvkey", "be"])
 )
 
 beta = (
-    pd.read_parquet("data-python/beta.parquet")
-    .query("return_type == 'monthly'")
-    .get(["permno", "date", "beta"])
+    pl.read_parquet("data-python/beta.parquet")
+    .filter(pl.col("return_type") == "monthly")
+    .select(["permno", "date", "beta"])
 )
 ```
 
@@ -52,42 +51,39 @@ We use the Compustat and CRSP data to compute the book-to-market ratio and the (
 
 ``` python
 characteristics = (compustat_annual
-    .assign(date=lambda x: x["datadate"].dt.to_period("M").dt.to_timestamp())
-    .merge(crsp_monthly, how="left", on=["gvkey", "date"], )
-    .merge(beta, how="left", on=["permno", "date"])
-    .assign(
-        bm=lambda x: x["be"]/x["mktcap"],
-        log_mktcap=lambda x: np.log(x["mktcap"]),
-        sorting_date=lambda x: x["date"]+pd.DateOffset(months=6)
+    .with_columns(date=pl.col("datadate").dt.truncate("1mo"))
+    .join(crsp_monthly, how="left", on=["gvkey", "date"])
+    .join(beta, how="left", on=["permno", "date"])
+    .with_columns(
+        bm=pl.col("be")/pl.col("mktcap"),
+        log_mktcap=pl.col("mktcap").log(),
+        sorting_date=pl.col("date").dt.offset_by("6mo")
     )
-    .get(["gvkey", "bm", "log_mktcap", "beta", "sorting_date"])
+    .select(["gvkey", "bm", "log_mktcap", "beta", "sorting_date"])
 )
 
 data_fama_macbeth = (crsp_monthly
-    .merge(characteristics, 
+    .join(characteristics,
             how="left",
             left_on=["gvkey", "date"], right_on=["gvkey", "sorting_date"])
-    .sort_values(["date", "permno"])
-    .groupby("permno")
-    .apply(lambda x: x.assign(
-        beta=x["beta"].fillna(method="ffill"),
-        bm=x["bm"].fillna(method="ffill"),
-        log_mktcap=x["log_mktcap"].fillna(method="ffill")
-        )
+    .sort(["date", "permno"])
+    .with_columns(
+        beta=pl.col("beta").forward_fill().over("permno"),
+        bm=pl.col("bm").forward_fill().over("permno"),
+        log_mktcap=pl.col("log_mktcap").forward_fill().over("permno")
     )
-    .reset_index(drop=True)  
 )
 
 data_fama_macbeth_lagged = (data_fama_macbeth
-    .assign(date=lambda x: x["date"]-pd.DateOffset(months=1))
-    .get(["permno", "date", "ret_excess"])
-    .rename(columns={"ret_excess": "ret_excess_lead"})
+    .with_columns(date=pl.col("date").dt.offset_by("-1mo"))
+    .select(["permno", "date", "ret_excess"])
+    .rename({"ret_excess": "ret_excess_lead"})
 )
 
 data_fama_macbeth = (data_fama_macbeth
-    .merge(data_fama_macbeth_lagged, how="left", on=["permno", "date"])
-    .get(["permno", "date", "ret_excess_lead", "beta", "log_mktcap", "bm"])
-    .dropna()
+    .join(data_fama_macbeth_lagged, how="left", on=["permno", "date"])
+    .select(["permno", "date", "ret_excess_lead", "beta", "log_mktcap", "bm"])
+    .drop_nulls()
 )
 ```
 
@@ -96,16 +92,19 @@ data_fama_macbeth = (data_fama_macbeth
 Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums \\\hat\lambda^{f}\_t\\ for each point in time.
 
 ``` python
-risk_premiums = (data_fama_macbeth
-    .groupby("date")
-    .apply(lambda x: smf.ols(
-        formula="ret_excess_lead ~ beta + log_mktcap + bm", 
-        data=x
-        ).fit()
-        .params
+def estimate_cross_section(group):
+    params = smf.ols(
+        formula="ret_excess_lead ~ beta + log_mktcap + bm",
+        data=group.to_pandas()
+    ).fit().params
+    return pl.DataFrame(params.to_frame().transpose()).with_columns(
+        date=group["date"].first()
     )
-    .reset_index()
-)
+
+risk_premiums = pl.concat([
+    estimate_cross_section(group)
+    for group in data_fama_macbeth.partition_by("date")
+]).select(["date", "Intercept", "beta", "log_mktcap", "bm"]).sort("date")
 ```
 
 ## Time-Series Aggregation
@@ -114,47 +113,56 @@ Now that we have the risk premiums’ estimates for each period, we can average 
 
 ``` python
 price_of_risk = (risk_premiums
-    .melt(id_vars="date", var_name="factor", value_name="estimate")
-    .groupby("factor")["estimate"]
-    .apply(lambda x: pd.Series({
-        "risk_premium": x.mean(),
-        "t_statistic": x.mean()/x.std()*np.sqrt(len(x))
-        })
+    .unpivot(index="date", variable_name="factor", value_name="estimate")
+    .group_by("factor")
+    .agg(
+        risk_premium=pl.col("estimate").mean(),
+        t_statistic=(
+            pl.col("estimate").mean()
+            / pl.col("estimate").std()
+            * pl.len().sqrt()
+        )
     )
-    .reset_index()
-    .pivot(index="factor", columns="level_1", values="estimate")
-    .reset_index()
+    .sort("factor")
 )
 ```
 
 It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in [Univariate Portfolio Sorts](../python/univariate-portfolio-sorts.llms.md), the typical procedure for this is computing Newey and West ([1987](#ref-Newey1987)) standard errors.
 
 ``` python
-price_of_risk_newey_west = (risk_premiums
-    .melt(id_vars="date", var_name="factor", value_name="estimate")
-    .groupby("factor")
-    .apply(lambda x: (
-        x["estimate"].mean()/ 
-            smf.ols("estimate ~ 1", x)
-            .fit(cov_type="HAC", cov_kwds={"maxlags": 6}).bse
-        )
+def estimate_newey_west(group):
+    fit = smf.ols(
+        "estimate ~ 1", group.to_pandas()
+    ).fit(cov_type="HAC", cov_kwds={"maxlags": 6})
+    t_statistic = group["estimate"].mean()/fit.bse["Intercept"]
+    return pl.DataFrame({
+        "factor": group["factor"].first(),
+        "t_statistic_newey_west": t_statistic
+    })
+
+price_of_risk_newey_west = pl.concat([
+    estimate_newey_west(group)
+    for group in (risk_premiums
+        .unpivot(index="date", variable_name="factor", value_name="estimate")
+        .partition_by("factor")
     )
-    .reset_index()
-    .rename(columns={"Intercept": "t_statistic_newey_west"})
-)
+])
 
 (price_of_risk
-    .merge(price_of_risk_newey_west, on="factor")
-    .round(3)
+    .join(price_of_risk_newey_west, on="factor")
+    .with_columns(pl.col(pl.Float64).round(3))
 )
 ```
 
-|     | factor     | risk_premium | t_statistic | t_statistic_newey_west |
-|-----|------------|--------------|-------------|------------------------|
-| 0   | Intercept  | 0.012        | 4.660       | 4.067                  |
-| 1   | beta       | 0.000        | 0.006       | 0.005                  |
-| 2   | bm         | 0.002        | 3.016       | 2.833                  |
-| 3   | log_mktcap | -0.001       | -2.812      | -2.639                 |
+shape: (4, 4)
+
+| factor       | risk_premium | t_statistic | t_statistic_newey_west |
+|--------------|--------------|-------------|------------------------|
+| str          | f64          | f64         | f64                    |
+| "Intercept"  | 0.012        | 4.659       | 4.067                  |
+| "beta"       | 0.0          | 0.007       | 0.006                  |
+| "log_mktcap" | -0.001       | -2.813      | -2.639                 |
+| "bm"         | 0.002        | 3.017       | 2.834                  |
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
@@ -162,7 +170,7 @@ Finally, let us interpret the results. Stocks with higher book-to-market ratios 
 import tidyfinance as tf
 
 tf.estimate_fama_macbeth(
-    data=data_fama_macbeth,
+    data=data_fama_macbeth.to_pandas(),
     model="ret_excess_lead ~ beta + bm + log_mktcap",
     vcov="newey-west"
 )

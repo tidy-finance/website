@@ -34,6 +34,7 @@ In this appendix chapter, we provide details on the package versions used in thi
 | exceptiongroup            | 1.3.1       |
 | executing                 | 2.2.1       |
 | faicons                   | 0.2.2       |
+| fastexcel                 | 0.20.2      |
 | fastjsonschema            | 2.21.2      |
 | fmpapi                    | 1.0.0       |
 | fonttools                 | 4.61.1      |
@@ -163,7 +164,6 @@ In this appendix chapter, we provide details on the package versions used in thi
 | websocket-client          | 1.9.0       |
 | widgetsnbextension        | 4.0.15      |
 | wrapt                     | 2.0.1       |
-| xlrd                      | 2.0.2       |
 | zipp                      | 3.23.0      |
 
 ## References
