@@ -272,7 +272,7 @@ Next, we read in the new data and transform the columns into the variables that 
 			
 For variable definitions and the required data transformations, you can consult the material on [Amit Goyal's website.](https://sites.google.com/view/agoyal145)
 
-Some numeric columns in the raw file contain thousands separators (e.g., `4,769.83`), so we read all columns as strings, strip the commas, and cast to floats before the actual transformations:
+Some numeric columns in the raw file contain thousands separators (e.g., `4,769.83`), so we read all columns as strings, strip the commas, and cast to floats before the actual transformations. In addition to the predictors, we compute the one-month-ahead excess market return (`rp_div`), which serves as the prediction target for the equity premium predictors:
 
 ```{python}
 macro_predictors = (
@@ -280,8 +280,13 @@ macro_predictors = (
     .with_columns(
         pl.exclude("yyyymm").str.replace_all(",", "").cast(pl.Float64, strict=False)
     )
+    .with_columns(index_div=pl.col("Index") + pl.col("D12"))
+    .with_columns(
+        logret=pl.col("index_div").log() - pl.col("index_div").shift(1).log()
+    )
     .with_columns(
         date=pl.col("yyyymm").str.to_date("%Y%m"),
+        rp_div=(pl.col("logret") - (pl.col("Rfree") + 1).log()).shift(-1),
         dp=pl.col("D12").log() - pl.col("Index").log(),
         dy=pl.col("D12").log() - pl.col("Index").shift(1).log(),
         ep=pl.col("E12").log() - pl.col("Index").log(),
@@ -293,6 +298,7 @@ macro_predictors = (
     .select(
         [
             "date",
+            "rp_div",
             "dp",
             "dy",
             "ep",
