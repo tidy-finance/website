@@ -119,10 +119,11 @@ crsp_monthly_query = (
 crsp_monthly = (pl.read_database(
         query=crsp_monthly_query,
         connection=wrds,
-        schema_overrides={"permno": pl.Int64, "siccd": pl.Int64},
+        # column types chosen to match the parquet files of the R edition
+        schema_overrides={"permno": pl.Float64, "siccd": pl.Int32},
     )
     .with_columns(pl.col(pl.Decimal).cast(pl.Float64))
-    .with_columns(shrout=pl.col("shrout")*1000)
+    .with_columns(shrout=(pl.col("shrout")*1000).cast(pl.Float64))
 )
 ```
 
@@ -528,7 +529,7 @@ We keep only the last available information for each firm-year group (by using `
 ```{python}
 #| eval: false
 compustat_annual = (
-    compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Int64))
+    compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
     .sort("datadate")
     .group_by(["gvkey", "year"], maintain_order=True)
     .tail(1)
