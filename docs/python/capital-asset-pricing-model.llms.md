@@ -9,7 +9,7 @@ The Capital Asset Pricing Model (CAPM) is one of the most influential theories i
 We use the following packages throughout this chapter:
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 import tidyfinance as tf
 
@@ -23,34 +23,37 @@ from adjustText import adjust_text
 Building on our analysis from the previous chapter on [Modern Portfolio Theory](../python/modern-portfolio-theory.llms.md), we again examine the Dow Jones Industrial Average constituents as an exemplary asset universe. We download and prepare our monthly return data:
 
 ``` python
-symbols = tf.download_data(
-    domain="constituents", 
-    index="Dow Jones Industrial Average"
+symbols = pl.from_pandas(
+    tf.download_data(
+        domain="constituents",
+        index="Dow Jones Industrial Average"
+    )
 )
 
-prices_daily = tf.download_data(
-    domain="stock_prices", 
-    symbols=symbols["symbol"].tolist(),
-    start_date="2000-01-01", 
-    end_date="2023-12-31"
+prices_daily = pl.from_pandas(
+    tf.download_data(
+        domain="stock_prices",
+        symbols=symbols["symbol"].to_list(),
+        start_date="2000-01-01",
+        end_date="2023-12-31"
+    )
 )
 
 prices_daily = (prices_daily
-    .groupby("symbol")
-    .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
-    .reset_index(drop=True)
-    .query("counts == counts.max()")
+    .with_columns(
+        counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
+    )
+    .filter(pl.col("counts") == pl.col("counts").max())
 )
 
 returns_monthly = (prices_daily
-    .assign(
-        date=prices_daily["date"].dt.to_period("M").dt.to_timestamp()
-    )
-    .groupby(["symbol", "date"], as_index=False)
-    .agg(adjusted_close=("adjusted_close", "last"))
-    .assign(
-        ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change()
-    )
+    .sort(["symbol", "date"])
+    .with_columns(month=pl.col("date").dt.truncate("1mo"))
+    .group_by(["symbol", "month"], maintain_order=True)
+    .agg(adjusted_close=pl.col("adjusted_close").last())
+    .rename({"month": "date"})
+    .sort(["symbol", "date"])
+    .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
 )
 ```
 
@@ -102,11 +105,13 @@ For illustrative purposes, we compute the efficient tangency portfolio for our h
 
 ``` python
 risk_free_monthly = (
-  tf.download_data("stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
-  .assign(
-    risk_free=lambda x: (1 + x["adjusted_close"] / 100)**(1/12) - 1
+  pl.from_pandas(
+    tf.download_data("stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
   )
-  .dropna()
+  .with_columns(
+    risk_free=(1 + pl.col("adjusted_close") / 100)**(1/12) - 1
+  )
+  .drop_nulls()
 )
 
 rf = risk_free_monthly["risk_free"].mean()
@@ -116,23 +121,28 @@ Next, we define the core parameters governing the distribution of asset returns,
 
 ``` python
 assets = (returns_monthly
-    .groupby("symbol", as_index=False)
+    .group_by("symbol")
     .agg(
-        mu=("ret", "mean"),
-        sigma=("ret", "std")
+        mu=pl.col("ret").mean(),
+        sigma=pl.col("ret").std()
     )
+    .sort("symbol")
 )
 
-sigma = (returns_monthly
-    .pivot(index="date", columns="symbol", values="ret")
-    .cov()
+symbols_sorted = assets["symbol"].to_list()
+
+returns_wide = (returns_monthly
+    .pivot(values="ret", index="date", on="symbol")
+    .sort("date")
+    .select(["date", *symbols_sorted])
 )
 
-mu = (returns_monthly
-    .groupby("symbol")["ret"]
-    .mean()
-    .values
+sigma = np.cov(
+    returns_wide.drop("date").drop_nulls().to_numpy(),
+    rowvar=False
 )
+
+mu = assets["mu"].to_numpy()
 ```
 
 We are ready to illustrate the resulting efficient frontier. Every investor chooses to allocate a fraction of her wealth in the efficient tangency portfolio \\\omega\_\text{tan}\\ and the remainder in the risk-free asset. The optimal allocation depends on the investor’s risk aversion. As the risk-free asset, by definition, has a zero volatility, the efficient frontier is a straight line connecting the risk-free asset with the tangency portfolio. The slope of the line connecting the risk-free asset and the tangency portfolio is
@@ -148,7 +158,7 @@ w_tan = w_tan / np.sum(w_tan)
 mu_w = w_tan.T @ mu
 sigma_w = np.sqrt(w_tan.T @ sigma @ w_tan)
 
-efficient_portfolios = pd.DataFrame(
+efficient_portfolios = pl.DataFrame(
     [
         {"symbol": "\omega_{tan}", "mu": mu_w, "sigma": sigma_w},
         {"symbol": "r_f", "mu": rf, "sigma": 0},
@@ -210,7 +220,7 @@ We can illustrate the relationship between systematic risk and expected returns 
 
 ``` python
 betas = (sigma @ w_tan) / (w_tan.T @ sigma @ w_tan)
-assets["beta"] = betas.values
+assets = assets.with_columns(beta=pl.Series(betas))
 
 price_of_risk = float(w_tan.T @ mu - rf)
 
@@ -257,52 +267,53 @@ Let’s turn to estimating CAPM parameters using real market data. Instead of us
 ``` python
 import tidyfinance as tf
 
-factors = tf.download_data(
-    domain="famafrench",
-    dataset="F-F_Research_Data_5_Factors_2x3",
-    start_date="2000-01-01",
-    end_date="2024-09-30",
+factors = pl.from_pandas(
+    tf.download_data(
+        domain="famafrench",
+        dataset="F-F_Research_Data_5_Factors_2x3",
+        start_date="2000-01-01",
+        end_date="2024-09-30",
+    )
 )
 ```
 
-For our regression analysis, we first prepare the data by calculating excess returns for each stock. We join our monthly returns with the Fama-French factors and subtract the risk-free rate to obtain excess returns. The `estimate_capm()` function then implements the regression equation we previously discussed. We leverage nested dataframes to efficiently run these regressions for all assets simultaneously. The `map()` function applies our regression to each nested dataset and extracts the coefficients, giving us a clean data frame of assets and their corresponding betas.
+For our regression analysis, we first prepare the data by calculating excess returns for each stock. We join our monthly returns with the Fama-French factors and subtract the risk-free rate to obtain excess returns. The `estimate_capm()` function then implements the regression equation we previously discussed. We partition the data by symbol and run these regressions for all assets, looping over the symbol-specific sub-frames. Because `statsmodels` expects a `pandas` data frame, we convert each sub-frame at the boundary with `to_pandas()`. Collecting the coefficients gives us a clean data frame of assets and their corresponding betas.
 
 ``` python
 import statsmodels.formula.api as smf
 
 returns_excess_monthly = (returns_monthly
-    .merge(factors, on="date", how="left")
-    .assign(ret_excess=lambda x: x["ret"] - x["risk_free"])
+    .join(factors, on="date", how="left")
+    .with_columns(ret_excess=pl.col("ret") - pl.col("risk_free"))
 )
 
 def estimate_capm(data):
-    model = smf.ols("ret_excess ~ mkt_excess", data=data).fit()
-    result = pd.DataFrame({
+    model = smf.ols("ret_excess ~ mkt_excess", data=data.to_pandas()).fit()
+    result = pl.DataFrame({
+        "symbol": data["symbol"][0],
         "coefficient": ["alpha", "beta"],
         "estimate": model.params.values,
         "t_statistic": model.tvalues.values
     })
     return result
 
-capm_results = (returns_excess_monthly
-    .groupby("symbol", group_keys=True)
-    .apply(estimate_capm)
-    .reset_index()
-)
+capm_results = pl.concat([
+    estimate_capm(data)
+    for (symbol,), data in returns_excess_monthly.group_by(["symbol"], maintain_order=True)
+])
 ```
 
 The results are particularly interesting when we visualize the alphas across our sample of Dow Jones constituents. [Figure 2](#fig-305) reveals the cross-sectional distribution of risk-adjusted performance, with positive values indicating outperformance and negative values indicating underperformance relative to what CAPM would predict. Statistical significance is indicated through color coding, showing which alphas are statistically different from zero at the 95% confidence level.
 
 ``` python
 alphas = (capm_results
-    .query("coefficient=='alpha'")
-    .assign(is_significant=lambda x: np.abs(x["t_statistic"]) >= 1.96)
+    .filter(pl.col("coefficient") == "alpha")
+    .with_columns(is_significant=pl.col("t_statistic").abs() >= 1.96)
 )
 
-alphas["symbol"] = pd.Categorical(
-    alphas["symbol"],
-    categories=alphas.sort_values("estimate")["symbol"],
-    ordered=True
+symbol_order = alphas.sort("estimate")["symbol"].to_list()
+alphas = alphas.with_columns(
+    pl.col("symbol").cast(pl.Enum(symbol_order))
 )
 
 alphas_figure = (

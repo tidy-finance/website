@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -98,10 +98,10 @@ div.csl-indent {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-2e93c9ea7df6fcc5d90b01baca22926b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-15df67a978eff2724f248dfecb6ea2b0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -614,8 +614,8 @@ Note
 <p>MPT relies on the fact that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: Combining assets with low or negative correlations with a given portfolio reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.</p>
 <p>At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk, defined as the variance of the portfolio returns. By balancing these two components, investors can construct portfolios that either maximize their expected return for a given level of risk or minimize their taken risk for a desired level of return. In this chapter, we first derive the optimal portfolio decisions and implement the mean-variance approach in R.</p>
 <p>We use the following packages throughout this chapter:</p>
-<div id="b99d10b9" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<div id="cf52d6b9" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tidyfinance <span class="im">as</span> tf</span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -630,48 +630,49 @@ Note
 <p>According to <span class="citation" data-cites="Markowitz1952">Markowitz (<a href="#ref-Markowitz1952" role="doc-biblioref">1952</a>)</span>, portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience. Second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated. You need historical data or other considerations to generate estimates of the distribution of future returns. Only then can one proceed proceed to optimal decision-making <em>conditional</em> on your estimation.</p>
 <p>To keep things conceptually simple, we focus on the latter part for now and assume that the actual distribution of the asset returns is known. In later chapters, we discuss the issues that arise once we take estimation uncertainty into account. To provide some meaningful illustrations, we rely on historical data to compute reasonable proxies for the expected returns and the variance-covariance of the assets returns, but we will work under the assumption that these are the true parameters of the return distribution.</p>
 <p>Thus, leveraging the approach introduced in <a href="../python/working-with-stock-returns.html">Working with Stock Returns</a>, we download the constituents of the Dow Jones Industrial Average as an example portfolio as well as their daily adjusted close prices.</p>
-<div id="166070be" class="cell" data-execution_count="4">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>symbols <span class="op">=</span> tf.download_data(</span>
+<div id="f0d9bda1" class="cell" data-execution_count="4">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>symbols <span class="op">=</span> pl.from_pandas(tf.download_data(</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    domain<span class="op">=</span><span class="st">"constituents"</span>, index<span class="op">=</span><span class="st">"Dow Jones Industrial Average"</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>))</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>prices_daily <span class="op">=</span> tf.download_data(</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>prices_daily <span class="op">=</span> pl.from_pandas(tf.download_data(</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    domain<span class="op">=</span><span class="st">"stock_prices"</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    symbols<span class="op">=</span>symbols[<span class="st">"symbol"</span>].tolist(),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    symbols<span class="op">=</span>symbols[<span class="st">"symbol"</span>].to_list(),</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    start_date<span class="op">=</span><span class="st">"2000-01-01"</span>,</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    end_date<span class="op">=</span><span class="st">"2023-12-31"</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:</p>
-<div id="380747e0" class="cell" data-execution_count="5">
+<div id="70921373" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>prices_daily <span class="op">=</span> (prices_daily</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"symbol"</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(counts<span class="op">=</span>x[<span class="st">"adjusted_close"</span>].dropna().count()))</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    .query(<span class="st">"counts == counts.max()"</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        counts<span class="op">=</span>pl.col(<span class="st">"adjusted_close"</span>).drop_nulls().<span class="bu">len</span>().over(<span class="st">"symbol"</span>)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(pl.col(<span class="st">"counts"</span>) <span class="op">==</span> pl.col(<span class="st">"counts"</span>).<span class="bu">max</span>())</span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We compute the sample average returns as <span class="math inline">\(\frac{1}{T} \sum_{t=1}^{T} r_{i,t},\)</span> where <span class="math inline">\(r_{i,t}\)</span> is the return of asset <span class="math inline">\(i\)</span> in period <span class="math inline">\(t\)</span>, and <span class="math inline">\(T\)</span> is the total number of periods. As noted above, we treat the vector of sample averages as the true expected returns of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.</p>
-<div id="402142d3" class="cell" data-execution_count="6">
+<div id="72f81289" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>returns_monthly <span class="op">=</span> (prices_daily</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"date"</span>].dt.to_period(<span class="st">"M"</span>).dt.to_timestamp()</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    .groupby([<span class="st">"symbol"</span>, <span class="st">"date"</span>], as_index<span class="op">=</span><span class="va">False</span>)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    .agg(adjusted_close<span class="op">=</span>(<span class="st">"adjusted_close"</span>, <span class="st">"last"</span>))</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    .assign(ret<span class="op">=</span><span class="kw">lambda</span> x: x.groupby(<span class="st">"symbol"</span>)[<span class="st">"adjusted_close"</span>].pct_change())</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .sort(<span class="st">"date"</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(date<span class="op">=</span>pl.col(<span class="st">"date"</span>).dt.truncate(<span class="st">"1mo"</span>))</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    .group_by([<span class="st">"symbol"</span>, <span class="st">"date"</span>])</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    .agg(adjusted_close<span class="op">=</span>pl.col(<span class="st">"adjusted_close"</span>).last())</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    .sort([<span class="st">"symbol"</span>, <span class="st">"date"</span>])</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    .with_columns(ret<span class="op">=</span>pl.col(<span class="st">"adjusted_close"</span>).pct_change().over(<span class="st">"symbol"</span>))</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Individual asset risk in MPT is typically quantified using variance (i.e., <span class="math inline">\(\sigma^2_i\)</span>) or volatilities (i.e., <span class="math inline">\(\sigma_i\)</span>).<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> We suppose that the true volatilities of the assets are also given by the sample standard deviation.</p>
 <p>We compute the sample standard deviation for each asset by using the <code>std()</code> function.</p>
-<div id="2ffcb490" class="cell" data-execution_count="7">
+<div id="2dcc45ca" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>assets <span class="op">=</span> (returns_monthly</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"symbol"</span>, as_index<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    .group_by(<span class="st">"symbol"</span>)</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .agg(</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        mu<span class="op">=</span>(<span class="st">"ret"</span>, <span class="st">"mean"</span>),</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        sigma<span class="op">=</span>(<span class="st">"ret"</span>, <span class="st">"std"</span>)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        mu<span class="op">=</span>pl.col(<span class="st">"ret"</span>).mean(),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        sigma<span class="op">=</span>pl.col(<span class="st">"ret"</span>).std()</span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    .sort(<span class="st">"symbol"</span>)</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We can illustrate the resulting distribution of the asset returns in <a href="#fig-201" class="quarto-xref">Figure&nbsp;1</a>, showing the volatility on the horizontal axis and the expected return on the vertical axis.</p>
 <div id="cell-fig-201" class="cell" data-execution_count="8">
@@ -705,29 +706,32 @@ Figure&nbsp;1: Expected returns and volatilities based on monthly returns adjust
 </div>
 <p>As highlighted above, a key innovation of MPT is to consider interactions between assets. The <em>variance-covariance matrix</em> collects this information. Again, we proxy the true variance-covariance matrix <span class="math inline">\(\Sigma\)</span> of the returns by the sample covariance.</p>
 <p>The interpretation of the covariance is straightforward: While a positive covariance between assets indicates that these assets tend to move in the same direction, a negative covariance indicates that the assets move in opposite directions.</p>
-<p>We can use the <code>cov()</code> function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a <span class="math inline">\((T \times N)\)</span> matrix with one column for each of the <span class="math inline">\(N\)</span> symbols and one row for each of the <span class="math inline">\(T\)</span> trading days. We achieve this by using <code>pivot_wider()</code> with the new column names from the <code>symbol</code>-column and setting the values to <code>ret</code>.</p>
-<div id="907200cc" class="cell" data-execution_count="9">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>returns_wide <span class="op">=</span> (returns_monthly</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    .pivot(index<span class="op">=</span><span class="st">"date"</span>, columns<span class="op">=</span><span class="st">"symbol"</span>, values<span class="op">=</span><span class="st">"ret"</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    .reset_index()</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>sigma <span class="op">=</span> (returns_wide</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    .drop(columns<span class="op">=</span>[<span class="st">"date"</span>])</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    .cov()</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>We can use <code>numpy</code>’s <code>cov()</code> function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a <span class="math inline">\((T \times N)\)</span> matrix with one column for each of the <span class="math inline">\(N\)</span> symbols and one row for each of the <span class="math inline">\(T\)</span> trading days. We achieve this by using <code>pivot()</code> with the new column names from the <code>symbol</code>-column and setting the values to <code>ret</code>. We sort the columns by symbol so that the order matches <code>assets</code>, drop the rows with missing returns, and hand the resulting matrix to <code>numpy</code> at the boundary.</p>
+<div id="1963ec0d" class="cell" data-execution_count="9">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>symbol_order <span class="op">=</span> assets[<span class="st">"symbol"</span>].to_list()</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>returns_wide <span class="op">=</span> (returns_monthly</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    .pivot(index<span class="op">=</span><span class="st">"date"</span>, on<span class="op">=</span><span class="st">"symbol"</span>, values<span class="op">=</span><span class="st">"ret"</span>)</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    .sort(<span class="st">"date"</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"date"</span>] <span class="op">+</span> symbol_order)</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>sigma <span class="op">=</span> np.cov(</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    returns_wide.drop(<span class="st">"date"</span>).drop_nulls().to_numpy(),</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>    rowvar<span class="op">=</span><span class="va">False</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Figure <a href="#fig-203" class="quarto-xref">Figure&nbsp;2</a> illustrates the resulting variance-covariance matrix.</p>
 <div id="cell-fig-203" class="cell" data-execution_count="10">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sigma_long <span class="op">=</span> (sigma</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    .reset_index()</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    .melt(id_vars<span class="op">=</span><span class="st">"symbol"</span>, var_name<span class="op">=</span><span class="st">"symbol_b"</span>, value_name<span class="op">=</span><span class="st">"value"</span>)</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>sigma_long[<span class="st">"symbol_b"</span>] <span class="op">=</span> pd.Categorical(</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    sigma_long[<span class="st">"symbol_b"</span>], </span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>sigma_long[<span class="st">"symbol_b"</span>].unique()[::<span class="op">-</span><span class="dv">1</span>],</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    ordered<span class="op">=</span><span class="va">True</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sigma_long <span class="op">=</span> (</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    pl.DataFrame(sigma, schema<span class="op">=</span>symbol_order)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(symbol<span class="op">=</span>pl.Series(symbol_order))</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>    .unpivot(index<span class="op">=</span><span class="st">"symbol"</span>, variable_name<span class="op">=</span><span class="st">"symbol_b"</span>, value_name<span class="op">=</span><span class="st">"value"</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>        symbol_b<span class="op">=</span>pl.col(<span class="st">"symbol_b"</span>).cast(</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>            pl.Enum(symbol_order[::<span class="op">-</span><span class="dv">1</span>])</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>sigma_figure <span class="op">=</span> (</span>
@@ -766,25 +770,25 @@ Figure&nbsp;2: Variances and covariances based on monthly returns adjusted for d
 <p>While staying fully invested across all available assets <span class="math inline">\(N\)</span>, <span class="math inline">\(\sum_{i=1}^{N} \omega_i = 1\)</span>. The analytical solution for the minimum-variance portfolio is</p>
 <p><span class="math display">\[\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},\]</span></p>
 <p>where <span class="math inline">\(\iota\)</span> is a vector of 1’s and <span class="math inline">\(\Sigma^{-1}\)</span> is the inverse of the variance-covariance matrix <span class="math inline">\(\Sigma\)</span>. See <a href="../python/proofs.html">Proofs</a> in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:</p>
-<div id="7b74ee7d" class="cell" data-execution_count="11">
+<div id="560cf5b3" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>iota <span class="op">=</span> np.ones(sigma.shape[<span class="dv">0</span>])</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>sigma_inv <span class="op">=</span> np.linalg.inv(sigma.values)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>sigma_inv <span class="op">=</span> np.linalg.inv(sigma)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>omega_mvp <span class="op">=</span> (sigma_inv <span class="op">@</span> iota) <span class="op">/</span> (iota <span class="op">@</span> sigma_inv <span class="op">@</span> iota)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Figure <a href="#fig-204" class="quarto-xref">Figure&nbsp;3</a> shows the resulting portfolio weights.</p>
 <div id="cell-fig-204" class="cell" data-execution_count="12">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>assets <span class="op">=</span> assets.assign(omega_mvp<span class="op">=</span>omega_mvp)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>assets <span class="op">=</span> assets.with_columns(omega_mvp<span class="op">=</span>pl.Series(omega_mvp))</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>assets[<span class="st">"symbol"</span>] <span class="op">=</span> pd.Categorical(</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    assets[<span class="st">"symbol"</span>],</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    categories<span class="op">=</span>assets.sort_values(<span class="st">"omega_mvp"</span>)[<span class="st">"symbol"</span>],</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    ordered<span class="op">=</span><span class="va">True</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>symbol_levels <span class="op">=</span> assets.sort(<span class="st">"omega_mvp"</span>)[<span class="st">"symbol"</span>].to_list()</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>assets <span class="op">=</span> assets.with_columns(</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    symbol<span class="op">=</span>pl.col(<span class="st">"symbol"</span>).cast(pl.Enum(symbol_levels)),</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    omega_positive<span class="op">=</span>pl.col(<span class="st">"omega_mvp"</span>) <span class="op">&gt;</span> <span class="dv">0</span></span>
 <span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>omega_figure <span class="op">=</span> (</span>
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>    ggplot(</span>
 <span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>        assets,</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>        aes(y<span class="op">=</span><span class="st">"omega_mvp"</span>, x<span class="op">=</span><span class="st">"symbol"</span>, fill<span class="op">=</span><span class="st">"omega_mvp&gt;0"</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>        aes(y<span class="op">=</span><span class="st">"omega_mvp"</span>, x<span class="op">=</span><span class="st">"symbol"</span>, fill<span class="op">=</span><span class="st">"omega_positive"</span>)</span>
 <span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_col()</span>
 <span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> coord_flip()</span>
@@ -807,11 +811,11 @@ Figure&nbsp;3: Weights are based on historical moments of monthly returns adjust
 </div>
 </div>
 <p>Before we move on to other portfolios, we collect the return and volatility of the minimum-variance portfolio in a data frame:</p>
-<div id="ce2a1b91" class="cell" data-execution_count="13">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> assets[<span class="st">"mu"</span>].values</span>
+<div id="69b28023" class="cell" data-execution_count="13">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>mu <span class="op">=</span> assets[<span class="st">"mu"</span>].to_numpy()</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>mu_mvp <span class="op">=</span> omega_mvp <span class="op">@</span> mu</span>
-<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>sigma_mvp <span class="op">=</span> np.sqrt(omega_mvp <span class="op">@</span> sigma.values <span class="op">@</span> omega_mvp)</span>
-<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>summary_mvp <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>sigma_mvp <span class="op">=</span> np.sqrt(omega_mvp <span class="op">@</span> sigma <span class="op">@</span> omega_mvp)</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>summary_mvp <span class="op">=</span> pl.DataFrame(</span>
 <span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    {</span>
 <span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        <span class="st">"mu"</span>: [mu_mvp],</span>
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        <span class="st">"sigma"</span>: [sigma_mvp],</span>
@@ -820,28 +824,35 @@ Figure&nbsp;3: Weights are based on historical moments of monthly returns adjust
 <span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>summary_mvp</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="13">
-<div>
-
-
+<div><style>
+.dataframe > thead > tr,
+.dataframe > tbody > tr {
+  text-align: right;
+  white-space: pre-wrap;
+}
+</style>
+<small>shape: (1, 3)</small>
 <table class="dataframe caption-top table table-sm table-striped small" data-border="1">
 <thead>
 <tr class="header">
-<th data-quarto-table-cell-role="th"></th>
 <th data-quarto-table-cell-role="th">mu</th>
 <th data-quarto-table-cell-role="th">sigma</th>
 <th data-quarto-table-cell-role="th">type</th>
 </tr>
+<tr class="even">
+<td>f64</td>
+<td>f64</td>
+<td>str</td>
+</tr>
 </thead>
 <tbody>
 <tr class="odd">
-<th data-quarto-table-cell-role="th">0</th>
 <td>0.008356</td>
 <td>0.032144</td>
-<td>Minimum-Variance Portfolio</td>
+<td>"Minimum-Variance Portfolio"</td>
 </tr>
 </tbody>
 </table>
-
 </div>
 </div>
 </div>
@@ -850,7 +861,7 @@ Figure&nbsp;3: Weights are based on historical moments of monthly returns adjust
 <h2 class="anchored" data-anchor-id="efficient-portfolios">Efficient Portfolios</h2>
 <p>In many instances, earning the lowest possible variance may not be the desired outcome. Instead, we generalize the concept of efficient portfolios, where, in addition to minimizing portfolio variance, the investor aims to earn a <strong>minimum expected return</strong> <span class="math inline">\(\omega^{\prime}\mu \geq \bar{\mu}.\)</span> In other words, when <span class="math inline">\(\bar\mu\geq \omega_\text{mvp}^{\prime}\mu\)</span>, the investor is willing to accept a higher portfolio variance in return for earning a higher expected return.</p>
 <p>Suppose, for instance, the investor wants to earn at least the historical average return of the asset that delivered the highest average returns in the past:</p>
-<div id="16d3f0b8" class="cell" data-execution_count="14">
+<div id="5b95cbb9" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>mu_bar <span class="op">=</span> assets[<span class="st">"mu"</span>].<span class="bu">max</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Formally, the optimization problem is given by</p>
@@ -859,39 +870,44 @@ Figure&nbsp;3: Weights are based on historical moments of monthly returns adjust
 <p><span class="math display">\[\omega_{efp} = \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\]</span></p>
 <p>where <span class="math inline">\(\lambda^* = 2\frac{\bar\mu - D/C}{E-D^2/C}\)</span>, <span class="math inline">\(C = \iota'\Sigma^{-1}\iota\)</span>, <span class="math inline">\(D=\iota'\Sigma^{-1}\mu\)</span>, and <span class="math inline">\(E=\mu'\Sigma^{-1}\mu\)</span>. For details, we again refer to the <a href="../python/proofs.html">Proofs</a> in the Appendix.</p>
 <p>The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.</p>
-<div id="eccf9b57" class="cell" data-execution_count="15">
+<div id="a0c74cc0" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>C <span class="op">=</span> iota <span class="op">@</span> sigma_inv <span class="op">@</span> iota</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>D <span class="op">=</span> iota <span class="op">@</span> sigma_inv <span class="op">@</span> mu</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>E <span class="op">=</span> mu <span class="op">@</span> sigma_inv <span class="op">@</span> mu</span>
 <span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>lambda_tilde <span class="op">=</span> <span class="dv">2</span> <span class="op">*</span> (mu_bar <span class="op">-</span> D <span class="op">/</span> C) <span class="op">/</span> (E <span class="op">-</span> (D<span class="op">**</span><span class="dv">2</span>) <span class="op">/</span> C)</span>
 <span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>omega_efp <span class="op">=</span> omega_mvp <span class="op">+</span> (lambda_tilde <span class="op">/</span> <span class="dv">2</span>) <span class="op">*</span> (sigma_inv <span class="op">@</span> mu <span class="op">-</span> D <span class="op">*</span> omega_mvp)</span>
 <span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>mu_efp <span class="op">=</span> omega_efp <span class="op">@</span> mu</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>sigma_efp <span class="op">=</span> np.sqrt(omega_efp <span class="op">@</span> sigma.values <span class="op">@</span> omega_efp)</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>sigma_efp <span class="op">=</span> np.sqrt(omega_efp <span class="op">@</span> sigma <span class="op">@</span> omega_efp)</span>
 <span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>summary_efp <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>summary_efp <span class="op">=</span> pl.DataFrame(</span>
 <span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>    {<span class="st">"mu"</span>: [mu_efp], <span class="st">"sigma"</span>: [sigma_efp], <span class="st">"type"</span>: [<span class="st">"Efficient Portfolio"</span>]}</span>
 <span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Figure <a href="#fig-205" class="quarto-xref">Figure&nbsp;4</a> shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.</p>
 <div id="cell-fig-205" class="cell" data-execution_count="16">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>summaries <span class="op">=</span> pd.concat([assets, summary_mvp, summary_efp], ignore_index<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>summaries_figure <span class="op">=</span> (</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    ggplot(summaries, aes(x<span class="op">=</span><span class="st">"sigma"</span>, y<span class="op">=</span><span class="st">"mu"</span>))</span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.query(<span class="st">"type.isna()"</span>))</span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.query(<span class="st">"type.notna()"</span>), color<span class="op">=</span><span class="st">"#F21A00"</span>, size<span class="op">=</span><span class="dv">3</span>)</span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_label(</span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>        aes(label<span class="op">=</span><span class="st">"type"</span>), adjust_text<span class="op">=</span>{<span class="st">"arrowprops"</span>: {<span class="st">"arrowstyle"</span>: <span class="st">"-"</span>}}</span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Volatility"</span>,</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>        y<span class="op">=</span><span class="st">"Expected return"</span>,</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Efficient &amp; minimum-variance portfolios"</span>,</span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>summaries_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>summaries <span class="op">=</span> pl.concat(</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    [assets, summary_mvp, summary_efp], how<span class="op">=</span><span class="st">"diagonal"</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>summaries_figure <span class="op">=</span> (</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>    ggplot(summaries, aes(x<span class="op">=</span><span class="st">"sigma"</span>, y<span class="op">=</span><span class="st">"mu"</span>))</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.<span class="bu">filter</span>(pl.col(<span class="st">"type"</span>).is_null()))</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>summaries.<span class="bu">filter</span>(pl.col(<span class="st">"type"</span>).is_not_null()),</span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"#F21A00"</span>, size<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_label(</span>
+<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>        aes(label<span class="op">=</span><span class="st">"type"</span>), adjust_text<span class="op">=</span>{<span class="st">"arrowprops"</span>: {<span class="st">"arrowstyle"</span>: <span class="st">"-"</span>}}</span>
+<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
+<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Volatility"</span>,</span>
+<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>        y<span class="op">=</span><span class="st">"Expected return"</span>,</span>
+<span id="cb14-20"><a href="#cb14-20" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Efficient &amp; minimum-variance portfolios"</span>,</span>
+<span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb14-22"><a href="#cb14-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb14-23"><a href="#cb14-23" aria-hidden="true" tabindex="-1"></a>summaries_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div id="fig-205" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Efficient &amp; minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents.">
 <figure class="quarto-float quarto-float-fig figure">
@@ -916,40 +932,41 @@ Figure&nbsp;4: The big dots indicate the location of the minimum-variance and th
 <p><span class="math display">\[a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2} = \left(\frac{a\mu_1 + (1-a)\mu_2- D/C }{E-D^2/C}\right)\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\]</span></p>
 <p>which corresponds to the efficient portfolio earning <span class="math inline">\(a\mu_1 + (1-a)\mu_2\)</span> in expectation.</p>
 <p>The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.</p>
-<div id="f2cb7ba2" class="cell" data-execution_count="17">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>efficient_frontier <span class="op">=</span> (</span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    pd.DataFrame({<span class="st">"a"</span>: np.arange(<span class="op">-</span><span class="dv">1</span>, <span class="fl">2.01</span>, <span class="fl">0.01</span>)})</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>        omega<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"a"</span>].<span class="bu">map</span>(</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>            <span class="kw">lambda</span> x: x <span class="op">*</span> omega_efp <span class="op">+</span> (<span class="dv">1</span> <span class="op">-</span> x) <span class="op">*</span> omega_mvp</span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>        mu<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"omega"</span>].<span class="bu">map</span>(<span class="kw">lambda</span> x: x <span class="op">@</span> mu),</span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a>        sigma<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"omega"</span>].<span class="bu">map</span>(<span class="kw">lambda</span> x: np.sqrt(x <span class="op">@</span> sigma <span class="op">@</span> x)),</span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="b8226ae7" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>a_grid <span class="op">=</span> np.arange(<span class="op">-</span><span class="dv">1</span>, <span class="fl">2.01</span>, <span class="fl">0.01</span>)</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>omega_grid <span class="op">=</span> [a <span class="op">*</span> omega_efp <span class="op">+</span> (<span class="dv">1</span> <span class="op">-</span> a) <span class="op">*</span> omega_mvp <span class="cf">for</span> a <span class="kw">in</span> a_grid]</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>efficient_frontier <span class="op">=</span> pl.DataFrame({</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"a"</span>: a_grid,</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"mu"</span>: [omega <span class="op">@</span> mu <span class="cf">for</span> omega <span class="kw">in</span> omega_grid],</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"sigma"</span>: [np.sqrt(omega <span class="op">@</span> sigma <span class="op">@</span> omega) <span class="cf">for</span> omega <span class="kw">in</span> omega_grid],</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios in a figure using <code>ggplot</code> (see <a href="#fig-206" class="quarto-xref">Figure&nbsp;5</a>). We also add the individual stocks in the same plot.</p>
 <div id="cell-fig-206" class="cell" data-execution_count="18">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>summaries <span class="op">=</span> pd.concat([summaries, efficient_frontier], ignore_index<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>summaries_figure <span class="op">=</span> (</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    ggplot(summaries, aes(x<span class="op">=</span><span class="st">"sigma"</span>, y<span class="op">=</span><span class="st">"mu"</span>))</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.query(<span class="st">"type.isna()"</span>))</span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.query(<span class="st">"type.notna()"</span>), color<span class="op">=</span><span class="st">"#F21A00"</span>, size<span class="op">=</span><span class="dv">3</span>)</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_label(</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>        aes(label<span class="op">=</span><span class="st">"type"</span>), adjust_text<span class="op">=</span>{<span class="st">"arrowprops"</span>: {<span class="st">"arrowstyle"</span>: <span class="st">"-"</span>}}</span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Volatility"</span>,</span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>        y<span class="op">=</span><span class="st">"Expected return"</span>,</span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Efficient &amp; minimum-variance portfolios"</span>,</span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>summaries_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>summaries <span class="op">=</span> pl.concat(</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    [summaries, efficient_frontier], how<span class="op">=</span><span class="st">"diagonal"</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>summaries_figure <span class="op">=</span> (</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    ggplot(summaries, aes(x<span class="op">=</span><span class="st">"sigma"</span>, y<span class="op">=</span><span class="st">"mu"</span>))</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(data<span class="op">=</span>summaries.<span class="bu">filter</span>(pl.col(<span class="st">"type"</span>).is_null()))</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>        data<span class="op">=</span>summaries.<span class="bu">filter</span>(pl.col(<span class="st">"type"</span>).is_not_null()),</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>        color<span class="op">=</span><span class="st">"#F21A00"</span>, size<span class="op">=</span><span class="dv">3</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_label(</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>        aes(label<span class="op">=</span><span class="st">"type"</span>), adjust_text<span class="op">=</span>{<span class="st">"arrowprops"</span>: {<span class="st">"arrowstyle"</span>: <span class="st">"-"</span>}}</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_x_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> scale_y_continuous(labels<span class="op">=</span>percent_format())</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Volatility"</span>,</span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>        y<span class="op">=</span><span class="st">"Expected return"</span>,</span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Efficient &amp; minimum-variance portfolios"</span>,</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>summaries_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
 <div id="fig-206" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility.">
 <figure class="quarto-float quarto-float-fig figure">
@@ -1005,105 +1022,205 @@ Merton, Robert C. 1972. <span>“<span class="nocase">An analytic derivation of 
 </ol>
 </section></div></main> <!-- /main -->
 <div class="custom-footer">
+
   <div class="copyright">© Christoph Frey, Christoph Scheuch, Stefan Voigt &amp; Patrick Weiss</div>
+
   <a href="disclaimer.html">Disclaimer</a>
+
   <a href="#" id="open_preferences_center">Cookie Preferences</a>
-</div>
-<div id="presale-banner" hidden="">
-  <div class="presale-banner__inner">
-    <span class="presale-banner__text">
-      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
-      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
-    </span>
-    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
-  </div>
+
 </div>
 
+<div id="presale-banner" hidden="">
+
+  <div class="presale-banner__inner">
+
+    <span class="presale-banner__text">
+
+      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
+
+      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
+
+    </span>
+
+    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
+
+  </div>
+
+</div>
+
+
+
 <style>
+
   #presale-banner {
+
     background: #E1AF00;
+
     color: #fff;
+
     border-bottom: 1px solid rgba(255,255,255,0.1);
+
     font-size: 0.95rem;
+
   }
+
   #presale-banner[hidden] { display: none; }
+
   .presale-banner__inner {
+
     max-width: 1200px;
+
     margin: 0 auto;
+
     padding: 0.6rem 3rem 0.6rem 1rem;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     gap: 1rem;
+
     position: relative;
+
     text-align: center;
+
   }
+
   .presale-banner__text a {
+
     color: black;
+
     text-decoration: none;
+
     font-weight: 600;
+
     margin-left: 0.25rem;
+
   }
+
   .presale-banner__text a:hover { color: #3B9AB2; }
+
   .presale-banner__close {
+
     position: absolute;
+
     right: 0.75rem;
+
     top: 50%;
+
     transform: translateY(-50%);
+
     background: transparent;
+
     border: 0;
+
     color: #fff;
+
     font-size: 1.4rem;
+
     line-height: 1;
+
     cursor: pointer;
+
     padding: 0.25rem 0.5rem;
+
     border-radius: 4px;
+
   }
+
   .presale-banner__close:hover { background: rgba(255,255,255,0.15); }
+
   @media (max-width: 600px) {
+
     .presale-banner__inner { font-size: 0.8rem; padding: 0.5rem 2.5rem 0.5rem 0.75rem; }
+
   }
+
+
 
 </style>
 
+
+
 <script>
+
 (function () {
+
   var STORAGE_KEY = 'presale-banner-dismissed-2026-06-22';
+
   var PRESALE_END = new Date('2026-06-22T23:59:59');
 
+
+
   // Don't show if expired or previously dismissed
+
   if (new Date() > PRESALE_END) return;
+
   try {
+
     if (localStorage.getItem(STORAGE_KEY) === '1') return;
+
   } catch (e) { /* ignore */ }
 
+
+
   function init() {
+
     var banner = document.getElementById('presale-banner');
+
     if (!banner) return;
 
+
+
     // Move banner to sit directly below the navbar
+
     var navbar = document.querySelector('header.quarto-secondary-nav') 
+
               || document.querySelector('nav.navbar')
+
               || document.querySelector('header#quarto-header')
+
               || document.querySelector('header');
+
     if (navbar && navbar.parentNode) {
+
       navbar.parentNode.insertBefore(banner, navbar.nextSibling);
+
     }
+
     banner.hidden = false;
 
+
+
     document.getElementById('presale-banner-close')
+
       .addEventListener('click', function () {
+
         banner.hidden = true;
+
         try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+
       });
+
   }
 
+
+
   if (document.readyState === 'loading') {
+
     document.addEventListener('DOMContentLoaded', init);
+
   } else {
+
     init();
+
   }
+
 })();
+
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {

@@ -9,6 +9,7 @@ In this chapter, we apply different portfolio performance measures to evaluate a
 The current chapter relies on the following set of Python packages:
 
 ``` python
+import polars as pl
 import pandas as pd
 import numpy as np
 import statsmodels.formula.api as smf
@@ -25,8 +26,8 @@ To get started, we load the monthly CRSP file, which forms our investment univer
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .dropna()
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .drop_nulls()
 )
 ```
 
@@ -34,8 +35,8 @@ To evaluate the performance of portfolios, we further use monthly market returns
 
 ``` python
 factors_ff_monthly = (
-    pd.read_parquet("data-python/factors_ff3_monthly.parquet")
-    .get(["date", "mkt_excess"])
+    pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .select(["date", "mkt_excess"])
 )
 ```
 
@@ -43,21 +44,21 @@ Next, we retrieve some stock characteristics that have been shown to have an eff
 
 ``` python
 crsp_monthly_lags = (crsp_monthly
-    .assign(date=lambda x: x["date"]+pd.DateOffset(months=13))
-    .get(["permno", "date", "mktcap"])
+    .with_columns(date=pl.col("date").dt.offset_by("13mo"))
+    .select(["permno", "date", "mktcap"])
+    .rename({"mktcap": "mktcap_13"})
 )
 
 crsp_monthly = (crsp_monthly
-    .merge(crsp_monthly_lags, 
-            how="inner", on=["permno", "date"], suffixes=["", "_13"])
+    .join(crsp_monthly_lags, how="inner", on=["permno", "date"])
 )
 
 data_portfolios = (crsp_monthly
-    .assign(
-        momentum_lag=lambda x: x["mktcap_lag"]/x["mktcap_13"],
-        size_lag=lambda x: np.log(x["mktcap_lag"])
+    .with_columns(
+        momentum_lag=pl.col("mktcap_lag")/pl.col("mktcap_13"),
+        size_lag=pl.col("mktcap_lag").log()
     )
-    .dropna(subset=["momentum_lag", "size_lag"])
+    .drop_nulls(["momentum_lag", "size_lag"])
 )
 ```
 
@@ -80,20 +81,17 @@ Intuitively, the portfolio strategy is a form of active portfolio management rel
 We first implement cross-sectional standardization for the entire CRSP universe. We also keep track of (lagged) relative market capitalization `relative_mktcap`, which will represent the value-weighted benchmark portfolio, while `n` denotes the number of traded assets \\N_t\\, which we use to construct the naive portfolio benchmark.
 
 ``` python
+lag_columns = [i for i in data_portfolios.columns if i.endswith("lag")]
+
 data_portfolios = (data_portfolios
-    .groupby("date")
-    .apply(lambda x: x.assign(
-        relative_mktcap=x["mktcap_lag"]/x["mktcap_lag"].sum()
-        )
+    .with_columns(
+        relative_mktcap=pl.col("mktcap_lag")/pl.col("mktcap_lag").sum().over("date")
     )
-    .reset_index(drop=True)
-    .set_index("date")
-    .groupby(level="date")
-    .transform(
-        lambda x: (x-x.mean())/x.std() if x.name.endswith("lag") else x
+    .with_columns(
+        [((pl.col(c)-pl.col(c).mean().over("date"))/
+          pl.col(c).std().over("date")).alias(c) for c in lag_columns]
     )
-    .reset_index()
-    .drop(["mktcap_lag"], axis=1)
+    .drop("mktcap_lag")
 )
 ```
 
@@ -110,7 +108,7 @@ To get a feeling for the performance of such an allocation strategy, we start wi
 ``` python
 lag_columns = [i for i in data_portfolios.columns if "lag" in i]
 n_parameters = len(lag_columns)
-theta = pd.DataFrame({"theta": [1.5]*n_parameters}, index=lag_columns)
+theta = np.array([1.5]*n_parameters)
 ```
 
 The function `compute_portfolio_weights()` below computes the portfolio weights \\\bar{\omega}\_{i,t} + \frac{1}{N_t}\theta'\hat{x}\_{i,t}\\ according to our parametrization for a given value \\\theta_0\\. Everything happens within a single pipeline. Hence, we provide a short walk-through.
@@ -124,41 +122,46 @@ The final few lines go a bit further and implement a simple version of a no-shor
 The following function computes the optimal portfolio weights in the way just described.
 
 ``` python
-def compute_portfolio_weights(theta, 
+def compute_portfolio_weights(theta,
                               data,
                               value_weighting=True,
                               allow_short_selling=True):
     """Compute portfolio weights for different strategies."""
-    
+
     lag_columns = [i for i in data.columns if "lag" in i]
-    theta = pd.DataFrame(theta, index=lag_columns)
+    theta = np.asarray(theta).flatten()
+
+    tilt_expr = pl.sum_horizontal(
+        [float(theta[k])*pl.col(lag_columns[k])
+         for k in range(len(lag_columns))]
+    )
 
     data = (data
-      .groupby("date")
-      .apply(lambda x: x.assign(
-          characteristic_tilt=x[theta.index] @ theta / x.shape[0]
+      .with_columns(
+          characteristic_tilt=(tilt_expr/pl.len()).over("date")
+      )
+      .with_columns(
+        weight_benchmark=(
+          pl.col("relative_mktcap") if value_weighting
+          else pl.lit(1/data.shape[0])
         )
       )
-      .reset_index(drop=True)
-      .assign(
-        weight_benchmark=lambda x: 
-          x["relative_mktcap"] if value_weighting else 1/x.shape[0],
-        weight_tilt=lambda x: 
-          x["weight_benchmark"] + x["characteristic_tilt"]
+      .with_columns(
+        weight_tilt=pl.col("weight_benchmark")+pl.col("characteristic_tilt")
       )
-      .drop(columns=["characteristic_tilt"])
+      .drop("characteristic_tilt")
     )
 
     if not allow_short_selling:
         data = (data
-          .assign(weight_tilt=lambda x: np.maximum(0, x["weight_tilt"]))
+          .with_columns(
+            weight_tilt=pl.max_horizontal(pl.lit(0.0), pl.col("weight_tilt")))
         )
 
     data = (data
-      .groupby("date")
-      .apply(lambda x: x.assign(
-        weight_tilt=lambda x: x["weight_tilt"]/x["weight_tilt"].sum()))
-      .reset_index(drop=True)
+      .with_columns(
+        weight_tilt=(pl.col("weight_tilt")/pl.col("weight_tilt").sum()).over("date")
+      )
     )
 
     return data
@@ -201,36 +204,41 @@ def evaluate_portfolio(weights_data,
                        length_year=12):
     """Calculate portfolio evaluation measures."""
     evaluation = (weights_data
-        .groupby("date")
-        .apply(lambda x: pd.Series(
-          np.average(x[["ret_excess", "ret_excess"]],
-                     weights=x[["weight_tilt", "weight_benchmark"]],
-                     axis=0),
-          ["return_tilt", "return_benchmark"])
+        .group_by("date")
+        .agg(
+          return_tilt=(pl.col("ret_excess")*pl.col("weight_tilt")).sum()
+            /pl.col("weight_tilt").sum(),
+          return_benchmark=(pl.col("ret_excess")*pl.col("weight_benchmark")).sum()
+            /pl.col("weight_benchmark").sum()
         )
-        .reset_index()
-        .melt(id_vars="date", var_name="model",
-              value_vars=["return_tilt", "return_benchmark"],
-              value_name="portfolio_return")
-        .assign(model=lambda x: x["model"].str.replace("return_", ""))
+        .unpivot(index="date", on=["return_tilt", "return_benchmark"],
+                 variable_name="model", value_name="portfolio_return")
+        .with_columns(model=pl.col("model").str.replace("return_", ""))
     )
 
     evaluation_stats = (evaluation
-        .groupby("model")["portfolio_return"]
-        .aggregate([
-          ("Expected utility", lambda x: np.mean(power_utility(x))),
-          ("Average return", lambda x: np.mean(length_year*x)*100),
-          ("SD return", lambda x: np.std(x)*np.sqrt(length_year)*100),
-          ("Sharpe ratio", lambda x: (np.mean(x)/np.std(x)* 
-                                        np.sqrt(length_year)))
+        .group_by("model")
+        .agg([
+          power_utility(pl.col("portfolio_return")).mean()
+            .alias("Expected utility"),
+          (length_year*pl.col("portfolio_return")).mean()
+            .mul(100).alias("Average return"),
+          (pl.col("portfolio_return").std(ddof=0)*np.sqrt(length_year))
+            .mul(100).alias("SD return"),
+          (pl.col("portfolio_return").mean()/
+           pl.col("portfolio_return").std(ddof=0)*np.sqrt(length_year))
+            .alias("Sharpe ratio")
         ])
+        .to_pandas()
+        .set_index("model")
     )
 
     if capm_evaluation:
         evaluation_capm = (evaluation
-            .merge(factors_ff_monthly, how="left", on="date")
+            .join(factors_ff_monthly, how="left", on="date")
+            .to_pandas()
             .groupby("model")
-            .apply(lambda x: 
+            .apply(lambda x:
               smf.ols(formula="portfolio_return ~ 1 + mkt_excess", data=x)
               .fit().params
             )
@@ -243,30 +251,28 @@ def evaluate_portfolio(weights_data,
 
     if full_evaluation:
         evaluation_weights = (weights_data
-          .melt(id_vars="date", var_name="model",
-                value_vars=["weight_benchmark", "weight_tilt"],
-                value_name="weight")
-          .groupby(["model", "date"])["weight"]
-          .aggregate([
-            ("Mean abs. weight", lambda x: np.mean(abs(x))),
-            ("Max. weight", lambda x: max(x)),
-            ("Min. weight", lambda x: min(x)),
-            ("Avg. sum of neg. weights", lambda x: -np.sum(x[x < 0])),
-            ("Avg. share of neg. weights", lambda x: np.mean(x < 0))
+          .unpivot(index="date", on=["weight_benchmark", "weight_tilt"],
+                   variable_name="model", value_name="weight")
+          .group_by(["model", "date"])
+          .agg([
+            pl.col("weight").abs().mean().alias("Mean abs. weight"),
+            pl.col("weight").max().alias("Max. weight"),
+            pl.col("weight").min().alias("Min. weight"),
+            pl.col("weight").filter(pl.col("weight") < 0).sum()
+              .mul(-1).alias("Avg. sum of neg. weights"),
+            (pl.col("weight") < 0).mean().alias("Avg. share of neg. weights")
           ])
-          .reset_index()
-          .drop(columns=["date"])
-          .groupby(["model"])
-          .aggregate(lambda x: np.average(x)*100)
-          .reset_index()
-          .assign(model=lambda x: x["model"].str.replace("weight_", ""))
+          .group_by("model")
+          .agg(pl.col(pl.Float64).mean()*100)
+          .with_columns(model=pl.col("model").str.replace("weight_", ""))
+          .to_pandas()
         )
-        
+
         evaluation_stats = (evaluation_stats
           .merge(evaluation_weights, how="left", on="model")
           .set_index("model")
         )
-        
+
     evaluation_stats = (evaluation_stats
       .transpose()
       .rename_axis(columns=None)
@@ -281,19 +287,19 @@ Let us take a look at the different portfolio strategies and evaluation measures
 evaluate_portfolio(weights_crsp).round(2)
 ```
 
-|                            | benchmark | tilt  |
-|----------------------------|-----------|-------|
-| Expected utility           | -0.25     | -0.26 |
-| Average return             | 7.05      | 0.83  |
-| SD return                  | 15.41     | 21.09 |
-| Sharpe ratio               | 0.46      | 0.04  |
-| Intercept                  | 0.00      | -0.00 |
-| Market beta                | 0.99      | 0.94  |
-| Mean abs. weight           | 0.04      | 0.09  |
-| Max. weight                | 4.29      | 4.48  |
-| Min. weight                | 0.00      | -0.20 |
-| Avg. sum of neg. weights   | 0.00      | 77.88 |
-| Avg. share of neg. weights | 0.00      | 48.71 |
+|                            | tilt  | benchmark |
+|----------------------------|-------|-----------|
+| Expected utility           | -0.26 | -0.25     |
+| Average return             | 0.82  | 7.05      |
+| SD return                  | 21.09 | 15.41     |
+| Sharpe ratio               | 0.04  | 0.46      |
+| Intercept                  | -0.00 | 0.00      |
+| Market beta                | 0.94  | 0.99      |
+| Mean abs. weight           | 0.09  | 0.04      |
+| Max. weight                | 4.48  | 4.29      |
+| Min. weight                | -0.20 | 0.00      |
+| Avg. sum of neg. weights   | 77.88 | 0.00      |
+| Avg. share of neg. weights | 48.71 | 0.00      |
 
 The value-weighted portfolio delivers an annualized return of more than six percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically one for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
 
@@ -344,7 +350,7 @@ optimal_theta = minimize(
 
 |               | momentum_lag | size_lag |
 |---------------|--------------|----------|
-| Optimal theta | 0.219        | -1.625   |
+| Optimal theta | 0.223        | -1.625   |
 
 The resulting values of \\\hat\theta\\ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio toward smaller stocks (negative coefficient for size) and toward past winners (positive value for momentum). Both findings are in line with the well-documented size effect ([Banz 1981](#ref-Banz1981)) and the momentum anomaly ([Jegadeesh and Titman 1993](#ref-Jegadeesh1993)).
 
@@ -411,19 +417,19 @@ performance_table = (pd.concat(results, axis=1)
 performance_table.get(["EW", "VW"])
 ```
 
-|                            | EW     | VW     |
-|----------------------------|--------|--------|
-| Expected utility           | -0.251 | -0.249 |
-| Average return             | 9.992  | 7.048  |
-| SD return                  | 20.454 | 15.410 |
-| Sharpe ratio               | 0.489  | 0.457  |
-| Intercept                  | 0.002  | 0.000  |
-| Market beta                | 1.138  | 0.995  |
-| Mean abs. weight           | 0.000  | 0.036  |
-| Max. weight                | 0.000  | 4.290  |
-| Min. weight                | 0.000  | 0.000  |
-| Avg. sum of neg. weights   | 0.000  | 0.000  |
-| Avg. share of neg. weights | 0.000  | 0.000  |
+|                            | EW     | EW     | VW     | VW     |
+|----------------------------|--------|--------|--------|--------|
+| Expected utility           | -0.251 | -0.251 | -0.249 | -0.249 |
+| Average return             | 9.996  | 9.996  | 7.048  | 7.048  |
+| SD return                  | 20.454 | 20.454 | 15.410 | 15.410 |
+| Sharpe ratio               | 0.489  | 0.489  | 0.457  | 0.457  |
+| Intercept                  | 0.002  | 0.002  | 0.000  | 0.000  |
+| Market beta                | 1.138  | 1.138  | 0.995  | 0.995  |
+| Mean abs. weight           | 0.000  | 0.000  | 0.036  | 0.036  |
+| Max. weight                | 0.000  | 0.000  | 4.290  | 4.290  |
+| Min. weight                | 0.000  | 0.000  | 0.000  | 0.000  |
+| Avg. sum of neg. weights   | 0.000  | 0.000  | 0.000  | 0.000  |
+| Avg. share of neg. weights | 0.000  | 0.000  | 0.000  | 0.000  |
 
 ``` python
 performance_table.get(["EW Optimal", "VW Optimal"])
@@ -431,17 +437,17 @@ performance_table.get(["EW Optimal", "VW Optimal"])
 
 |                            | EW Optimal | VW Optimal |
 |----------------------------|------------|------------|
-| Expected utility           | -25.923    | -0.260     |
-| Average return             | -4549.172  | 0.829      |
-| SD return                  | 14990.324  | 21.090     |
-| Sharpe ratio               | -0.303     | 0.039      |
-| Intercept                  | -3.226     | -0.005     |
-| Market beta                | -97.529    | 0.939      |
-| Mean abs. weight           | 104.055    | 0.092      |
-| Max. weight                | 1467.888   | 4.480      |
-| Min. weight                | -353.727   | -0.205     |
-| Avg. sum of neg. weights   | 82132.315  | 77.884     |
-| Avg. share of neg. weights | 51.548     | 48.707     |
+| Expected utility           | -26.613    | -0.260     |
+| Average return             | -4563.673  | 0.823      |
+| SD return                  | 15022.128  | 21.090     |
+| Sharpe ratio               | -0.304     | 0.039      |
+| Intercept                  | -3.236     | -0.005     |
+| Market beta                | -97.738    | 0.939      |
+| Mean abs. weight           | 104.273    | 0.092      |
+| Max. weight                | 1470.741   | 4.480      |
+| Min. weight                | -354.451   | -0.205     |
+| Avg. sum of neg. weights   | 82304.602  | 77.884     |
+| Avg. share of neg. weights | 51.549     | 48.708     |
 
 ``` python
 performance_table.get(["EW Optimal (no s.)", "VW Optimal (no s.)"])
@@ -450,8 +456,8 @@ performance_table.get(["EW Optimal (no s.)", "VW Optimal (no s.)"])
 |                            | EW Optimal (no s.) | VW Optimal (no s.) |
 |----------------------------|--------------------|--------------------|
 | Expected utility           | -0.252             | -0.250             |
-| Average return             | 8.011              | 7.539              |
-| SD return                  | 19.113             | 16.654             |
+| Average return             | 8.012              | 7.540              |
+| SD return                  | 19.114             | 16.655             |
 | Sharpe ratio               | 0.419              | 0.453              |
 | Intercept                  | 0.000              | 0.000              |
 | Market beta                | 1.138              | 1.056              |

@@ -9,7 +9,7 @@ In this chapter, we conduct portfolio backtesting in a realistic setting by incl
 Throughout this chapter, we use the following Python packages:
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 
 from plotnine import *
@@ -27,9 +27,9 @@ We start by loading the required data from our Parquet files introduced in [Acce
 
 ``` python
 industry_returns = (
-    pd.read_parquet("data-python/industries_ff_monthly.parquet")
-    .drop(columns=["date"])
-    .dropna()
+    pl.read_parquet("data-python/industries_ff_monthly.parquet")
+    .drop("date")
+    .drop_nulls()
 )
 ```
 
@@ -44,30 +44,34 @@ where \\\Sigma\\ is the \\(N \times N)\\ covariance matrix of the returns. The o
 ``` python
 n_industries = industry_returns.shape[1]
 
-mu = np.array(industry_returns.mean()).T
-sigma = np.array(industry_returns.cov())
+industry_matrix = industry_returns.to_numpy()
+mu = industry_matrix.mean(axis=0)
+sigma = np.cov(industry_matrix, rowvar=False)
 w_mvp = np.linalg.inv(sigma) @ np.ones(n_industries)
 w_mvp = w_mvp/w_mvp.sum()
 
-weights_mvp = pd.DataFrame({
-    "Industry": industry_returns.columns.tolist(),
+weights_mvp = pl.DataFrame({
+    "Industry": industry_returns.columns,
     "Minimum variance": w_mvp
 })
-weights_mvp.round(3)
+weights_mvp.with_columns(pl.col(pl.Float64).round(3))
 ```
 
-|     | Industry | Minimum variance |
-|-----|----------|------------------|
-| 0   | nodur    | 0.274            |
-| 1   | durbl    | 0.010            |
-| 2   | manuf    | 0.023            |
-| 3   | enrgy    | 0.087            |
-| 4   | hitec    | 0.021            |
-| 5   | telcm    | 0.231            |
-| 6   | shops    | 0.087            |
-| 7   | hlth     | 0.170            |
-| 8   | utils    | 0.460            |
-| 9   | other    | -0.364           |
+shape: (10, 2)
+
+| Industry | Minimum variance |
+|----------|------------------|
+| str      | f64              |
+| "nodur"  | 0.274            |
+| "durbl"  | 0.01             |
+| "manuf"  | 0.021            |
+| "enrgy"  | 0.087            |
+| "hitec"  | 0.022            |
+| "telcm"  | 0.231            |
+| "shops"  | 0.087            |
+| "hlth"   | 0.17             |
+| "utils"  | 0.46             |
+| "other"  | -0.363           |
 
 Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* \\\bar{\mu}\\ such that she chooses
 
@@ -142,27 +146,30 @@ def compute_efficient_weight(
 
 w_efficient = compute_efficient_weight(sigma, mu)
 
-weights_efficient = pd.DataFrame(
+weights_efficient = pl.DataFrame(
     {
-        "Industry": industry_returns.columns.tolist(),
+        "Industry": industry_returns.columns,
         "Efficient portfolio": w_efficient,
     }
 )
-weights_efficient.round(3)
+weights_efficient.with_columns(pl.col(pl.Float64).round(3))
 ```
 
-|     | Industry | Efficient portfolio |
-|-----|----------|---------------------|
-| 0   | nodur    | 1.192               |
-| 1   | durbl    | 0.239               |
-| 2   | manuf    | -1.664              |
-| 3   | enrgy    | 0.616               |
-| 4   | hitec    | 0.453               |
-| 5   | telcm    | -0.438              |
-| 6   | shops    | 0.755               |
-| 7   | hlth     | 0.359               |
-| 8   | utils    | -0.047              |
-| 9   | other    | -0.465              |
+shape: (10, 2)
+
+| Industry | Efficient portfolio |
+|----------|---------------------|
+| str      | f64                 |
+| "nodur"  | 1.185               |
+| "durbl"  | 0.237               |
+| "manuf"  | -1.639              |
+| "enrgy"  | 0.614               |
+| "hitec"  | 0.449               |
+| "telcm"  | -0.437              |
+| "shops"  | 0.754               |
+| "hlth"   | 0.358               |
+| "utils"  | -0.047              |
+| "other"  | -0.475              |
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient \\\gamma=2\\ in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of \\-1\\ implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter \\\beta\\ and risk aversion \\\gamma\\.
 
@@ -170,19 +177,19 @@ The portfolio weights above indicate the efficient portfolio for an investor wit
 gammas = [2, 4, 8, 20]
 betas = 20*expon.ppf(np.arange(1, 100)/100, scale=1)
 
-transaction_costs = (pd.DataFrame(
-        list(product(gammas, betas)), 
-        columns=["gamma", "beta"]
-    )
-    .assign(
-        weights=lambda x: x.apply(lambda y:
-        compute_efficient_weight(
-            sigma, mu, gamma=y["gamma"], beta=y["beta"]/10000, w_prev=w_mvp), 
-        axis=1
-        ),
-        concentration=lambda x: x["weights"].apply(
-        lambda x: np.sum(np.abs(x-w_mvp))
-        )
+transaction_costs = pl.DataFrame(
+    list(product(gammas, betas)),
+    schema=["gamma", "beta"],
+    orient="row",
+).with_columns(
+    concentration=pl.struct("gamma", "beta").map_elements(
+        lambda row: float(np.sum(np.abs(
+            compute_efficient_weight(
+                sigma, mu, gamma=row["gamma"], beta=row["beta"]/10000,
+                w_prev=w_mvp
+            ) - w_mvp
+        ))),
+        return_dtype=pl.Float64,
     )
 )
 ```
@@ -201,7 +208,7 @@ rebalancing_figure = (
         ),
     )
     + geom_line()
-    + guides(linetype=None)
+    + guides(linetype="none")
     + labs(
         x="Transaction cost parameter",
         y="Distance from MVP",
@@ -304,27 +311,30 @@ w_no_short_sale = minimize(
     method=options["method"],
 )
 
-weights_no_short_sale = pd.DataFrame(
+weights_no_short_sale = pl.DataFrame(
     {
-        "Industry": industry_returns.columns.tolist(),
+        "Industry": industry_returns.columns,
         "No short-sale": w_no_short_sale.x,
     }
 )
-weights_no_short_sale.round(3)
+weights_no_short_sale.with_columns(pl.col(pl.Float64).round(3))
 ```
 
-|     | Industry | No short-sale |
-|-----|----------|---------------|
-| 0   | nodur    | 0.280         |
-| 1   | durbl    | 0.000         |
-| 2   | manuf    | 0.000         |
-| 3   | enrgy    | 0.198         |
-| 4   | hitec    | 0.000         |
-| 5   | telcm    | 0.000         |
-| 6   | shops    | 0.339         |
-| 7   | hlth     | 0.182         |
-| 8   | utils    | 0.000         |
-| 9   | other    | 0.000         |
+shape: (10, 2)
+
+| Industry | No short-sale |
+|----------|---------------|
+| str      | f64           |
+| "nodur"  | 0.28          |
+| "durbl"  | 0.0           |
+| "manuf"  | 0.0           |
+| "enrgy"  | 0.198         |
+| "hitec"  | 0.0           |
+| "telcm"  | 0.0           |
+| "shops"  | 0.339         |
+| "hlth"   | 0.182         |
+| "utils"  | 0.0           |
+| "other"  | 0.0           |
 
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than in the unrestricted case. You can verify that `np.sum(w_no_short_sale.x)` returns 1. In other words, `minimize()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden.
 
@@ -365,33 +375,36 @@ w_reg_t = minimize(
     method=options["method"],
 )
 
-weights_reg_t = pd.DataFrame(
-    {"Industry": industry_returns.columns.tolist(), "Regulation-T": w_reg_t.x}
+weights_reg_t = pl.DataFrame(
+    {"Industry": industry_returns.columns, "Regulation-T": w_reg_t.x}
 )
-weights_reg_t.round(3)
+weights_reg_t.with_columns(pl.col(pl.Float64).round(3))
 ```
 
-|     | Industry | Regulation-T |
-|-----|----------|--------------|
-| 0   | nodur    | 0.358        |
-| 1   | durbl    | 0.000        |
-| 2   | manuf    | -0.250       |
-| 3   | enrgy    | 0.245        |
-| 4   | hitec    | 0.051        |
-| 5   | telcm    | -0.000       |
-| 6   | shops    | 0.401        |
-| 7   | hlth     | 0.195        |
-| 8   | utils    | 0.000        |
-| 9   | other    | -0.000       |
+shape: (10, 2)
+
+| Industry | Regulation-T |
+|----------|--------------|
+| str      | f64          |
+| "nodur"  | 0.358        |
+| "durbl"  | 0.0          |
+| "manuf"  | -0.25        |
+| "enrgy"  | 0.245        |
+| "hitec"  | 0.051        |
+| "telcm"  | -0.0         |
+| "shops"  | 0.401        |
+| "hlth"   | 0.195        |
+| "utils"  | 0.0          |
+| "other"  | -0.0         |
 
 [Figure 2](#fig-1702) shows the optimal allocation weights across all `python len(industry_returns.columns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with \\\gamma\\ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
 ``` python
 weights = (weights_mvp
-    .merge(weights_efficient)
-    .merge(weights_no_short_sale)
-    .merge(weights_reg_t)
-    .melt(id_vars="Industry", var_name="Strategy", value_name="weights")
+    .join(weights_efficient, on="Industry")
+    .join(weights_no_short_sale, on="Industry")
+    .join(weights_reg_t, on="Industry")
+    .unpivot(index="Industry", variable_name="Strategy", value_name="weights")
 )
 
 weights_figure = (
@@ -502,11 +515,11 @@ The following code chunk performs a rolling-window estimation, which we implemen
 
 ``` python
 for p in range(periods):
-    returns_window = industry_returns.iloc[p : (p + window_length - 1), :]
-    next_return = industry_returns.iloc[p + window_length, :]
+    returns_window = industry_matrix[p : (p + window_length - 1), :]
+    next_return = industry_matrix[p + window_length, :]
 
-    sigma_window = np.array(returns_window.cov())
-    mu = 0 * np.array(returns_window.mean())
+    sigma_window = np.cov(returns_window, rowvar=False)
+    mu = 0 * returns_window.mean(axis=0)
 
     # Transaction-cost adjusted portfolio
     w_1 = compute_efficient_weight_L1_TC(
@@ -540,43 +553,44 @@ for p in range(periods):
 Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations.
 
 ``` python
-performance = pd.DataFrame()
-for i in enumerate(performance_values.keys()):
-    tmp_data = pd.DataFrame(
-        performance_values[i[1]],
-        columns=["raw_return", "turnover", "net_return"],
-    )
-    tmp_data["strategy"] = i[1]
-    performance = pd.concat([performance, tmp_data], axis=0)
+performance = pl.concat([
+    pl.DataFrame(
+        values,
+        schema=["raw_return", "turnover", "net_return"],
+        orient="row",
+    ).with_columns(strategy=pl.lit(strategy))
+    for strategy, values in performance_values.items()
+])
 
 length_year = 12
 
 performance_table = (performance
-    .groupby("strategy")
-    .aggregate(
-        mean=("net_return", lambda x: length_year * 100 * x.mean()),
-        sd=("net_return", lambda x: np.sqrt(length_year) * 100 * x.std()),
-        sharpe_ratio=(
-            "net_return",
-            lambda x: (
-                (length_year * 100 * x.mean())
-                / (np.sqrt(length_year) * 100 * x.std())
-                if x.mean() > 0
-                else np.nan
-            ),
-        ),
-        turnover=("turnover", lambda x: 100 * x.mean()),
+    .group_by("strategy")
+    .agg(
+        mean=length_year * 100 * pl.col("net_return").mean(),
+        sd=np.sqrt(length_year) * 100 * pl.col("net_return").std(),
+        sharpe_ratio=pl.when(pl.col("net_return").mean() > 0)
+            .then(
+                (length_year * 100 * pl.col("net_return").mean())
+                / (np.sqrt(length_year) * 100 * pl.col("net_return").std())
+            )
+            .otherwise(None),
+        turnover=100 * pl.col("turnover").mean(),
     )
-    .reset_index()
+    .sort("strategy")
+    .with_columns(pl.col(pl.Float64).round(3))
 )
-performance_table.round(3)
+performance_table
 ```
 
-|     | strategy | mean   | sd     | sharpe_ratio | turnover |
-|-----|----------|--------|--------|--------------|----------|
-| 0   | MV       | -1.041 | 12.556 | NaN          | 210.015  |
-| 1   | MV (TC)  | 12.068 | 15.129 | 0.798        | 0.019    |
-| 2   | Naive    | 12.052 | 15.132 | 0.796        | 0.236    |
+shape: (3, 5)
+
+| strategy  | mean   | sd     | sharpe_ratio | turnover |
+|-----------|--------|--------|--------------|----------|
+| str       | f64    | f64    | f64          | f64      |
+| "MV"      | -1.046 | 12.554 | null         | 210.145  |
+| "MV (TC)" | 12.071 | 15.129 | 0.798        | 0.02     |
+| "Naive"   | 12.054 | 15.133 | 0.797        | 0.236    |
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters \\\hat\mu_t\\ and \\\hat\Sigma_t\\ indicate that the current allocation is too far away from the optimal theoretical portfolio.
 

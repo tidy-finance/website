@@ -13,7 +13,7 @@ This chapter also draws on the resources provided by the project [Open Source Bo
 The current chapter relies on the following set of Python packages.
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 import tidyfinance as tf
 import httpimport
@@ -21,6 +21,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 
+from datetime import date
 from plotnine import *
 from sqlalchemy import create_engine
 from mizani.formatters import comma_format
@@ -106,13 +107,12 @@ fisd_query = (
           "AND (preferred_security = 'N' OR preferred_security IS NULL)"
 )
 
-fisd = pd.read_sql_query(
-    sql=fisd_query,
-    con=wrds,
-    dtype={"complete_cusip": str, "interest_frequency": str, 
-            "issue_id": int, "issuer_id": int},
-    parse_dates={"maturity", "offering_date", 
-                "dated_date", "last_interest_date"}
+fisd = pl.read_database(
+    query=fisd_query,
+    connection=wrds,
+    schema_overrides={"complete_cusip": pl.String,
+                      "interest_frequency": pl.String,
+                      "issue_id": pl.Int64, "issuer_id": pl.Int64},
 )
 ```
 
@@ -124,29 +124,30 @@ fisd_issuer_query = (
         "FROM fisd.fisd_mergedissuer"
 )
 
-fisd_issuer = pd.read_sql_query(
-    sql=fisd_issuer_query,
-    con=wrds,
-    dtype={"issuer_id": int, "sic_code": str, "country_domicile": str}
+fisd_issuer = pl.read_database(
+    query=fisd_issuer_query,
+    connection=wrds,
+    schema_overrides={"issuer_id": pl.Int64, "sic_code": pl.String,
+                      "country_domicile": pl.String},
 )
 
 fisd = (fisd
-    .merge(fisd_issuer, how="inner", on="issuer_id")
-    .query("country_domicile == 'USA'")
-    .drop(columns="country_domicile")
+    .join(fisd_issuer, how="inner", on="issuer_id")
+    .filter(pl.col("country_domicile") == "USA")
+    .drop("country_domicile")
 )
 ```
 
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `tf.set_wrds_credentials()`.
 
 ``` python
-fisd = tf.download_data(domain="wrds", dataset="fisd")
+fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
 ```
 
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ``` python
-fisd.to_parquet("data-python/fisd.parquet")
+fisd.write_parquet("data-python/fisd.parquet")
 ```
 
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms (e.g., [Handler et al. 2021](#ref-handler2021)). The FISD redemption database also contains information on callable bonds. Moreover, FISD also provides information on bond ratings. We do not need either here.
@@ -175,7 +176,7 @@ exec(response.text)
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1,000 bonds, which we define below.
 
 ``` python
-cusips = list(fisd["complete_cusip"].unique())
+cusips = fisd["complete_cusip"].unique().to_list()
 batch_size = 1000
 batches = np.ceil(len(cusips)/batch_size).astype(int)
 ```
@@ -199,8 +200,8 @@ for j in range(1, batches + 1):
             end_date="'11/30/2016'"
     )
     
-    if not trace_enhanced_sub.empty:
-            table = (pa.Table.from_pandas(trace_enhanced_sub, preserve_index=False)
+    if not trace_enhanced_sub.is_empty():
+            table = (trace_enhanced_sub.to_arrow()
                 .append_column("batch", pa.array([j] * len(trace_enhanced_sub)))
             )
             pq.write_to_dataset(
@@ -232,51 +233,57 @@ While many news outlets readily provide information on stocks and the underlying
 We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016.
 
 ``` python
-dates = pd.date_range(start="2014-01-01", end="2016-11-30", freq="QE")
+dates = pl.DataFrame(
+    {"date": pl.date_range(
+        date(2014, 3, 1), date(2016, 11, 30), interval="3mo", eager=True
+    ).dt.month_end()}
+)
 
-bonds_outstanding = (pd.DataFrame({"date": dates})
-    .merge(fisd[["complete_cusip"]], how="cross")
-    .merge(fisd[["complete_cusip", "offering_date", "maturity"]],
-            on="complete_cusip", how="left")
-    .assign(offering_date=lambda x: x["offering_date"].dt.floor("D"),
-            maturity=lambda x: x["maturity"].dt.floor("D"))
-    .query("date >= offering_date & date <= maturity")
-    .groupby("date")
-    .size()
-    .reset_index(name="count")
-    .assign(type="Outstanding")
+bonds_outstanding = (dates
+    .join(fisd.select(["complete_cusip", "offering_date", "maturity"]), how="cross")
+    .filter(
+        (pl.col("date") >= pl.col("offering_date"))
+        & (pl.col("date") <= pl.col("maturity"))
+    )
+    .group_by("date")
+    .agg(count=pl.len())
+    .with_columns(type=pl.lit("Outstanding"))
 )
 ```
 
 Next, we look at the bonds traded each quarter in the same period. Notice that we load the complete TRACE data from our dataset, as we only have a single part of it in the environment from the download loop above.
 
 ``` python
-trace_enhanced = ds.dataset("data-python/trace_enhanced", format="parquet").to_table().to_pandas()
+trace_enhanced = pl.from_arrow(
+    ds.dataset("data-python/trace_enhanced", format="parquet").to_table()
+)
 
 bonds_traded = (trace_enhanced
-    .assign(
-        date=lambda x: (
-        (x["trd_exctn_dt"]-pd.offsets.MonthBegin(1))
-            .dt.to_period("Q").dt.start_time
-        )
+    .with_columns(
+        date=pl.when(pl.col("trd_exctn_dt").dt.day() == 1)
+            .then(pl.col("trd_exctn_dt").dt.offset_by("-1mo"))
+            .otherwise(pl.col("trd_exctn_dt").dt.truncate("1mo"))
+            .dt.truncate("1q")
     )
-    .groupby("date")
-    .aggregate(count=("cusip_id", "nunique"))
-    .reset_index()
-    .assign(type="Traded")
+    .group_by("date")
+    .agg(count=pl.col("cusip_id").n_unique())
+    .with_columns(type=pl.lit("Traded"))
 )
 ```
 
 Finally, we plot the two time series in [Figure 1](#fig-401).
 
 ``` python
-bonds_combined = pd.concat(
-    [bonds_outstanding, bonds_traded], ignore_index=True
-)
+bonds_combined = pl.concat(
+    [
+        bonds_outstanding.select(["date", "count", "type"]),
+        bonds_traded.select(["date", "count", "type"])
+    ]
+).sort("date")
 
 bonds_figure = (
     ggplot(
-        bonds_combined, 
+        bonds_combined,
         aes(x="date", y="count", color="type", linetype="type")
     )
     + geom_line()
@@ -284,7 +291,7 @@ bonds_figure = (
         x="", y="", color="", linetype="",
         title="Number of bonds outstanding and traded each quarter"
         )
-    + scale_x_datetime(date_breaks="1 year", date_labels="%Y")
+    + scale_x_date(date_breaks="1 year", date_labels="%Y")
     + scale_y_continuous(labels=comma_format())
 )
 bonds_figure.draw()
@@ -298,27 +305,37 @@ We see that the number of bonds outstanding increases steadily between 2014 and 
 
 ``` python
 average_characteristics = (fisd
-    .assign(
-        maturity=lambda x: (x["maturity"] - x["offering_date"]).dt.days/365,
-        offering_amt=lambda x: x["offering_amt"]/10**3
+    .with_columns(
+        maturity=(pl.col("maturity") - pl.col("offering_date")).dt.total_days()/365,
+        offering_amt=pl.col("offering_amt")/10**3
     )
-    .melt(var_name="measure",
-            value_vars=["maturity", "coupon", "offering_amt"], 
-            value_name="value")
-    .dropna()
-    .groupby("measure")["value"]
-    .describe(percentiles=[.05, .50, .95])
-    .drop(columns="count")
+    .unpivot(
+        on=["maturity", "coupon", "offering_amt"],
+        variable_name="measure", value_name="value"
+    )
+    .drop_nulls()
+    .group_by("measure")
+    .agg(
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05),
+        median=pl.col("value").quantile(0.50),
+        q95=pl.col("value").quantile(0.95),
+        max=pl.col("value").max(),
+    )
 )
-average_characteristics.round(2)
+average_characteristics.with_columns(pl.col(pl.Float64).round(2))
 ```
 
-|              | mean   | std    | min   | 5%   | 50%  | 95%    | max      |
-|--------------|--------|--------|-------|------|------|--------|----------|
-| measure      |        |        |       |      |      |        |          |
-| coupon       | 2.34   | 3.43   | 0.00  | 0.00 | 0.00 | 8.67   | 39.00    |
-| maturity     | 5.47   | 6.55   | -6.24 | 1.04 | 3.52 | 20.01  | 100.74   |
-| offering_amt | 121.20 | 353.41 | 0.00  | 0.22 | 2.64 | 750.00 | 15000.00 |
+shape: (3, 8)
+
+| measure        | mean  | std    | min   | q05  | median | q95   | max     |
+|----------------|-------|--------|-------|------|--------|-------|---------|
+| str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
+| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
+| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
+| "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
 
 We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of ten years and pays around 6 percent in coupons.
 
@@ -326,28 +343,37 @@ Finally, let us compute some summary statistics for the trades in this market. T
 
 ``` python
 average_trade_size = (trace_enhanced
-    .groupby("trd_exctn_dt")
-    .aggregate(
-        trade_size=("entrd_vol_qt", lambda x: (
-        sum(x*trace_enhanced.loc[x.index, "rptd_pr"]/100)/10**6)
-        ),
-        trade_number=("trd_exctn_dt", "size")
+    .group_by("trd_exctn_dt")
+    .agg(
+        trade_size=(pl.col("entrd_vol_qt")*pl.col("rptd_pr")/100).sum()/10**6,
+        trade_number=pl.len()
     )
-    .reset_index()
-    .melt(id_vars=["trd_exctn_dt"], var_name="measure",
-            value_vars=["trade_size", "trade_number"], value_name="value")
-    .groupby("measure")["value"]
-    .describe(percentiles=[.05, .50, .95])
-    .drop(columns="count")
+    .unpivot(
+        index=["trd_exctn_dt"],
+        on=["trade_size", "trade_number"],
+        variable_name="measure", value_name="value"
+    )
+    .group_by("measure")
+    .agg(
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05),
+        median=pl.col("value").quantile(0.50),
+        q95=pl.col("value").quantile(0.95),
+        max=pl.col("value").max(),
+    )
 )
-average_trade_size.round(0)
+average_trade_size.with_columns(pl.col(pl.Float64).round(0))
 ```
 
-|              | mean    | std    | min   | 5%      | 50%     | 95%     | max     |
-|--------------|---------|--------|-------|---------|---------|---------|---------|
-| measure      |         |        |       |         |         |         |         |
-| trade_number | 25937.0 | 5446.0 | 439.0 | 17854.0 | 26072.0 | 34398.0 | 40868.0 |
-| trade_size   | 12971.0 | 3577.0 | 17.0  | 6128.0  | 13423.0 | 17869.0 | 21313.0 |
+shape: (2, 8)
+
+| measure        | mean    | std    | min   | q05     | median  | q95     | max     |
+|----------------|---------|--------|-------|---------|---------|---------|---------|
+| str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
+| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17845.0 | 26051.0 | 34379.0 | 40839.0 |
+| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6136.0  | 13421.0 | 17845.0 | 21312.0 |
 
 On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can, hence, conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

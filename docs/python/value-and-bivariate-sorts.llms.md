@@ -11,12 +11,11 @@ We form portfolios on firm size and the book-to-market ratio. To calculate book-
 The current chapter relies on this set of Python packages.
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
-import datetime as dt
 ```
 
-Compared to previous chapters, we introduce the `datetime` module that is part of the Python standard library for manipulating dates.
+Compared to previous chapters, we rely on `numpy` to construct evenly spaced breakpoints for the portfolio sorts later in this chapter.
 
 ## Data Preparation
 
@@ -24,23 +23,21 @@ First, we load the necessary data from our Parquet files introduced in [Accessin
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["permno", "gvkey", "date", "ret_excess", "mktcap", 
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["permno", "gvkey", "date", "ret_excess", "mktcap",
           "mktcap_lag", "exchange"])
-    .dropna()
+    .drop_nulls()
 )
 ```
 
 Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.
 
 ``` python
-book_equity = (pd.read_parquet("data-python/compustat_annual.parquet")
-    .get(["gvkey", "datadate", "be"])
-    .dropna()
-    .assign(
-        date=lambda x: (
-        pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()
-        )
+book_equity = (pl.read_parquet("data-python/compustat_annual.parquet")
+    .select(["gvkey", "datadate", "be"])
+    .drop_nulls()
+    .with_columns(
+        date=pl.col("datadate").dt.truncate("1mo")
     )
 )
 ```
@@ -51,49 +48,48 @@ A fundamental problem in handling accounting data is the *look-ahead bias*; we m
 
 As in the previous chapter, we continue to lag firm size by one month. Then, we compute the book-to-market ratio, which relates a firm’s book equity to its market equity. Firms with high (low) book-to-market ratio are called value (growth) firms. After matching the accounting and market equity information from the same month, we lag book-to-market by six months. This is a sufficiently conservative approach because accounting information is usually released well before six months pass. However, in the asset pricing literature, even longer lags are used as well.[^1]
 
-Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet, the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fillna(method="ffill")`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `.groupby()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
+Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet, the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `forward_fill()`-expression after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by adding `.over(["permno", "gvkey"])` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
 ``` python
 size = (crsp_monthly
-    .assign(sorting_date=lambda x: x["date"]+pd.DateOffset(months=1))
-    .rename(columns={"mktcap": "size"})
-    .get(["permno", "sorting_date", "size"])
+    .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo"))
+    .rename({"mktcap": "size"})
+    .select(["permno", "sorting_date", "size"])
 )
 
 bm = (book_equity
-    .merge(crsp_monthly, how="inner", on=["gvkey", "date"])
-    .assign(bm=lambda x: x["be"]/x["mktcap"],
-            sorting_date=lambda x: x["date"]+pd.DateOffset(months=6))
-    .assign(accounting_date=lambda x: x["sorting_date"])
-    .get(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
+    .join(crsp_monthly, how="inner", on=["gvkey", "date"])
+    .with_columns(
+        bm=pl.col("be")/pl.col("mktcap"),
+        sorting_date=pl.col("date").dt.offset_by("6mo")
+    )
+    .with_columns(accounting_date=pl.col("sorting_date"))
+    .select(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
 )
 
 data_for_sorts = (crsp_monthly
-    .merge(bm, 
-            how="left", 
-            left_on=["permno", "gvkey", "date"], 
+    .join(bm,
+            how="left",
+            left_on=["permno", "gvkey", "date"],
             right_on=["permno", "gvkey", "sorting_date"])
-    .merge(size, 
-            how="left", 
-            left_on=["permno", "date"], 
+    .join(size,
+            how="left",
+            left_on=["permno", "date"],
             right_on=["permno", "sorting_date"])
-    .get(["permno", "gvkey", "date", "ret_excess", 
+    .select(["permno", "gvkey", "date", "ret_excess",
             "mktcap_lag", "size", "bm", "exchange", "accounting_date"])
 )
 
 data_for_sorts = (data_for_sorts
-    .sort_values(by=["permno", "gvkey", "date"])
-    .groupby(["permno", "gvkey"])
-    .apply(lambda x: x.assign(
-        bm=x["bm"].fillna(method="ffill"), 
-        accounting_date=x["accounting_date"].fillna(method="ffill")
-        )
+    .sort(["permno", "gvkey", "date"])
+    .with_columns(
+        bm=pl.col("bm").forward_fill().over(["permno", "gvkey"]),
+        accounting_date=pl.col("accounting_date").forward_fill().over(["permno", "gvkey"])
     )
-    .reset_index(drop=True)
-    .assign(threshold_date = lambda x: (x["date"]-pd.DateOffset(months=12)))
-    .query("accounting_date > threshold_date")
-    .drop(columns=["accounting_date", "threshold_date"])
-    .dropna()
+    .with_columns(threshold_date=pl.col("date").dt.offset_by("-12mo"))
+    .filter(pl.col("accounting_date") > pl.col("threshold_date"))
+    .drop(["accounting_date", "threshold_date"])
+    .drop_nulls()
 )
 ```
 
@@ -102,25 +98,34 @@ The last step of preparation for the portfolio sorts is the computation of break
 ``` python
 def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
     """Assign portfolio for a given sorting variable."""
-    
-    breakpoints = (data
-      .query(f"exchange in {exchanges}")
-      .get(sorting_variable)
-      .quantile(np.linspace(0, 1, num=n_portfolios+1), 
-                interpolation="linear")
-      .drop_duplicates()
+
+    breakpoints = np.quantile(
+      data.filter(pl.col("exchange").is_in(exchanges))[sorting_variable].to_numpy(),
+      np.linspace(0, 1, num=n_portfolios+1),
+      method="linear"
     )
-    breakpoints.iloc[0] = -np.inf
-    breakpoints.iloc[breakpoints.size-1] = np.inf
-    
-    assigned_portfolios = pd.cut(
-      data[sorting_variable],
-      bins=breakpoints,
-      labels=range(1, breakpoints.size),
-      include_lowest=True,
-      right=False
+    breakpoints = np.unique(breakpoints)
+    if breakpoints.size < 2:
+        # Degenerate group (e.g., a single stock): no interior breakpoints,
+        # so all observations end up in a single portfolio
+        breakpoints = np.array([-np.inf, np.inf])
+    breakpoints[0] = -np.inf
+    breakpoints[-1] = np.inf
+
+    assigned_portfolios = (data
+      .select(
+          pl.col(sorting_variable)
+          .cut(
+              breaks=breakpoints[1:-1].tolist(),
+              labels=[str(i) for i in range(1, len(breakpoints))],
+              left_closed=True
+          )
+          .cast(pl.String)
+          .cast(pl.Int64)
+      )
+      .to_series()
     )
-    
+
     return assigned_portfolios
 ```
 
@@ -136,8 +141,8 @@ To implement the independent bivariate portfolio sort, we assign monthly portfol
 
 ``` python
 value_portfolios = (data_for_sorts
-    .groupby("date")
-    .apply(lambda x: x.assign(
+    .group_by("date")
+    .map_groups(lambda x: x.with_columns(
         portfolio_bm=assign_portfolio(
             data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
         ),
@@ -146,13 +151,11 @@ value_portfolios = (data_for_sorts
         )
         )
     )
-    .reset_index(drop=True)
-    .groupby(["date", "portfolio_bm", "portfolio_size"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
+    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .agg(
+        ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+            / pl.col("mktcap_lag").sum()
     )
-    .reset_index()
 )
 ```
 
@@ -160,22 +163,21 @@ Equipped with our monthly portfolio returns, we are ready to compute the value p
 
 ``` python
 value_premium = (value_portfolios
-    .groupby(["date", "portfolio_bm"])
-    .aggregate({"ret": "mean"})
-    .reset_index()
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "value_premium": (
-            x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() - 
-            x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
+    .group_by(["date", "portfolio_bm"])
+    .agg(ret=pl.col("ret").mean())
+    .group_by("date")
+    .agg(
+        value_premium=(
+            pl.col("ret").filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").max()).mean() -
+            pl.col("ret").filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").min()).mean()
         )
-        })
     )
-    .aggregate({"value_premium": "mean"})
+    .select(pl.col("value_premium").mean())
+    .item()
 )
 ```
 
-The resulting monthly value premium is np.float64(0.41) percent with an annualized return of np.float64(5.0) percent.
+The resulting monthly value premium is 0.41 percent with an annualized return of 5.0 percent.
 
 ## Dependent Sorts
 
@@ -184,48 +186,56 @@ In the previous exercise, we assigned the portfolios without considering the sec
 To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable="me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ``` python
-value_portfolios = (data_for_sorts
-    .groupby("date")
-    .apply(lambda x: x.assign(
-        portfolio_size=assign_portfolio(
-            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
-        )
-        )
-    )
-    .reset_index(drop=True)
-    .groupby(["date", "portfolio_size"])
-    .apply(lambda x: x.assign(
-        portfolio_bm=assign_portfolio(
-            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
-        )
+value_portfolios = (
+    data_for_sorts.group_by("date")
+    .map_groups(
+        lambda x: x.with_columns(
+            portfolio_size=assign_portfolio(
+                data=x,
+                sorting_variable="size",
+                n_portfolios=5,
+                exchanges=["NYSE"],
+            )
         )
     )
-    .reset_index(drop=True)
-    .groupby(["date", "portfolio_bm", "portfolio_size"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
+    .group_by("date", "portfolio_size")
+    .map_groups(
+        lambda x: x.with_columns(
+            portfolio_bm=assign_portfolio(
+                data=x,
+                sorting_variable="bm",
+                n_portfolios=5,
+                exchanges=["NYSE"],
+            )
+        )
     )
-    .reset_index()
+    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .agg(
+        ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+        / pl.col("mktcap_lag").sum()
+    )
 )
 
-value_premium = (value_portfolios
-    .groupby(["date", "portfolio_bm"])
-    .aggregate({"ret": "mean"})
-    .reset_index()
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "value_premium": (
-            x.loc[x["portfolio_bm"] == x["portfolio_bm"].max(), "ret"].mean() -
-            x.loc[x["portfolio_bm"] == x["portfolio_bm"].min(), "ret"].mean()
+value_premium = (
+    value_portfolios.group_by(["date", "portfolio_bm"])
+    .agg(ret=pl.col("ret").mean())
+    .group_by("date")
+    .agg(
+        value_premium=(
+            pl.col("ret")
+            .filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").max())
+            .mean()
+            - pl.col("ret")
+            .filter(pl.col("portfolio_bm") == pl.col("portfolio_bm").min())
+            .mean()
         )
-        })
     )
-    .aggregate({"value_premium": "mean"})
+    .select(pl.col("value_premium").mean())
+    .item()
 )
 ```
 
-The monthly value premium from dependent sorts is np.float64(0.35) percent, which translates to an annualized premium of np.float64(4.2) percent per year.
+The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.3 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](../python/size-sorts-and-p-hacking.llms.md), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

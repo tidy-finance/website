@@ -94,6 +94,28 @@ The so-called *Zen of Python* by Tim Peters summarizes its major syntax guidelin
 import this
 ```
 
+    The Zen of Python, by Tim Peters
+
+    Beautiful is better than ugly.
+    Explicit is better than implicit.
+    Simple is better than complex.
+    Complex is better than complicated.
+    Flat is better than nested.
+    Sparse is better than dense.
+    Readability counts.
+    Special cases aren't special enough to break the rules.
+    Although practicality beats purity.
+    Errors should never pass silently.
+    Unless explicitly silenced.
+    In the face of ambiguity, refuse the temptation to guess.
+    There should be one-- and preferably only one --obvious way to do it.
+    Although that way may not be obvious at first unless you're Dutch.
+    Now is better than never.
+    Although never is often better than *right* now.
+    If the implementation is hard to explain, it's a bad idea.
+    If the implementation is easy to explain, it may be a good idea.
+    Namespaces are one honking great idea -- let's do more of those!
+
 Python comes in many flavors, and endless external packages extend the possibilities for conducting financial research. Any code we provide echoes some arguably subjective decisions we have taken to comply with our idea of what Tidy Finance comprises: Code should not simply yield the correct output but should be easy to read. Therefore, we advocate using chaining, which is the practice of calling multiple methods in a sequence, each operating on the result of the previous step.
 
 Further, the entire book rests on tidy data, which we handle with a small set of powerful packages proven effective: `pandas` and `numpy`. Regarding visualization (which we deem highly relevant to provide a fundamentally human-centered experience), we follow the Grammars of Graphics’ philosophical framework ([Wilkinson 2012](#ref-Wilkinson2012)), which has been carefully implemented using `plotnine`.

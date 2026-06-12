@@ -13,7 +13,7 @@ At the heart of MPT is mean-variance analysis, which evaluates portfolios based 
 We use the following packages throughout this chapter:
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 import tidyfinance as tf
 
@@ -35,26 +35,26 @@ To keep things conceptually simple, we focus on the latter part for now and assu
 Thus, leveraging the approach introduced in [Working with Stock Returns](../python/working-with-stock-returns.llms.md), we download the constituents of the Dow Jones Industrial Average as an example portfolio as well as their daily adjusted close prices.
 
 ``` python
-symbols = tf.download_data(
+symbols = pl.from_pandas(tf.download_data(
     domain="constituents", index="Dow Jones Industrial Average"
-)
+))
 
-prices_daily = tf.download_data(
+prices_daily = pl.from_pandas(tf.download_data(
     domain="stock_prices",
-    symbols=symbols["symbol"].tolist(),
+    symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2023-12-31",
-)
+))
 ```
 
 To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:
 
 ``` python
 prices_daily = (prices_daily
-    .groupby("symbol")
-    .apply(lambda x: x.assign(counts=x["adjusted_close"].dropna().count()))
-    .reset_index(drop=True)
-    .query("counts == counts.max()")
+    .with_columns(
+        counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
+    )
+    .filter(pl.col("counts") == pl.col("counts").max())
 )
 ```
 
@@ -62,12 +62,12 @@ We compute the sample average returns as \\\frac{1}{T} \sum\_{t=1}^{T} r\_{i,t},
 
 ``` python
 returns_monthly = (prices_daily
-    .assign(
-        date=lambda x: x["date"].dt.to_period("M").dt.to_timestamp()
-    )
-    .groupby(["symbol", "date"], as_index=False)
-    .agg(adjusted_close=("adjusted_close", "last"))
-    .assign(ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change())
+    .sort("date")
+    .with_columns(date=pl.col("date").dt.truncate("1mo"))
+    .group_by(["symbol", "date"])
+    .agg(adjusted_close=pl.col("adjusted_close").last())
+    .sort(["symbol", "date"])
+    .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
 )
 ```
 
@@ -77,11 +77,12 @@ We compute the sample standard deviation for each asset by using the `std()` fun
 
 ``` python
 assets = (returns_monthly
-    .groupby("symbol", as_index=False)
+    .group_by("symbol")
     .agg(
-        mu=("ret", "mean"),
-        sigma=("ret", "std")
+        mu=pl.col("ret").mean(),
+        sigma=pl.col("ret").std()
     )
+    .sort("symbol")
 )
 ```
 
@@ -113,32 +114,35 @@ As highlighted above, a key innovation of MPT is to consider interactions betwee
 
 The interpretation of the covariance is straightforward: While a positive covariance between assets indicates that these assets tend to move in the same direction, a negative covariance indicates that the assets move in opposite directions.
 
-We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a \\(T \times N)\\ matrix with one column for each of the \\N\\ symbols and one row for each of the \\T\\ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
+We can use `numpy`’s `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a \\(T \times N)\\ matrix with one column for each of the \\N\\ symbols and one row for each of the \\T\\ trading days. We achieve this by using `pivot()` with the new column names from the `symbol`-column and setting the values to `ret`. We sort the columns by symbol so that the order matches `assets`, drop the rows with missing returns, and hand the resulting matrix to `numpy` at the boundary.
 
 ``` python
+symbol_order = assets["symbol"].to_list()
+
 returns_wide = (returns_monthly
-    .pivot(index="date", columns="symbol", values="ret")
-    .reset_index()
+    .pivot(index="date", on="symbol", values="ret")
+    .sort("date")
+    .select(["date"] + symbol_order)
 )
 
-sigma = (returns_wide
-    .drop(columns=["date"])
-    .cov()
+sigma = np.cov(
+    returns_wide.drop("date").drop_nulls().to_numpy(),
+    rowvar=False
 )
 ```
 
 Figure [Figure 2](#fig-203) illustrates the resulting variance-covariance matrix.
 
 ``` python
-sigma_long = (sigma
-    .reset_index()
-    .melt(id_vars="symbol", var_name="symbol_b", value_name="value")
-)
-
-sigma_long["symbol_b"] = pd.Categorical(
-    sigma_long["symbol_b"], 
-    categories=sigma_long["symbol_b"].unique()[::-1],
-    ordered=True
+sigma_long = (
+    pl.DataFrame(sigma, schema=symbol_order)
+    .with_columns(symbol=pl.Series(symbol_order))
+    .unpivot(index="symbol", variable_name="symbol_b", value_name="value")
+    .with_columns(
+        symbol_b=pl.col("symbol_b").cast(
+            pl.Enum(symbol_order[::-1])
+        )
+    )
 )
 
 sigma_figure = (
@@ -177,25 +181,25 @@ where \\\iota\\ is a vector of 1’s and \\\Sigma^{-1}\\ is the inverse of the v
 
 ``` python
 iota = np.ones(sigma.shape[0])
-sigma_inv = np.linalg.inv(sigma.values)
+sigma_inv = np.linalg.inv(sigma)
 omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
 ```
 
 Figure [Figure 3](#fig-204) shows the resulting portfolio weights.
 
 ``` python
-assets = assets.assign(omega_mvp=omega_mvp)
+assets = assets.with_columns(omega_mvp=pl.Series(omega_mvp))
 
-assets["symbol"] = pd.Categorical(
-    assets["symbol"],
-    categories=assets.sort_values("omega_mvp")["symbol"],
-    ordered=True
+symbol_levels = assets.sort("omega_mvp")["symbol"].to_list()
+assets = assets.with_columns(
+    symbol=pl.col("symbol").cast(pl.Enum(symbol_levels)),
+    omega_positive=pl.col("omega_mvp") > 0
 )
 
 omega_figure = (
     ggplot(
         assets,
-        aes(y="omega_mvp", x="symbol", fill="omega_mvp>0")
+        aes(y="omega_mvp", x="symbol", fill="omega_positive")
     )
     + geom_col()
     + coord_flip()
@@ -213,10 +217,10 @@ Figure 3: Weights are based on historical moments of monthly returns adjusted f
 Before we move on to other portfolios, we collect the return and volatility of the minimum-variance portfolio in a data frame:
 
 ``` python
-mu = assets["mu"].values
+mu = assets["mu"].to_numpy()
 mu_mvp = omega_mvp @ mu
-sigma_mvp = np.sqrt(omega_mvp @ sigma.values @ omega_mvp)
-summary_mvp = pd.DataFrame(
+sigma_mvp = np.sqrt(omega_mvp @ sigma @ omega_mvp)
+summary_mvp = pl.DataFrame(
     {
         "mu": [mu_mvp],
         "sigma": [sigma_mvp],
@@ -226,9 +230,12 @@ summary_mvp = pd.DataFrame(
 summary_mvp
 ```
 
-|     | mu       | sigma    | type                       |
-|-----|----------|----------|----------------------------|
-| 0   | 0.008356 | 0.032144 | Minimum-Variance Portfolio |
+shape: (1, 3)
+
+| mu       | sigma    | type                         |
+|----------|----------|------------------------------|
+| f64      | f64      | str                          |
+| 0.008356 | 0.032144 | "Minimum-Variance Portfolio" |
 
 ## Efficient Portfolios
 
@@ -259,9 +266,9 @@ E = mu @ sigma_inv @ mu
 lambda_tilde = 2 * (mu_bar - D / C) / (E - (D**2) / C)
 omega_efp = omega_mvp + (lambda_tilde / 2) * (sigma_inv @ mu - D * omega_mvp)
 mu_efp = omega_efp @ mu
-sigma_efp = np.sqrt(omega_efp @ sigma.values @ omega_efp)
+sigma_efp = np.sqrt(omega_efp @ sigma @ omega_efp)
 
-summary_efp = pd.DataFrame(
+summary_efp = pl.DataFrame(
     {"mu": [mu_efp], "sigma": [sigma_efp], "type": ["Efficient Portfolio"]}
 )
 ```
@@ -269,12 +276,17 @@ summary_efp = pd.DataFrame(
 Figure [Figure 4](#fig-205) shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
 
 ``` python
-summaries = pd.concat([assets, summary_mvp, summary_efp], ignore_index=True)
+summaries = pl.concat(
+    [assets, summary_mvp, summary_efp], how="diagonal"
+)
 
 summaries_figure = (
     ggplot(summaries, aes(x="sigma", y="mu"))
-    + geom_point(data=summaries.query("type.isna()"))
-    + geom_point(data=summaries.query("type.notna()"), color="#F21A00", size=3)
+    + geom_point(data=summaries.filter(pl.col("type").is_null()))
+    + geom_point(
+        data=summaries.filter(pl.col("type").is_not_null()),
+        color="#F21A00", size=3
+    )
     + geom_label(
         aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
@@ -312,29 +324,30 @@ which corresponds to the efficient portfolio earning \\a\mu_1 + (1-a)\mu_2\\ in 
 The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
 
 ``` python
-efficient_frontier = (
-    pd.DataFrame({"a": np.arange(-1, 2.01, 0.01)})
-    .assign(
-        omega=lambda x: x["a"].map(
-            lambda x: x * omega_efp + (1 - x) * omega_mvp
-        )
-    )
-    .assign(
-        mu=lambda x: x["omega"].map(lambda x: x @ mu),
-        sigma=lambda x: x["omega"].map(lambda x: np.sqrt(x @ sigma @ x)),
-    )
-)
+a_grid = np.arange(-1, 2.01, 0.01)
+omega_grid = [a * omega_efp + (1 - a) * omega_mvp for a in a_grid]
+
+efficient_frontier = pl.DataFrame({
+    "a": a_grid,
+    "mu": [omega @ mu for omega in omega_grid],
+    "sigma": [np.sqrt(omega @ sigma @ omega) for omega in omega_grid],
+})
 ```
 
 Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios in a figure using `ggplot` (see [Figure 5](#fig-206)). We also add the individual stocks in the same plot.
 
 ``` python
-summaries = pd.concat([summaries, efficient_frontier], ignore_index=True)
+summaries = pl.concat(
+    [summaries, efficient_frontier], how="diagonal"
+)
 
 summaries_figure = (
     ggplot(summaries, aes(x="sigma", y="mu"))
-    + geom_point(data=summaries.query("type.isna()"))
-    + geom_point(data=summaries.query("type.notna()"), color="#F21A00", size=3)
+    + geom_point(data=summaries.filter(pl.col("type").is_null()))
+    + geom_point(
+        data=summaries.filter(pl.col("type").is_not_null()),
+        color="#F21A00", size=3
+    )
     + geom_label(
         aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )

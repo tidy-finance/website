@@ -11,8 +11,7 @@ A univariate portfolio sort considers only one sorting variable \\x\_{i,t-1}\\. 
 The current chapter relies on the following set of Python packages.
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
 import statsmodels.api as sm
 
 from plotnine import *
@@ -26,53 +25,53 @@ We start with loading the required data from our Parquet files introduced in [Ac
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["permno", "date", "ret_excess", "mktcap_lag"])
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["permno", "date", "ret_excess", "mktcap_lag"])
 )
 
 factors_ff3_monthly = (
-    pd.read_parquet("data-python/factors_ff3_monthly.parquet")
-    .get(["date", "mkt_excess"])
+    pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .select(["date", "mkt_excess"])
 )
 
 beta = (
-    pd.read_parquet("data-python/beta.parquet")
-    .query("return_type == 'monthly'")
-    .get(["permno", "date", "beta"])
+    pl.read_parquet("data-python/beta.parquet")
+    .filter(pl.col("return_type") == "monthly")
+    .select(["permno", "date", "beta"])
 )
 ```
 
 ## Sorting by Market Beta
 
-Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month \\t\\ information is available in month \\t+1\\. You may be tempted to simply use a call such as `crsp_monthly['beta_lag'] = crsp_monthly.groupby('permno')['beta'].shift(1)` instead. This procedure, however, does not work correctly if there are implicit missing values in the time series.
+Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month \\t\\ information is available in month \\t+1\\. You may be tempted to simply use a call such as `crsp_monthly.with_columns(beta_lag=pl.col("beta").shift(1).over("permno"))` instead. This procedure, however, does not work correctly if there are implicit missing values in the time series.
 
 ``` python
 beta_lag = (beta
-    .assign(date=lambda x: x["date"]+pd.DateOffset(months=1))
-    .get(["permno", "date", "beta"])
-    .rename(columns={"beta": "beta_lag"})
-    .dropna()
+    .with_columns(date=pl.col("date").dt.offset_by("1mo"))
+    .select(["permno", "date", "beta"])
+    .rename({"beta": "beta_lag"})
+    .drop_nulls()
 )
 
 data_for_sorts = (crsp_monthly
-    .merge(beta_lag, how="inner", on=["permno", "date"])
+    .join(beta_lag, how="inner", on=["permno", "date"])
 )
 ```
 
-The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. For simplicity, we start with the median lagged market beta as the single breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight in `np.average()`.
+The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios. For simplicity, we start with the median lagged market beta as the single breakpoint. We assign portfolios within each date using `qcut()` with the median as the only breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight: we divide the sum of capitalization-weighted excess returns by the sum of weights.
 
 ``` python
 beta_portfolios = (data_for_sorts
-    .groupby("date")
-    .apply(lambda x: (x.assign(
-        portfolio=pd.qcut(
-            x["beta_lag"], q=[0, 0.5, 1], labels=["low", "high"]))
-        )
+    .with_columns(
+        portfolio=pl.col("beta_lag")
+            .qcut([0.5], labels=["low", "high"])
+            .over("date")
     )
-    .reset_index(drop=True)
-    .groupby(["portfolio","date"])
-    .apply(lambda x: np.average(x["ret_excess"], weights=x["mktcap_lag"]))
-    .reset_index(name="ret")
+    .group_by(["portfolio", "date"])
+    .agg(
+        ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+            / pl.col("mktcap_lag").sum()
+    )
 )
 ```
 
@@ -82,9 +81,9 @@ We can construct a long-short strategy based on the two portfolios: buy the high
 
 ``` python
 beta_longshort = (beta_portfolios
-    .pivot_table(index="date", columns="portfolio", values="ret")
-    .reset_index()
-    .assign(long_short=lambda x: x["high"]-x["low"])
+    .pivot(values="ret", index="date", on="portfolio")
+    .sort("date")
+    .with_columns(long_short=pl.col("high")-pl.col("low"))
 )
 ```
 
@@ -93,7 +92,7 @@ We compute the average return and the corresponding standard error to test wheth
 ``` python
 model_fit = (sm.OLS.from_formula(
     formula="long_short ~ 1",
-    data=beta_longshort
+    data=beta_longshort.to_pandas()
   )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 6})
 )
@@ -105,7 +104,7 @@ prettify_result(model_fit)
 
     Coefficients:
                Estimate  Std. Error  t-Statistic  p-Value
-    Intercept       0.0       0.001        0.408    0.683
+    Intercept       0.0       0.001         0.41    0.682
 
     Summary statistics:
     - Number of observations: 719
@@ -116,48 +115,41 @@ The results indicate that we cannot reject the null hypothesis of average return
 
 ## Functional Programming for Portfolio Sorts
 
-Now, we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we define a function that gives us flexibility concerning which variable to use for the sorting, denoted by `sorting_variable`. We use `np.quantile()` to compute breakpoints for `n_portfolios`. Then, we assign portfolios to stocks using the `pd.cut()` function. The output of the following function is a new column that contains the number of the portfolio to which a stock belongs.
+Now, we take portfolio sorts to the next level. We want to be able to sort stocks into an arbitrary number of portfolios. For this case, functional programming is very handy: we define a function that gives us flexibility concerning which variable to use for the sorting, denoted by `sorting_variable`. We use `qcut()` to compute breakpoints for `n_portfolios` and to assign each stock to the corresponding portfolio bin in a single step. The output of the following function is an expression that yields a new column containing the number of the portfolio to which a stock belongs.
 
 In some applications, the variable used for the sorting might be clustered (e.g., at a lower bound of 0). Then, multiple breakpoints may be identical, leading to empty portfolios. Similarly, some portfolios might have a very small number of stocks at the beginning of the sample. Cases where the number of portfolio constituents differs substantially due to the distribution of the characteristics require careful consideration and, depending on the application, might require customized sorting approaches.
 
 ``` python
-def assign_portfolio(data, sorting_variable, n_portfolios):
+def assign_portfolio(sorting_variable, n_portfolios):
     """Assign portfolios to a bin between breakpoints."""
-    
-    breakpoints = np.quantile(
-      data[sorting_variable].dropna(), 
-      np.linspace(0, 1, n_portfolios + 1), 
-      method="linear"
+
+    assigned_portfolios = (pl.col(sorting_variable)
+        .qcut(
+            n_portfolios,
+            labels=[str(i) for i in range(1, n_portfolios + 1)],
+            allow_duplicates=True
+        )
     )
-    
-    assigned_portfolios = pd.cut(
-      data[sorting_variable],
-      bins=breakpoints,
-      labels=range(1, breakpoints.size),
-      include_lowest=True,
-      right=False
-    )
-    
+
     return assigned_portfolios
 ```
 
-We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we transform the portfolio column to a factor variable because it provides more convenience for the figure construction below.
+We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we cast the portfolio column to an ordered categorical (`pl.Enum`) because it provides more convenience for the figure construction below.
 
 ``` python
+portfolio_labels = pl.Enum([str(i) for i in range(1, 11)])
+
 beta_portfolios = (data_for_sorts
-  .groupby("date")
-  .apply(lambda x: x.assign(
-      portfolio=assign_portfolio(x, "beta_lag", 10)
-    )
+  .with_columns(
+      portfolio=assign_portfolio("beta_lag", 10).over("date")
   )
-  .reset_index(drop=True)
-  .groupby(["portfolio", "date"])
-  .apply(lambda x: x.assign(
-      ret=np.average(x["ret_excess"], weights=x["mktcap_lag"])
-    )
+  .group_by(["portfolio", "date"])
+  .agg(
+      ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+          / pl.col("mktcap_lag").sum()
   )
-  .reset_index(drop=True)
-  .merge(factors_ff3_monthly, how="left", on="date")
+  .with_columns(portfolio=pl.col("portfolio").cast(portfolio_labels))
+  .join(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -166,22 +158,24 @@ beta_portfolios = (data_for_sorts
 In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.
 
 ``` python
-beta_portfolios_summary = (beta_portfolios
-  .groupby("portfolio")
-  .apply(lambda x: x.assign(
-      alpha=sm.OLS.from_formula(
-          formula="ret ~ 1 + mkt_excess", 
-          data=x
-        ).fit().params[0],
-      beta=sm.OLS.from_formula(
-          formula="ret ~ 1 + mkt_excess", 
-          data=x
-        ).fit().params[1],
-      ret=x["ret"].mean()
-    ).tail(1)
-  )
-  .reset_index(drop=True)
-  .get(["portfolio", "alpha", "beta", "ret"])
+beta_portfolios_summary = []
+for portfolio, portfolio_data in beta_portfolios.group_by("portfolio"):
+    model_fit = (sm.OLS.from_formula(
+        formula="ret ~ 1 + mkt_excess",
+        data=portfolio_data.to_pandas()
+      )
+      .fit()
+    )
+    beta_portfolios_summary.append({
+        "portfolio": portfolio[0],
+        "alpha": model_fit.params.iloc[0],
+        "beta": model_fit.params.iloc[1],
+        "ret": portfolio_data["ret"].mean()
+    })
+
+beta_portfolios_summary = (pl.DataFrame(beta_portfolios_summary)
+    .with_columns(portfolio=pl.col("portfolio").cast(portfolio_labels))
+    .sort("portfolio")
 )
 ```
 
@@ -216,8 +210,8 @@ The CAPM predicts that our portfolios should lie on the security market line (SM
 
 ``` python
 sml_capm = (sm.OLS.from_formula(
-    formula="ret ~ 1 + beta", 
-    data=beta_portfolios_summary
+    formula="ret ~ 1 + beta",
+    data=beta_portfolios_summary.to_pandas()
   )
   .fit()
   .params
@@ -256,19 +250,18 @@ To provide more evidence against the CAPM predictions, we again form a long-shor
 
 ``` python
 beta_longshort = (beta_portfolios
-  .assign(
-    portfolio=lambda x: (
-      x["portfolio"].apply(
-        lambda y: "high" if y == x["portfolio"].max()
-        else ("low" if y == x["portfolio"].min()
-        else y)
-      )
-    )
+  .with_columns(
+    portfolio=pl.when(pl.col("portfolio") == pl.col("portfolio").max())
+        .then(pl.lit("high"))
+        .when(pl.col("portfolio") == pl.col("portfolio").min())
+        .then(pl.lit("low"))
+        .otherwise(pl.col("portfolio").cast(pl.Utf8))
   )
-  .query("portfolio in ['low', 'high']")
-  .pivot_table(index="date", columns="portfolio", values="ret")
-  .assign(long_short=lambda x: x["high"]-x["low"])
-  .merge(factors_ff3_monthly, how="left", on="date")
+  .filter(pl.col("portfolio").is_in(["low", "high"]))
+  .pivot(values="ret", index="date", on="portfolio")
+  .sort("date")
+  .with_columns(long_short=pl.col("high")-pl.col("low"))
+  .join(factors_ff3_monthly, how="left", on="date")
 )
 ```
 
@@ -276,8 +269,8 @@ Again, the resulting long-short strategy does not exhibit statistically signific
 
 ``` python
 model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1", 
-    data=beta_longshort
+    formula="long_short ~ 1",
+    data=beta_longshort.to_pandas()
   )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
 )
@@ -289,7 +282,7 @@ prettify_result(model_fit)
 
     Coefficients:
                Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     0.003       0.003        0.884    0.377
+    Intercept     0.003       0.003        0.882    0.378
 
     Summary statistics:
     - Number of observations: 719
@@ -300,8 +293,8 @@ However, controlling for the effect of beta, the long-short portfolio yields a s
 
 ``` python
 model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1 + mkt_excess", 
-    data=beta_longshort
+    formula="long_short ~ 1 + mkt_excess",
+    data=beta_longshort.to_pandas()
   )
   .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
 )
@@ -313,27 +306,28 @@ prettify_result(model_fit)
 
     Coefficients:
                 Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     -0.004       0.002       -1.650    0.099
-    mkt_excess     1.134       0.069       16.529    0.000
+    Intercept     -0.004       0.002       -1.653    0.098
+    mkt_excess     1.134       0.069       16.528    0.000
 
     Summary statistics:
     - Number of observations: 719
     - R-squared: 0.419, Adjusted R-squared: 0.418
-    - F-statistic: 273.199 on 1 and 717 DF, p-value: 0.000
+    - F-statistic: 273.166 on 1 and 717 DF, p-value: 0.000
 
 [Figure 3](#fig-703) shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years; each portfolio exhibits periods with positive and negative annual returns.
 
 ``` python
 beta_longshort_year = (beta_longshort
-  .assign(year=lambda x: x["date"].dt.year)
-  .groupby("year")
-  .aggregate(
-    low=("low", lambda x: (1+x).prod()-1),
-    high=("high", lambda x: (1+x).prod()-1),
-    long_short=("long_short", lambda x: (1+x).prod()-1)
+  .with_columns(year=pl.col("date").dt.year())
+  .group_by("year")
+  .agg(
+    low=(pl.col("low") + 1).product() - 1,
+    high=(pl.col("high") + 1).product() - 1,
+    long_short=(pl.col("long_short") + 1).product() - 1
   )
-  .reset_index()
-  .melt(id_vars="year", var_name="name", value_name="value")
+  .sort("year")
+  .unpivot(index="year", on=["low", "high", "long_short"],
+           variable_name="name", value_name="value")
 )
 
 beta_longshort_figure = (

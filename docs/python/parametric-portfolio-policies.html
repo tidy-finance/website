@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -98,10 +98,10 @@ div.csl-indent {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-2e93c9ea7df6fcc5d90b01baca22926b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-15df67a978eff2724f248dfecb6ea2b0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -608,49 +608,50 @@ Note
 </div>
 <p>In this chapter, we apply different portfolio performance measures to evaluate and compare portfolio allocation strategies. For this purpose, we introduce a direct way to estimate optimal portfolio weights for large-scale cross-sectional applications. More precisely, the approach of <span class="citation" data-cites="Brandt2009">Brandt et al. (<a href="#ref-Brandt2009" role="doc-biblioref">2009</a>)</span> proposes to parametrize the optimal portfolio weights as a function of stock characteristics instead of estimating the stock’s expected return, variance, and covariances with other stocks in a prior step. We choose weights as a function of characteristics that maximize the expected utility of the investor. This approach is feasible for large portfolio dimensions (such as the entire CRSP universe) and has been proposed by <span class="citation" data-cites="Brandt2009">Brandt et al. (<a href="#ref-Brandt2009" role="doc-biblioref">2009</a>)</span>. See the review paper by <span class="citation" data-cites="Brandt2010">Brandt (<a href="#ref-Brandt2010" role="doc-biblioref">2010</a>)</span> for an excellent treatment of related portfolio choice methods.</p>
 <p>The current chapter relies on the following set of Python packages:</p>
-<div id="09792e6a" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> itertools <span class="im">import</span> product, starmap</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> minimize</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="727d260d" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> statsmodels.formula.api <span class="im">as</span> smf</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> itertools <span class="im">import</span> product, starmap</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> minimize</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Compared to previous chapters, we introduce the <code>scipy.optimize</code> module from the <code>scipy</code> <span class="citation" data-cites="scipy">(<a href="#ref-scipy" role="doc-biblioref"><span class="nocase">Virtanen et al.</span> 2020</a>)</span> for solving optimization problems.</p>
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>To get started, we load the monthly CRSP file, which forms our investment universe. We load the data from our Parquet files introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>.</p>
-<div id="c91c96c1" class="cell" data-execution_count="3">
+<div id="704e2c44" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    pd.read_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    .dropna()</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    pl.read_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    .drop_nulls()</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>To evaluate the performance of portfolios, we further use monthly market returns as a benchmark to compute CAPM alphas.</p>
-<div id="cbe62ebb" class="cell" data-execution_count="4">
+<div id="bbafe878" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>factors_ff_monthly <span class="op">=</span> (</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    pd.read_parquet(<span class="st">"data-python/factors_ff3_monthly.parquet"</span>)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"date"</span>, <span class="st">"mkt_excess"</span>])</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    pl.read_parquet(<span class="st">"data-python/factors_ff3_monthly.parquet"</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"date"</span>, <span class="st">"mkt_excess"</span>])</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Next, we retrieve some stock characteristics that have been shown to have an effect on the expected returns or expected variances (or even higher moments) of the return distribution. In particular, we record the lagged one-year return momentum (<code>momentum_lag</code>), defined as the compounded return between months <span class="math inline">\(t-13\)</span> and <span class="math inline">\(t-2\)</span> for each firm, which we calculate using market capitalization for simplicity. In finance, momentum is the empirically observed tendency for rising asset prices to rise further and falling prices to keep falling <span class="citation" data-cites="Jegadeesh1993">(<a href="#ref-Jegadeesh1993" role="doc-biblioref">Jegadeesh and Titman 1993</a>)</span>. We refer to the exercise for a more elaborate measure of momentum. The second characteristic is the firm’s market equity (<code>size_lag</code>), defined as the log of the price per share times the number of shares outstanding <span class="citation" data-cites="Banz1981">(<a href="#ref-Banz1981" role="doc-biblioref">Banz 1981</a>)</span>. To construct the correct lagged values, we use the approach introduced in <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>.</p>
-<div id="dc5cea04" class="cell" data-execution_count="5">
+<div id="a0806725" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly_lags <span class="op">=</span> (crsp_monthly</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .assign(date<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"date"</span>]<span class="op">+</span>pd.DateOffset(months<span class="op">=</span><span class="dv">13</span>))</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .get([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"mktcap"</span>])</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    .merge(crsp_monthly_lags, </span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>            how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"date"</span>], suffixes<span class="op">=</span>[<span class="st">""</span>, <span class="st">"_13"</span>])</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(date<span class="op">=</span>pl.col(<span class="st">"date"</span>).dt.offset_by(<span class="st">"13mo"</span>))</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"permno"</span>, <span class="st">"date"</span>, <span class="st">"mktcap"</span>])</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    .rename({<span class="st">"mktcap"</span>: <span class="st">"mktcap_13"</span>})</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    .join(crsp_monthly_lags, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span>[<span class="st">"permno"</span>, <span class="st">"date"</span>])</span>
 <span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>data_portfolios <span class="op">=</span> (crsp_monthly</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>        momentum_lag<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"mktcap_lag"</span>]<span class="op">/</span>x[<span class="st">"mktcap_13"</span>],</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        size_lag<span class="op">=</span><span class="kw">lambda</span> x: np.log(x[<span class="st">"mktcap_lag"</span>])</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>        momentum_lag<span class="op">=</span>pl.col(<span class="st">"mktcap_lag"</span>)<span class="op">/</span>pl.col(<span class="st">"mktcap_13"</span>),</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>        size_lag<span class="op">=</span>pl.col(<span class="st">"mktcap_lag"</span>).log()</span>
 <span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    .dropna(subset<span class="op">=</span>[<span class="st">"momentum_lag"</span>, <span class="st">"size_lag"</span>])</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>    .drop_nulls([<span class="st">"momentum_lag"</span>, <span class="st">"size_lag"</span>])</span>
 <span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
@@ -670,22 +671,19 @@ Note
 <p>where <span class="math inline">\(\bar{\omega}_{i,t}\)</span> is a stock’s weight in a benchmark portfolio (we use the value-weighted or naive portfolio in the application below), <span class="math inline">\(\theta\)</span> is a vector of coefficients which we are going to estimate, and <span class="math inline">\(\hat{x}_{i,t}\)</span> are the characteristics of stock <span class="math inline">\(i\)</span>, cross-sectionally standardized to have zero mean and unit standard deviation.</p>
 <p>Intuitively, the portfolio strategy is a form of active portfolio management relative to a performance benchmark. Deviations from the benchmark portfolio are derived from the individual stock characteristics. Note that by construction, the weights sum up to one as <span class="math inline">\(\sum_{i=1}^{N_t}\hat{x}_{i,t} = 0\)</span> due to the standardization. Moreover, the coefficients are constant across assets and over time. The implicit assumption is that the characteristics fully capture all aspects of the joint distribution of returns that are relevant for forming optimal portfolios.</p>
 <p>We first implement cross-sectional standardization for the entire CRSP universe. We also keep track of (lagged) relative market capitalization <code>relative_mktcap</code>, which will represent the value-weighted benchmark portfolio, while <code>n</code> denotes the number of traded assets <span class="math inline">\(N_t\)</span>, which we use to construct the naive portfolio benchmark.</p>
-<div id="64c59520" class="cell" data-execution_count="6">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>data_portfolios <span class="op">=</span> (data_portfolios</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    .groupby(<span class="st">"date"</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>        relative_mktcap<span class="op">=</span>x[<span class="st">"mktcap_lag"</span>]<span class="op">/</span>x[<span class="st">"mktcap_lag"</span>].<span class="bu">sum</span>()</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        )</span>
+<div id="a0dce849" class="cell" data-execution_count="6">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>lag_columns <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> data_portfolios.columns <span class="cf">if</span> i.endswith(<span class="st">"lag"</span>)]</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>data_portfolios <span class="op">=</span> (data_portfolios</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>        relative_mktcap<span class="op">=</span>pl.col(<span class="st">"mktcap_lag"</span>)<span class="op">/</span>pl.col(<span class="st">"mktcap_lag"</span>).<span class="bu">sum</span>().over(<span class="st">"date"</span>)</span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    .set_index(<span class="st">"date"</span>)</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    .groupby(level<span class="op">=</span><span class="st">"date"</span>)</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    .transform(</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>        <span class="kw">lambda</span> x: (x<span class="op">-</span>x.mean())<span class="op">/</span>x.std() <span class="cf">if</span> x.name.endswith(<span class="st">"lag"</span>) <span class="cf">else</span> x</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    .reset_index()</span>
-<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    .drop([<span class="st">"mktcap_lag"</span>], axis<span class="op">=</span><span class="dv">1</span>)</span>
-<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>        [((pl.col(c)<span class="op">-</span>pl.col(c).mean().over(<span class="st">"date"</span>))<span class="op">/</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>          pl.col(c).std().over(<span class="st">"date"</span>)).alias(c) <span class="cf">for</span> c <span class="kw">in</span> lag_columns]</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    .drop(<span class="st">"mktcap_lag"</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="computing-portfolio-weights" class="level2">
@@ -698,10 +696,10 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 \tag{3}\]</span></span></p>
 <p>The allocation strategy is straightforward because the number of parameters to estimate is small. Instead of a tedious specification of the <span class="math inline">\(N_t\)</span> dimensional vector of expected returns and the <span class="math inline">\(N_t(N_t+1)/2\)</span> free elements of the covariance matrix, all we need to focus on in our application is the vector <span class="math inline">\(\theta\)</span>. <span class="math inline">\(\theta\)</span> contains only two elements in our application: the relative deviation from the benchmark due to <em>size</em> and <em>momentum</em>.</p>
 <p>To get a feeling for the performance of such an allocation strategy, we start with an arbitrary initial vector <span class="math inline">\(\theta_0\)</span>. The next step is to choose <span class="math inline">\(\theta\)</span> optimally to maximize the objective function. We automatically detect the number of parameters by counting the number of columns with lagged values. Note that the value for <span class="math inline">\(\theta\)</span> of 1.5 is an arbitrary choice.</p>
-<div id="b34f1631" class="cell" data-execution_count="7">
+<div id="d9d50621" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>lag_columns <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> data_portfolios.columns <span class="cf">if</span> <span class="st">"lag"</span> <span class="kw">in</span> i]</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>n_parameters <span class="op">=</span> <span class="bu">len</span>(lag_columns)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>theta <span class="op">=</span> pd.DataFrame({<span class="st">"theta"</span>: [<span class="fl">1.5</span>]<span class="op">*</span>n_parameters}, index<span class="op">=</span>lag_columns)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>theta <span class="op">=</span> np.array([<span class="fl">1.5</span>]<span class="op">*</span>n_parameters)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The function <code>compute_portfolio_weights()</code> below computes the portfolio weights <span class="math inline">\(\bar{\omega}_{i,t} + \frac{1}{N_t}\theta'\hat{x}_{i,t}\)</span> according to our parametrization for a given value <span class="math inline">\(\theta_0\)</span>. Everything happens within a single pipeline. Hence, we provide a short walk-through.</p>
 <p>We first compute <code>characteristic_tilt</code>, the tilting values <span class="math inline">\(\frac{1}{N_t}\theta'\hat{x}_{i, t}\)</span> which resemble the deviation from the benchmark portfolio. Next, we compute the benchmark portfolio <code>weight_benchmark</code>, which can be any reasonable set of portfolio weights. In our case, we choose either the value or equal-weighted allocation. <code>weight_tilt</code> completes the picture and contains the final portfolio weights <code>weight_tilt = weight_benchmark + characteristic_tilt</code>, which deviate from the benchmark portfolio depending on the stock characteristics.</p>
@@ -710,48 +708,53 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 \omega_{i,t}^+ = \frac{\max(0, \omega_{i,t})}{\sum_{j=1}^{N_t}\max(0, \omega_{i,t})}.
 \tag{4}\]</span></span></p>
 <p>The following function computes the optimal portfolio weights in the way just described.</p>
-<div id="f97ad550" class="cell" data-execution_count="8">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_portfolio_weights(theta, </span>
+<div id="35830aa6" class="cell" data-execution_count="8">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> compute_portfolio_weights(theta,</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>                              data,</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>                              value_weighting<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>                              allow_short_selling<span class="op">=</span><span class="va">True</span>):</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Compute portfolio weights for different strategies."""</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    lag_columns <span class="op">=</span> [i <span class="cf">for</span> i <span class="kw">in</span> data.columns <span class="cf">if</span> <span class="st">"lag"</span> <span class="kw">in</span> i]</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    theta <span class="op">=</span> pd.DataFrame(theta, index<span class="op">=</span>lag_columns)</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    theta <span class="op">=</span> np.asarray(theta).flatten()</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> (data</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"date"</span>)</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>          characteristic_tilt<span class="op">=</span>x[theta.index] <span class="op">@</span> theta <span class="op">/</span> x.shape[<span class="dv">0</span>]</span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>      )</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>      .assign(</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>        weight_benchmark<span class="op">=</span><span class="kw">lambda</span> x: </span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>          x[<span class="st">"relative_mktcap"</span>] <span class="cf">if</span> value_weighting <span class="cf">else</span> <span class="dv">1</span><span class="op">/</span>x.shape[<span class="dv">0</span>],</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>        weight_tilt<span class="op">=</span><span class="kw">lambda</span> x: </span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>          x[<span class="st">"weight_benchmark"</span>] <span class="op">+</span> x[<span class="st">"characteristic_tilt"</span>]</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>      )</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>      .drop(columns<span class="op">=</span>[<span class="st">"characteristic_tilt"</span>])</span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> allow_short_selling:</span>
-<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>        data <span class="op">=</span> (data</span>
-<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>          .assign(weight_tilt<span class="op">=</span><span class="kw">lambda</span> x: np.maximum(<span class="dv">0</span>, x[<span class="st">"weight_tilt"</span>]))</span>
-<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    tilt_expr <span class="op">=</span> pl.sum_horizontal(</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>        [<span class="bu">float</span>(theta[k])<span class="op">*</span>pl.col(lag_columns[k])</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>         <span class="cf">for</span> k <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(lag_columns))]</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> (data</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>      .with_columns(</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>          characteristic_tilt<span class="op">=</span>(tilt_expr<span class="op">/</span>pl.<span class="bu">len</span>()).over(<span class="st">"date"</span>)</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>      .with_columns(</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>        weight_benchmark<span class="op">=</span>(</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>          pl.col(<span class="st">"relative_mktcap"</span>) <span class="cf">if</span> value_weighting</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>          <span class="cf">else</span> pl.lit(<span class="dv">1</span><span class="op">/</span>data.shape[<span class="dv">0</span>])</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>      .with_columns(</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>        weight_tilt<span class="op">=</span>pl.col(<span class="st">"weight_benchmark"</span>)<span class="op">+</span>pl.col(<span class="st">"characteristic_tilt"</span>)</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>      .drop(<span class="st">"characteristic_tilt"</span>)</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> (data</span>
-<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>      .groupby(<span class="st">"date"</span>)</span>
-<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>      .<span class="bu">apply</span>(<span class="kw">lambda</span> x: x.assign(</span>
-<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>        weight_tilt<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"weight_tilt"</span>]<span class="op">/</span>x[<span class="st">"weight_tilt"</span>].<span class="bu">sum</span>()))</span>
-<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>      .reset_index(drop<span class="op">=</span><span class="va">True</span>)</span>
-<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="kw">not</span> allow_short_selling:</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>        data <span class="op">=</span> (data</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>          .with_columns(</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>            weight_tilt<span class="op">=</span>pl.max_horizontal(pl.lit(<span class="fl">0.0</span>), pl.col(<span class="st">"weight_tilt"</span>)))</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>    data <span class="op">=</span> (data</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>      .with_columns(</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>        weight_tilt<span class="op">=</span>(pl.col(<span class="st">"weight_tilt"</span>)<span class="op">/</span>pl.col(<span class="st">"weight_tilt"</span>).<span class="bu">sum</span>()).over(<span class="st">"date"</span>)</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> data</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>In the next step, we compute the portfolio weights for the arbitrary vector <span class="math inline">\(\theta_0\)</span>. In the example below, we use the value-weighted portfolio as a benchmark and allow negative portfolio weights.</p>
-<div id="f3fd4fc3" class="cell" data-execution_count="9">
+<div id="a0232ee5" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>weights_crsp <span class="op">=</span> compute_portfolio_weights(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    theta,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    data_portfolios,</span>
@@ -766,7 +769,7 @@ E_t\left(u(r_{p, t+1})\right) = \frac{1}{T}\sum\limits_{t=0}^{T-1}u\left(\sum\li
 <p><span id="eq-power-utility"><span class="math display">\[
 u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 \tag{5}\]</span></span> where <span class="math inline">\(\gamma\)</span> is the risk aversion factor.</p>
-<div id="b5a1d6ec" class="cell" data-execution_count="10">
+<div id="9339547d" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> power_utility(r, gamma<span class="op">=</span><span class="dv">5</span>):</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Calculate power utility for given risk aversion."""</span></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    </span>
@@ -776,88 +779,91 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 </div>
 <p>We want to note that <span class="citation" data-cites="Gehrig2020">Gehrig et al. (<a href="#ref-Gehrig2020" role="doc-biblioref">2020</a>)</span> warn that, in the leading case of constant relative risk aversion (CRRA), strong assumptions on the properties of the returns, the variables used to implement the parametric portfolio policy, and the parameter space are necessary to obtain a well-defined optimization problem.</p>
 <p>No doubt, there are many other ways to evaluate a portfolio. The function below provides a summary of all kinds of interesting measures that can be considered relevant. Do we need all these evaluation measures? It depends: The original paper by <span class="citation" data-cites="Brandt2009">Brandt et al. (<a href="#ref-Brandt2009" role="doc-biblioref">2009</a>)</span> only cares about the expected utility to choose <span class="math inline">\(\theta\)</span>. However, if you want to choose optimal values that achieve the highest performance while putting some constraints on your portfolio weights, it is helpful to have everything in one function.</p>
-<div id="8451cdc4" class="cell" data-execution_count="11">
+<div id="78f9a91d" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> evaluate_portfolio(weights_data,</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>                       full_evaluation<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>                       capm_evaluation<span class="op">=</span><span class="va">True</span>,</span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>                       length_year<span class="op">=</span><span class="dv">12</span>):</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Calculate portfolio evaluation measures."""</span></span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    evaluation <span class="op">=</span> (weights_data</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        .groupby(<span class="st">"date"</span>)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        .<span class="bu">apply</span>(<span class="kw">lambda</span> x: pd.Series(</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>          np.average(x[[<span class="st">"ret_excess"</span>, <span class="st">"ret_excess"</span>]],</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>                     weights<span class="op">=</span>x[[<span class="st">"weight_tilt"</span>, <span class="st">"weight_benchmark"</span>]],</span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>                     axis<span class="op">=</span><span class="dv">0</span>),</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>          [<span class="st">"return_tilt"</span>, <span class="st">"return_benchmark"</span>])</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>        .group_by(<span class="st">"date"</span>)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>        .agg(</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>          return_tilt<span class="op">=</span>(pl.col(<span class="st">"ret_excess"</span>)<span class="op">*</span>pl.col(<span class="st">"weight_tilt"</span>)).<span class="bu">sum</span>()</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>            <span class="op">/</span>pl.col(<span class="st">"weight_tilt"</span>).<span class="bu">sum</span>(),</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>          return_benchmark<span class="op">=</span>(pl.col(<span class="st">"ret_excess"</span>)<span class="op">*</span>pl.col(<span class="st">"weight_benchmark"</span>)).<span class="bu">sum</span>()</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>            <span class="op">/</span>pl.col(<span class="st">"weight_benchmark"</span>).<span class="bu">sum</span>()</span>
 <span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        .reset_index()</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>        .melt(id_vars<span class="op">=</span><span class="st">"date"</span>, var_name<span class="op">=</span><span class="st">"model"</span>,</span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>              value_vars<span class="op">=</span>[<span class="st">"return_tilt"</span>, <span class="st">"return_benchmark"</span>],</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>              value_name<span class="op">=</span><span class="st">"portfolio_return"</span>)</span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>        .assign(model<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"model"</span>].<span class="bu">str</span>.replace(<span class="st">"return_"</span>, <span class="st">""</span>))</span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="op">=</span> (evaluation</span>
-<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>        .groupby(<span class="st">"model"</span>)[<span class="st">"portfolio_return"</span>]</span>
-<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>        .aggregate([</span>
-<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>          (<span class="st">"Expected utility"</span>, <span class="kw">lambda</span> x: np.mean(power_utility(x))),</span>
-<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>          (<span class="st">"Average return"</span>, <span class="kw">lambda</span> x: np.mean(length_year<span class="op">*</span>x)<span class="op">*</span><span class="dv">100</span>),</span>
-<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>          (<span class="st">"SD return"</span>, <span class="kw">lambda</span> x: np.std(x)<span class="op">*</span>np.sqrt(length_year)<span class="op">*</span><span class="dv">100</span>),</span>
-<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>          (<span class="st">"Sharpe ratio"</span>, <span class="kw">lambda</span> x: (np.mean(x)<span class="op">/</span>np.std(x)<span class="op">*</span> </span>
-<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>                                        np.sqrt(length_year)))</span>
-<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>        ])</span>
-<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> capm_evaluation:</span>
-<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>        evaluation_capm <span class="op">=</span> (evaluation</span>
-<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>            .merge(factors_ff_monthly, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"date"</span>)</span>
-<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>            .groupby(<span class="st">"model"</span>)</span>
-<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>            .<span class="bu">apply</span>(<span class="kw">lambda</span> x: </span>
-<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>              smf.ols(formula<span class="op">=</span><span class="st">"portfolio_return ~ 1 + mkt_excess"</span>, data<span class="op">=</span>x)</span>
-<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>              .fit().params</span>
-<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>            )</span>
-<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>            .rename(columns<span class="op">=</span>{<span class="st">"const"</span>: <span class="st">"CAPM alpha"</span>,</span>
-<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>                             <span class="st">"mkt_excess"</span>: <span class="st">"Market beta"</span>})</span>
-<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>            )</span>
-<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>        evaluation_stats <span class="op">=</span> (evaluation_stats</span>
-<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>          .merge(evaluation_capm, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"model"</span>)</span>
-<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> full_evaluation:</span>
-<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>        evaluation_weights <span class="op">=</span> (weights_data</span>
-<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>          .melt(id_vars<span class="op">=</span><span class="st">"date"</span>, var_name<span class="op">=</span><span class="st">"model"</span>,</span>
-<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>                value_vars<span class="op">=</span>[<span class="st">"weight_benchmark"</span>, <span class="st">"weight_tilt"</span>],</span>
-<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a>                value_name<span class="op">=</span><span class="st">"weight"</span>)</span>
-<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>          .groupby([<span class="st">"model"</span>, <span class="st">"date"</span>])[<span class="st">"weight"</span>]</span>
-<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>          .aggregate([</span>
-<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"Mean abs. weight"</span>, <span class="kw">lambda</span> x: np.mean(<span class="bu">abs</span>(x))),</span>
-<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"Max. weight"</span>, <span class="kw">lambda</span> x: <span class="bu">max</span>(x)),</span>
-<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"Min. weight"</span>, <span class="kw">lambda</span> x: <span class="bu">min</span>(x)),</span>
-<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"Avg. sum of neg. weights"</span>, <span class="kw">lambda</span> x: <span class="op">-</span>np.<span class="bu">sum</span>(x[x <span class="op">&lt;</span> <span class="dv">0</span>])),</span>
-<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>            (<span class="st">"Avg. share of neg. weights"</span>, <span class="kw">lambda</span> x: np.mean(x <span class="op">&lt;</span> <span class="dv">0</span>))</span>
-<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>          ])</span>
-<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>          .reset_index()</span>
-<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>          .drop(columns<span class="op">=</span>[<span class="st">"date"</span>])</span>
-<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>          .groupby([<span class="st">"model"</span>])</span>
-<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>          .aggregate(<span class="kw">lambda</span> x: np.average(x)<span class="op">*</span><span class="dv">100</span>)</span>
-<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>          .reset_index()</span>
-<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>          .assign(model<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"model"</span>].<span class="bu">str</span>.replace(<span class="st">"weight_"</span>, <span class="st">""</span>))</span>
-<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>        </span>
-<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>        evaluation_stats <span class="op">=</span> (evaluation_stats</span>
-<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>          .merge(evaluation_weights, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"model"</span>)</span>
-<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a>          .set_index(<span class="st">"model"</span>)</span>
-<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a>        </span>
-<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="op">=</span> (evaluation_stats</span>
-<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a>      .transpose()</span>
-<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a>      .rename_axis(columns<span class="op">=</span><span class="va">None</span>)</span>
-<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> evaluation_stats</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>        .unpivot(index<span class="op">=</span><span class="st">"date"</span>, on<span class="op">=</span>[<span class="st">"return_tilt"</span>, <span class="st">"return_benchmark"</span>],</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>                 variable_name<span class="op">=</span><span class="st">"model"</span>, value_name<span class="op">=</span><span class="st">"portfolio_return"</span>)</span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>        .with_columns(model<span class="op">=</span>pl.col(<span class="st">"model"</span>).<span class="bu">str</span>.replace(<span class="st">"return_"</span>, <span class="st">""</span>))</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="op">=</span> (evaluation</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>        .group_by(<span class="st">"model"</span>)</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>        .agg([</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>          power_utility(pl.col(<span class="st">"portfolio_return"</span>)).mean()</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>            .alias(<span class="st">"Expected utility"</span>),</span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>          (length_year<span class="op">*</span>pl.col(<span class="st">"portfolio_return"</span>)).mean()</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>            .mul(<span class="dv">100</span>).alias(<span class="st">"Average return"</span>),</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>          (pl.col(<span class="st">"portfolio_return"</span>).std(ddof<span class="op">=</span><span class="dv">0</span>)<span class="op">*</span>np.sqrt(length_year))</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>            .mul(<span class="dv">100</span>).alias(<span class="st">"SD return"</span>),</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>          (pl.col(<span class="st">"portfolio_return"</span>).mean()<span class="op">/</span></span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>           pl.col(<span class="st">"portfolio_return"</span>).std(ddof<span class="op">=</span><span class="dv">0</span>)<span class="op">*</span>np.sqrt(length_year))</span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>            .alias(<span class="st">"Sharpe ratio"</span>)</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>        ])</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>        .to_pandas()</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>        .set_index(<span class="st">"model"</span>)</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> capm_evaluation:</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>        evaluation_capm <span class="op">=</span> (evaluation</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>            .join(factors_ff_monthly, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"date"</span>)</span>
+<span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>            .to_pandas()</span>
+<span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a>            .groupby(<span class="st">"model"</span>)</span>
+<span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a>            .<span class="bu">apply</span>(<span class="kw">lambda</span> x:</span>
+<span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a>              smf.ols(formula<span class="op">=</span><span class="st">"portfolio_return ~ 1 + mkt_excess"</span>, data<span class="op">=</span>x)</span>
+<span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>              .fit().params</span>
+<span id="cb10-44"><a href="#cb10-44" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb10-45"><a href="#cb10-45" aria-hidden="true" tabindex="-1"></a>            .rename(columns<span class="op">=</span>{<span class="st">"const"</span>: <span class="st">"CAPM alpha"</span>,</span>
+<span id="cb10-46"><a href="#cb10-46" aria-hidden="true" tabindex="-1"></a>                             <span class="st">"mkt_excess"</span>: <span class="st">"Market beta"</span>})</span>
+<span id="cb10-47"><a href="#cb10-47" aria-hidden="true" tabindex="-1"></a>            )</span>
+<span id="cb10-48"><a href="#cb10-48" aria-hidden="true" tabindex="-1"></a>        evaluation_stats <span class="op">=</span> (evaluation_stats</span>
+<span id="cb10-49"><a href="#cb10-49" aria-hidden="true" tabindex="-1"></a>          .merge(evaluation_capm, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"model"</span>)</span>
+<span id="cb10-50"><a href="#cb10-50" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-51"><a href="#cb10-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-52"><a href="#cb10-52" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> full_evaluation:</span>
+<span id="cb10-53"><a href="#cb10-53" aria-hidden="true" tabindex="-1"></a>        evaluation_weights <span class="op">=</span> (weights_data</span>
+<span id="cb10-54"><a href="#cb10-54" aria-hidden="true" tabindex="-1"></a>          .unpivot(index<span class="op">=</span><span class="st">"date"</span>, on<span class="op">=</span>[<span class="st">"weight_benchmark"</span>, <span class="st">"weight_tilt"</span>],</span>
+<span id="cb10-55"><a href="#cb10-55" aria-hidden="true" tabindex="-1"></a>                   variable_name<span class="op">=</span><span class="st">"model"</span>, value_name<span class="op">=</span><span class="st">"weight"</span>)</span>
+<span id="cb10-56"><a href="#cb10-56" aria-hidden="true" tabindex="-1"></a>          .group_by([<span class="st">"model"</span>, <span class="st">"date"</span>])</span>
+<span id="cb10-57"><a href="#cb10-57" aria-hidden="true" tabindex="-1"></a>          .agg([</span>
+<span id="cb10-58"><a href="#cb10-58" aria-hidden="true" tabindex="-1"></a>            pl.col(<span class="st">"weight"</span>).<span class="bu">abs</span>().mean().alias(<span class="st">"Mean abs. weight"</span>),</span>
+<span id="cb10-59"><a href="#cb10-59" aria-hidden="true" tabindex="-1"></a>            pl.col(<span class="st">"weight"</span>).<span class="bu">max</span>().alias(<span class="st">"Max. weight"</span>),</span>
+<span id="cb10-60"><a href="#cb10-60" aria-hidden="true" tabindex="-1"></a>            pl.col(<span class="st">"weight"</span>).<span class="bu">min</span>().alias(<span class="st">"Min. weight"</span>),</span>
+<span id="cb10-61"><a href="#cb10-61" aria-hidden="true" tabindex="-1"></a>            pl.col(<span class="st">"weight"</span>).<span class="bu">filter</span>(pl.col(<span class="st">"weight"</span>) <span class="op">&lt;</span> <span class="dv">0</span>).<span class="bu">sum</span>()</span>
+<span id="cb10-62"><a href="#cb10-62" aria-hidden="true" tabindex="-1"></a>              .mul(<span class="op">-</span><span class="dv">1</span>).alias(<span class="st">"Avg. sum of neg. weights"</span>),</span>
+<span id="cb10-63"><a href="#cb10-63" aria-hidden="true" tabindex="-1"></a>            (pl.col(<span class="st">"weight"</span>) <span class="op">&lt;</span> <span class="dv">0</span>).mean().alias(<span class="st">"Avg. share of neg. weights"</span>)</span>
+<span id="cb10-64"><a href="#cb10-64" aria-hidden="true" tabindex="-1"></a>          ])</span>
+<span id="cb10-65"><a href="#cb10-65" aria-hidden="true" tabindex="-1"></a>          .group_by(<span class="st">"model"</span>)</span>
+<span id="cb10-66"><a href="#cb10-66" aria-hidden="true" tabindex="-1"></a>          .agg(pl.col(pl.Float64).mean()<span class="op">*</span><span class="dv">100</span>)</span>
+<span id="cb10-67"><a href="#cb10-67" aria-hidden="true" tabindex="-1"></a>          .with_columns(model<span class="op">=</span>pl.col(<span class="st">"model"</span>).<span class="bu">str</span>.replace(<span class="st">"weight_"</span>, <span class="st">""</span>))</span>
+<span id="cb10-68"><a href="#cb10-68" aria-hidden="true" tabindex="-1"></a>          .to_pandas()</span>
+<span id="cb10-69"><a href="#cb10-69" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-70"><a href="#cb10-70" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-71"><a href="#cb10-71" aria-hidden="true" tabindex="-1"></a>        evaluation_stats <span class="op">=</span> (evaluation_stats</span>
+<span id="cb10-72"><a href="#cb10-72" aria-hidden="true" tabindex="-1"></a>          .merge(evaluation_weights, how<span class="op">=</span><span class="st">"left"</span>, on<span class="op">=</span><span class="st">"model"</span>)</span>
+<span id="cb10-73"><a href="#cb10-73" aria-hidden="true" tabindex="-1"></a>          .set_index(<span class="st">"model"</span>)</span>
+<span id="cb10-74"><a href="#cb10-74" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb10-75"><a href="#cb10-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-76"><a href="#cb10-76" aria-hidden="true" tabindex="-1"></a>    evaluation_stats <span class="op">=</span> (evaluation_stats</span>
+<span id="cb10-77"><a href="#cb10-77" aria-hidden="true" tabindex="-1"></a>      .transpose()</span>
+<span id="cb10-78"><a href="#cb10-78" aria-hidden="true" tabindex="-1"></a>      .rename_axis(columns<span class="op">=</span><span class="va">None</span>)</span>
+<span id="cb10-79"><a href="#cb10-79" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb10-80"><a href="#cb10-80" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-81"><a href="#cb10-81" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> evaluation_stats</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p> Let us take a look at the different portfolio strategies and evaluation measures.</p>
-<div id="b4310cc2" class="cell" data-execution_count="12">
+<div id="430785ff" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>evaluate_portfolio(weights_crsp).<span class="bu">round</span>(<span class="dv">2</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="12">
 <div>
@@ -867,65 +873,65 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <thead>
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
-<th data-quarto-table-cell-role="th">benchmark</th>
 <th data-quarto-table-cell-role="th">tilt</th>
+<th data-quarto-table-cell-role="th">benchmark</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Expected utility</th>
-<td>-0.25</td>
 <td>-0.26</td>
+<td>-0.25</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Average return</th>
+<td>0.82</td>
 <td>7.05</td>
-<td>0.83</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">SD return</th>
-<td>15.41</td>
 <td>21.09</td>
+<td>15.41</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Sharpe ratio</th>
-<td>0.46</td>
 <td>0.04</td>
+<td>0.46</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Intercept</th>
-<td>0.00</td>
 <td>-0.00</td>
+<td>0.00</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Market beta</th>
-<td>0.99</td>
 <td>0.94</td>
+<td>0.99</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Mean abs. weight</th>
-<td>0.04</td>
 <td>0.09</td>
+<td>0.04</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Max. weight</th>
-<td>4.29</td>
 <td>4.48</td>
+<td>4.29</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Min. weight</th>
-<td>0.00</td>
 <td>-0.20</td>
+<td>0.00</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Avg. sum of neg. weights</th>
-<td>0.00</td>
 <td>77.88</td>
+<td>0.00</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Avg. share of neg. weights</th>
-<td>0.00</td>
 <td>48.71</td>
+<td>0.00</td>
 </tr>
 </tbody>
 </table>
@@ -938,7 +944,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <section id="optimal-parameter-choice" class="level2">
 <h2 class="anchored" data-anchor-id="optimal-parameter-choice">Optimal Parameter Choice</h2>
 <p>Next, we move to a choice of <span class="math inline">\(\theta\)</span> that actually aims to improve some (or all) of the performance measures. We first define the helper function <code>compute_objective_function()</code>, which we then pass to an optimizer.</p>
-<div id="6f280228" class="cell" data-execution_count="13">
+<div id="22552c01" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> objective_function(theta,</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>                       data,</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>                       objective_measure<span class="op">=</span><span class="st">"Expected utility"</span>,</span>
@@ -961,7 +967,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> objective_function</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>You may wonder why we return the negative value of the objective function. This is simply due to the common convention for optimization procedures to search for minima as a default. By minimizing the negative value of the objective function, we get the maximum value as a result. In its most basic form, Python optimization uses the function <code>minimize()</code>. As main inputs, the function requires an initial guess of the parameters and the objective function to minimize. Now, we are fully equipped to compute the optimal values of <span class="math inline">\(\hat\theta\)</span>, which maximize the hypothetical expected utility of the investor.</p>
-<div id="3e773300" class="cell" data-execution_count="14">
+<div id="66815a6e" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>optimal_theta <span class="op">=</span> minimize(</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    fun<span class="op">=</span>objective_function,</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    x0<span class="op">=</span>[<span class="fl">1.5</span>]<span class="op">*</span>n_parameters,</span>
@@ -990,7 +996,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <tbody>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Optimal theta</th>
-<td>0.219</td>
+<td>0.223</td>
 <td>-1.625</td>
 </tr>
 </tbody>
@@ -1004,7 +1010,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <section id="more-model-specifications" class="level2">
 <h2 class="anchored" data-anchor-id="more-model-specifications">More Model Specifications</h2>
 <p>How does the portfolio perform for different model specifications? For this purpose, we compute the performance of a number of different modeling choices based on the entire CRSP sample. The next code chunk performs all the heavy lifting.</p>
-<div id="fb90f30f" class="cell" data-execution_count="15">
+<div id="eb923913" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> evaluate_optimal_performance(data,</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>                                 objective_measure<span class="op">=</span><span class="st">"Expected utility"</span>,</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>                                 value_weighting<span class="op">=</span><span class="va">True</span>,</span>
@@ -1041,7 +1047,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <span id="cb14-34"><a href="#cb14-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span>(portfolio_evaluation)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Finally, we can compare the results. The table below shows summary statistics for all possible combinations: equal- or value-weighted benchmark portfolio, with or without short-selling constraints, and tilted toward maximizing expected utility.</p>
-<div id="b3ac802f" class="cell" data-execution_count="16">
+<div id="b5c14d0a" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> [data_portfolios]</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>value_weighting <span class="op">=</span> [<span class="va">True</span>, <span class="va">False</span>]</span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>allow_short_selling <span class="op">=</span> [<span class="va">True</span>, <span class="va">False</span>]</span>
@@ -1068,6 +1074,8 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <tr class="header">
 <th data-quarto-table-cell-role="th"></th>
 <th data-quarto-table-cell-role="th">EW</th>
+<th data-quarto-table-cell-role="th">EW</th>
+<th data-quarto-table-cell-role="th">VW</th>
 <th data-quarto-table-cell-role="th">VW</th>
 </tr>
 </thead>
@@ -1075,45 +1083,63 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Expected utility</th>
 <td>-0.251</td>
+<td>-0.251</td>
+<td>-0.249</td>
 <td>-0.249</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Average return</th>
-<td>9.992</td>
+<td>9.996</td>
+<td>9.996</td>
+<td>7.048</td>
 <td>7.048</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">SD return</th>
 <td>20.454</td>
+<td>20.454</td>
+<td>15.410</td>
 <td>15.410</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Sharpe ratio</th>
 <td>0.489</td>
+<td>0.489</td>
+<td>0.457</td>
 <td>0.457</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Intercept</th>
 <td>0.002</td>
+<td>0.002</td>
+<td>0.000</td>
 <td>0.000</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Market beta</th>
 <td>1.138</td>
+<td>1.138</td>
+<td>0.995</td>
 <td>0.995</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Mean abs. weight</th>
 <td>0.000</td>
+<td>0.000</td>
+<td>0.036</td>
 <td>0.036</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Max. weight</th>
 <td>0.000</td>
+<td>0.000</td>
+<td>4.290</td>
 <td>4.290</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Min. weight</th>
+<td>0.000</td>
+<td>0.000</td>
 <td>0.000</td>
 <td>0.000</td>
 </tr>
@@ -1121,9 +1147,13 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <th data-quarto-table-cell-role="th">Avg. sum of neg. weights</th>
 <td>0.000</td>
 <td>0.000</td>
+<td>0.000</td>
+<td>0.000</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Avg. share of neg. weights</th>
+<td>0.000</td>
+<td>0.000</td>
 <td>0.000</td>
 <td>0.000</td>
 </tr>
@@ -1133,7 +1163,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 </div>
 </div>
 </div>
-<div id="5d287968" class="cell" data-execution_count="17">
+<div id="dd129473" class="cell" data-execution_count="17">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>performance_table.get([<span class="st">"EW Optimal"</span>, <span class="st">"VW Optimal"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="17">
 <div>
@@ -1150,58 +1180,58 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 <tbody>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Expected utility</th>
-<td>-25.923</td>
+<td>-26.613</td>
 <td>-0.260</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Average return</th>
-<td>-4549.172</td>
-<td>0.829</td>
+<td>-4563.673</td>
+<td>0.823</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">SD return</th>
-<td>14990.324</td>
+<td>15022.128</td>
 <td>21.090</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Sharpe ratio</th>
-<td>-0.303</td>
+<td>-0.304</td>
 <td>0.039</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Intercept</th>
-<td>-3.226</td>
+<td>-3.236</td>
 <td>-0.005</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Market beta</th>
-<td>-97.529</td>
+<td>-97.738</td>
 <td>0.939</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Mean abs. weight</th>
-<td>104.055</td>
+<td>104.273</td>
 <td>0.092</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Max. weight</th>
-<td>1467.888</td>
+<td>1470.741</td>
 <td>4.480</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Min. weight</th>
-<td>-353.727</td>
+<td>-354.451</td>
 <td>-0.205</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Avg. sum of neg. weights</th>
-<td>82132.315</td>
+<td>82304.602</td>
 <td>77.884</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">Avg. share of neg. weights</th>
-<td>51.548</td>
-<td>48.707</td>
+<td>51.549</td>
+<td>48.708</td>
 </tr>
 </tbody>
 </table>
@@ -1209,7 +1239,7 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 </div>
 </div>
 </div>
-<div id="bff23bd0" class="cell" data-execution_count="18">
+<div id="a4c1319d" class="cell" data-execution_count="18">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>performance_table.get([<span class="st">"EW Optimal (no s.)"</span>, <span class="st">"VW Optimal (no s.)"</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display" data-execution_count="18">
 <div>
@@ -1231,13 +1261,13 @@ u_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma},
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Average return</th>
-<td>8.011</td>
-<td>7.539</td>
+<td>8.012</td>
+<td>7.540</td>
 </tr>
 <tr class="odd">
 <th data-quarto-table-cell-role="th">SD return</th>
-<td>19.113</td>
-<td>16.654</td>
+<td>19.114</td>
+<td>16.655</td>
 </tr>
 <tr class="even">
 <th data-quarto-table-cell-role="th">Sharpe ratio</th>
@@ -1332,105 +1362,205 @@ Jegadeesh, Narasimhan, and Sheridan Titman. 1993. <span>“<span class="nocase">
 </div>
 </div></section></div></main> <!-- /main -->
 <div class="custom-footer">
+
   <div class="copyright">© Christoph Frey, Christoph Scheuch, Stefan Voigt &amp; Patrick Weiss</div>
+
   <a href="disclaimer.html">Disclaimer</a>
+
   <a href="#" id="open_preferences_center">Cookie Preferences</a>
-</div>
-<div id="presale-banner" hidden="">
-  <div class="presale-banner__inner">
-    <span class="presale-banner__text">
-      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
-      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
-    </span>
-    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
-  </div>
+
 </div>
 
+<div id="presale-banner" hidden="">
+
+  <div class="presale-banner__inner">
+
+    <span class="presale-banner__text">
+
+      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
+
+      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
+
+    </span>
+
+    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
+
+  </div>
+
+</div>
+
+
+
 <style>
+
   #presale-banner {
+
     background: #E1AF00;
+
     color: #fff;
+
     border-bottom: 1px solid rgba(255,255,255,0.1);
+
     font-size: 0.95rem;
+
   }
+
   #presale-banner[hidden] { display: none; }
+
   .presale-banner__inner {
+
     max-width: 1200px;
+
     margin: 0 auto;
+
     padding: 0.6rem 3rem 0.6rem 1rem;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     gap: 1rem;
+
     position: relative;
+
     text-align: center;
+
   }
+
   .presale-banner__text a {
+
     color: black;
+
     text-decoration: none;
+
     font-weight: 600;
+
     margin-left: 0.25rem;
+
   }
+
   .presale-banner__text a:hover { color: #3B9AB2; }
+
   .presale-banner__close {
+
     position: absolute;
+
     right: 0.75rem;
+
     top: 50%;
+
     transform: translateY(-50%);
+
     background: transparent;
+
     border: 0;
+
     color: #fff;
+
     font-size: 1.4rem;
+
     line-height: 1;
+
     cursor: pointer;
+
     padding: 0.25rem 0.5rem;
+
     border-radius: 4px;
+
   }
+
   .presale-banner__close:hover { background: rgba(255,255,255,0.15); }
+
   @media (max-width: 600px) {
+
     .presale-banner__inner { font-size: 0.8rem; padding: 0.5rem 2.5rem 0.5rem 0.75rem; }
+
   }
+
+
 
 </style>
 
+
+
 <script>
+
 (function () {
+
   var STORAGE_KEY = 'presale-banner-dismissed-2026-06-22';
+
   var PRESALE_END = new Date('2026-06-22T23:59:59');
 
+
+
   // Don't show if expired or previously dismissed
+
   if (new Date() > PRESALE_END) return;
+
   try {
+
     if (localStorage.getItem(STORAGE_KEY) === '1') return;
+
   } catch (e) { /* ignore */ }
 
+
+
   function init() {
+
     var banner = document.getElementById('presale-banner');
+
     if (!banner) return;
 
+
+
     // Move banner to sit directly below the navbar
+
     var navbar = document.querySelector('header.quarto-secondary-nav') 
+
               || document.querySelector('nav.navbar')
+
               || document.querySelector('header#quarto-header')
+
               || document.querySelector('header');
+
     if (navbar && navbar.parentNode) {
+
       navbar.parentNode.insertBefore(banner, navbar.nextSibling);
+
     }
+
     banner.hidden = false;
 
+
+
     document.getElementById('presale-banner-close')
+
       .addEventListener('click', function () {
+
         banner.hidden = true;
+
         try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+
       });
+
   }
 
+
+
   if (document.readyState === 'loading') {
+
     document.addEventListener('DOMContentLoaded', init);
+
   } else {
+
     init();
+
   }
+
 })();
+
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {

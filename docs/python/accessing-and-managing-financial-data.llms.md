@@ -11,8 +11,7 @@ This chapter shows how to import different open-source datasets. Specifically, o
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them.
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
 import io
 import re
 import zipfile
@@ -69,33 +68,34 @@ chunks = raw_text.split("\r\n\r\n")
 table_text = max(chunks, key=len)
 ```
 
-Within this block, the first CSV header line starts at the first line beginning with a comma. We add a “Date” label for the index and pass everything to `read_csv`:
+Within this block, the first CSV header line starts at the first line beginning with a comma. We add a “Date” label for the first column and pass everything to `pl.read_csv()`, which accepts the raw bytes directly. The numeric fields in the raw file carry leading spaces (e.g., `2.89`), which `polars` does not strip automatically — such values are read as strings. We therefore trim the whitespace and cast all non-date columns to floats:
 
 ``` python
 match = re.search(r"^\s*,", table_text, flags=re.M)
 start = match.start()
 csv_text = "Date" + table_text[start:]
 
-factors_ff_raw = pd.read_csv(io.StringIO(csv_text), index_col=0)
+factors_ff_raw = pl.read_csv(csv_text.encode("latin1")).with_columns(
+    pl.exclude("Date").cast(pl.String).str.strip_chars().cast(pl.Float64)
+)
 ```
 
-At this point, the index still consists of integer date codes with different lengths depending on the frequency. We need a bit of logic to convert them into a proper `DatetimeIndex`:
+At this point, the `Date` column still consists of integer date codes with different lengths depending on the frequency. We need a bit of logic to convert them into a proper date column:
 
 ``` python
-s = factors_ff_raw.index.astype(str)
+s = factors_ff_raw["Date"].cast(pl.String)
+n = s.str.len_chars()
 
-if (s.str.len() == 8).all():  # daily: YYYYMMDD
-    dt = pd.to_datetime(s, format="%Y%m%d")
-elif (s.str.len() == 6).all():  # monthly: YYYYMM
-    dt = pd.to_datetime(s + "01", format="%Y%m%d")
-elif (s.str.len() == 4).all():  # annual: YYYY
-    dt = pd.to_datetime(s + "0101", format="%Y%m%d")
-    dt = dt.dt.to_period("A-DEC").dt.to_timestamp("end")
+if (n == 8).all():  # daily: YYYYMMDD
+    date = s.str.to_date("%Y%m%d")
+elif (n == 6).all():  # monthly: YYYYMM
+    date = (s + "01").str.to_date("%Y%m%d")
+elif (n == 4).all():  # annual: YYYY, assigned to year-end
+    date = (s + "1231").str.to_date("%Y%m%d")
 else:
     raise ValueError("Unknown date format in Fama–French index.")
 
-factors_ff_raw = factors_ff_raw.set_index(dt)
-factors_ff_raw.index.name = "date"
+factors_ff_raw = factors_ff_raw.with_columns(date=date).drop("Date")
 ```
 
 Finally, we still have to clean the data:
@@ -110,35 +110,39 @@ This all could look like this:
 ``` python
 # start and end dates
 if start_date:
-    factors_ff_raw = factors_ff_raw[factors_ff_raw.index >= pd.to_datetime(start_date)]
+    factors_ff_raw = factors_ff_raw.filter(
+        pl.col("date") >= pl.lit(start_date).str.to_date()
+    )
 if end_date:
-    factors_ff_raw = factors_ff_raw[factors_ff_raw.index <= pd.to_datetime(end_date)]
+    factors_ff_raw = factors_ff_raw.filter(
+        pl.col("date") <= pl.lit(end_date).str.to_date()
+    )
 
-factors_ff3_monthly = (factors_ff_raw
-    .div(100)
-    .reset_index(names="date")
-    .rename(columns=str.lower)
-    .rename(columns={"mkt-rf": "mkt_excess", "rf": "risk_free"})
-    .replace({"-99.99": pd.NA, -99.99: pd.NA, -999: pd.NA})
+factors_ff3_monthly = (
+    factors_ff_raw.rename(lambda c: c.lower())
+    .rename({"mkt-rf": "mkt_excess", "rf": "risk_free"})
+    .with_columns(pl.exclude("date").replace({-99.99: None, -999: None}) / 100)
+    .select(pl.col("date"), pl.exclude("date"))
 )
 factors_ff3_monthly
 ```
 
-|     | date       | mkt_excess | smb     | hml     | risk_free |
-|-----|------------|------------|---------|---------|-----------|
-| 0   | 1960-01-01 | -0.0698    | 0.0212  | 0.0265  | 0.0033    |
-| 1   | 1960-02-01 | 0.0116     | 0.0060  | -0.0197 | 0.0029    |
-| 2   | 1960-03-01 | -0.0163    | -0.0055 | -0.0275 | 0.0035    |
-| 3   | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
-| 4   | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
-| ... | ...        | ...        | ...     | ...     | ...       |
-| 775 | 2024-08-01 | 0.0160     | -0.0349 | -0.0110 | 0.0048    |
-| 776 | 2024-09-01 | 0.0172     | -0.0013 | -0.0277 | 0.0040    |
-| 777 | 2024-10-01 | -0.0100    | -0.0099 | 0.0086  | 0.0039    |
-| 778 | 2024-11-01 | 0.0649     | 0.0446  | 0.0015  | 0.0040    |
-| 779 | 2024-12-01 | -0.0317    | -0.0271 | -0.0300 | 0.0037    |
+shape: (780, 5)
 
-780 rows × 5 columns
+| date       | mkt_excess | smb     | hml     | risk_free |
+|------------|------------|---------|---------|-----------|
+| date       | f64        | f64     | f64     | f64       |
+| 1960-01-01 | -0.0698    | 0.0212  | 0.0265  | 0.0033    |
+| 1960-02-01 | 0.0116     | 0.006   | -0.0197 | 0.0029    |
+| 1960-03-01 | -0.0163    | -0.0055 | -0.0275 | 0.0035    |
+| 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
+| 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
+| …          | …          | …       | …       | …         |
+| 2024-08-01 | 0.016      | -0.035  | -0.011  | 0.0048    |
+| 2024-09-01 | 0.0172     | -0.0012 | -0.0277 | 0.004     |
+| 2024-10-01 | -0.01      | -0.0096 | 0.0089  | 0.0039    |
+| 2024-11-01 | 0.0649     | 0.0454  | 0.0029  | 0.004     |
+| 2024-12-01 | -0.0317    | -0.027  | -0.0298 | 0.0037    |
 
 All of these steps are doable, but none of them are really about finance - they are just the technical scaffolding required before you can work with the actual factor returns. That’s where a dedicated helper or package becomes invaluable. The `tidyfinance` package performs this entire workflow under the hood: you request a Fama–French dataset and receive a clean, consistently formatted data table from Kenneth French’s Data Library.. This avoids repetitive boilerplate, reduces errors, and lets you focus on modeling and analysis rather than on data plumbing.
 
@@ -150,79 +154,86 @@ import tidyfinance as tf
 
 For example, we can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French’s finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.
 
+Because the downloaded data arrives with timestamp columns, we cast the `date` column to the polars `Date` type — calendar dates rather than timestamps — a convention we use for all tables we store in this book.
+
 ``` python
-factors_ff3_monthly = tf.download_data(
-    domain="famafrench",
-    dataset="F-F_Research_Data_Factors",
-    start_date=start_date,
-    end_date=end_date,
-)
+factors_ff3_monthly = pl.from_pandas(
+    tf.download_data(
+        domain="famafrench",
+        dataset="F-F_Research_Data_Factors",
+        start_date=start_date,
+        end_date=end_date,
+    )
+).with_columns(pl.col("date").cast(pl.Date))
 ```
 
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability (`rmw`) and investment (`cma`) factors. We demonstrate how the monthly factors are constructed in [Replicating Fama and French Factors](../python/replicating-fama-and-french-factors.llms.md).
 
 ``` python
-factors_ff5_monthly = tf.download_data(
-    domain="famafrench",
-    dataset="F-F_Research_Data_5_Factors_2x3",
-    start_date=start_date,
-    end_date=end_date,
-)
+factors_ff5_monthly = pl.from_pandas(
+    tf.download_data(
+        domain="famafrench",
+        dataset="F-F_Research_Data_5_Factors_2x3",
+        start_date=start_date,
+        end_date=end_date,
+    )
+).with_columns(pl.col("date").cast(pl.Date))
 ```
 
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
 
 ``` python
-factors_ff3_daily = tf.download_data(
-    domain="famafrench",
-    dataset="F-F_Research_Data_Factors_daily",
-    start_date=start_date,
-    end_date=end_date,
-)
+factors_ff3_daily = pl.from_pandas(
+    tf.download_data(
+        domain="famafrench",
+        dataset="F-F_Research_Data_Factors_daily",
+        start_date=start_date,
+        end_date=end_date,
+    )
+).with_columns(pl.col("date").cast(pl.Date))
 ```
 
 In a subsequent chapter, we also use the monthly returns from ten industry portfolios, so let us fetch that data, too.
 
 ``` python
-industries_ff_monthly = tf.download_data(
-    domain="famafrench",
-    dataset="10_Industry_Portfolios",
-    start_date=start_date,
-    end_date=end_date,
-)
+industries_ff_monthly = pl.from_pandas(
+    tf.download_data(
+        domain="famafrench",
+        dataset="10_Industry_Portfolios",
+        start_date=start_date,
+        end_date=end_date,
+    )
+).with_columns(pl.col("date").cast(pl.Date))
 ```
 
 It is worth taking a look at all available portfolio return time series from Kenneth French’s homepage. You should check out the other sets by calling `tf.get_available_famafrench_datasets()`.
 
 ## q-Factors
 
-In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the Hou et al. ([2014](#ref-Hou2015)) *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q*-factors can be downloaded directly from the authors’ homepage from within `pd.read_csv()`.
+In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the Hou et al. ([2014](#ref-Hou2015)) *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q*-factors can be downloaded directly from the authors’ homepage.
 
-We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prescript using regular expressions and write all column names in lowercase. We then query the data to select observations between the start and end dates. Finally, we use the double asterisk (`**`) notation in the `assign` function to apply the same transform of dividing by 100 to all four factors by iterating through them. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html) note that we temporarily adjust the SSL certificate handling behavior in Python’s `ssl` module when retrieving the \\q\\-factors directly from the web, as demonstrated in [Working with Stock Returns](../python/working-with-stock-returns.llms.md). This method should be used with caution, which is why we restore the default settings immediately after successfully downloading the data.
+We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prescript using regular expressions and write all column names in lowercase. We then filter the data to select observations between the start and end dates. Finally, we apply the same transform of dividing by 100 to all four factors. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html)
+
+We download the CSV with `requests` and pass the response body directly to `pl.read_csv()`:
 
 ``` python
-import ssl
-
-ssl._create_default_https_context = ssl._create_unverified_context
-
 factors_q_monthly_link = (
     "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2024.csv"
 )
 
 factors_q_monthly = (
-    pd.read_csv(factors_q_monthly_link)
-    .assign(
-        date=lambda x: (
-            pd.to_datetime(x["year"].astype(str) + "-" + x["month"].astype(str) + "-01")
-        )
+    pl.read_csv(requests.get(factors_q_monthly_link).content)
+    .with_columns(
+        date=pl.date(pl.col("year"), pl.col("month"), 1)
     )
-    .drop(columns=["R_F", "R_MKT", "year"])
-    .rename(columns=lambda x: x.replace("R_", "").lower())
-    .query(f"date >= '{start_date}' and date <= '{end_date}'")
-    .assign(**{col: lambda x: x[col] / 100 for col in ["me", "ia", "roe", "eg"]})
+    .drop(["R_F", "R_MKT", "year"])
+    .rename(lambda x: x.replace("R_", "").lower())
+    .filter(
+        (pl.col("date") >= pl.lit(start_date).str.to_date())
+        & (pl.col("date") <= pl.lit(end_date).str.to_date())
+    )
+    .with_columns(pl.col(["me", "ia", "roe", "eg"]) / 100)
 )
-
-ssl._create_default_https_context = ssl.create_default_context
 ```
 
 Again, you can use the `tidyfinance` package for a shortcut:
@@ -267,24 +278,33 @@ Next, we read in the new data and transform the columns into the variables that 
 
 For variable definitions and the required data transformations, you can consult the material on [Amit Goyal’s website.](https://sites.google.com/view/agoyal145)
 
-``` python
-ssl._create_default_https_context = ssl._create_unverified_context
+Some numeric columns in the raw file contain thousands separators (e.g., `4,769.83`), so we read all columns as strings, strip the commas, and cast to floats before the actual transformations. In addition to the predictors, we compute the one-month-ahead excess market return (`rp_div`), which serves as the prediction target for the equity premium predictors:
 
+``` python
 macro_predictors = (
-    pd.read_csv(macro_predictors_link, thousands=",")
-    .assign(
-        date=lambda x: pd.to_datetime(x["yyyymm"], format="%Y%m"),
-        dp=lambda x: np.log(x["D12"]) - np.log(x["Index"]),
-        dy=lambda x: np.log(x["D12"]) - np.log(x["Index"].shift(1)),
-        ep=lambda x: np.log(x["E12"]) - np.log(x["Index"]),
-        de=lambda x: np.log(x["D12"]) - np.log(x["E12"]),
-        tms=lambda x: x["lty"] - x["tbl"],
-        dfy=lambda x: x["BAA"] - x["AAA"],
+    pl.read_csv(requests.get(macro_predictors_link).content, infer_schema=False)
+    .with_columns(
+        pl.exclude("yyyymm").str.replace_all(",", "").cast(pl.Float64, strict=False)
     )
-    .rename(columns={"b/m": "bm"})
-    .get(
+    .with_columns(index_div=pl.col("Index") + pl.col("D12"))
+    .with_columns(
+        logret=pl.col("index_div").log() - pl.col("index_div").shift(1).log()
+    )
+    .with_columns(
+        date=pl.col("yyyymm").str.to_date("%Y%m"),
+        rp_div=(pl.col("logret") - (pl.col("Rfree") + 1).log()).shift(-1),
+        dp=pl.col("D12").log() - pl.col("Index").log(),
+        dy=pl.col("D12").log() - pl.col("Index").shift(1).log(),
+        ep=pl.col("E12").log() - pl.col("Index").log(),
+        de=pl.col("D12").log() - pl.col("E12").log(),
+        tms=pl.col("lty") - pl.col("tbl"),
+        dfy=pl.col("BAA") - pl.col("AAA"),
+    )
+    .rename({"b/m": "bm"})
+    .select(
         [
             "date",
+            "rp_div",
             "dp",
             "dy",
             "ep",
@@ -300,11 +320,12 @@ macro_predictors = (
             "infl",
         ]
     )
-    .query("date >= @start_date and date <= @end_date")
-    .dropna()
+    .filter(
+        (pl.col("date") >= pl.lit(start_date).str.to_date())
+        & (pl.col("date") <= pl.lit(end_date).str.to_date())
+    )
+    .drop_nulls()
 )
-
-ssl._create_default_https_context = ssl.create_default_context
 ```
 
 To get the equivalent data through `tidyfinance`, you can call:
@@ -327,22 +348,24 @@ series = "CPIAUCNS"
 url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 ```
 
-We can then use the `requests` module to request the CSV, extract the data from the response body, and convert the columns to a tidy format:
+We can then use the `requests` module to request the CSV, extract the data from the response body, and convert the columns to a tidy format. Note that we pass `impersonate="chrome"` so that the request mimics a regular browser; FRED rejects downloads that do not look like they come from a browser.
 
 ``` python
-resp = requests.get(url)
-resp_csv = pd.io.common.StringIO(resp.text)
+resp = requests.get(url, impersonate="chrome")
 
 cpi_monthly = (
-    pd.read_csv(resp_csv)
-    .assign(
-        date=lambda x: pd.to_datetime(x["observation_date"]),
-        value=lambda x: pd.to_numeric(x[series], errors="coerce"),
-        series=series,
+    pl.read_csv(resp.content)
+    .with_columns(
+        date=pl.col("observation_date").str.to_date(),
+        value=pl.col(series).cast(pl.Float64, strict=False),
+        series=pl.lit(series),
     )
-    .get(["date", "series", "value"])
-    .query("date >= @start_date & date <= @end_date")
-    .assign(cpi=lambda x: x["value"] / x["value"].iloc[-1])
+    .select(["date", "series", "value"])
+    .filter(
+        (pl.col("date") >= pl.lit(start_date).str.to_date())
+        & (pl.col("date") <= pl.lit(end_date).str.to_date())
+    )
+    .with_columns(cpi=pl.col("value") / pl.col("value").last())
 )
 ```
 
@@ -351,26 +374,20 @@ The last line sets the current (latest) price level as the reference price level
 The `tidyfinance` package can, of course, also fetch the same index data and many more data series:
 
 ``` python
-tf.download_data(
-    domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
+pl.from_pandas(
+    tf.download_data(
+        domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
+    )
 )
 ```
 
-|     | date       | series   | value   |
-|-----|------------|----------|---------|
-| 0   | 1960-01-01 | CPIAUCNS | 29.300  |
-| 1   | 1960-02-01 | CPIAUCNS | 29.400  |
-| 2   | 1960-03-01 | CPIAUCNS | 29.400  |
-| 3   | 1960-04-01 | CPIAUCNS | 29.500  |
-| 4   | 1960-05-01 | CPIAUCNS | 29.500  |
-| ... | ...        | ...      | ...     |
-| 775 | 2024-08-01 | CPIAUCNS | 314.796 |
-| 776 | 2024-09-01 | CPIAUCNS | 315.301 |
-| 777 | 2024-10-01 | CPIAUCNS | 315.664 |
-| 778 | 2024-11-01 | CPIAUCNS | 315.493 |
-| 779 | 2024-12-01 | CPIAUCNS | 315.605 |
+    Failed to retrieve data for series CPIAUCNS: Failed to perform, curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2). See https://curl.se/libcurl/c/libcurl-errors.html first for more details.
 
-780 rows × 3 columns
+shape: (0, 3)
+
+| date | value | series |
+|------|-------|--------|
+| str  | str   | str    |
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through tidyfinance, we recommend working with the `fredapi` package. Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
 
@@ -387,33 +404,34 @@ if not os.path.exists("data-python"):
     os.makedirs("data-python")
 ```
 
-Next, we create a remote table with the monthly Fama-French factor data. We do so with the `pandas` function `to_pandas()`, which stores the data to parquet files.
+Next, we create a remote table with the monthly Fama-French factor data. We do so with the `polars` function `write_parquet()`, which stores the data to parquet files.
 
 ``` python
-factors_ff3_monthly.to_parquet("data-python/factors_ff3_monthly.parquet")
+factors_ff3_monthly.write_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
-Now, if we want to have the whole table in memory, we need to call `pd.read_parquet()` with the corresponding query.
+Now, if we want to have the whole table in memory, we need to call `pl.read_parquet()` with the corresponding query.
 
 ``` python
-pd.read_parquet("data-python/factors_ff3_monthly.parquet")
+pl.read_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
-|     | date       | mkt_excess | smb     | hml     | risk_free |
-|-----|------------|------------|---------|---------|-----------|
-| 0   | 1960-01-01 | -0.0698    | 0.0212  | 0.0265  | 0.0033    |
-| 1   | 1960-02-01 | 0.0116     | 0.0060  | -0.0197 | 0.0029    |
-| 2   | 1960-03-01 | -0.0163    | -0.0055 | -0.0275 | 0.0035    |
-| 3   | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
-| 4   | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
-| ... | ...        | ...        | ...     | ...     | ...       |
-| 775 | 2024-08-01 | 0.0160     | -0.0349 | -0.0110 | 0.0048    |
-| 776 | 2024-09-01 | 0.0172     | -0.0013 | -0.0277 | 0.0040    |
-| 777 | 2024-10-01 | -0.0100    | -0.0099 | 0.0086  | 0.0039    |
-| 778 | 2024-11-01 | 0.0649     | 0.0446  | 0.0015  | 0.0040    |
-| 779 | 2024-12-01 | -0.0317    | -0.0271 | -0.0300 | 0.0037    |
+shape: (780, 5)
 
-780 rows × 5 columns
+| date       | mkt_excess | smb     | hml     | risk_free |
+|------------|------------|---------|---------|-----------|
+| date       | f64        | f64     | f64     | f64       |
+| 1960-01-01 | -0.0698    | 0.0212  | 0.0265  | 0.0033    |
+| 1960-02-01 | 0.0116     | 0.006   | -0.0197 | 0.0029    |
+| 1960-03-01 | -0.0163    | -0.0055 | -0.0275 | 0.0035    |
+| 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
+| 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
+| …          | …          | …       | …       | …         |
+| 2024-08-01 | 0.016      | -0.035  | -0.011  | 0.0048    |
+| 2024-09-01 | 0.0172     | -0.0012 | -0.0277 | 0.004     |
+| 2024-10-01 | -0.01      | -0.0096 | 0.0089  | 0.0039    |
+| 2024-11-01 | 0.0649     | 0.0454  | 0.0029  | 0.004     |
+| 2024-12-01 | -0.0317    | -0.027  | -0.0298 | 0.0037    |
 
 The last couple of code chunks are really all there is to organizing a simple database! You can also share the parquet files across devices and programming languages.
 
@@ -430,7 +448,7 @@ data_dict = {
 }
 
 for key, value in data_dict.items():
-    value.to_parquet("data-python/" + key + ".parquet")
+    value.write_parquet("data-python/" + key + ".parquet")
 ```
 
 ## Key Takeaways
@@ -442,7 +460,7 @@ for key, value in data_dict.items():
 
 ## Exercises
 
-1.  Download the monthly Fama-French factors manually from [Kenneth French’s data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `pd.read_csv()`. Validate that you get the same data as via the `tf.download_data()` package.
+1.  Download the monthly Fama-French factors manually from [Kenneth French’s data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `pl.read_csv()`. Validate that you get the same data as via the `tf.download_data()` package.
 2.  Download the daily Fama-French 5 factors using the `tf.download_data()` function. After the successful download and conversion to the column format that we used above, compare the `risk_free`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_daily` to `factors_ff5_daily`. Discuss any differences you might find.
 
 ## References

@@ -6,41 +6,47 @@
 
 The main aim of this chapter is to familiarize yourself with the core packages for working with stock market data. We focus on downloading and visualizing stock data from data provider Yahoo Finance.
 
-At the start of each session, we load the required Python packages. Throughout the entire book, we always use the `pandas` ([McKinney 2010](#ref-mckinney-proc-scipy-2010)) and `numpy` ([Harris et al. 2020](#ref-harris2020array)) packages. In this chapter, we also load the `tidyfinance` package to download stock price data. This package provides a convenient wrapper for various quantitative functions compatible with the core packages and our book.
+At the start of each session, we load the required Python packages. Throughout the entire book, we use the `polars` package ([Vink and Polars contributors 2024](#ref-polars)) as our core data frame library. `polars` is a modern, high-performance alternative to `pandas` with an expressive, expression-based API and excellent handling of large datasets. In this chapter, we also load the `tidyfinance` package to download stock price data. This package provides a convenient wrapper for various quantitative functions compatible with the core packages and our book.
 
-You typically have to install a package once before you can load it into your active Python session. In case you have not done this yet, call, for instance, `pip install tidyfinance` in your terminal.
+You typically have to install a package once before you can load it into your active Python session. In case you have not done this yet, call, for instance, `pip install polars tidyfinance` in your terminal.
 
 ``` python
-import pandas as pd
-import numpy as np
+import polars as pl
 import tidyfinance as tf
 ```
 
 ## Downloading Data
 
-Note that `import pandas as pd` implies that we can call all pandas functions later with a simple `pd.function()`. Instead, utilizing `from pandas import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `pandas` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pd` abbreviation is a very convenient way to prevent this.
+Note that `import polars as pl` implies that we can call all polars functions later with a simple `pl.function()`. Instead, utilizing `from polars import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `polars` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pl` abbreviation is a very convenient way to prevent this.
 
 We first download daily prices for one stock symbol, e.g., the Apple stock (*AAPL*), directly from the data provider Yahoo Finance. To download the data, you can use the function `tf.download_data()`.
 
 In the following code, we request daily data from the beginning of 2000 to the end of the last year, which is a period of more than 20 years.
 
+Because `tf.download_data()` returns a `pandas` data frame, we wrap the call in `pl.from_pandas()` to obtain a `polars` data frame that we work with for the rest of the chapter. Since `pandas` represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
+
 ``` python
-prices = tf.download_data(
-    domain="stock_prices", 
-    symbols="AAPL",
-    start_date="2000-01-01", 
-    end_date="2023-12-31"
-)
-prices.head().round(3)
+prices = pl.from_pandas(
+    tf.download_data(
+        domain="stock_prices",
+        symbols="AAPL",
+        start_date="2000-01-01",
+        end_date="2023-12-31"
+    )
+).with_columns(pl.col("date").cast(pl.Date))
+prices.head()
 ```
 
-|     | symbol | date       | volume    | open  | low   | high  | close | adjusted_close |
-|-----|--------|------------|-----------|-------|-------|-------|-------|----------------|
-| 0   | AAPL   | 2000-01-03 | 535796800 | 0.936 | 0.908 | 1.004 | 0.999 | 0.839          |
-| 1   | AAPL   | 2000-01-04 | 512377600 | 0.967 | 0.903 | 0.988 | 0.915 | 0.769          |
-| 2   | AAPL   | 2000-01-05 | 778321600 | 0.926 | 0.920 | 0.987 | 0.929 | 0.780          |
-| 3   | AAPL   | 2000-01-06 | 767972800 | 0.948 | 0.848 | 0.955 | 0.848 | 0.712          |
-| 4   | AAPL   | 2000-01-07 | 460734400 | 0.862 | 0.853 | 0.902 | 0.888 | 0.746          |
+shape: (5, 8)
+
+| symbol | date       | volume    | open     | low      | high     | close    | adjusted_close |
+|--------|------------|-----------|----------|----------|----------|----------|----------------|
+| str    | date       | i64       | f64      | f64      | f64      | f64      | f64            |
+| "AAPL" | 2000-01-03 | 535796800 | 0.936384 | 0.907924 | 1.004464 | 0.999442 | 0.837724       |
+| "AAPL" | 2000-01-04 | 512377600 | 0.966518 | 0.90346  | 0.987723 | 0.915179 | 0.767096       |
+| "AAPL" | 2000-01-05 | 778321600 | 0.926339 | 0.919643 | 0.987165 | 0.928571 | 0.778321       |
+| "AAPL" | 2000-01-06 | 767972800 | 0.947545 | 0.848214 | 0.955357 | 0.848214 | 0.710966       |
+| "AAPL" | 2000-01-07 | 460734400 | 0.861607 | 0.852679 | 0.901786 | 0.888393 | 0.744644       |
 
 `tf.download_data(domain="stock_prices")` downloads stock market data from Yahoo Finance. The above code chunk returns a data frame with eight self-explanatory columns: `date`, `symbol`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
 
@@ -71,35 +77,36 @@ Instead of analyzing prices, we compute daily returns defined as \\r_t = p_t / p
 
 ``` python
 returns = (prices
-    .sort_values("date")
-    .assign(ret=lambda x: x["adjusted_close"].pct_change())
-    .get(["symbol", "date", "ret"])
+    .sort("date")
+    .with_columns(ret=pl.col("adjusted_close").pct_change())
+    .select(["symbol", "date", "ret"])
 )
 returns
 ```
 
-|      | symbol | date       | ret       |
-|------|--------|------------|-----------|
-| 0    | AAPL   | 2000-01-03 | NaN       |
-| 1    | AAPL   | 2000-01-04 | -0.084310 |
-| 2    | AAPL   | 2000-01-05 | 0.014633  |
-| 3    | AAPL   | 2000-01-06 | -0.086538 |
-| 4    | AAPL   | 2000-01-07 | 0.047369  |
-| ...  | ...    | ...        | ...       |
-| 6032 | AAPL   | 2023-12-22 | -0.005548 |
-| 6033 | AAPL   | 2023-12-26 | -0.002841 |
-| 6034 | AAPL   | 2023-12-27 | 0.000518  |
-| 6035 | AAPL   | 2023-12-28 | 0.002226  |
-| 6036 | AAPL   | 2023-12-29 | -0.005424 |
+shape: (6_037, 3)
 
-6037 rows × 3 columns
+| symbol | date       | ret       |
+|--------|------------|-----------|
+| str    | date       | f64       |
+| "AAPL" | 2000-01-03 | null      |
+| "AAPL" | 2000-01-04 | -0.08431  |
+| "AAPL" | 2000-01-05 | 0.014633  |
+| "AAPL" | 2000-01-06 | -0.086538 |
+| "AAPL" | 2000-01-07 | 0.047369  |
+| …      | …          | …         |
+| "AAPL" | 2023-12-22 | -0.005547 |
+| "AAPL" | 2023-12-26 | -0.002841 |
+| "AAPL" | 2023-12-27 | 0.000518  |
+| "AAPL" | 2023-12-28 | 0.002226  |
+| "AAPL" | 2023-12-29 | -0.005424 |
 
-The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`NaN`) because there is no previous price. Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates. The function `sort_values()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `ascending=False`.
+The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`null`) because there is no previous price. Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates. The method `sort()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `descending=True`.
 
 For the upcoming examples, we remove missing values as these would require separate treatment for many applications. For example, missing values can affect sums and averages by reducing the number of valid data points if not properly accounted for. In general, always ensure you understand why `NaN` values occur and carefully examine if you can simply get rid of these observations.
 
 ``` python
-returns = returns.dropna() 
+returns = returns.drop_nulls()
 ```
 
 Next, we visualize the distribution of daily returns in a histogram in [Figure 2](#fig-101). Additionally, we draw a dashed line that indicates the historical five percent quantile of the daily returns to the histogram, which is a crude proxy for the worst possible return of the stock with a probability of at most five percent. This quantile is closely connected to the (historical) value-at-risk, a risk measure commonly monitored by regulators. We refer to Tsay ([2010](#ref-Tsay2010)) for a more thorough introduction to the stylized facts of financial returns.
@@ -126,52 +133,62 @@ Figure 2: The dotted vertical line indicates the historical five percent quanti
 Here, `bins=100` determines the number of bins used in the illustration and, hence, implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the historical five percent quantile of the daily returns. Before proceeding with *any* data, a typical task is to compute and analyze the summary statistics for the main variables of interest.
 
 ``` python
-pd.DataFrame(returns["ret"].describe()).round(3).T
+returns.select("ret").describe()
 ```
 
-|     | count  | mean  | std   | min    | 25%   | 50%   | 75%   | max   |
-|-----|--------|-------|-------|--------|-------|-------|-------|-------|
-| ret | 6036.0 | 0.001 | 0.025 | -0.519 | -0.01 | 0.001 | 0.013 | 0.139 |
+shape: (9, 2)
 
-We see that the maximum *daily* return was np.float64(13.9) percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
+| statistic    | ret       |
+|--------------|-----------|
+| str          | f64       |
+| "count"      | 6036.0    |
+| "null_count" | 0.0       |
+| "mean"       | 0.001218  |
+| "std"        | 0.024735  |
+| "min"        | -0.518692 |
+| "25%"        | -0.01007  |
+| "50%"        | 0.000897  |
+| "75%"        | 0.012939  |
+| "max"        | 0.13905   |
 
-You can also compute these summary statistics for each year individually by imposing `groupby(returns["date"].dt.year)`, where the call `dt.year` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
+We see that the maximum *daily* return was 13.9 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
+
+You can also compute these summary statistics for each year individually by grouping with `group_by(pl.col("date").dt.year())`, where the call `dt.year()` extracts the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. Unlike `pandas`, `polars` has no single `describe()` per group, so we list the desired statistics explicitly inside `agg()`. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
 
 ``` python
-(returns["ret"]
-    .groupby(returns["date"].dt.year)
-    .describe()
-    .round(3)
+(returns
+    .group_by(pl.col("date").dt.year().alias("year"))
+    .agg(
+        count=pl.len(),
+        mean=pl.col("ret").mean(),
+        std=pl.col("ret").std(),
+        min=pl.col("ret").min(),
+        q25=pl.col("ret").quantile(0.25),
+        median=pl.col("ret").median(),
+        q75=pl.col("ret").quantile(0.75),
+        max=pl.col("ret").max(),
+    )
+    .sort("year")
+    .with_columns(pl.col(pl.Float64).round(3))
 )
 ```
 
-|      | count | mean   | std   | min    | 25%    | 50%    | 75%   | max   |
+shape: (24, 9)
+
+| year | count | mean   | std   | min    | q25    | median | q75   | max   |
 |------|-------|--------|-------|--------|--------|--------|-------|-------|
-| date |       |        |       |        |        |        |       |       |
-| 2000 | 251.0 | -0.003 | 0.055 | -0.519 | -0.034 | -0.002 | 0.027 | 0.137 |
-| 2001 | 248.0 | 0.002  | 0.039 | -0.172 | -0.023 | -0.001 | 0.027 | 0.129 |
-| 2002 | 252.0 | -0.001 | 0.031 | -0.150 | -0.019 | -0.003 | 0.018 | 0.085 |
-| 2003 | 252.0 | 0.002  | 0.023 | -0.081 | -0.012 | 0.002  | 0.015 | 0.113 |
-| 2004 | 252.0 | 0.005  | 0.025 | -0.056 | -0.009 | 0.003  | 0.016 | 0.132 |
-| 2005 | 252.0 | 0.003  | 0.024 | -0.092 | -0.010 | 0.003  | 0.017 | 0.091 |
-| 2006 | 251.0 | 0.001  | 0.024 | -0.063 | -0.014 | -0.002 | 0.014 | 0.118 |
-| 2007 | 251.0 | 0.004  | 0.024 | -0.070 | -0.009 | 0.003  | 0.018 | 0.105 |
-| 2008 | 253.0 | -0.003 | 0.037 | -0.179 | -0.024 | -0.001 | 0.019 | 0.139 |
-| 2009 | 252.0 | 0.004  | 0.021 | -0.050 | -0.009 | 0.002  | 0.015 | 0.068 |
-| 2010 | 252.0 | 0.002  | 0.017 | -0.050 | -0.006 | 0.002  | 0.011 | 0.077 |
-| 2011 | 252.0 | 0.001  | 0.017 | -0.056 | -0.009 | 0.001  | 0.011 | 0.059 |
-| 2012 | 250.0 | 0.001  | 0.019 | -0.064 | -0.008 | 0.000  | 0.012 | 0.089 |
-| 2013 | 252.0 | 0.000  | 0.018 | -0.124 | -0.009 | -0.000 | 0.011 | 0.051 |
-| 2014 | 252.0 | 0.001  | 0.014 | -0.080 | -0.006 | 0.001  | 0.010 | 0.082 |
-| 2015 | 252.0 | 0.000  | 0.017 | -0.061 | -0.009 | -0.001 | 0.009 | 0.057 |
-| 2016 | 252.0 | 0.001  | 0.015 | -0.066 | -0.006 | 0.001  | 0.008 | 0.065 |
-| 2017 | 251.0 | 0.002  | 0.011 | -0.039 | -0.004 | 0.001  | 0.007 | 0.061 |
-| 2018 | 251.0 | -0.000 | 0.018 | -0.066 | -0.009 | 0.001  | 0.009 | 0.070 |
-| 2019 | 252.0 | 0.003  | 0.016 | -0.100 | -0.005 | 0.003  | 0.012 | 0.068 |
-| 2020 | 253.0 | 0.003  | 0.029 | -0.129 | -0.010 | 0.002  | 0.017 | 0.120 |
-| 2021 | 252.0 | 0.001  | 0.016 | -0.042 | -0.008 | 0.001  | 0.012 | 0.054 |
-| 2022 | 251.0 | -0.001 | 0.022 | -0.059 | -0.016 | -0.001 | 0.014 | 0.089 |
-| 2023 | 250.0 | 0.002  | 0.013 | -0.048 | -0.006 | 0.002  | 0.009 | 0.047 |
+| i32  | u32   | f64    | f64   | f64    | f64    | f64    | f64   | f64   |
+| 2000 | 251   | -0.003 | 0.055 | -0.519 | -0.034 | -0.002 | 0.028 | 0.137 |
+| 2001 | 248   | 0.002  | 0.039 | -0.172 | -0.023 | -0.001 | 0.027 | 0.129 |
+| 2002 | 252   | -0.001 | 0.031 | -0.15  | -0.019 | -0.003 | 0.018 | 0.085 |
+| 2003 | 252   | 0.002  | 0.023 | -0.081 | -0.012 | 0.002  | 0.014 | 0.113 |
+| 2004 | 252   | 0.005  | 0.025 | -0.056 | -0.009 | 0.003  | 0.015 | 0.132 |
+| …    | …     | …      | …     | …      | …      | …      | …     | …     |
+| 2019 | 252   | 0.003  | 0.016 | -0.1   | -0.005 | 0.003  | 0.012 | 0.068 |
+| 2020 | 253   | 0.003  | 0.029 | -0.129 | -0.01  | 0.002  | 0.017 | 0.12  |
+| 2021 | 252   | 0.001  | 0.016 | -0.042 | -0.008 | 0.001  | 0.012 | 0.054 |
+| 2022 | 251   | -0.001 | 0.022 | -0.059 | -0.016 | -0.001 | 0.014 | 0.089 |
+| 2023 | 250   | 0.002  | 0.013 | -0.048 | -0.006 | 0.002  | 0.009 | 0.047 |
 
 ## Scaling Up the Analysis
 
@@ -182,21 +199,25 @@ This is where the `tidyverse` magic starts: Tidy data makes it extremely easy to
 We first download a table with DOW Jones constituents again using `tf.download_data()`, but this time with `domain="constituents"`.
 
 ``` python
-symbols = tf.download_data(
-    domain="constituents", 
-    index="Dow Jones Industrial Average"
+symbols = pl.from_pandas(
+    tf.download_data(
+        domain="constituents",
+        index="Dow Jones Industrial Average"
+    )
 )
 ```
 
 Conveniently, `tf.download_data()` provides the functionality to get all stock prices from an index for a specific point in time with a single call.
 
 ``` python
-prices_daily = tf.download_data(
-    domain="stock_prices", 
-    symbols=symbols["symbol"].tolist(),
-    start_date="2000-01-01", 
-    end_date="2023-12-31"
-)
+prices_daily = pl.from_pandas(
+    tf.download_data(
+        domain="stock_prices",
+        symbols=symbols["symbol"].to_list(),
+        start_date="2000-01-01",
+        end_date="2023-12-31"
+    )
+).with_columns(pl.col("date").cast(pl.Date))
 ```
 
 The resulting data frame contains 177,925 daily observations for 30 different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
@@ -205,7 +226,7 @@ The resulting data frame contains 177,925 daily observations for 30 different st
 prices_figure = (
     ggplot(prices_daily, aes(y="adjusted_close", x="date", color="symbol"))
     + geom_line()
-    + scale_x_datetime(date_breaks="5 years", date_labels="%Y")
+    + scale_x_date(date_breaks="5 years", date_labels="%Y")
     + labs(x="", y="", color="", title="Stock prices of DOW index constituents")
     + theme(legend_position="none")
 )
@@ -218,55 +239,49 @@ Figure 3: Prices in USD, adjusted for dividend payments and stock splits.
 
 Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrage number of subjects quite well.
 
-The same holds for stock returns. Before computing the returns, we use `groupby("symbol")` such that the `assign()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `groupby("symbol")` is the key to aggregating the time series into symbol-specific variables of interest.
+The same holds for stock returns. Before computing the returns, we sort by symbol and date and add `.over("symbol")` to the `pct_change()` expression, so that returns are computed within each symbol individually without bleeding across symbol boundaries. The same logic also applies to the computation of summary statistics: `group_by("symbol")` is the key to aggregating the time series into symbol-specific variables of interest.
 
 ``` python
 returns_daily = (prices_daily
-    .assign(ret=lambda x: x.groupby("symbol")["adjusted_close"].pct_change())
-    .get(["symbol", "date", "ret"])
-    .dropna(subset="ret")
+    .sort("symbol", "date")
+    .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
+    .select(["symbol", "date", "ret"])
+    .drop_nulls("ret")
 )
 
 (returns_daily
-    .groupby("symbol")["ret"]
-    .describe()
-    .round(3)
+    .group_by("symbol")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("ret").mean(),
+        std=pl.col("ret").std(),
+        min=pl.col("ret").min(),
+        q25=pl.col("ret").quantile(0.25),
+        median=pl.col("ret").median(),
+        q75=pl.col("ret").quantile(0.75),
+        max=pl.col("ret").max(),
+    )
+    .sort("symbol")
+    .with_columns(pl.col(pl.Float64).round(3))
 )
 ```
 
-|        | count  | mean  | std   | min    | 25%    | 50%   | 75%   | max   |
-|--------|--------|-------|-------|--------|--------|-------|-------|-------|
-| symbol |        |       |       |        |        |       |       |       |
-| AAPL   | 6036.0 | 0.001 | 0.025 | -0.519 | -0.010 | 0.001 | 0.013 | 0.139 |
-| AMGN   | 6036.0 | 0.000 | 0.019 | -0.134 | -0.009 | 0.000 | 0.009 | 0.151 |
-| AMZN   | 6036.0 | 0.001 | 0.032 | -0.248 | -0.012 | 0.000 | 0.014 | 0.345 |
-| AXP    | 6036.0 | 0.001 | 0.023 | -0.176 | -0.009 | 0.000 | 0.010 | 0.219 |
-| BA     | 6036.0 | 0.001 | 0.022 | -0.238 | -0.010 | 0.001 | 0.011 | 0.243 |
-| CAT    | 6036.0 | 0.001 | 0.020 | -0.145 | -0.010 | 0.001 | 0.011 | 0.147 |
-| CRM    | 4914.0 | 0.001 | 0.027 | -0.271 | -0.012 | 0.001 | 0.014 | 0.260 |
-| CSCO   | 6036.0 | 0.000 | 0.023 | -0.162 | -0.009 | 0.000 | 0.010 | 0.244 |
-| CVX    | 6036.0 | 0.001 | 0.018 | -0.221 | -0.008 | 0.001 | 0.009 | 0.227 |
-| DIS    | 6036.0 | 0.000 | 0.019 | -0.184 | -0.009 | 0.000 | 0.009 | 0.160 |
-| GS     | 6036.0 | 0.001 | 0.023 | -0.190 | -0.010 | 0.000 | 0.011 | 0.265 |
-| HD     | 6036.0 | 0.001 | 0.019 | -0.287 | -0.008 | 0.001 | 0.009 | 0.141 |
-| HON    | 6036.0 | 0.000 | 0.019 | -0.174 | -0.008 | 0.001 | 0.009 | 0.282 |
-| IBM    | 6036.0 | 0.000 | 0.016 | -0.155 | -0.007 | 0.000 | 0.008 | 0.120 |
-| JNJ    | 6036.0 | 0.000 | 0.012 | -0.158 | -0.005 | 0.000 | 0.006 | 0.122 |
-| JPM    | 6036.0 | 0.001 | 0.024 | -0.207 | -0.009 | 0.000 | 0.010 | 0.251 |
-| KO     | 6036.0 | 0.000 | 0.013 | -0.101 | -0.005 | 0.000 | 0.006 | 0.139 |
-| MCD    | 6036.0 | 0.001 | 0.015 | -0.159 | -0.006 | 0.001 | 0.007 | 0.181 |
-| MMM    | 6036.0 | 0.000 | 0.015 | -0.129 | -0.007 | 0.000 | 0.008 | 0.126 |
-| MRK    | 6036.0 | 0.000 | 0.017 | -0.268 | -0.007 | 0.000 | 0.008 | 0.130 |
-| MSFT   | 6036.0 | 0.001 | 0.019 | -0.156 | -0.008 | 0.000 | 0.009 | 0.196 |
-| NKE    | 6036.0 | 0.001 | 0.019 | -0.198 | -0.008 | 0.001 | 0.009 | 0.155 |
-| NVDA   | 6036.0 | 0.002 | 0.038 | -0.352 | -0.016 | 0.001 | 0.018 | 0.424 |
-| PG     | 6036.0 | 0.000 | 0.013 | -0.302 | -0.005 | 0.000 | 0.006 | 0.120 |
-| SHW    | 6036.0 | 0.001 | 0.018 | -0.208 | -0.008 | 0.001 | 0.009 | 0.153 |
-| TRV    | 6036.0 | 0.001 | 0.018 | -0.208 | -0.007 | 0.001 | 0.008 | 0.256 |
-| UNH    | 6036.0 | 0.001 | 0.020 | -0.186 | -0.008 | 0.001 | 0.010 | 0.348 |
-| V      | 3973.0 | 0.001 | 0.019 | -0.136 | -0.008 | 0.001 | 0.009 | 0.150 |
-| VZ     | 6036.0 | 0.000 | 0.015 | -0.118 | -0.007 | 0.000 | 0.007 | 0.146 |
-| WMT    | 6036.0 | 0.000 | 0.015 | -0.114 | -0.007 | 0.000 | 0.007 | 0.117 |
+shape: (30, 9)
+
+| symbol | count | mean  | std   | min    | q25    | median | q75   | max   |
+|--------|-------|-------|-------|--------|--------|--------|-------|-------|
+| str    | u32   | f64   | f64   | f64    | f64    | f64    | f64   | f64   |
+| "AAPL" | 6036  | 0.001 | 0.025 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
+| "AMGN" | 6036  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
+| "AMZN" | 6036  | 0.001 | 0.032 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
+| "AXP"  | 6036  | 0.001 | 0.023 | -0.176 | -0.009 | 0.0    | 0.01  | 0.219 |
+| "BA"   | 6036  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
+| …      | …     | …     | …     | …      | …      | …      | …     | …     |
+| "TRV"  | 6036  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
+| "UNH"  | 6036  | 0.001 | 0.02  | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
+| "V"    | 3973  | 0.001 | 0.019 | -0.136 | -0.008 | 0.001  | 0.009 | 0.15  |
+| "VZ"   | 6036  | 0.0   | 0.015 | -0.118 | -0.007 | 0.0    | 0.007 | 0.146 |
+| "WMT"  | 6036  | 0.0   | 0.015 | -0.114 | -0.007 | 0.0    | 0.007 | 0.117 |
 
 ## Different Frequencies
 
@@ -276,9 +291,10 @@ So far, we have worked with daily returns, but we can easily convert our data to
 
 ``` python
 returns_monthly = (returns_daily
-    .assign(date=returns_daily["date"].dt.to_period("M").dt.to_timestamp())
-    .groupby(["symbol", "date"], as_index=False)
-    .agg(ret=("ret", lambda x: np.prod(1 + x) - 1))
+    .with_columns(date=pl.col("date").dt.truncate("1mo"))
+    .group_by(["symbol", "date"])
+    .agg(ret=(pl.col("ret") + 1).product() - 1)
+    .sort(["symbol", "date"])
 )
 ```
 
@@ -286,16 +302,16 @@ In this code, we first group the data by symbol and month and then compute month
 
 ``` python
 apple_daily = (returns_daily
-    .query("symbol == 'AAPL'")
-    .assign(frequency="Daily")
+    .filter(pl.col("symbol") == "AAPL")
+    .with_columns(frequency=pl.lit("Daily"))
 )
 
 apple_monthly = (returns_monthly
-    .query("symbol == 'AAPL'")
-    .assign(frequency="Monthly")
+    .filter(pl.col("symbol") == "AAPL")
+    .with_columns(frequency=pl.lit("Monthly"))
 )
 
-apple_returns = pd.concat([apple_daily, apple_monthly], ignore_index=True)
+apple_returns = pl.concat([apple_daily, apple_monthly])
 
 apple_returns_figure = (
     ggplot(apple_returns, aes(x="ret", fill="frequency"))
@@ -321,17 +337,17 @@ Of course, aggregation across variables other than `symbol` or `date` can also m
 
 ``` python
 trading_volume = (prices_daily
-    .assign(trading_volume=lambda x: (x["volume"]*x["adjusted_close"])/1e9)
-    .groupby("date")["trading_volume"]
-    .sum()
-    .reset_index()
-    .assign(trading_volume_lag=lambda x: x["trading_volume"].shift(periods=1))
+    .with_columns(trading_volume=(pl.col("volume") * pl.col("adjusted_close")) / 1e9)
+    .group_by("date")
+    .agg(pl.col("trading_volume").sum())
+    .sort("date")
+    .with_columns(trading_volume_lag=pl.col("trading_volume").shift(1))
 )
 
 trading_volume_figure = (
     ggplot(trading_volume, aes(x="date", y="trading_volume"))
     + geom_line()
-    + scale_x_datetime(date_breaks="5 years", date_labels="%Y")
+    + scale_x_date(date_breaks="5 years", date_labels="%Y")
     + labs(
         x="", y="",
         title="Aggregate daily trading volume of DOW index constituents in billion USD"
@@ -368,7 +384,7 @@ Purely eye-balling reveals that days with high trading volume are often followed
 
 ## Key Takeaways
 
-- You can use `pandas` and `numpy` in Python to efficiently analyze stock market data using consistent and scalable workflows.
+- You can use `polars` in Python to efficiently analyze stock market data using consistent and scalable workflows built on an expressive, expression-based API.
 - The `tidyfinance` Python package allows seamless downloading of historical stock prices and index data directly from Yahoo Finance.
 - Tidy data principles enable efficient analysis of financial data.
 - Adjusted stock prices provide a more accurate reflection of investor returns by accounting for dividends and stock splits.
@@ -389,12 +405,10 @@ Purely eye-balling reveals that days with high trading volume are often followed
 
 Goldstein, Itay, Ralph S J Koijen, and Holger M. Mueller. 2021. “COVID-19 and its impact on financial markets and the real economy.” *Review of Financial Studies* 34 (11): 5135–48. <https://doi.org/10.1093/rfs/hhab085>.
 
-Harris, Charles R., K. Jarrod Millman, Stéfan J. van der Walt, et al. 2020. “Array Programming with NumPy.” *Nature* 585 (7825): 357–62. <https://doi.org/10.1038/s41586-020-2649-2>.
-
 Kibirige, Hassan. 2023. *Plotnine: An Implementation of the Grammar of Graphics in Python*. [Https://pypi.org/project/plotnine/](https://pypi.org/project/plotnine/).
 
-McKinney, Wes. 2010. “Data Structures for Statistical Computing in Python.” In *Proceedings of the 9th Python in Science Conference*, edited by Stéfan van der Walt and Jarrod Millman. [https://doi.org/10.25080/Majora-92bf1922-00a](https://doi.org/10.25080/Majora-92bf1922-00a%20) .
-
 Tsay, Ruey S. 2010. *Analysis of financial time series*. John Wiley & Sons.
+
+Vink, Ritchie, and Polars contributors. 2024. *Polars: Blazingly Fast DataFrames in Rust, Python, Node.js, r, and SQL*. [Https://pypi.org/project/polars/](https://pypi.org/project/polars/).
 
 Wilkinson, Leland. 2012. *The grammar of graphics*. Springer.

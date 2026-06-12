@@ -13,7 +13,7 @@ After the replication of the three-factor model, we move to the five-factors by 
 The current chapter relies on this set of Python packages.
 
 ``` python
-import pandas as pd
+import polars as pl
 import numpy as np
 import statsmodels.formula.api as smf
 
@@ -26,26 +26,26 @@ We use CRSP and Compustat as data sources, as we need exactly the same variables
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["permno", "gvkey", "date", "ret_excess", "mktcap", 
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["permno", "gvkey", "date", "ret_excess", "mktcap",
         "mktcap_lag", "exchange"])
-    .dropna()
+    .drop_nulls()
 )
- 
+
 compustat_annual = (
-    pd.read_parquet("data-python/compustat_annual.parquet")
-    .get(["gvkey", "datadate", "be", "op", "inv"])
-    .dropna()
-) 
+    pl.read_parquet("data-python/compustat_annual.parquet")
+    .select(["gvkey", "datadate", "be", "op", "inv"])
+    .drop_nulls()
+)
 
 factors_ff3_monthly = (
-    pd.read_parquet("data-python/factors_ff3_monthly.parquet")
-    .get(["date", "smb", "hml"])
+    pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .select(["date", "smb", "hml"])
 )
 
 factors_ff5_monthly = (
-    pd.read_parquet("data-python/factors_ff5_monthly.parquet")
-    .get(["date", "smb", "hml", "rmw", "cma"])
+    pl.read_parquet("data-python/factors_ff5_monthly.parquet")
+    .select(["date", "smb", "hml", "rmw", "cma"])
 )
 ```
 
@@ -53,38 +53,36 @@ Yet when we start merging our dataset for computing the premiums, there are a fe
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year \\t - 1\\ and the book equity reported in year \\t-1\\, i.e., the `datadate` is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity.
 
-To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `drop_duplicates()` at the end of the chunk below.
+To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `unique()` at the end of the chunk below.
 
 ``` python
 size = (crsp_monthly
-    .query("date.dt.month == 6")
-    .assign(sorting_date=lambda x: (x["date"]+pd.DateOffset(months=1)))
-    .get(["permno", "exchange", "sorting_date", "mktcap"])
-    .rename(columns={"mktcap": "size"})
+    .filter(pl.col("date").dt.month() == 6)
+    .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo").cast(pl.Date))
+    .select(["permno", "exchange", "sorting_date", "mktcap"])
+    .rename({"mktcap": "size"})
 )
 
 market_equity = (crsp_monthly
-    .query("date.dt.month == 12")
-    .assign(sorting_date=lambda x: (x["date"]+pd.DateOffset(months=7)))
-    .get(["permno", "gvkey", "sorting_date", "mktcap"])
-    .rename(columns={"mktcap": "me"})
+    .filter(pl.col("date").dt.month() == 12)
+    .with_columns(sorting_date=pl.col("date").dt.offset_by("7mo").cast(pl.Date))
+    .select(["permno", "gvkey", "sorting_date", "mktcap"])
+    .rename({"mktcap": "me"})
 )
 
 book_to_market = (compustat_annual
-    .assign(
-        sorting_date=lambda x: (pd.to_datetime(
-        (x["datadate"].dt.year+1).astype(str)+"0701", format="%Y%m%d")
-        )
+    .with_columns(
+        sorting_date=pl.date(pl.col("datadate").dt.year() + 1, 7, 1)
     )
-    .merge(market_equity, how="inner", on=["gvkey", "sorting_date"])
-    .assign(bm=lambda x: x["be"]/x["me"])
-    .get(["permno", "sorting_date", "me", "bm"])
+    .join(market_equity, how="inner", on=["gvkey", "sorting_date"])
+    .with_columns(bm=pl.col("be") / pl.col("me"))
+    .select(["permno", "sorting_date", "me", "bm"])
 )
 
 sorting_variables = (size
-    .merge(book_to_market, how="inner", on=["permno", "sorting_date"])
-    .dropna()
-    .drop_duplicates(subset=["permno", "sorting_date"])
+    .join(book_to_market, how="inner", on=["permno", "sorting_date"])
+    .drop_nulls()
+    .unique(subset=["permno", "sorting_date"])
  )
 ```
 
@@ -95,36 +93,40 @@ Next, we construct our portfolios with an adjusted `assign_portfolio()` function
 ``` python
 def assign_portfolio(data, sorting_variable, percentiles):
     """Assign portfolios to a bin according to a sorting variable."""
-    
-    breakpoints = (data
-      .query("exchange == 'NYSE'")
-      .get(sorting_variable)
-      .quantile([0] + percentiles + [1], interpolation="linear")
-      .drop_duplicates()
+
+    breakpoints = np.quantile(
+      data.filter(pl.col("exchange") == "NYSE")
+        .get_column(sorting_variable)
+        .to_numpy(),
+      percentiles, method="linear"
     )
-    breakpoints.iloc[0] = -np.inf
-    breakpoints.iloc[breakpoints.size-1] = np.inf
-    
-    assigned_portfolios = pd.cut(
-      data[sorting_variable],
-      bins=breakpoints,
-      labels=pd.Series(range(1, breakpoints.size)),
-      include_lowest=True,
-      right=False
+    breakpoints = np.unique(breakpoints)
+
+    assigned_portfolios = (data
+      .select(pl.col(sorting_variable)
+        .cut(
+            list(breakpoints[1:-1]),
+            labels=[str(i) for i in range(1, len(breakpoints))],
+            left_closed=True
+        )
+        .cast(pl.String)
+        .cast(pl.Int64)
+        .alias("portfolio")
+      )
+      .get_column("portfolio")
     )
-    
+
     return assigned_portfolios
 
 portfolios = (sorting_variables
-    .groupby("sorting_date")
-    .apply(lambda x: x
-        .assign(
+    .group_by("sorting_date")
+    .map_groups(lambda x: x
+        .with_columns(
         portfolio_size=assign_portfolio(x, "size", [0, 0.5, 1]),
         portfolio_bm=assign_portfolio(x, "bm", [0, 0.3, 0.7, 1])
         )
     )
-    .reset_index(drop=True)
-    .get(["permno", "sorting_date", "portfolio_size", "portfolio_bm"])
+    .select(["permno", "sorting_date", "portfolio_size", "portfolio_bm"])
 )
 ```
 
@@ -134,12 +136,12 @@ Next, we merge the portfolios to the return data for the rest of the year. To im
 
 ``` python
 portfolios = (crsp_monthly
-    .assign(
-        sorting_date=lambda x: (pd.to_datetime(
-        x["date"].apply(lambda x: str(x.year-1)+
-            "0701" if x.month <= 6 else str(x.year)+"0701")))
+    .with_columns(
+        sorting_date=pl.when(pl.col("date").dt.month() <= 6)
+            .then(pl.date(pl.col("date").dt.year() - 1, 7, 1))
+            .otherwise(pl.date(pl.col("date").dt.year(), 7, 1))
     )
-    .merge(portfolios, how="inner", on=["permno", "sorting_date"])
+    .join(portfolios, how="inner", on=["permno", "sorting_date"])
 )
 ```
 
@@ -149,27 +151,23 @@ Equipped with the return data and the assigned portfolios, we can now compute th
 
 ``` python
 factors_replicated = (portfolios
-    .groupby(["portfolio_size", "portfolio_bm", "date"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
+    .group_by(["portfolio_size", "portfolio_bm", "date"])
+    .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+        / pl.col("mktcap_lag").sum())
+    .group_by("date")
+    .agg(
+        smb_replicated=(
+            pl.col("ret").filter(pl.col("portfolio_size") == 1).mean()
+            - pl.col("ret").filter(pl.col("portfolio_size") == 2).mean()),
+        hml_replicated=(
+            pl.col("ret").filter(pl.col("portfolio_bm") == 3).mean()
+            - pl.col("ret").filter(pl.col("portfolio_bm") == 1).mean())
     )
-    .reset_index()
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "smb_replicated": (
-        x["ret"][x["portfolio_size"] == 1].mean() - 
-            x["ret"][x["portfolio_size"] == 2].mean()),
-        "hml_replicated": (
-        x["ret"][x["portfolio_bm"] == 3].mean() -
-            x["ret"][x["portfolio_bm"] == 1].mean())
-        }))
-    .reset_index()
 )
 
 factors_replicated = (factors_replicated
-    .merge(factors_ff3_monthly, how="inner", on="date")
-    .round(4)
+    .join(factors_ff3_monthly, how="inner", on="date")
+    .with_columns(pl.col(pl.Float64).round(4))
 )
 ```
 
@@ -181,8 +179,8 @@ To test the success of the SMB factor, we hence run the following regression:
 
 ``` python
 model_smb = (smf.ols(
-        formula="smb ~ smb_replicated", 
-        data=factors_replicated
+        formula="smb ~ smb_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -194,20 +192,20 @@ prettify_result(model_smb)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          -0.00       0.000       -1.854    0.064
-    smb_replicated      0.98       0.004      235.856    0.000
+    Intercept         -0.000       0.000       -1.890    0.059
+    smb_replicated     0.979       0.004      235.871    0.000
 
     Summary statistics:
     - Number of observations: 750
     - R-squared: 0.987, Adjusted R-squared: 0.987
-    - F-statistic: 55,628.284 on 1 and 748 DF, p-value: 0.000
+    - F-statistic: 55,634.918 on 1 and 748 DF, p-value: 0.000
 
 The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is np.float64(0.98) and R-squared are at 99 percent.
 
 ``` python
 model_hml = (smf.ols(
-        formula="hml ~ hml_replicated", 
-        data=factors_replicated
+        formula="hml ~ hml_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -219,13 +217,13 @@ prettify_result(model_hml)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        2.200    0.028
-    hml_replicated     0.956       0.007      138.274    0.000
+    Intercept          0.000       0.000        2.172     0.03
+    hml_replicated     0.956       0.007      137.822     0.00
 
     Summary statistics:
     - Number of observations: 750
     - R-squared: 0.962, Adjusted R-squared: 0.962
-    - F-statistic: 19,119.651 on 1 and 748 DF, p-value: 0.000
+    - F-statistic: 18,994.884 on 1 and 748 DF, p-value: 0.000
 
 The replication of the HML factor is also a success, although at a slightly lower level with coefficient of np.float64(0.96) and R-squared around 96 percent.
 
@@ -233,24 +231,22 @@ The evidence allows us to conclude that we did a relatively good job in replicat
 
 ## Fama-French Five-Factor Model
 
-Now, let us move to the replication of the five-factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `dropna()` statement yields different sample sizes, as some firms with `be` values might not have `op` or `inv` values.
+Now, let us move to the replication of the five-factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `drop_nulls()` statement yields different sample sizes, as some firms with `be` values might not have `op` or `inv` values.
 
 ``` python
 other_sorting_variables = (compustat_annual
-    .assign(
-        sorting_date=lambda x: (pd.to_datetime(
-        (x["datadate"].dt.year+1).astype(str)+"0701", format="%Y%m%d")
-        )
+    .with_columns(
+        sorting_date=pl.date(pl.col("datadate").dt.year() + 1, 7, 1)
     )
-    .merge(market_equity, how="inner", on=["gvkey", "sorting_date"])
-    .assign(bm=lambda x: x["be"]/x["me"])
-    .get(["permno", "sorting_date", "me", "bm", "op", "inv"])
+    .join(market_equity, how="inner", on=["gvkey", "sorting_date"])
+    .with_columns(bm=pl.col("be") / pl.col("me"))
+    .select(["permno", "sorting_date", "me", "bm", "op", "inv"])
 )
 
 sorting_variables = (size
-    .merge(other_sorting_variables, how="inner", on=["permno", "sorting_date"])
-    .dropna()
-    .drop_duplicates(subset=["permno", "sorting_date"])
+    .join(other_sorting_variables, how="inner", on=["permno", "sorting_date"])
+    .drop_nulls()
+    .unique(subset=["permno", "sorting_date"])
  )
 ```
 
@@ -258,34 +254,32 @@ In each month, we independently sort all stocks into the two size portfolios. Th
 
 ``` python
 portfolios = (sorting_variables
-    .groupby("sorting_date")
-    .apply(lambda x: x
-        .assign(
+    .group_by("sorting_date")
+    .map_groups(lambda x: x
+        .with_columns(
         portfolio_size=assign_portfolio(x, "size", [0, 0.5, 1])
         )
     )
-    .reset_index(drop=True)
-    .groupby(["sorting_date", "portfolio_size"])
-    .apply(lambda x: x
-        .assign(
+    .group_by("sorting_date", "portfolio_size")
+    .map_groups(lambda x: x
+        .with_columns(
         portfolio_bm=assign_portfolio(x, "bm", [0, 0.3, 0.7, 1]),
         portfolio_op=assign_portfolio(x, "op", [0, 0.3, 0.7, 1]),
         portfolio_inv=assign_portfolio(x, "inv", [0, 0.3, 0.7, 1])
         )
     )
-    .reset_index(drop=True)
-    .get(["permno", "sorting_date", 
+    .select(["permno", "sorting_date",
             "portfolio_size", "portfolio_bm",
             "portfolio_op", "portfolio_inv"])
 )
 
 portfolios = (crsp_monthly
-    .assign(
-        sorting_date=lambda x: (pd.to_datetime(
-        x["date"].apply(lambda x: str(x.year-1)+
-            "0701" if x.month <= 6 else str(x.year)+"0701")))
+    .with_columns(
+        sorting_date=pl.when(pl.col("date").dt.month() <= 6)
+            .then(pl.date(pl.col("date").dt.year() - 1, 7, 1))
+            .otherwise(pl.date(pl.col("date").dt.year(), 7, 1))
     )
-    .merge(portfolios, how="inner", on=["permno", "sorting_date"])
+    .join(portfolios, how="inner", on=["permno", "sorting_date"])
 )
 ```
 
@@ -293,22 +287,16 @@ Now, we want to construct each of the factors, but this time, the size factor ac
 
 ``` python
 portfolios_value = (portfolios
-    .groupby(["portfolio_size", "portfolio_bm", "date"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
-    )
-    .reset_index()
+    .group_by(["portfolio_size", "portfolio_bm", "date"])
+    .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+        / pl.col("mktcap_lag").sum())
 )
 
 factors_value = (portfolios_value
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "hml_replicated": (
-        x["ret"][x["portfolio_bm"] == 3].mean() - 
-            x["ret"][x["portfolio_bm"] == 1].mean())})
-    )
-    .reset_index()
+    .group_by("date")
+    .agg(hml_replicated=(
+        pl.col("ret").filter(pl.col("portfolio_bm") == 3).mean()
+        - pl.col("ret").filter(pl.col("portfolio_bm") == 1).mean()))
 )
 ```
 
@@ -316,22 +304,16 @@ For the profitability factor, RMW (robust-minus-weak), we take a long position i
 
 ``` python
 portfolios_profitability = (portfolios
-    .groupby(["portfolio_size", "portfolio_op", "date"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
-    )
-    .reset_index()
+    .group_by(["portfolio_size", "portfolio_op", "date"])
+    .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+        / pl.col("mktcap_lag").sum())
 )
 
 factors_profitability = (portfolios_profitability
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "rmw_replicated": (
-        x["ret"][x["portfolio_op"] == 3].mean() - 
-            x["ret"][x["portfolio_op"] == 1].mean())})
-    )
-    .reset_index()
+    .group_by("date")
+    .agg(rmw_replicated=(
+        pl.col("ret").filter(pl.col("portfolio_op") == 3).mean()
+        - pl.col("ret").filter(pl.col("portfolio_op") == 1).mean()))
 )
 ```
 
@@ -339,22 +321,16 @@ For the investment factor, CMA (conservative-minus-aggressive), we go long the t
 
 ``` python
 portfolios_investment = (portfolios
-    .groupby(["portfolio_size", "portfolio_inv", "date"])
-    .apply(lambda x: pd.Series({
-        "ret": np.average(x["ret_excess"], weights=x["mktcap_lag"])
-        })
-    )
-    .reset_index()
+    .group_by(["portfolio_size", "portfolio_inv", "date"])
+    .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
+        / pl.col("mktcap_lag").sum())
 )
 
 factors_investment = (portfolios_investment
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "cma_replicated": (
-        x["ret"][x["portfolio_inv"] == 1].mean() - 
-            x["ret"][x["portfolio_inv"] == 3].mean())})
-    )
-    .reset_index()
+    .group_by("date")
+    .agg(cma_replicated=(
+        pl.col("ret").filter(pl.col("portfolio_inv") == 1).mean()
+        - pl.col("ret").filter(pl.col("portfolio_inv") == 3).mean()))
 )
 ```
 
@@ -362,17 +338,15 @@ Finally, the size factor, SMB, is constructed by going long the nine small portf
 
 ``` python
 factors_size = (
-    pd.concat(
-        [portfolios_value, portfolios_profitability, portfolios_investment], 
-        ignore_index=True
+    pl.concat(
+        [portfolios_value.select(["portfolio_size", "date", "ret"]),
+         portfolios_profitability.select(["portfolio_size", "date", "ret"]),
+         portfolios_investment.select(["portfolio_size", "date", "ret"])]
     )
-    .groupby("date")
-    .apply(lambda x: pd.Series({
-        "smb_replicated": (
-        x["ret"][x["portfolio_size"] == 1].mean() - 
-            x["ret"][x["portfolio_size"] == 2].mean())})
-    )
-    .reset_index()
+    .group_by("date")
+    .agg(smb_replicated=(
+        pl.col("ret").filter(pl.col("portfolio_size") == 1).mean()
+        - pl.col("ret").filter(pl.col("portfolio_size") == 2).mean()))
 )
 ```
 
@@ -380,14 +354,14 @@ We then join all factors together into one dataframe and construct again a suita
 
 ``` python
 factors_replicated = (factors_size
-    .merge(factors_value, how="outer", on="date")
-    .merge(factors_profitability, how="outer", on="date")
-    .merge(factors_investment, how="outer", on="date")
+    .join(factors_value, how="full", on="date", coalesce=True)
+    .join(factors_profitability, how="full", on="date", coalesce=True)
+    .join(factors_investment, how="full", on="date", coalesce=True)
 )
 
 factors_replicated = (factors_replicated
-    .merge(factors_ff5_monthly, how="inner", on="date")
-    .round(4)
+    .join(factors_ff5_monthly, how="inner", on="date")
+    .with_columns(pl.col(pl.Float64).round(4))
 )
 ```
 
@@ -395,8 +369,8 @@ Let us start the replication evaluation again with the size factor:
 
 ``` python
 model_smb = (smf.ols(
-        formula="smb ~ smb_replicated", 
-        data=factors_replicated
+        formula="smb ~ smb_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -408,20 +382,20 @@ prettify_result(model_smb)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          -0.00       0.000       -1.726    0.085
-    smb_replicated      0.96       0.004      234.731    0.000
+    Intercept         -0.000       0.000       -1.774    0.076
+    smb_replicated     0.959       0.004      233.631    0.000
 
     Summary statistics:
     - Number of observations: 738
     - R-squared: 0.987, Adjusted R-squared: 0.987
-    - F-statistic: 55,098.862 on 1 and 736 DF, p-value: 0.000
+    - F-statistic: 54,583.244 on 1 and 736 DF, p-value: 0.000
 
 The results for the SMB factor are quite convincing, as all three criteria outlined above are met and the coefficient is np.float64(0.96) and the R-squared is at 99 percent.
 
 ``` python
 model_hml = (smf.ols(
-        formula="hml ~ hml_replicated", 
-        data=factors_replicated
+        formula="hml ~ hml_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -433,20 +407,20 @@ prettify_result(model_hml)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.001        0.00        2.073    0.039
-    hml_replicated     0.980        0.01      100.032    0.000
+    Intercept          0.001        0.00        2.050    0.041
+    hml_replicated     0.979        0.01       99.919    0.000
 
     Summary statistics:
     - Number of observations: 738
     - R-squared: 0.931, Adjusted R-squared: 0.931
-    - F-statistic: 10,006.436 on 1 and 736 DF, p-value: 0.000
+    - F-statistic: 9,983.737 on 1 and 736 DF, p-value: 0.000
 
 The replication of the HML factor is also a success, although at a slightly higher coefficient of np.float64(0.98) and an R-squared around 93 percent.
 
 ``` python
 model_rmw = (smf.ols(
-        formula="rmw ~ rmw_replicated", 
-        data=factors_replicated
+        formula="rmw ~ rmw_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -458,20 +432,20 @@ prettify_result(model_rmw)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        0.174    0.862
-    rmw_replicated     0.949       0.009      108.647    0.000
+    Intercept          0.000       0.000        0.178    0.859
+    rmw_replicated     0.949       0.009      108.448    0.000
 
     Summary statistics:
     - Number of observations: 738
     - R-squared: 0.941, Adjusted R-squared: 0.941
-    - F-statistic: 11,804.162 on 1 and 736 DF, p-value: 0.000
+    - F-statistic: 11,760.968 on 1 and 736 DF, p-value: 0.000
 
 We are also able to replicate the RMW factor quite well with a coefficient of np.float64(0.95) and an R-squared around 94 percent.
 
 ``` python
 model_cma = (smf.ols(
-        formula="cma ~ cma_replicated", 
-        data=factors_replicated
+        formula="cma ~ cma_replicated",
+        data=factors_replicated.to_pandas()
     )
     .fit()
 )
@@ -483,15 +457,15 @@ prettify_result(model_cma)
 
     Coefficients:
                     Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        3.096    0.002
-    cma_replicated     0.955       0.008      117.013    0.000
+    Intercept          0.000       0.000        3.061    0.002
+    cma_replicated     0.954       0.008      116.563    0.000
 
     Summary statistics:
     - Number of observations: 738
     - R-squared: 0.949, Adjusted R-squared: 0.949
-    - F-statistic: 13,692.051 on 1 and 736 DF, p-value: 0.000
+    - F-statistic: 13,586.916 on 1 and 736 DF, p-value: 0.000
 
-Finally, the CMA factor also replicates well with a coefficient of np.float64(0.96) and an R-squared around 95 percent.
+Finally, the CMA factor also replicates well with a coefficient of np.float64(0.95) and an R-squared around 95 percent.
 
 Overall, our approach seems to replicate the Fama-French three and five-factor models just as well as the three-factors.
 

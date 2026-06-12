@@ -13,9 +13,7 @@ Typically, this investment regression uses quarterly balance sheet data provided
 The current chapter relies on the following set of Python packages.
 
 ``` python
-import pandas as pd
-import numpy as np
-import datetime as dt
+import polars as pl
 import pyfixest as pf
 ```
 
@@ -27,13 +25,14 @@ We use CRSP and annual Compustat as data sources from our Parquet files introduc
 
 ``` python
 crsp_monthly = (
-    pd.read_parquet("data-python/crsp_monthly.parquet")
-    .get(["gvkey", "date", "mktcap"])
+    pl.read_parquet("data-python/crsp_monthly.parquet")
+    .select(["gvkey", "date", "mktcap"])
+    .with_columns(date=pl.col("date").cast(pl.Date))
 )
 
 compustat_annual = (
-    pd.read_parquet("data-python/compustat_annual.parquet")
-    .get(["datadate", "gvkey", "year", "at", "be", "capx", "oancf", "txdb"])
+    pl.read_parquet("data-python/compustat_annual.parquet")
+    .select(["datadate", "gvkey", "year", "at", "be", "capx", "oancf", "txdb"])
 )
 ```
 
@@ -41,25 +40,23 @@ The classical investment regressions model is the capital investment of a firm a
 
 ``` python
 data_investment = (compustat_annual
-    .assign(
-        date=lambda x: (
-        pd.to_datetime(x["datadate"]).dt.to_period("M").dt.to_timestamp()
-        )
+    .with_columns(
+        date=pl.col("datadate").cast(pl.Date).dt.truncate("1mo")
     )
-    .merge(compustat_annual
-            .get(["gvkey", "year", "at"])
-            .rename(columns={"at": "at_lag"})
-            .assign(year=lambda x: x["year"]+1), 
+    .join(compustat_annual
+            .select(["gvkey", "year", "at"])
+            .rename({"at": "at_lag"})
+            .with_columns(year=pl.col("year")+1),
             on=["gvkey", "year"], how="left")
-    .query("at > 0 and at_lag > 0")
-    .assign(investment=lambda x: x["capx"]/x["at_lag"],
-            cash_flows=lambda x: x["oancf"]/x["at_lag"])                   
+    .filter((pl.col("at") > 0) & (pl.col("at_lag") > 0))
+    .with_columns(investment=pl.col("capx")/pl.col("at_lag"),
+                  cash_flows=pl.col("oancf")/pl.col("at_lag"))
 )
 
 data_investment = (data_investment
-    .merge(data_investment.get(["gvkey", "year", "investment"])
-            .rename(columns={"investment": "investment_lead"})
-            .assign(year=lambda x: x["year"]-1), 
+    .join(data_investment.select(["gvkey", "year", "investment"])
+            .rename({"investment": "investment_lead"})
+            .with_columns(year=pl.col("year")-1),
             on=["gvkey", "year"], how="left")
 )
 ```
@@ -68,36 +65,38 @@ Tobin’s q is the ratio of the market value of capital to its replacement costs
 
 ``` python
 data_investment = (data_investment
-    .merge(crsp_monthly, on=["gvkey", "date"], how="left")
-    .assign(
-        tobins_q=lambda x: (
-        (x["mktcap"]+x["at"]-x["be"]+x["txdb"])/x["at"]
+    .join(crsp_monthly, on=["gvkey", "date"], how="left")
+    .with_columns(
+        tobins_q=(
+        (pl.col("mktcap")+pl.col("at")-pl.col("be")+pl.col("txdb"))/pl.col("at")
         )
     )
-    .get(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
-    .dropna()
+    .select(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
+    .drop_nulls()
 )
 ```
 
 As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions. In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.[^1]
 
 ``` python
-def winsorize(x, cut):
-    """Winsorize returns at cut level."""
-    
-    tmp_x = x.copy()
-    upper_quantile=np.nanquantile(tmp_x, 1 - cut)
-    lower_quantile=np.nanquantile(tmp_x, cut)
-    tmp_x[tmp_x > upper_quantile]=upper_quantile
-    tmp_x[tmp_x < lower_quantile]=lower_quantile
-    
-    return tmp_x
+def winsorize(col, cut):
+    """Winsorize a column at cut level."""
+
+    x = pl.col(col)
+    upper_quantile = x.quantile(1 - cut)
+    lower_quantile = x.quantile(cut)
+    return (
+        pl.when(x > upper_quantile).then(upper_quantile)
+        .when(x < lower_quantile).then(lower_quantile)
+        .otherwise(x)
+        .alias(col)
+    )
 
 data_investment = (data_investment
-    .assign(
-        investment_lead=lambda x: winsorize(x["investment_lead"], 0.01),
-        cash_flows=lambda x: winsorize(x["cash_flows"], 0.01),
-        tobins_q=lambda x: winsorize(x["tobins_q"], 0.01)
+    .with_columns(
+        winsorize("investment_lead", 0.01),
+        winsorize("cash_flows", 0.01),
+        winsorize("tobins_q", 0.01)
     )
 )
 ```
@@ -106,22 +105,34 @@ Before proceeding to any estimations, we highly recommend tabulating summary sta
 
 ``` python
 data_investment_summary = (data_investment
-    .melt(id_vars=["gvkey", "year"], var_name="measure",
-          value_vars=["investment_lead", "cash_flows", "tobins_q"])
-    .get(["measure", "value"])
-    .groupby("measure")
-    .describe(percentiles=[0.05, 0.5, 0.95])
+    .unpivot(index=["gvkey", "year"], variable_name="measure",
+             on=["investment_lead", "cash_flows", "tobins_q"])
+    .select(["measure", "value"])
+    .group_by("measure")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05),
+        median=pl.col("value").median(),
+        q95=pl.col("value").quantile(0.95),
+        max=pl.col("value").max(),
+    )
+    .sort("measure")
+    .with_columns(pl.col(pl.Float64).round(2))
 )
-np.round(data_investment_summary, 2)
+data_investment_summary
 ```
 
-|                 | value    |      |      |       |       |      |      |       |
-|-----------------|----------|------|------|-------|-------|------|------|-------|
-|                 | count    | mean | std  | min   | 5%    | 50%  | 95%  | max   |
-| measure         |          |      |      |       |       |      |      |       |
-| cash_flows      | 133619.0 | 0.01 | 0.27 | -1.56 | -0.48 | 0.06 | 0.27 | 0.47  |
-| investment_lead | 133619.0 | 0.06 | 0.08 | 0.00  | 0.00  | 0.03 | 0.20 | 0.46  |
-| tobins_q        | 133619.0 | 1.99 | 1.69 | 0.56  | 0.79  | 1.39 | 5.35 | 10.80 |
+shape: (3, 9)
+
+| measure           | count  | mean | std  | min   | q05   | median | q95  | max  |
+|-------------------|--------|------|------|-------|-------|--------|------|------|
+| str               | u32    | f64  | f64  | f64   | f64   | f64    | f64  | f64  |
+| "cash_flows"      | 133608 | 0.01 | 0.27 | -1.56 | -0.48 | 0.06   | 0.27 | 0.47 |
+| "investment_lead" | 133608 | 0.06 | 0.08 | 0.0   | 0.0   | 0.03   | 0.2  | 0.46 |
+| "tobins_q"        | 133608 | 1.99 | 1.69 | 0.56  | 0.79  | 1.39   | 5.35 | 10.8 |
 
 ## Fixed Effects
 
@@ -132,10 +143,12 @@ To illustrate fixed effects regressions, we use the `pyfixest` package, which is
 where \\\varepsilon_t\\ is i.i.d. normally distributed across time and firms. We use the `PanelOLS()`-function to estimate the simple model so that the output has the same structure as the other regressions below.
 
 ``` python
+data_investment_pd = data_investment.to_pandas()
+
 model_ols = pf.feols(
     "investment_lead ~ cash_flows + tobins_q",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_ols.summary()
 ```
@@ -145,13 +158,13 @@ model_ols.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: 0
     Inference:  iid
-    Observations:  133619
+    Observations:  133608
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.042 |        0.000 |   130.092 |      0.000 |  0.041 |   0.042 |
-    | cash_flows    |      0.049 |        0.001 |    64.316 |      0.000 |  0.047 |   0.050 |
-    | tobins_q      |      0.007 |        0.000 |    57.707 |      0.000 |  0.007 |   0.007 |
+    | Intercept     |      0.042 |        0.000 |   130.069 |      0.000 |  0.041 |   0.042 |
+    | cash_flows    |      0.049 |        0.001 |    64.309 |      0.000 |  0.047 |   0.050 |
+    | tobins_q      |      0.007 |        0.000 |    57.710 |      0.000 |  0.007 |   0.007 |
     ---
     RMSE: 0.074 R2: 0.044 
 
@@ -169,7 +182,7 @@ To include the firm fixed effect, we use `gvkey` (Compustat’s firm identifier)
 model_fe_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_fe_firm.summary()
 ```
@@ -179,12 +192,12 @@ model_fe_firm.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: gvkey
     Inference:  iid
-    Observations:  131834
+    Observations:  131823
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.014 |        0.001 |    15.694 |      0.000 |  0.012 |   0.015 |
-    | tobins_q      |      0.011 |        0.000 |    83.032 |      0.000 |  0.010 |   0.011 |
+    | cash_flows    |      0.014 |        0.001 |    15.659 |      0.000 |  0.012 |   0.015 |
+    | tobins_q      |      0.011 |        0.000 |    83.006 |      0.000 |  0.010 |   0.011 |
     ---
     RMSE: 0.049 R2: 0.577 R2 Within: 0.056 
 
@@ -200,7 +213,7 @@ where \\\alpha_t\\ is the time fixed effect. Here you can think of higher invest
 model_fe_firmyear = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = "iid",
-    data = data_investment
+    data = data_investment_pd
 )
 model_fe_firmyear.summary()
 ```
@@ -210,12 +223,12 @@ model_fe_firmyear.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: gvkey+year
     Inference:  iid
-    Observations:  131834
+    Observations:  131823
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.017 |        0.001 |    19.615 |      0.000 |  0.015 |   0.019 |
-    | tobins_q      |      0.010 |        0.000 |    76.360 |      0.000 |  0.009 |   0.010 |
+    | cash_flows    |      0.017 |        0.001 |    19.576 |      0.000 |  0.015 |   0.018 |
+    | tobins_q      |      0.010 |        0.000 |    76.335 |      0.000 |  0.009 |   0.010 |
     ---
     RMSE: 0.048 R2: 0.599 R2 Within: 0.049 
 
@@ -233,14 +246,14 @@ pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.049\*\*\* (64.316) | 0.014\*\*\* (15.694) | 0.017\*\*\* (19.615) |
-| tobins_q | 0.007\*\*\* (57.707) | 0.011\*\*\* (83.032) | 0.010\*\*\* (76.360) |
-| Intercept | 0.042\*\*\* (130.092) |  |  |
+| cash_flows | 0.049\*\*\* (64.309) | 0.014\*\*\* (15.659) | 0.017\*\*\* (19.576) |
+| tobins_q | 0.007\*\*\* (57.710) | 0.011\*\*\* (83.006) | 0.010\*\*\* (76.335) |
+| Intercept | 0.042\*\*\* (130.069) |  |  |
 | fe |  |  |  |
-| year | \- | \- | x |
 | gvkey | \- | x | x |
+| year | \- | \- | x |
 | stats |  |  |  |
-| Observations | 133619 | 131834 | 131834 |
+| Observations | 133608 | 131823 | 131823 |
 | S.E. type | iid | iid | iid |
 | R² | 0.044 | 0.577 | 0.599 |
 | R² Within | \- | 0.056 | 0.049 |
@@ -258,13 +271,13 @@ Instead of relying on the i.i.d. assumption, we can use the `cov_type="clustered
 model_cluster_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = {"CRV1": "gvkey"},
-    data = data_investment
+    data = data_investment_pd
 )
 
 model_cluster_firmyear = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = {"CRV1": "gvkey + year"},
-    data = data_investment
+    data = data_investment_pd
 )
 ```
 
@@ -278,13 +291,13 @@ pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.017\*\*\* (19.615) | 0.017\*\*\* (11.388) | 0.017\*\*\* (9.394) |
-| tobins_q | 0.010\*\*\* (76.360) | 0.010\*\*\* (35.762) | 0.010\*\*\* (14.965) |
+| cash_flows | 0.017\*\*\* (19.576) | 0.017\*\*\* (11.367) | 0.017\*\*\* (9.361) |
+| tobins_q | 0.010\*\*\* (76.335) | 0.010\*\*\* (35.755) | 0.010\*\*\* (14.944) |
 | fe |  |  |  |
-| year | x | x | x |
 | gvkey | x | x | x |
+| year | x | x | x |
 | stats |  |  |  |
-| Observations | 131834 | 131834 | 131834 |
+| Observations | 131823 | 131823 | 131823 |
 | S.E. type | iid | by: gvkey | by: gvkey+year |
 | R² | 0.599 | 0.599 | 0.599 |
 | R² Within | 0.049 | 0.049 | 0.049 |
@@ -331,4 +344,4 @@ Wooldridge, Jefrey M. 2010. *Econometric analysis of cross section and panel dat
 
 ## Footnotes
 
-[^1]: Note that in `pandas`, when you index a dataframee, you receive a reference to the original dataframee. Consequently, modifying a subset will directly impact the initial dataframee. To prevent unintended changes to the original dataframee, it is advisable to use the `copy()` method as we do here in the `winsorize` function.
+[^1]: Note that `polars` operations never modify a data frame in place; every expression returns a new data frame. Our `winsorize` function therefore returns a `polars` expression that we apply via `with_columns()`, so the original data frame is never altered unintentionally.
