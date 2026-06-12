@@ -205,7 +205,7 @@ It is worth taking a look at all available portfolio return time series from Ken
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the @Hou2015 *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q*-factors can be downloaded directly from the authors' homepage. \index{Data!q-factors}\index{Factor!q-factors}
 
-We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lowercase. We then filter the data to select observations between the start and end dates. Finally, we apply the same transform of dividing by 100 to all four factors. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)\index{Style guide}
+We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the "R_"-prescript using regular expressions and write all column names in lowercase. We then filter the data to select observations between the start and end dates. Finally, we apply the same transform of dividing by 100 to all factor returns. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)\index{Style guide}
 
 We download the CSV with `requests` and pass the response body directly to `pl.read_csv()`:
 
@@ -219,13 +219,15 @@ factors_q_monthly = (
     .with_columns(
         date=pl.date(pl.col("year"), pl.col("month"), 1)
     )
-    .drop(["R_F", "R_MKT", "year", "month"])
+    .drop(["year", "month"])
     .rename(lambda x: x.replace("R_", "").lower())
+    .rename({"f": "risk_free", "mkt": "mkt_excess"})
     .filter(
         (pl.col("date") >= pl.lit(start_date).str.to_date())
         & (pl.col("date") <= pl.lit(end_date).str.to_date())
     )
-    .with_columns(pl.col(["me", "ia", "roe", "eg"]) / 100)
+    .with_columns(pl.exclude("date") / 100)
+    .select(["date", "risk_free", "mkt_excess", "me", "ia", "roe", "eg"])
 )
 ```
 
