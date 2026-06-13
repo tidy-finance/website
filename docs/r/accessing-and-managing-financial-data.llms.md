@@ -117,10 +117,11 @@ We also need to adjust this data. First, we discard information we will not use 
 
 ``` r
 factors_q_monthly_link <-
-  "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2023.csv"
+  "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2024.csv"
 
 factors_q_monthly <- read_csv(factors_q_monthly_link) |>
   mutate(date = ymd(str_c(year, month, "01", sep = "-"))) |>
+  select(-year, -month) |>
   rename_with(~ str_remove(., "R_")) |>
   rename_with(str_to_lower) |>
   mutate(across(-date, ~ . / 100)) |>
@@ -252,7 +253,8 @@ cpi_monthly <- resp_csv |>
   filter(date >= start_date & date <= end_date) |>
   mutate(
     cpi = value / value[date == max(date)]
-  )
+  ) |>
+  select(date, series, value, cpi)
 ```
 
 The last line sets the current (latest) price level as the reference price level.
@@ -268,8 +270,15 @@ download_data(
 )
 ```
 
-    # A tibble: 0 × 3
-    # ℹ 3 variables: date <date>, value <dbl>, series <chr>
+    # A tibble: 780 × 3
+      date       value series  
+      <date>     <dbl> <chr>   
+    1 1960-01-01  29.3 CPIAUCNS
+    2 1960-02-01  29.4 CPIAUCNS
+    3 1960-03-01  29.4 CPIAUCNS
+    4 1960-04-01  29.5 CPIAUCNS
+    5 1960-05-01  29.5 CPIAUCNS
+    # ℹ 775 more rows
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key. If your desired time series is not supported through `tidyfinance`, we recommend working with the `fredr` package ([Boysel and Vaughan 2021](#ref-fredr)). Note that you need to get an API key to use its functionality. We refer to the package documentation for details.
 
