@@ -33,95 +33,155 @@ end_date <- ymd("2024-12-31")
 
 ## Fama-French Data
 
-We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. Fortunately, there is a neat package by [Nelson Areal](https://github.com/nareal/frenchdata/) that allows us to access the data easily: the `frenchdata` package provides functions to download and read data sets from [Prof. Kenneth French finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) [@frenchdata].\index{Data!Fama-French factors} \index{Kenneth French homepage}
+We start by downloading some famous Fama-French factors [e.g., @Fama1993] and portfolio returns commonly used in empirical asset pricing. The data are freely available from [Prof. Kenneth French's finance data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html), but the raw files come in a rather idiosyncratic format.\index{Data!Fama-French factors} \index{Kenneth French homepage} If you access the data through the website, the manual *raw* workflow looks like this:
+
+1.  Open the data library website.
+1.  Find the right dataset.
+1.  Download a ZIP file.
+1.  Extract the CSV inside.
+1.  Select the relevant data table from the file and import it into R.
+1.  Clean the dates, scale the returns, fix the column names, and handle missing values.
+
+Doing this once is fine; doing it repeatedly across projects is exactly the kind of boilerplate that is easy to get wrong and annoying to maintain. It is therefore natural to automate these steps in R. In fact, this is precisely what the `tidyfinance` package does under the hood. In this section, we first reproduce the source code behind the package so that you understand what happens when you download Fama-French data, and then we show the convenient shortcut.
+
+### From manual steps to a download script
+
+A minimal download script mirrors the manual steps one by one. To fetch a Fama-French dataset, we first construct the URL of the corresponding ZIP archive on Kenneth French's server. Each dataset is identified by the file name of its archive; the *Fama/French 3 Factors* set, for instance, lives in `F-F_Research_Data_Factors_CSV.zip`.
 
 ```{r}
-#| message: false
-library(frenchdata)
+base_url <- "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
+file_name <- "F-F_Research_Data_Factors_CSV.zip"
+url <- paste0(base_url, file_name)
 ```
 
-We can use the `download_french_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market `mkt_excess`, size `smb` and value `hml` alongside the risk-free rates `risk_free`. Note that we have to do some manual work to correctly parse all the columns and scale them appropriately, as the raw Fama-French data comes in a very unpractical data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to `frenchdata`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate}
+Next, we replace the browser download with an HTTP request using the `httr2` [@httr2] package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French's server rejects requests that do not provide one.\index{httr2}
 
 ```{r}
 #| message: false
-factors_ff3_monthly_raw <- download_french_data("Fama/French 3 Factors")
-factors_ff3_monthly <- factors_ff3_monthly_raw$subsets$data[[1]] |>
+library(httr2)
+
+tmp_zip <- tempfile(fileext = ".zip")
+
+request(url) |>
+  req_user_agent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  ) |>
+  req_perform(path = tmp_zip)
+```
+
+The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
+
+```{r}
+tmp_dir <- tempfile()
+dir.create(tmp_dir)
+csv_file <- unzip(tmp_zip, exdir = tmp_dir)[1]
+
+raw_lines <- readLines(csv_file, warn = FALSE)
+```
+
+The raw file starts with several lines of descriptive text, followed by one or more data tables (e.g., monthly returns and a block of annual summary rows). To emulate *scrolling down until the numbers start*, we flag every line that begins with a date key---an optional run of spaces followed by a digit---and keep the first contiguous block of such lines. The line directly above that block holds the column names.
+
+```{r}
+is_data <- grepl("^\\s*[0-9]", raw_lines)
+
+runs <- rle(is_data)
+first_run <- which(runs$values)[1]
+preceding <- sum(runs$lengths[seq_len(first_run - 1)])
+first_data <- preceding + 1
+last_data <- preceding + runs$lengths[first_run]
+
+block <- raw_lines[c(first_data - 1, first_data:last_data)]
+```
+
+We hand this block to `read.csv()` and label the first (unnamed) column `date`.
+
+```{r}
+factors_ff3_monthly_raw <- read.csv(text = block, check.names = FALSE) |>
+  as_tibble()
+names(factors_ff3_monthly_raw)[1] <- "date"
+factors_ff3_monthly_raw
+```
+
+Finally, we still have to clean the data. The set *Fama/French 3 Factors* contains the return time series of the market `mkt_excess`, size `smb`, and value `hml` factors alongside the risk-free rate `risk_free`.\index{Factor!Market}\index{Factor!Size}\index{Factor!Value}\index{Factor!Profitability}\index{Factor!Investment}\index{Risk-free rate} Cleaning involves a handful of steps:
+
+-   Parse the integer date keys (e.g., `192607`) into proper dates.
+-   Replace Kenneth French's missing-value codes (`-99.99` and `-999`) with `NA`.
+-   Convert the returns from percent to decimals by dividing by 100.
+-   Standardize the column names (lower case, `Mkt-RF` to `mkt_excess`, and `RF` to `risk_free`).
+-   Filter the data to the desired date range.
+
+```{r}
+factors_ff3_monthly <- factors_ff3_monthly_raw |>
   mutate(
     date = floor_date(ymd(str_c(date, "01")), "month"),
-    across(c(RF, `Mkt-RF`, SMB, HML), ~ as.numeric(.) / 100),
-    .keep = "none"
+    across(-date, as.numeric),
+    across(-date, ~ na_if(., -99.99)),
+    across(-date, ~ na_if(., -999)),
+    across(-date, ~ . / 100)
   ) |>
-  rename_with(str_to_lower) |>
+  rename_with(str_to_lower, -date) |>
   rename(mkt_excess = `mkt-rf`, risk_free = rf) |>
   filter(date >= start_date & date <= end_date)
+factors_ff3_monthly
 ```
 
-We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the monthly factors are constructed in the chapter [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
+All of these steps are doable, but none of them are really about finance---they are just the technical scaffolding required before you can work with the actual factor returns. That is where a dedicated package becomes invaluable.
 
-```{r}
-#| message: false
-factors_ff5_monthly_raw <- download_french_data("Fama/French 5 Factors (2x3)")
+### Using the tidyfinance shortcut
 
-factors_ff5_monthly <- factors_ff5_monthly_raw$subsets$data[[1]] |>
-  mutate(
-    date = floor_date(ymd(str_c(date, "01")), "month"),
-    across(c(RF, `Mkt-RF`, SMB, HML, RMW, CMA), ~ as.numeric(.) / 100),
-    .keep = "none"
-  ) |>
-  rename_with(str_to_lower) |>
-  rename(mkt_excess = `mkt-rf`, risk_free = rf) |>
-  filter(date >= start_date & date <= end_date)
-```
-
-It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
-
-```{r}
-#| message: false
-factors_ff3_daily_raw <- download_french_data("Fama/French 3 Factors [Daily]")
-
-factors_ff3_daily <- factors_ff3_daily_raw$subsets$data[[1]] |>
-  mutate(
-    date = ymd(date),
-    across(c(RF, `Mkt-RF`, SMB, HML), ~ as.numeric(.) / 100),
-    .keep = "none"
-  ) |>
-  rename_with(str_to_lower) |>
-  rename(mkt_excess = `mkt-rf`, risk_free = rf) |>
-  filter(date >= start_date & date <= end_date)
-```
-
-In a subsequent chapter, we also use the 10 monthly industry portfolios, so let us fetch that data, too.\index{Data!Industry portfolios}
-
-```{r}
-#| message: false
-industries_ff_monthly_raw <- download_french_data("10 Industry Portfolios")
-
-industries_ff_monthly <- industries_ff_monthly_raw$subsets$data[[1]] |>
-  mutate(date = floor_date(ymd(str_c(date, "01")), "month")) |>
-  mutate(across(where(is.numeric), ~ . / 100)) |>
-  select(date, everything()) |>
-  filter(date >= start_date & date <= end_date) |>
-  rename_with(str_to_lower)
-```
-
-It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You should check out the other sets by calling `get_french_data_list()`. 
-
-To automatically download and process Fama-French data, you can also use the `tidyfinance` package with `type = "factors_ff_3_monthly"` or similar, e.g.:
+The `tidyfinance` package performs the entire workflow above under the hood: you request a Fama-French dataset by name and receive a clean, consistently formatted tibble from Kenneth French's data library. This avoids repetitive boilerplate, reduces errors, and lets you focus on modeling rather than data plumbing. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. We can use the `download_data()` function to download the same monthly *Fama/French 3 Factors* as above.
 
 ```{r}
 #| output: false
-download_data(
-  type = "factors_ff_3_monthly",
+factors_ff3_monthly <- download_data(
+  domain = "famafrench",
+  dataset = "Fama/French 3 Factors",
   start_date = start_date,
   end_date = end_date
 )
 ```
 
-The `tidyfinance` package implements the processing steps as above and returns the same cleaned data frame. The list of supported Fama-French data types can be called as follows:
+We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the monthly factors are constructed in the chapter [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
 
 ```{r}
 #| output: false
-list_supported_types(domain = "Fama-French")
+factors_ff5_monthly <- download_data(
+  domain = "famafrench",
+  dataset = "Fama/French 5 Factors (2x3)",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
+
+```{r}
+#| output: false
+factors_ff3_daily <- download_data(
+  domain = "famafrench",
+  dataset = "Fama/French 3 Factors [Daily]",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+In a subsequent chapter, we also use the monthly returns of 10 industry portfolios, so let us fetch that data, too.\index{Data!Industry portfolios}
+
+```{r}
+#| output: false
+industries_ff_monthly <- download_data(
+  domain = "famafrench",
+  dataset = "10 Industry Portfolios",
+  start_date = start_date,
+  end_date = end_date
+)
+```
+
+It is worth taking a look at all available portfolio return time series from Kenneth French's homepage. You can list all the Fama-French datasets that `tidyfinance` supports as follows:
+
+```{r}
+#| output: false
+list_supported_datasets(domain = "Fama-French")
 ```
 
 ## q-Factors
@@ -348,5 +408,5 @@ lst(
 
 ## Exercises
 
-1.  Download the monthly Fama-French factors manually from [Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `read_csv()`. Validate that you get the same data as via the `frenchdata` package.
-2.  Download the daily Fama-French 5 factors using the `frenchdata` package. Use `get_french_data_list()` to find the corresponding table name. After the successful download and conversion to the column format that we used above, compare the `risk_free`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_daily` to `factors_ff5_daily`. Discuss any differences you might find.
+1.  Download the monthly Fama-French factors manually from [Ken French's data library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) and read them in via `read_csv()`. Validate that you get the same data as via the download script we developed above.
+2.  Download the daily Fama-French 5 factors using `download_data()`. Use `list_supported_datasets(domain = "Fama-French")` to find the corresponding dataset name. After the successful download, compare the `risk_free`, `mkt_excess`, `smb`, and `hml` columns of `factors_ff3_daily` to `factors_ff5_daily`. Discuss any differences you might find.
