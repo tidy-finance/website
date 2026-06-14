@@ -10,7 +10,7 @@ Building on this standardized information, financial ratios transform raw accoun
 
 This chapter demonstrates how to access, process, and analyze financial statements using R. We start by reviewing the financial statements balance sheet, income statement, and cash flow statement. Then, we download publicly available statements to calculate key financial ratios, implement common screening strategies, and evaluate companies. Our analysis combines theoretical frameworks with practical implementation, providing tools for both academic research and investment practice.
 
-For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package `fmpapi`.
+For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses such as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package `fmpapi`.
 
 The FMP API’s free tier provides access to:
 
@@ -55,9 +55,9 @@ The asset side of the balance sheet typically comprises three main categories, e
 
 [Figure 2](#fig-401) illustrates this breakdown of assets, showing how companies classify their resources.
 
-[![](../assets/img/balance-sheet-breakdown.svg)](../assets/img/balance-sheet-breakdown.svg "Figure 2: A stylized representation of a balance sheet beakdown.")
+[![](../assets/img/balance-sheet-breakdown.svg)](../assets/img/balance-sheet-breakdown.svg "Figure 2: A stylized representation of a balance sheet breakdown.")
 
-Figure 2: A stylized representation of a balance sheet beakdown.
+Figure 2: A stylized representation of a balance sheet breakdown.
 
 [Figure 2](#fig-401) also shows the breakdown of liabilities. The liability side similarly follows a temporal classification, dividing obligations based on when they come due:
 
@@ -214,9 +214,31 @@ We now turn to downloading and processing statements for multiple companies. The
 
 ``` r
 sample <- c(
-  "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "DIS", "NKE",
-  "WMT", "KO", "JPM", "BAC", "V", "XOM", "CVX", "JNJ", "PFE", "INTC",
-  "AMD", "SBUX", "BABA", "UBER", "CSCO"
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "TSLA",
+  "NVDA",
+  "META",
+  "NFLX",
+  "DIS",
+  "NKE",
+  "WMT",
+  "KO",
+  "JPM",
+  "BAC",
+  "V",
+  "XOM",
+  "CVX",
+  "JNJ",
+  "PFE",
+  "INTC",
+  "AMD",
+  "SBUX",
+  "BABA",
+  "UBER",
+  "CSCO"
 )
 
 params <- list(period = "annual", limit = 5)
@@ -247,7 +269,7 @@ Liquidity ratios assess a company’s ability to meet its short-term obligations
 
 The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:
 
-\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Total Liabilities}}\\
+\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}\\
 
 A ratio above one indicates that the company has enough current assets to cover its current liabilities, which are due within one year as discussed above.
 
@@ -259,7 +281,7 @@ The most conservative liquidity measure is the Cash Ratio:
 
 \\\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}\\
 
-This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. Afterall, all that cash could also be distributed to equity or pay down costly debt.
+This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. After all, all that cash could also be distributed to equity or pay down costly debt.
 
 Next, we calculate these ratios for all stocks, focusing on four major technology companies:
 
@@ -269,7 +291,7 @@ selected_symbols <- c("MSFT", "AAPL", "AMZN", "NVDA")
 balance_sheet_statements <- balance_sheet_statements |>
   mutate(
     fiscal_year = as.integer(fiscal_year),
-    current_ratio = total_current_assets / total_assets,
+    current_ratio = total_current_assets / total_current_liabilities,
     quick_ratio = (total_current_assets - inventory) /
       total_current_liabilities,
     cash_ratio = cash_and_cash_equivalents / total_current_liabilities,
@@ -300,7 +322,7 @@ balance_sheet_statements |>
 
 Figure 8: Liquidity ratios are based on financial statements provided through the FMP API.
 
-While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more convervative approach by holding larger liquidity buffers in the company.
+While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more conservative approach by holding larger liquidity buffers in the company.
 
 ## Leverage Ratios
 
@@ -466,7 +488,7 @@ combined_statements <- balance_sheet_statements |>
   ) |>
   left_join(
     cash_flow_statements |>
-      mutate(fiscal_year = as.integer(fiscal_year)) |> 
+      mutate(fiscal_year = as.integer(fiscal_year)) |>
       select(symbol, fiscal_year, inventory, accounts_receivables),
     join_by(symbol, fiscal_year)
   )
@@ -479,7 +501,7 @@ combined_statements <- combined_statements |>
   )
 ```
 
-We leave the visualization and interpretation of these figures as an exercise and move on the the last category of financial ratios.
+We leave the visualization and interpretation of these figures as an exercise and move on to the last category of financial ratios.
 
 ## Profitability Ratios
 
@@ -620,7 +642,7 @@ These combined rankings highlight how different business models and strategies l
 The Fama-French five-factor model aims to explain stock returns by incorporating specific financial metrics ratios. We provide more details in [Replicating Fama-French Factors](../r/replicating-fama-and-french-factors.llms.md), but here is an intuitive overview:
 
 - Size: Calculated as the logarithm of a company’s market capitalization, which is the total market value of its outstanding shares. This factor captures the tendency for smaller firms to outperform larger ones over time.
-- Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’’’ stock. This metric helps differentiate between undervalued and overvalued companies.
+- Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’ stock. This metric helps differentiate between undervalued and overvalued companies.
 - Profitability: Measured as the ratio of operating profit to book equity, where operating profit is calculated as revenue minus cost of goods sold (COGS), selling, general, and administrative expenses (SG&A), and interest expense. This factor assesses a company’s efficiency in generating profits from its equity base.
 - Investment: Calculated as the percentage change in total assets from the previous period. This factor reflects the company’s growth strategy, indicating whether it is investing aggressively or conservatively.
 
@@ -635,7 +657,7 @@ market_cap <- sample |>
         x
       )
     }
-  ) |> 
+  ) |>
   filter(date == min(date))
 
 combined_statements_ff <- combined_statements |>

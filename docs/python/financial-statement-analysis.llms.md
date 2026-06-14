@@ -99,11 +99,11 @@ fmp_get(
 
 |  | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | cash_and_cash_equivalents | short_term_investments | ... | additional_paid_in_capital | accumulated_other_comprehensive_income_loss | other_total_stockholders_equity | total_stockholders_equity | total_equity | minority_interest | total_liabilities_and_total_equity | total_investments | total_debt | net_debt |
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| 0 | 2025-06-30 | MSFT | USD | 0000789019 | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | FY | 30242000000 | 64313000000 | ... | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 60588000000 | 30346000000 |
-| 1 | 2024-06-30 | MSFT | USD | 0000789019 | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | FY | 18315000000 | 57216000000 | ... | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 67127000000 | 48812000000 |
-| 2 | 2023-06-30 | MSFT | USD | 0000789019 | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | FY | 34704000000 | 76552000000 | ... | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 59965000000 | 25261000000 |
-| 3 | 2022-06-30 | MSFT | USD | 0000789019 | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | FY | 13931000000 | 90818000000 | ... | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 61270000000 | 47339000000 |
-| 4 | 2021-06-30 | MSFT | USD | 0000789019 | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | FY | 14224000000 | 116032000000 | ... | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 67775000000 | 53551000000 |
+| 0 | 2025-06-30 | MSFT | USD | 0000789019 | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | FY | 30242000000 | 64313000000 | ... | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 112184000000 | 81942000000 |
+| 1 | 2024-06-30 | MSFT | USD | 0000789019 | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | FY | 18315000000 | 57216000000 | ... | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 97852000000 | 79537000000 |
+| 2 | 2023-06-30 | MSFT | USD | 0000789019 | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | FY | 34704000000 | 76552000000 | ... | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 79441000000 | 44737000000 |
+| 3 | 2022-06-30 | MSFT | USD | 0000789019 | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | FY | 13931000000 | 90818000000 | ... | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 78400000000 | 64469000000 |
+| 4 | 2021-06-30 | MSFT | USD | 0000789019 | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | FY | 14224000000 | 116032000000 | ... | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 82278000000 | 68054000000 |
 
 5 rows × 61 columns
 
@@ -242,13 +242,15 @@ Liquidity ratios assess a company’s ability to meet its short-term obligations
 
 The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:
 
-\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Total Liabilities}}\\
+\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}\\
 
 A ratio above one indicates that the company has enough current assets to cover its current liabilities, which are due within one year as discussed above.
 
 However, not all current assets are equally liquid, i.e., can be easily sold to meet a company’s obligations. This aspect is reflected in the Quick Ratio:
 
-\\\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\\ The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.
+\\\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\\
+
+The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.
 
 The most conservative liquidity measure is the Cash Ratio:
 
@@ -264,7 +266,7 @@ selected_symbols = ["MSFT", "AAPL", "AMZN", "NVDA"]
 balance_sheet_statements = (balance_sheet_statements
   .assign(
     fiscal_year=lambda x: x["fiscal_year"].astype(int),
-    current_ratio=lambda x: x["total_current_assets"] / x["total_assets"],
+    current_ratio=lambda x: x["total_current_assets"] / x["total_current_liabilities"],
     quick_ratio=lambda x: (x["total_current_assets"] - x["inventory"]) / x["total_current_liabilities"],
     cash_ratio=lambda x: x["cash_and_cash_equivalents"] / x["total_current_liabilities"],
     label=lambda x: np.where(x["symbol"].isin(selected_symbols), x["symbol"], np.nan)
