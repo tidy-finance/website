@@ -1,6 +1,6 @@
-In [Beta Estimation](../../python/beta-estimation.llms.md), we estimate rolling CAPM betas for the entire CRSP universe by calling a regression routine for every stock and every monthly estimation window. That design is easy to read and easy to generalize, but it requires over two million individual regression fits — even parallelized across all cores, the estimation takes hours.
+In Beta Estimation ([R](../../r/beta-estimation.llms.md) / [Python](../../python/beta-estimation.llms.md)), we estimate rolling CAPM betas for the entire CRSP universe by calling a regression routine for every stock and every monthly estimation window. That design is easy to read and easy to generalize, but it requires over two million individual regression fits — even parallelized across all cores, the estimation takes hours.
 
-This post shows that `polars` can produce the *identical* estimates in a few seconds. The trick is that, for a single-regressor model, the OLS coefficients and their \\t\\-statistics are simple functions of precomputed cumulants: the observation count \\n\\ and the sums \\\sum x_t\\, \\\sum y_t\\, \\\sum x_t^2\\, \\\sum y_t^2\\, and \\\sum x_t y_t\\. Because sums are additive, we can compute them once per stock-month and let `polars` aggregate them over rolling calendar windows in a single vectorized pass — no loops, no parallelization machinery. We then reproduce every output of the book chapter with this approach.
+This post shows that the *identical* estimates can be produced in a few seconds, in both languages, without a single explicit regression and without any parallelization machinery. The trick is that, for a single-regressor model, the OLS coefficients and their \\t\\-statistics are simple functions of precomputed cumulants: the observation count \\n\\ and the sums \\\sum x_t\\, \\\sum y_t\\, \\\sum x_t^2\\, \\\sum y_t^2\\, and \\\sum x_t y_t\\. Because sums are additive, we can compute them once per stock-month and aggregate them over rolling calendar windows in a single vectorized pass — `polars` does this in Python, `dplyr` together with `slider` in R. We then reproduce every output of the book chapter with this approach.
 
 To be specific, with \\x\\ denoting the market excess return, \\y\\ the stock excess return, and all sums running over a rolling estimation window with \\n\\ observations, the slope and intercept follow as
 
@@ -9,6 +9,8 @@ To be specific, with \\x\\ denoting the market excess return, \\y\\ the stock ex
 where \\S\_{xy} = \sum x_t y_t - \frac{1}{n}\sum x_t \sum y_t\\ and \\S\_{xx} = \sum x_t^2 - \frac{1}{n}\left(\sum x_t\right)^2\\. With \\S\_{yy}\\ defined analogously, the residual variance is \\\hat\sigma^2 = (S\_{yy} - \hat\beta S\_{xy}) / (n - 2)\\, and the \\t\\-statistics follow from the standard errors \\\text{se}(\hat\beta) = \sqrt{\hat\sigma^2 / S\_{xx}}\\ and \\\text{se}(\hat\alpha) = \sqrt{\hat\sigma^2 \left(\frac{1}{n} + \frac{\bar x^2}{S\_{xx}}\right)}\\.
 
 We use the following packages:
+
+## Python
 
 ``` python
 import time
@@ -20,9 +22,22 @@ from plotnine import *
 from mizani.formatters import percent_format
 ```
 
+## R
+
+``` r
+library(tidyverse)
+library(arrow)
+library(slider)
+library(scales)
+```
+
+We rely on `slider` ([Vaughan 2021](#ref-slider)) for its fast, index-aware rolling-sum function, but otherwise stay within the tidyverse.
+
 ## Data
 
-As in the chapter, we combine monthly CRSP returns with the market excess returns from the Fama-French data library, both stored in the Parquet files introduced in [WRDS, CRSP, and Compustat](../../python/wrds-crsp-and-compustat.llms.md).
+As in the chapter, we combine monthly CRSP returns with the market excess returns from the Fama-French data library, both stored in the Parquet files introduced in WRDS, CRSP, and Compustat ([R](../../r/wrds-crsp-and-compustat.llms.md) / [Python](../../python/wrds-crsp-and-compustat.llms.md)).
+
+## Python
 
 ``` python
 crsp_monthly = (pl.read_parquet("data-python/crsp_monthly.parquet")
@@ -36,9 +51,26 @@ crsp_monthly = (pl.read_parquet("data-python/crsp_monthly.parquet")
 )
 ```
 
+## R
+
+``` r
+crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+  select(permno, date, industry, ret_excess) |>
+  drop_na() |>
+  left_join(
+    read_parquet("data-r/factors_ff3_monthly.parquet") |>
+      select(date, mkt_excess),
+    join_by(date)
+  )
+```
+
 ## Vectorized Rolling Estimation
 
-The function below performs the rolling estimation in three steps: (i) collapse the data to one row of cumulants per stock and month, (ii) aggregate the cumulants over rolling windows of `look_back` calendar months via `rolling()`, keeping only windows with at least `min_obs` observations and `look_back` months of available history, and (iii) map the aggregated sums into \\\hat\alpha\\, \\\hat\beta\\, and their \\t\\-statistics. The output format mirrors the chapter exactly: one row per stock, month, and coefficient.
+The function below performs the rolling estimation in three steps: (i) collapse the data to one row of cumulants per stock and month, (ii) aggregate the cumulants over rolling windows of `look_back` calendar months, keeping only windows with at least `min_obs` observations, and (iii) map the aggregated sums into \\\hat\alpha\\, \\\hat\beta\\, and their \\t\\-statistics. The output format mirrors the chapter exactly: one row per stock, month, and coefficient.
+
+The two editions differ only in the windowing primitive. In Python, `polars` aggregates the cumulants over a calendar window with `rolling()`. In R, we use `slider::slide_index_sum()`, a C-level rolling sum that respects an index, so there is no R-level loop over windows. The only subtlety is that we index the window by an integer month counter (`year * 12 + month`) rather than by the calendar `date`: this sidesteps `lubridate`’s end-of-month arithmetic (e.g., subtracting a month from the 31st can yield `NA`) and defines the 60-month window unambiguously.
+
+## Python
 
 ``` python
 def roll_capm_estimation(data, look_back=60, min_obs=48):
@@ -69,10 +101,7 @@ def roll_capm_estimation(data, look_back=60, min_obs=48):
             pl.col("n", "sum_x", "sum_y", "sum_xx", "sum_yy", "sum_xy").sum(),
             month_index=pl.col("month_index").last(),
         )
-        .filter(
-            (pl.col("month_index") >= look_back - 1)
-            & (pl.col("n") >= min_obs)
-        )
+        .filter(pl.col("n") >= min_obs)
     )
 
     estimates = (rolling_sums
@@ -115,7 +144,64 @@ def roll_capm_estimation(data, look_back=60, min_obs=48):
     )
 ```
 
-Estimating betas for the entire monthly CRSP sample — around 26,000 stocks and over two million rolling windows — is now a matter of seconds:
+## R
+
+``` r
+roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
+  cumulants <- data |>
+    summarize(
+      n = n(),
+      sum_x = sum(mkt_excess),
+      sum_y = sum(ret_excess),
+      sum_xx = sum(mkt_excess^2),
+      sum_yy = sum(ret_excess^2),
+      sum_xy = sum(mkt_excess * ret_excess),
+      .by = c(permno, date)
+    ) |>
+    arrange(permno, date) |>
+    mutate(
+      period = year(date) * 12 + month(date),
+      month_index = row_number(),
+      .by = permno
+    )
+
+  rolling_sums <- cumulants |>
+    mutate(
+      across(
+        c(n, sum_x, sum_y, sum_xx, sum_yy, sum_xy),
+        \(col) slide_index_sum(col, period, before = look_back - 1)
+      ),
+      .by = permno
+    ) |>
+    filter(n >= min_obs)
+
+  estimates <- rolling_sums |>
+    mutate(
+      s_xx = sum_xx - sum_x^2 / n,
+      s_xy = sum_xy - sum_x * sum_y / n,
+      s_yy = sum_yy - sum_y^2 / n,
+      beta = s_xy / s_xx,
+      alpha = (sum_y - beta * sum_x) / n,
+      sigma2 = (s_yy - beta * s_xy) / (n - 2),
+      t_alpha = alpha / sqrt(sigma2 * (1 / n + (sum_x / n)^2 / s_xx)),
+      t_beta = beta / sqrt(sigma2 / s_xx)
+    )
+
+  bind_rows(
+    estimates |>
+      transmute(permno, date, coefficient = "alpha",
+                estimate = alpha, t_statistic = t_alpha),
+    estimates |>
+      transmute(permno, date, coefficient = "mkt_excess",
+                estimate = beta, t_statistic = t_beta)
+  ) |>
+    arrange(permno, date, coefficient)
+}
+```
+
+Estimating betas for the entire monthly CRSP sample — around 26,000 stocks and over two million rolling windows — is now a matter of seconds. Note that the whole sample is processed in a single call: there is no nesting by stock and no parallelization.
+
+## Python
 
 ``` python
 tic = time.perf_counter()
@@ -125,9 +211,23 @@ toc = time.perf_counter()
 print(f"Monthly estimation: {capm_monthly.shape[0]:,} rows in {toc - tic:.1f} seconds")
 ```
 
-    Monthly estimation: 4,268,604 rows in 2.1 seconds
+    Monthly estimation: 4,665,538 rows in 1.2 seconds
 
-The estimates are numerically identical to the regression-based approach of the chapter — closed-form OLS is still OLS. We verify this claim for one stock and window: the latest five-year window of Apple’s returns, estimated via `statsmodels`.
+## R
+
+``` r
+tic <- Sys.time()
+capm_monthly <- roll_capm_estimation(crsp_monthly)
+toc <- Sys.time()
+
+cat(sprintf(
+  "Monthly estimation: %s rows in %.1f seconds\n",
+  format(nrow(capm_monthly), big.mark = ","),
+  as.numeric(toc - tic, units = "secs")
+))
+```
+
+The estimates are numerically identical to the regression-based approach of the chapter — closed-form OLS is still OLS. We verify this claim for one stock and window: the latest five-year window of Apple’s returns, estimated via the standard regression routine.
 
 ``` python
 import statsmodels.formula.api as smf
@@ -149,19 +249,33 @@ apple_vectorized = (capm_monthly
 )
 
 print(f"statsmodels beta: {fit.params['mkt_excess']:.12f}")
-print(f"vectorized beta:  {apple_vectorized['estimate'][0]:.12f}")
-print(f"statsmodels t:    {fit.tvalues['mkt_excess']:.12f}")
-print(f"vectorized t:     {apple_vectorized['t_statistic'][0]:.12f}")
 ```
 
     statsmodels beta: 1.159627113952
+
+``` python
+print(f"vectorized beta:  {apple_vectorized['estimate'][0]:.12f}")
+```
+
     vectorized beta:  1.159627113952
+
+``` python
+print(f"statsmodels t:    {fit.tvalues['mkt_excess']:.12f}")
+```
+
     statsmodels t:    8.737072884233
+
+``` python
+print(f"vectorized t:     {apple_vectorized['t_statistic'][0]:.12f}")
+```
+
     vectorized t:     8.737072884233
 
 ## Daily Betas Without Batching
 
-The chapter splits the daily CRSP data into batches of stocks to keep memory in check during the parallelized estimation. The cumulant approach makes this unnecessary: since the data immediately collapses to one row per stock and month, we can lazily scan the full partitioned dataset and process all 180 million daily observations in one go. Following the chapter, we truncate daily dates to the start of the month — so the windows still span 60 months, with one estimate per month — and require at least 1,000 daily observations.
+The chapter splits the daily CRSP data into batches of stocks to keep memory in check during the parallelized estimation. The cumulant approach makes this unnecessary: since the data immediately collapses to one row per stock and month, we can read the full partitioned dataset and process all 72 million daily observations in one go. Following the chapter, we truncate daily dates to the start of the month — so the windows still span 60 months, with one estimate per month — and require at least 1,000 daily observations.
+
+## Python
 
 ``` python
 factors_ff3_daily = (pl.read_parquet("data-python/factors_ff3_daily.parquet")
@@ -189,11 +303,37 @@ toc = time.perf_counter()
 print(f"Daily estimation: {capm_daily.shape[0]:,} rows in {toc - tic:.1f} seconds")
 ```
 
-    Daily estimation: 4,326,458 rows in 149.1 seconds
+    Daily estimation: 4,709,150 rows in 113.4 seconds
+
+## R
+
+``` r
+factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
+  select(date, mkt_excess)
+
+tic <- Sys.time()
+crsp_daily <- open_dataset("data-r/crsp_daily") |>
+  select(permno, date, ret_excess) |>
+  collect()
+
+capm_daily <- crsp_daily |>
+  inner_join(factors_ff3_daily, join_by(date)) |>
+  mutate(date = floor_date(date, "month")) |>
+  roll_capm_estimation(min_obs = 1000)
+toc <- Sys.time()
+
+cat(sprintf(
+  "Daily estimation: %s rows in %.1f seconds\n",
+  format(nrow(capm_daily), big.mark = ","),
+  as.numeric(toc - tic, units = "secs")
+))
+```
 
 ## Reproducing the Chapter’s Results
 
-The remainder of this post reproduces every output of [Beta Estimation](../../python/beta-estimation.llms.md) from the two estimate tables. First, the rolling betas of four well-known stocks:
+The remainder of this post reproduces every output of the chapter from the two estimate tables. First, the rolling betas of four well-known stocks:
+
+## Python
 
 ``` python
 examples = pl.DataFrame({
@@ -214,11 +354,35 @@ beta_examples = (capm_monthly
 ).show()
 ```
 
-[![Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time but are always positive for each stock.](index_files/figure-html/cell-9-output-1.png)](index_files/figure-html/cell-9-output-1.png "The figure shows monthly beta estimates for example stocks using five years of data, estimated with the vectorized cumulant approach.")
+[![Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time but are always positive for each stock.](index_files/figure-html/unnamed-chunk-13-1.png)](index_files/figure-html/unnamed-chunk-13-1.png "The figure shows monthly beta estimates for example stocks using five years of data, estimated with the vectorized cumulant approach.")
 
 The figure shows monthly beta estimates for example stocks using five years of data, estimated with the vectorized cumulant approach.
 
+## R
+
+``` r
+examples <- tibble(
+  permno = c(14593, 10107, 93436, 17778),
+  company = c("Apple", "Microsoft", "Tesla", "Berkshire Hathaway")
+)
+
+beta_examples <- capm_monthly |>
+  filter(coefficient == "mkt_excess") |>
+  inner_join(examples, join_by(permno))
+
+beta_examples |>
+  ggplot(aes(x = date, y = estimate, color = company, linetype = company)) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Monthly beta estimates for example stocks using 5 years of data"
+  ) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")
+```
+
 Next, the distribution of average firm-specific betas by industry:
+
+## Python
 
 ``` python
 beta_monthly = (capm_monthly
@@ -250,11 +414,33 @@ industry_order = (beta_industries
 ).show()
 ```
 
-[![Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. The large majority of all stocks has CAPM betas between 0.5 and 1.5, with very few negative values.](index_files/figure-html/cell-10-output-1.png)](index_files/figure-html/cell-10-output-1.png "The box plots show the average firm-specific beta estimates by industry.")
+[![Title: Firm-specific beta distributions by industry. The figure shows box plots for each industry. The large majority of all stocks has CAPM betas between 0.5 and 1.5, with very few negative values.](index_files/figure-html/unnamed-chunk-15-1.png)](index_files/figure-html/unnamed-chunk-15-1.png "The box plots show the average firm-specific beta estimates by industry.")
 
 The box plots show the average firm-specific beta estimates by industry.
 
+## R
+
+``` r
+beta_monthly <- capm_monthly |>
+  filter(coefficient == "mkt_excess") |>
+  select(permno, date, beta = estimate) |>
+  mutate(return_type = "monthly")
+
+beta_industries <- beta_monthly |>
+  inner_join(crsp_monthly, join_by(permno, date)) |>
+  drop_na(beta) |>
+  summarize(beta = mean(beta), .by = c(industry, permno))
+
+beta_industries |>
+  ggplot(aes(x = reorder(industry, beta, FUN = median), y = beta)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(x = NULL, y = NULL, title = "Firm-specific beta distributions by industry")
+```
+
 The monthly deciles of estimated betas over time:
+
+## Python
 
 ``` python
 beta_quantiles = (beta_monthly
@@ -282,11 +468,34 @@ n_quantiles = beta_quantiles["quantile"].n_unique()
 ).show()
 ```
 
-[![Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas. The deciles vary substantially over time and tend to move jointly.](index_files/figure-html/cell-11-output-1.png)](index_files/figure-html/cell-11-output-1.png "The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.")
+[![Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas. The deciles vary substantially over time and tend to move jointly.](index_files/figure-html/unnamed-chunk-17-1.png)](index_files/figure-html/unnamed-chunk-17-1.png "The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.")
 
 The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.
 
+## R
+
+``` r
+beta_monthly |>
+  group_by(date) |>
+  reframe(
+    beta = quantile(beta, seq(0.1, 0.9, 0.1)),
+    quantile = 100 * seq(0.1, 0.9, 0.1)
+  ) |>
+  ggplot(aes(
+    x = date, y = beta,
+    color = as_factor(quantile), linetype = as_factor(quantile)
+  )) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Monthly deciles of estimated betas"
+  ) +
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y")
+```
+
 The comparison of monthly and daily estimates for the example stocks:
+
+## Python
 
 ``` python
 beta_daily = (capm_daily
@@ -309,11 +518,35 @@ beta = pl.concat([beta_monthly, beta_daily])
 ).show()
 ```
 
-[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on daily data are smoother, but trend and level are similar across frequencies.](index_files/figure-html/cell-12-output-1.png)](index_files/figure-html/cell-12-output-1.png "The figure shows the comparison of beta estimates using monthly and daily data for example stocks.")
+[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on daily data are smoother, but trend and level are similar across frequencies.](index_files/figure-html/unnamed-chunk-19-1.png)](index_files/figure-html/unnamed-chunk-19-1.png "The figure shows the comparison of beta estimates using monthly and daily data for example stocks.")
 
 The figure shows the comparison of beta estimates using monthly and daily data for example stocks.
 
+## R
+
+``` r
+beta_daily <- capm_daily |>
+  filter(coefficient == "mkt_excess") |>
+  select(permno, date, beta = estimate) |>
+  mutate(return_type = "daily")
+
+beta <- bind_rows(beta_monthly, beta_daily)
+
+beta |>
+  inner_join(examples, join_by(permno)) |>
+  ggplot(aes(x = date, y = beta, color = return_type, linetype = return_type)) +
+  geom_line() +
+  facet_wrap(~company, ncol = 1) +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "Comparison of beta estimates using monthly and daily data"
+  ) +
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y")
+```
+
 The share of stocks with available beta estimates over time:
+
+## Python
 
 ``` python
 return_types = pl.DataFrame({"return_type": ["monthly", "daily"]})
@@ -335,11 +568,35 @@ beta_coverage = (crsp_monthly
 ).show()
 ```
 
-[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with the share of securities with beta estimates using monthly or daily data. The daily estimates exhibit almost no missing data, while the monthly estimates cover around 75 percent of all stock-month combinations.](index_files/figure-html/cell-13-output-1.png)](index_files/figure-html/cell-13-output-1.png "The figure shows the end-of-month share of securities with beta estimates, separately for the monthly and daily estimation.")
+[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with the share of securities with beta estimates using monthly or daily data. The daily estimates exhibit almost no missing data, while the monthly estimates cover around 75 percent of all stock-month combinations.](index_files/figure-html/unnamed-chunk-21-1.png)](index_files/figure-html/unnamed-chunk-21-1.png "The figure shows the end-of-month share of securities with beta estimates, separately for the monthly and daily estimation.")
 
 The figure shows the end-of-month share of securities with beta estimates, separately for the monthly and daily estimation.
 
+## R
+
+``` r
+beta_coverage <- crossing(
+  crsp_monthly,
+  tibble(return_type = c("monthly", "daily"))
+) |>
+  left_join(beta, join_by(permno, date, return_type)) |>
+  group_by(date, return_type) |>
+  summarize(share = sum(!is.na(beta)) / n(), .groups = "drop")
+
+beta_coverage |>
+  ggplot(aes(x = date, y = share, color = return_type, linetype = return_type)) +
+  geom_line() +
+  labs(
+    x = NULL, y = NULL, color = NULL, linetype = NULL,
+    title = "End-of-month share of securities with beta estimates"
+  ) +
+  scale_y_continuous(labels = percent) +
+  scale_x_date(date_breaks = "10 years", date_labels = "%Y")
+```
+
 The summary statistics of both estimate sets:
+
+## Python
 
 ``` python
 (beta
@@ -361,13 +618,33 @@ The summary statistics of both estimate sets:
 
 shape: (2, 9)
 
-| return_type | count   | mean | std  | min   | q25  | median | q75  | max   |
-|-------------|---------|------|------|-------|------|--------|------|-------|
-| str         | u32     | f64  | f64  | f64   | f64  | f64    | f64  | f64   |
-| "daily"     | 2163229 | 0.8  | 0.49 | -3.67 | 0.42 | 0.76   | 1.12 | 4.74  |
-| "monthly"   | 2134302 | 1.1  | 0.7  | -9.01 | 0.64 | 1.04   | 1.47 | 10.35 |
+| return_type | count   | mean | std  | min    | q25  | median | q75  | max   |
+|-------------|---------|------|------|--------|------|--------|------|-------|
+| str         | u32     | f64  | f64  | f64    | f64  | f64    | f64  | f64   |
+| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.41 | 0.75   | 1.12 | 4.97  |
+| "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.64 | 1.04   | 1.48 | 11.72 |
+
+## R
+
+``` r
+beta |>
+  group_by(return_type) |>
+  summarize(
+    count = n(),
+    mean = mean(beta),
+    std = sd(beta),
+    min = min(beta),
+    q25 = quantile(beta, 0.25),
+    median = median(beta),
+    q75 = quantile(beta, 0.75),
+    max = max(beta)
+  ) |>
+  mutate(across(c(mean, std, min, q25, median, q75, max), \(x) round(x, 2)))
+```
 
 And, finally, the correlation between the monthly and daily estimators:
+
+## Python
 
 ``` python
 (beta
@@ -379,11 +656,28 @@ And, finally, the correlation between the monthly and daily estimators:
 )
 ```
 
-|         | monthly | daily |
-|---------|---------|-------|
-| monthly | 1.00    | 0.62  |
-| daily   | 0.62    | 1.00  |
+             monthly  daily
+    monthly     1.00   0.62
+    daily       0.62   1.00
+
+## R
+
+``` r
+beta |>
+  pivot_wider(
+    id_cols = c(permno, date),
+    names_from = return_type, values_from = beta
+  ) |>
+  select(monthly, daily) |>
+  drop_na() |>
+  cor() |>
+  round(2)
+```
 
 ## Takeaways
 
-All outputs match the chapter — the same betas, the same figures, the same summary statistics — but the entire estimation finishes in a few minutes - dominated by reading the 180 million daily returns - instead of many hours. Whenever a rolling estimator can be written in terms of additive cumulants, precomputing them and letting `polars` aggregate over rolling windows turns a parallelization problem into a one-pass computation. The pattern extends naturally to multi-factor models: with \\k\\ regressors, the required cumulants are the entries of the stacked moment matrices \\X'X\\, \\X'y\\, and \\y'y\\ — the same logic, just more sums.
+All outputs match the chapter — the same betas, the same figures, the same summary statistics — but the entire estimation finishes in minutes (dominated by reading the 72 million daily returns) instead of many hours. The same pattern works across languages: whenever a rolling estimator can be written in terms of additive cumulants, precomputing them and letting a vectorized rolling aggregation — `polars` in Python, `dplyr` and `slider` in R — accumulate them over windows turns a parallelization problem into a one-pass computation. In R, this also removes the need for `furrr` and the per-stock nesting used in the chapter. The pattern extends naturally to multi-factor models: with \\k\\ regressors, the required cumulants are the entries of the stacked moment matrices \\X'X\\, \\X'y\\, and \\y'y\\ — the same logic, just more sums.
+
+## References
+
+Vaughan, Davis. 2021. *slider: Sliding window functions*. <https://CRAN.R-project.org/package=slider>.
