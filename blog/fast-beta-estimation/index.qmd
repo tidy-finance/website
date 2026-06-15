@@ -8,6 +8,8 @@ author:
       - name: Danish Finance Institute
 date: "2026-06-12"
 description: Vectorizing rolling CAPM regressions with precomputed cumulants speeds up beta estimation by orders of magnitude — in both Python and R
+image: thumbnail.png
+image-alt: A monochrome Japanese sumi-e ink wash painting of a school of koi fish swimming swiftly in parallel in the same direction, one fish breaking ahead of the group, with trailing ink splatter evoking speed and motion against a clean white background.
 categories:
   - Python
   - R
@@ -98,7 +100,7 @@ crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
 
 ## Vectorized Rolling Estimation
 
-The function below performs the rolling estimation in three steps: (i) collapse the data to one row of cumulants per stock and month, (ii) aggregate the cumulants over rolling windows of `look_back` calendar months, keeping only windows with at least `min_obs` observations and `look_back` months of available history, and (iii) map the aggregated sums into $\hat\alpha$, $\hat\beta$, and their $t$-statistics. The output format mirrors the chapter exactly: one row per stock, month, and coefficient.
+The function below performs the rolling estimation in three steps: (i) collapse the data to one row of cumulants per stock and month, (ii) aggregate the cumulants over rolling windows of `look_back` calendar months, keeping only windows with at least `min_obs` observations, and (iii) map the aggregated sums into $\hat\alpha$, $\hat\beta$, and their $t$-statistics. The output format mirrors the chapter exactly: one row per stock, month, and coefficient.
 
 The two editions differ only in the windowing primitive. In Python, `polars` aggregates the cumulants over a calendar window with `rolling()`. In R, we use `slider::slide_index_sum()`, a C-level rolling sum that respects an index, so there is no R-level loop over windows. The only subtlety is that we index the window by an integer month counter (`year * 12 + month`) rather than by the calendar `date`: this sidesteps `lubridate`'s end-of-month arithmetic (e.g., subtracting a month from the 31st can yield `NA`) and defines the 60-month window unambiguously.
 
@@ -134,10 +136,7 @@ def roll_capm_estimation(data, look_back=60, min_obs=48):
             pl.col("n", "sum_x", "sum_y", "sum_xx", "sum_yy", "sum_xy").sum(),
             month_index=pl.col("month_index").last(),
         )
-        .filter(
-            (pl.col("month_index") >= look_back - 1)
-            & (pl.col("n") >= min_obs)
-        )
+        .filter(pl.col("n") >= min_obs)
     )
 
     estimates = (rolling_sums
@@ -209,7 +208,7 @@ roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
       ),
       .by = permno
     ) |>
-    filter(month_index >= look_back, n >= min_obs)
+    filter(n >= min_obs)
 
   estimates <- rolling_sums |>
     mutate(
@@ -321,7 +320,7 @@ cat(sprintf("vectorized t:     %.12f\n", apple_vectorized$t_statistic))
 
 ## Daily Betas Without Batching
 
-The chapter splits the daily CRSP data into batches of stocks to keep memory in check during the parallelized estimation. The cumulant approach makes this unnecessary: since the data immediately collapses to one row per stock and month, we can read the full partitioned dataset and process all 180 million daily observations in one go. Following the chapter, we truncate daily dates to the start of the month — so the windows still span 60 months, with one estimate per month — and require at least 1,000 daily observations.
+The chapter splits the daily CRSP data into batches of stocks to keep memory in check during the parallelized estimation. The cumulant approach makes this unnecessary: since the data immediately collapses to one row per stock and month, we can read the full partitioned dataset and process all 72 million daily observations in one go. Following the chapter, we truncate daily dates to the start of the month — so the windows still span 60 months, with one estimate per month — and require at least 1,000 daily observations.
 
 ::: {.panel-tabset group="language"}
 ### Python
@@ -727,4 +726,4 @@ beta |>
 
 ## Takeaways
 
-All outputs match the chapter — the same betas, the same figures, the same summary statistics — but the entire estimation finishes in a few minutes (dominated by reading the 180 million daily returns) instead of many hours. The same pattern works across languages: whenever a rolling estimator can be written in terms of additive cumulants, precomputing them and letting a vectorized rolling aggregation — `polars` in Python, `dplyr` and `slider` in R — accumulate them over windows turns a parallelization problem into a one-pass computation. In R, this also removes the need for `furrr` and the per-stock nesting used in the chapter. The pattern extends naturally to multi-factor models: with $k$ regressors, the required cumulants are the entries of the stacked moment matrices $X'X$, $X'y$, and $y'y$ — the same logic, just more sums.
+All outputs match the chapter — the same betas, the same figures, the same summary statistics — but the entire estimation finishes in minutes (dominated by reading the 72 million daily returns) instead of many hours. The same pattern works across languages: whenever a rolling estimator can be written in terms of additive cumulants, precomputing them and letting a vectorized rolling aggregation — `polars` in Python, `dplyr` and `slider` in R — accumulate them over windows turns a parallelization problem into a one-pass computation. In R, this also removes the need for `furrr` and the per-stock nesting used in the chapter. The pattern extends naturally to multi-factor models: with $k$ regressors, the required cumulants are the entries of the stacked moment matrices $X'X$, $X'y$, and $y'y$ — the same logic, just more sums.
