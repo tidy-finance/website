@@ -217,6 +217,7 @@ n_cores = cpu_count() - 1
 Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Instead of looping over groups, we use `Parallel()` to execute multiple tasks concurrently and `delayed()` to wrap each function call, allowing the calls to be queued and distributed to worker processes rather than executed immediately.
 
 ```{python}
+#| eval: false
 crsp_monthly_nested = crsp_monthly.partition_by("permno")
 
 capm_monthly = pl.concat(
@@ -265,7 +266,8 @@ min_obs = 1_000
 We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. Note that we also convert the daily date to the beginning of the month so that we can still look back over 60 months and get one beta estimate per month, even though we are using daily data.
 
 ```{python}
-# | output: false
+#| output: false
+#| eval: false 
 capm_daily = []
 
 for j in range(1, batches + 1):
@@ -316,6 +318,14 @@ capm_daily = pl.concat(capm_daily)
 What is a typical value for stock betas? First, let us extract the relevant estimates from our CAPM results based on monthly returns.
 
 ```{python}
+#| echo: false
+beta_monthly = pl.read_parquet("data-python/beta.parquet").filter(
+    pl.col("return_type") == "monthly"
+)
+```
+
+```{python}
+#| eval: false
 beta_monthly = (capm_monthly
     .filter(pl.col("coefficient") == "mkt_excess")
     .select(["permno", "date", "estimate"])
@@ -406,6 +416,7 @@ beta_quantiles_figure.show()
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. 
 
 ```{python}
+#| eval: false
 beta_daily = (capm_daily
     .filter(pl.col("coefficient") == "mkt_excess")
     .select(["permno", "date", "estimate"])
@@ -414,6 +425,10 @@ beta_daily = (capm_daily
 )
 
 beta = pl.concat([beta_monthly, beta_daily])
+```
+```{python}
+#| echo: false
+beta = pl.read_parquet("data-python/beta.parquet")
 ```
 
 Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604.
@@ -451,7 +466,6 @@ Finally, we write the estimates to our local folder so that we can use them in l
 
 ```{python}
 #| output: false
-
 beta.write_parquet("data-python/beta.parquet")
 ```
 
@@ -464,8 +478,8 @@ Whenever you perform some kind of estimation, it also makes sense to do rough pl
 #| fig-pos: "htb"
 return_types = pl.DataFrame({"return_type": ["monthly", "daily"]})
 
-beta_coverage = (crsp_monthly
-    .join(return_types, how="cross")
+beta_coverage = (
+    crsp_monthly.join(return_types, how="cross")
     .join(beta, on=["permno", "date", "return_type"], how="left")
     .group_by(["date", "return_type"])
     .agg(share=pl.col("beta").is_not_null().mean())
