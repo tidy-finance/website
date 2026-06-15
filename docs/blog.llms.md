@@ -2,6 +2,18 @@
 
 Experimental and external contributions based on *Tidy Finance with R*. [Contribute](contribute.llms.md) your ideas!
 
+![A monochrome Japanese sumi-e ink wash painting of a school of koi fish swimming swiftly in parallel in the same direction, one fish breaking ahead of the group, with trailing ink splatter evoking speed and motion against a clean white background.](./blog/fast-beta-estimation/thumbnail.png)
+
+##### Fast, Vectorized Beta Estimation
+
+21 min
+
+Vectorizing rolling CAPM regressions with precomputed cumulants speeds up beta estimation by orders of magnitude — in both Python and R
+
+Stefan Voigt
+
+Jun 12, 2026
+
 ![Illustration showing a data conversion workflow: a database icon with a blue feather on the left, a glowing arrow in the center, and a Parquet file icon labeled ‘.parquet’ on the right, set against a split digital background with cool green-blue tones on the left and warm orange tones on the right.](./blog/sql-legacy-version/thumbnail.png)
 
 ##### Tidy Finance migrates from SQLite to Parquet
@@ -205,8 +217,6 @@ You can learn Tidy Finance and support Ukraine at the same time
 Patrick Weiss
 
 Nov 19, 2022
-
-![](./blog/user-conference-2022/thumbnail.png)
 
 ##### Tidy Finance at the useR!2022 Conference
 
