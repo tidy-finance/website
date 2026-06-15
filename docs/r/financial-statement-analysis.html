@@ -588,7 +588,7 @@ Note
 <p>Financial statements and ratios are fundamental tools for understanding and evaluating companies. While we discuss how assets are priced in equilibrium in the previous chapter on the <a href="../r/capital-asset-pricing-model.html">Capital Asset Pricing Model</a>, this chapter examines how investors and analysts assess companies using accounting information. Financial statements serve as the primary source of standardized information about a company’s operations, financial position, and performance. Their standardization and legal requirements make them particularly valuable as all companies must file financial statements.</p>
 <p>Building on this standardized information, financial ratios transform raw accounting data into meaningful metrics that facilitate analysis across companies and over time. These ratios serve multiple purposes in both academic research and practical applications. They enable investors to benchmark companies against their peers, identify industry trends, and screen for investment opportunities. In academic finance, ratios play a crucial role in asset pricing models (e.g., the book-to-market ratio in the Fama-French three-factor model) and corporate finance (e.g., capital structure research). In many practical applications, ratios help assess a company’s financial health and performance.</p>
 <p>This chapter demonstrates how to access, process, and analyze financial statements using R. We start by reviewing the financial statements balance sheet, income statement, and cash flow statement. Then, we download publicly available statements to calculate key financial ratios, implement common screening strategies, and evaluate companies. Our analysis combines theoretical frameworks with practical implementation, providing tools for both academic research and investment practice.</p>
-<p>For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package <code>fmpapi</code>.</p>
+<p>For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses such as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package <code>fmpapi</code>.</p>
 <p>The FMP API’s free tier provides access to:</p>
 <ul>
 <li>250 API calls per day,</li>
@@ -643,10 +643,10 @@ Figure&nbsp;1: A stylized representation of a balance sheet statement.
 <div id="fig-401" class="quarto-float quarto-figure quarto-figure-center anchored">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-401-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="../assets/img/balance-sheet-breakdown.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;2: A stylized representation of a balance sheet beakdown."><img src="../assets/img/balance-sheet-breakdown.svg" class="img-fluid figure-img"></a>
+<a href="../assets/img/balance-sheet-breakdown.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;2: A stylized representation of a balance sheet breakdown."><img src="../assets/img/balance-sheet-breakdown.svg" class="img-fluid figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-401-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;2: A stylized representation of a balance sheet beakdown.
+Figure&nbsp;2: A stylized representation of a balance sheet breakdown.
 </figcaption>
 </figure>
 </div>
@@ -824,29 +824,51 @@ Figure&nbsp;7: A screenshot of the cash flow statement of Microsoft in 2023.
 <p>We now turn to downloading and processing statements for multiple companies. The next code chunk demonstrates how to retrieve financial data for selected stocks that are supported in the free tier of FMP.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>sample <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"AAPL"</span>, <span class="st">"MSFT"</span>, <span class="st">"GOOGL"</span>, <span class="st">"AMZN"</span>, <span class="st">"TSLA"</span>, <span class="st">"NVDA"</span>, <span class="st">"META"</span>, <span class="st">"NFLX"</span>, <span class="st">"DIS"</span>, <span class="st">"NKE"</span>,</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"WMT"</span>, <span class="st">"KO"</span>, <span class="st">"JPM"</span>, <span class="st">"BAC"</span>, <span class="st">"V"</span>, <span class="st">"XOM"</span>, <span class="st">"CVX"</span>, <span class="st">"JNJ"</span>, <span class="st">"PFE"</span>, <span class="st">"INTC"</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"AMD"</span>, <span class="st">"SBUX"</span>, <span class="st">"BABA"</span>, <span class="st">"UBER"</span>, <span class="st">"CSCO"</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>params <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">period =</span> <span class="st">"annual"</span>, <span class="at">limit =</span> <span class="dv">5</span>)</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>balance_sheet_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    \(x) {</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"balance-sheet-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>income_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    \(x) <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"income-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>cash_flow_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
-<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>    \(x) <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"cash-flow-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
-<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"AAPL"</span>,</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">"MSFT"</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">"GOOGL"</span>,</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">"AMZN"</span>,</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">"TSLA"</span>,</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">"NVDA"</span>,</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">"META"</span>,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">"NFLX"</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">"DIS"</span>,</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">"NKE"</span>,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">"WMT"</span>,</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">"KO"</span>,</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">"JPM"</span>,</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">"BAC"</span>,</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">"V"</span>,</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  <span class="st">"XOM"</span>,</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">"CVX"</span>,</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  <span class="st">"JNJ"</span>,</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="st">"PFE"</span>,</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="st">"INTC"</span>,</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="st">"AMD"</span>,</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">"SBUX"</span>,</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>  <span class="st">"BABA"</span>,</span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>  <span class="st">"UBER"</span>,</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>  <span class="st">"CSCO"</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>params <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">period =</span> <span class="st">"annual"</span>, <span class="at">limit =</span> <span class="dv">5</span>)</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>balance_sheet_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>    \(x) {</span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>      <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"balance-sheet-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>income_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    \(x) <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"income-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>cash_flow_statements <span class="ot">&lt;-</span> sample <span class="sc">|&gt;</span></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(</span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>    \(x) <span class="fu">fmp_get</span>(<span class="at">resource =</span> <span class="st">"cash-flow-statement"</span>, <span class="at">symbol =</span> x, <span class="at">params =</span> params)</span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The resulting data sets provide a foundation for cross-sectional analyses of financial ratios and trends across major U.S. companies. In the following sections, we use these data sets to calculate various financial ratios and analyze patterns in corporate financial performance.</p>
 </section>
@@ -854,13 +876,13 @@ Figure&nbsp;7: A screenshot of the cash flow statement of Microsoft in 2023.
 <h2 class="anchored" data-anchor-id="liquidity-ratios">Liquidity Ratios</h2>
 <p>Liquidity ratios assess a company’s ability to meet its short-term obligations and are typically calculated using balance sheet items. These ratios are particularly important for creditors and investors concerned about a company’s short-term financial health and ability to cover immediate obligations.</p>
 <p>The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:</p>
-<p><span class="math display">\[\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Total Liabilities}}\]</span></p>
+<p><span class="math display">\[\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}\]</span></p>
 <p>A ratio above one indicates that the company has enough current assets to cover its current liabilities, which are due within one year as discussed above.</p>
 <p>However, not all current assets are equally liquid, i.e., can be easily sold to meet a company’s obligations. This aspect is reflected in the Quick Ratio:</p>
 <p><span class="math display">\[\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\]</span> The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.</p>
 <p>The most conservative liquidity measure is the Cash Ratio:</p>
 <p><span class="math display">\[\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}\]</span></p>
-<p>This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. Afterall, all that cash could also be distributed to equity or pay down costly debt.</p>
+<p>This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. After all, all that cash could also be distributed to equity or pay down costly debt.</p>
 <p>Next, we calculate these ratios for all stocks, focusing on four major technology companies:</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>selected_symbols <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"MSFT"</span>, <span class="st">"AAPL"</span>, <span class="st">"AMZN"</span>, <span class="st">"NVDA"</span>)</span>
@@ -868,7 +890,7 @@ Figure&nbsp;7: A screenshot of the cash flow statement of Microsoft in 2023.
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>balance_sheet_statements <span class="ot">&lt;-</span> balance_sheet_statements <span class="sc">|&gt;</span></span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">fiscal_year =</span> <span class="fu">as.integer</span>(fiscal_year),</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">current_ratio =</span> total_current_assets <span class="sc">/</span> total_assets,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">current_ratio =</span> total_current_assets <span class="sc">/</span> total_current_liabilities,</span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">quick_ratio =</span> (total_current_assets <span class="sc">-</span> inventory) <span class="sc">/</span></span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>      total_current_liabilities,</span>
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">cash_ratio =</span> cash_and_cash_equivalents <span class="sc">/</span> total_current_liabilities,</span>
@@ -904,7 +926,7 @@ Figure&nbsp;8: Liquidity ratios are based on financial statements provided throu
 </div>
 </div>
 </div>
-<p>While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more convervative approach by holding larger liquidity buffers in the company.</p>
+<p>While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more conservative approach by holding larger liquidity buffers in the company.</p>
 </section>
 <section id="leverage-ratios" class="level2">
 <h2 class="anchored" data-anchor-id="leverage-ratios">Leverage Ratios</h2>
@@ -1068,7 +1090,7 @@ Figure&nbsp;11: Debt-to-asset ratios and interest coverages are based on financi
 <span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
 <span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
 <span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a>    cash_flow_statements <span class="sc">|&gt;</span></span>
-<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">fiscal_year =</span> <span class="fu">as.integer</span>(fiscal_year)) <span class="sc">|&gt;</span> </span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">fiscal_year =</span> <span class="fu">as.integer</span>(fiscal_year)) <span class="sc">|&gt;</span></span>
 <span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>      <span class="fu">select</span>(symbol, fiscal_year, inventory, accounts_receivables),</span>
 <span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>    <span class="fu">join_by</span>(symbol, fiscal_year)</span>
 <span id="cb15-34"><a href="#cb15-34" aria-hidden="true" tabindex="-1"></a>  )</span>
@@ -1080,7 +1102,7 @@ Figure&nbsp;11: Debt-to-asset ratios and interest coverages are based on financi
 <span id="cb15-40"><a href="#cb15-40" aria-hidden="true" tabindex="-1"></a>    <span class="at">receivables_turnover =</span> revenue <span class="sc">/</span> accounts_receivables</span>
 <span id="cb15-41"><a href="#cb15-41" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>We leave the visualization and interpretation of these figures as an exercise and move on the the last category of financial ratios.</p>
+<p>We leave the visualization and interpretation of these figures as an exercise and move on to the last category of financial ratios.</p>
 </section>
 <section id="profitability-ratios" class="level2">
 <h2 class="anchored" data-anchor-id="profitability-ratios">Profitability Ratios</h2>
@@ -1228,7 +1250,7 @@ Figure&nbsp;14: Ranks are based on financial statements provided through the FMP
 <p>The Fama-French five-factor model aims to explain stock returns by incorporating specific financial metrics ratios. We provide more details in <a href="../r/replicating-fama-and-french-factors.html">Replicating Fama-French Factors</a>, but here is an intuitive overview:</p>
 <ul>
 <li>Size: Calculated as the logarithm of a company’s market capitalization, which is the total market value of its outstanding shares. This factor captures the tendency for smaller firms to outperform larger ones over time.</li>
-<li>Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’’’ stock. This metric helps differentiate between undervalued and overvalued companies.</li>
+<li>Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’ stock. This metric helps differentiate between undervalued and overvalued companies.</li>
 <li>Profitability: Measured as the ratio of operating profit to book equity, where operating profit is calculated as revenue minus cost of goods sold (COGS), selling, general, and administrative expenses (SG&amp;A), and interest expense. This factor assesses a company’s efficiency in generating profits from its equity base.</li>
 <li>Investment: Calculated as the percentage change in total assets from the previous period. This factor reflects the company’s growth strategy, indicating whether it is investing aggressively or conservatively.</li>
 </ul>
@@ -1242,7 +1264,7 @@ Figure&nbsp;14: Ranks are based on financial statements provided through the FMP
 <span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>        x</span>
 <span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>      )</span>
 <span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    }</span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
 <span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(date <span class="sc">==</span> <span class="fu">min</span>(date))</span>
 <span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>combined_statements_ff <span class="ot">&lt;-</span> combined_statements <span class="sc">|&gt;</span></span>

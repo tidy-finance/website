@@ -48,11 +48,12 @@ crsp_monthly = (
 )
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.\index{Data!Compustat}
+Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. We keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity} Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.\index{Data!Compustat}
 
 ```{python}
 book_equity = (pl.read_parquet("data-python/compustat_annual.parquet")
     .select(["gvkey", "datadate", "be"])
+    .filter(pl.col("be") > 0)
     .drop_nulls()
     .with_columns(
         date=pl.col("datadate").dt.truncate("1mo")
@@ -371,6 +372,133 @@ plot_mktcap = (
     + facet_wrap("sorting_method")
     + scale_x_continuous(breaks=list(range(1, 6)))
     + scale_y_continuous(breaks=list(range(1, 6)))
+    + scale_fill_continuous(labels=percent_format())
+    + labs(
+        x="Size portfolio", y="Book-to-market portfolio", fill="Market cap (%)",
+        title="Market capitalization share per portfolio across sorting methods"
+    )
+)
+plot_mktcap.show()
+```
+
+The two figures highlight a tension that is invisible when looking at returns alone. Because the breakpoints are based on NYSE stocks, while the bulk of small firms trade on NASDAQ and AMEX, the small-size portfolios absorb a large number of stocks under both sorting schemes. The difference between the methods shows up along the book-to-market dimension: independent sorts apply the same NYSE book-to-market cutoffs to every size group, so the counts within a size column are uneven, whereas dependent sorts recompute the book-to-market breakpoints inside each size bucket and therefore distribute stocks more evenly across book-to-market within a given size group. Market capitalization tells the mirror-image story: regardless of the sorting method, aggregate market value concentrates in the large-size, low-book-to-market corner, where comparatively few stocks account for the lion's share of total market capitalization. This is a useful reminder that value-weighting lets a handful of large firms dominate portfolio returns, even when most of the stocks sit elsewhere in the grid.
+
+## Portfolio Composition
+
+So far, we have focused exclusively on the returns of our portfolios. Yet the way stocks are distributed across the size–value grid is itself informative, and it differs systematically between independent and dependent sorts. In this section, we visualize two characteristics for each of the 25 portfolios and for both sorting methods: the number of stocks and the aggregate market capitalization.
+
+We start with the independent assignment. As before, we group by month and assign the size and book-to-market portfolios separately.
+
+```{python}
+assignments_independent = (data_for_sorts
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        ),
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .reset_index(drop=True)
+    .assign(sorting_method="Independent")
+)
+```
+
+For the dependent assignment, we again first form the size portfolios and then assign book-to-market portfolios within each size bucket, so that the book-to-market breakpoints are specific to each size group.
+
+```{python}
+assignments_dependent = (data_for_sorts
+    .groupby("date")
+    .apply(lambda x: x.assign(
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .reset_index(drop=True)
+    .groupby(["date", "portfolio_size"])
+    .apply(lambda x: x.assign(
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .reset_index(drop=True)
+    .assign(sorting_method="Dependent")
+)
+```
+
+Next, we stack both assignments and compute the characteristics of interest. For each month and portfolio, we count the number of stocks and sum their lagged market capitalization. We then average these monthly figures across the whole sample to obtain one value per portfolio. Finally, we express market capitalization as a share of the total within each sorting method, which makes the concentration of market value across the grid directly comparable.
+
+```{python}
+portfolio_characteristics = (
+    pd.concat([assignments_independent, assignments_dependent])
+    .groupby(
+        ["sorting_method", "date", "portfolio_size", "portfolio_bm"],
+        observed=True
+    )
+    .agg(n_stocks=("permno", "count"), mktcap=("mktcap_lag", "sum"))
+    .reset_index()
+    .groupby(["sorting_method", "portfolio_size", "portfolio_bm"], observed=True)
+    .agg(n_stocks=("n_stocks", "mean"), mktcap=("mktcap", "mean"))
+    .reset_index()
+    .assign(
+        mktcap_share=lambda x: (
+            x["mktcap"]/x.groupby("sorting_method")["mktcap"].transform("sum")
+        )
+    )
+    .assign(
+        sorting_method=lambda x: pd.Categorical(
+            x["sorting_method"],
+            categories=["Independent", "Dependent"],
+            ordered=True
+        ),
+        n_stocks_label=lambda x: x["n_stocks"].round().astype(int),
+        mktcap_share_label=lambda x: (
+            (x["mktcap_share"]*100).round(1).astype(str)+"%"
+        )
+    )
+)
+```
+
+We are now ready to visualize the results. We use `geom_tile()` to draw the 25 portfolios as a heatmap spanned by the size and book-to-market portfolios, and facet by the sorting method. @fig-901 shows the average number of stocks per portfolio.
+
+```{python}
+#| label: fig-901
+#| fig-cap: "Average number of stocks per portfolio for independent and dependent bivariate sorts. Breakpoints are based on NYSE stocks. Portfolio 1 (5) contains the smallest (largest) firms along each dimension."
+#| fig-alt: "Two heatmaps of a five-by-five size and book-to-market grid, one for independent and one for dependent sorts. Stock counts are highest in the small-size portfolios and decline toward the large-size portfolios."
+plot_counts = (
+    ggplot(
+        portfolio_characteristics,
+        aes(x="portfolio_size", y="portfolio_bm", fill="n_stocks")
+    )
+    + geom_tile()
+    + geom_text(aes(label="n_stocks_label"))
+    + facet_wrap("sorting_method")
+    + labs(
+        x="Size portfolio", y="Book-to-market portfolio", fill="Avg. stocks",
+        title="Average number of stocks per portfolio across sorting methods"
+    )
+)
+plot_counts.show()
+```
+
+@fig-902 shows each portfolio's average market capitalization as a share of the total.
+
+```{python}
+#| label: fig-902
+#| fig-cap: "Average market capitalization per portfolio, expressed as a share of total market capitalization within each sorting method. Breakpoints are based on NYSE stocks."
+#| fig-alt: "Two heatmaps of a five-by-five size and book-to-market grid, one for independent and one for dependent sorts. Market capitalization concentrates heavily in the large-size, low-book-to-market portfolios."
+plot_mktcap = (
+    ggplot(
+        portfolio_characteristics,
+        aes(x="portfolio_size", y="portfolio_bm", fill="mktcap_share")
+    )
+    + geom_tile()
+    + geom_text(aes(label="mktcap_share_label"))
+    + facet_wrap("sorting_method")
     + scale_fill_continuous(labels=percent_format())
     + labs(
         x="Size portfolio", y="Book-to-market portfolio", fill="Market cap (%)",
