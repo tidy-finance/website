@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: modern-portfolio-theory-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -23,6 +24,7 @@ At the heart of MPT is mean-variance analysis, which evaluates portfolios based 
 We use the following packages throughout this chapter: 
 
 ```{python}
+#| label: modern-portfolio-theory-packages
 import polars as pl
 import numpy as np
 import tidyfinance as tf
@@ -33,6 +35,7 @@ from adjustText import adjust_text
 ```
 
 ```{python}
+#| label: modern-portfolio-theory-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -50,6 +53,7 @@ To keep things conceptually simple, we focus on the latter part for now and assu
 Thus, leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio as well as their daily adjusted close prices. 
 
 ```{python}
+#| label: modern-portfolio-theory-download-data
 symbols = pl.from_pandas(tf.download_data(
     domain="constituents", index="Dow Jones Industrial Average"
 ))
@@ -65,6 +69,7 @@ prices_daily = pl.from_pandas(tf.download_data(
 To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:
 
 ```{python}
+#| label: modern-portfolio-theory-filter-prices
 prices_daily = (prices_daily
     .with_columns(
         counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
@@ -76,6 +81,7 @@ prices_daily = (prices_daily
 We compute the sample average returns as $\frac{1}{T} \sum_{t=1}^{T} r_{i,t},$ where $r_{i,t}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods. As noted above, we treat the vector of sample averages as the true expected returns of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
 
 ```{python}
+#| label: modern-portfolio-theory-monthly-returns
 returns_monthly = (prices_daily
     .sort("date")
     .with_columns(date=pl.col("date").dt.truncate("1mo"))
@@ -91,6 +97,7 @@ Individual asset risk in MPT is typically quantified using variance (i.e., $\sig
 We compute the sample standard deviation for each asset by using the `std()` function.
 
 ```{python}
+#| label: modern-portfolio-theory-asset-moments
 assets = (returns_monthly
     .group_by("symbol")
     .agg(
@@ -131,6 +138,7 @@ The interpretation of the covariance is straightforward: While a positive covari
 We can use `numpy`'s `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot()` with the new column names from the `symbol`-column and setting the values to `ret`. We sort the columns by symbol so that the order matches `assets`, drop the rows with missing returns, and hand the resulting matrix to `numpy` at the boundary.
 
 ```{python}
+#| label: modern-portfolio-theory-covariance-matrix
 symbol_order = assets["symbol"].to_list()
 
 returns_wide = (returns_monthly
@@ -193,6 +201,7 @@ $$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},$$
 where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is the inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:
 
 ```{python}
+#| label: modern-portfolio-theory-mvp-weights
 iota = np.ones(sigma.shape[0])
 sigma_inv = np.linalg.inv(sigma)
 omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
@@ -229,6 +238,7 @@ omega_figure.show()
 Before we move on to other portfolios, we collect the return and volatility of the minimum-variance portfolio in a data frame:
 
 ```{python}
+#| label: modern-portfolio-theory-mvp-summary
 mu = assets["mu"].to_numpy()
 mu_mvp = omega_mvp @ mu
 sigma_mvp = np.sqrt(omega_mvp @ sigma @ omega_mvp)
@@ -249,6 +259,7 @@ In many instances, earning the lowest possible variance may not be the desired o
 Suppose, for instance, the investor wants to earn at least the historical average return of the asset that delivered the highest average returns in the past:
 
 ```{python}
+#| label: modern-portfolio-theory-target-return
 mu_bar = assets["mu"].max()
 ```
 
@@ -265,6 +276,7 @@ where $\lambda^* = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$
 The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
 
 ```{python}
+#| label: modern-portfolio-theory-efficient-portfolio
 C = iota @ sigma_inv @ iota
 D = iota @ sigma_inv @ mu
 E = mu @ sigma_inv @ mu
@@ -329,6 +341,7 @@ which corresponds to the efficient portfolio earning $a\mu_1 + (1-a)\mu_2$ in ex
 The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
 
 ```{python}
+#| label: modern-portfolio-theory-efficient-frontier
 a_grid = np.arange(-1, 2.01, 0.01)
 omega_grid = [a * omega_efp + (1 - a) * omega_mvp for a in a_grid]
 

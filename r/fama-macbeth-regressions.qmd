@@ -31,6 +31,7 @@ Before we move to the implementation, we want to highlight that the characterist
 The current chapter relies on this set of R packages. 
 
 ```{r}
+#| label: fama-macbeth-regressions-packages
 #| message: false
 library(tidyverse)
 library(arrow)
@@ -43,6 +44,7 @@ library(broom)
 We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). As in the previous chapters, we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Data!CRSP}\index{Data!Compustat}\index{Beta}\index{Book equity}
 
 ```{r}
+#| label: fama-macbeth-regressions-read-data
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(permno, gvkey, date, ret_excess, mktcap) |>
   collect()
@@ -60,6 +62,7 @@ We use the Compustat and CRSP data to compute the book-to-market ratio and the (
 Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.\index{Beta}\index{CAPM}
 
 ```{r}
+#| label: fama-macbeth-regressions-build-characteristics
 characteristics <- compustat_annual |>
   mutate(date = floor_date(ymd(datadate), "month")) |>
   left_join(crsp_monthly, join_by(gvkey, date)) |>
@@ -93,6 +96,7 @@ data_fama_macbeth <- crsp_monthly |>
 Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums $\hat\lambda^{f}_t$ for each point in time. \index{Regression!Cross-section}
 
 ```{r}
+#| label: fama-macbeth-regressions-cross-sectional
 risk_premiums <- data_fama_macbeth |>
   nest(data = c(ret_excess_lead, beta, log_mktcap, bm, permno)) |>
   mutate(
@@ -109,6 +113,7 @@ risk_premiums <- data_fama_macbeth |>
 Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the $t$-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests. 
 
 ```{r}
+#| label: fama-macbeth-regressions-price-of-risk
 price_of_risk <- risk_premiums |>
   group_by(factor = term) |>
   summarize(
@@ -120,6 +125,7 @@ price_of_risk <- risk_premiums |>
 It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), the typical procedure for this is computing @Newey1987 standard errors. We again recommend the data-driven approach of @Newey1994 using the `NeweyWest()` function, but note that you can enforce the typical 6 lag settings via `NeweyWest(., lag = 6, prewhite = FALSE)`.\index{Standard errors!Newey-West}
 
 ```{r}
+#| label: fama-macbeth-regressions-newey-west
 regressions_for_newey_west <- risk_premiums |>
   select(date, factor = term, estimate) |>
   nest(data = c(date, estimate)) |>
@@ -147,6 +153,7 @@ Finally, let us interpret the results. Stocks with higher book-to-market ratios 
 You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function:
 
 ```{r}
+#| label: fama-macbeth-regressions-tidyfinance
 #| eval: false
 library(tidyfinance)
 

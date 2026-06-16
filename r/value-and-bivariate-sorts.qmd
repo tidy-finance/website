@@ -18,6 +18,7 @@ We form portfolios on firm size and the book-to-market ratio. To calculate book-
 The current chapter relies on this set of R packages. 
 
 ```{r}
+#| label: value-and-bivariate-sorts-packages
 #| message: false
 library(tidyverse)
 library(arrow)
@@ -28,6 +29,7 @@ library(arrow)
 First, we load the necessary data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). We conduct portfolio sorts based on the CRSP sample but keep only the necessary columns in our memory. We use the same data sources for firm size as in [Size Sorts and P-Hacking](size-sorts-and-p-hacking.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{r}
+#| label: value-and-bivariate-sorts-load-crsp
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(
     permno,
@@ -44,6 +46,7 @@ crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
 Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our database. We keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity} Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date. To achieve this, we use the function `floor_date()`.\index{Data!Compustat}
 
 ```{r}
+#| label: value-and-bivariate-sorts-load-book-equity
 book_equity <- read_parquet("data-r/compustat_annual.parquet") |>
   select(gvkey, datadate, be) |>
   filter(be > 0) |>
@@ -60,6 +63,7 @@ As in the previous chapter, we continue to lag firm size by one month.\index{Mar
 Having both variables, i.e., firm size lagged by one month and book-to-market lagged by six months, we merge these sorting variables to our returns using the `sorting_date`-column created for this purpose. The final step in our data preparation deals with differences in the frequency of our variables. Returns and firm size are recorded monthly. Yet the accounting information is only released on an annual basis. Hence, we only match book-to-market to one month per year and have eleven empty observations. To solve this frequency issue, we carry the latest book-to-market ratio of each firm to the subsequent months, i.e., we fill the missing observations with the most current report. This is done via the `fill()`-function after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by `group_by()` as usual). We filter out all observations with accounting data that is older than a year. As the last step, we remove all rows with missing entries because the returns cannot be matched to any annual report.
 
 ```{r}
+#| label: value-and-bivariate-sorts-prepare-sorting-data
 size <- crsp_monthly |>
   mutate(sorting_date = date %m+% months(1)) |>
   select(permno, sorting_date, size = mktcap)
@@ -107,6 +111,7 @@ data_for_sorts <- data_for_sorts |>
 The last step of preparation for the portfolio sorts is the computation of breakpoints. We continue to use the same function allowing for the specification of exchanges to use for the breakpoints. Additionally, we reintroduce the argument `sorting_variable` into the function for defining different sorting variables.
 
 ```{r}
+#| label: value-and-bivariate-sorts-assign-portfolio-function
 assign_portfolio <- function(
   data,
   sorting_variable,
@@ -148,6 +153,7 @@ Bivariate sorts create portfolios within a two-dimensional space spanned by two 
 To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_size`, respectively.\index{Portfolio sorts!Independent bivariate} Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
 ```{r}
+#| label: value-and-bivariate-sorts-independent-portfolios
 value_portfolios <- data_for_sorts |>
   group_by(date) |>
   mutate(
@@ -174,6 +180,7 @@ value_portfolios <- data_for_sorts |>
 Equipped with our monthly portfolio returns, we are ready to compute the value premium. However, we still have to decide how to invest in the five high and the five low book-to-market portfolios. The most common approach is to weigh these portfolios equally, but this is yet another researcher's choice. Then, we compute the return differential between the high and low book-to-market portfolios and show the average value premium.
 
 ```{r}
+#| label: value-and-bivariate-sorts-independent-value-premium
 value_premium <- value_portfolios |>
   group_by(date, portfolio_bm) |>
   summarize(ret = mean(ret), .groups = "drop_last") |>
@@ -195,6 +202,7 @@ In the previous exercise, we assigned the portfolios without considering the sec
 To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable = "size"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ```{r}
+#| label: value-and-bivariate-sorts-dependent-portfolios
 value_portfolios <- data_for_sorts |>
   group_by(date) |>
   mutate(
@@ -243,6 +251,7 @@ So far, we have focused exclusively on the returns of our portfolios. Yet the wa
 We start with the independent assignment. As before, we group by month and assign the size and book-to-market portfolios separately.
 
 ```{r}
+#| label: value-and-bivariate-sorts-assignments-independent
 assignments_independent <- data_for_sorts |>
   group_by(date) |>
   mutate(
@@ -266,6 +275,7 @@ assignments_independent <- data_for_sorts |>
 For the dependent assignment, we again first form the size portfolios and then assign book-to-market portfolios within each size bucket, so that the book-to-market breakpoints are specific to each size group.
 
 ```{r}
+#| label: value-and-bivariate-sorts-assignments-dependent
 assignments_dependent <- data_for_sorts |>
   group_by(date) |>
   mutate(
@@ -292,6 +302,7 @@ assignments_dependent <- data_for_sorts |>
 Next, we stack both assignments and compute the characteristics of interest. For each month and portfolio, we count the number of stocks and sum their lagged market capitalization. We then average these monthly figures across the whole sample to obtain one value per portfolio. Finally, we express market capitalization as a share of the total within each sorting method, which makes the concentration of market value across the grid directly comparable.
 
 ```{r}
+#| label: value-and-bivariate-sorts-portfolio-characteristics
 portfolio_characteristics <- bind_rows(
   assignments_independent,
   assignments_dependent

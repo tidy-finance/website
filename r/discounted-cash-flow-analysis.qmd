@@ -30,6 +30,7 @@ We make a few simplifying assumptions due to the diverse nature of businesses, w
 In this chapter, we rely on the following packages to build a simple DCF analysis:
 
 ```{r}
+#| label: discounted-cash-flow-analysis-packages
 #| message: false
 #| warning: false
 library(tidyverse)
@@ -47,6 +48,7 @@ The `fmpapi` package is developed by Christoph Scheuch and is not sponsored by o
 Before we can perform a DCF analysis, we need historical financial data to inform our forecasts. We use the Financial Modeling Prep (FMP) API to download financial statements. The `fmpapi` package provides a convenient interface for accessing this data in a tidy format.\index{Data!FMP API}
 
 ```{r}
+#| label: discounted-cash-flow-analysis-download-statements
 #| cache: true
 symbol <- "MSFT"
 
@@ -78,6 +80,7 @@ Each component of this formula serves a specific purpose in capturing the compan
 We can implement this calculation by combining and transforming our financial statement data. Note that we also arrange by year, which is important for some of the following code chunks.
 
 ```{r}
+#| label: discounted-cash-flow-analysis-compute-historical-fcf
 dcf_data <- income_statements |>
   mutate(
     fiscal_year = as.integer(fiscal_year),
@@ -194,6 +197,7 @@ The final step in our FCF forecast is projecting revenue growth. While there are
 We use GDP growth forecasts from the [IMF World Economic Outlook (WEO)](https://www.imf.org/en/Publications/WEO/weo-database/2024/October/weo-report?c=111,&s=NGDP_RPCH,&sy=2020&ey=2029&ssm=0&scsm=1&scc=0&ssd=1&ssc=0&sic=1&sort=country&ds=.&br=1) database as our baseline. The WEO provides comprehensive economic projections, though it is important to note that these forecasts are periodically revised as new data becomes available.\index{Data!IMF WEO} We manually collect these forecasts and store them in a tibble.
 
 ```{r}
+#| label: discounted-cash-flow-analysis-gdp-growth-forecasts
 gdp_growth <- tibble(
   year = 2021:2030,
   gdp_growth = c(
@@ -217,6 +221,7 @@ dcf_data <- dcf_data |>
 Our approach models revenue growth as a linear function of GDP growth. This relation captures the intuition that company revenues often move in tandem with broader economic activity, though usually with different sensitivity.\index{Growth modeling} Let us estimate the model with historical data.
 
 ```{r}
+#| label: discounted-cash-flow-analysis-revenue-growth-model
 revenue_growth_model <- dcf_data |>
   lm(revenue_growth ~ gdp_growth, data = _) |>
   coefficients()
@@ -261,6 +266,7 @@ While more sophisticated approaches exist (e.g., proprietary analyst forecasts o
 With all components in place - revenue growth projections and forecast ratios - we can now calculate our FCF forecasts. We must first convert our growth rates into revenue projections and then apply our forecast ratios to compute each FCF component.\index{Free Cash Flow!Computation}
 
 ```{r}
+#| label: discounted-cash-flow-analysis-project-fcf-components
 dcf_data$revenue_growth[1] <- 0
 dcf_data$revenue <- dcf_data$revenue[1] * cumprod(1 + dcf_data$revenue_growth)
 
@@ -312,6 +318,7 @@ The perpetual growth rate $g$ should reflect the long-term economic growth poten
 Let us implement the Perpetuity Growth Model:
 
 ```{r}
+#| label: discounted-cash-flow-analysis-terminal-value
 compute_terminal_value <- function(last_fcf, growth_rate, discount_rate) {
   last_fcf * (1 + growth_rate) / (discount_rate - growth_rate)
 }
@@ -344,6 +351,7 @@ While you can often find estimates of WACC from financial databases or analysts'
 If you would rather not estimate WACC manually, resources are available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s [database](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html). He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. For example, if you are analyzing a company in the Computer Services sector, as we do here, you can look up the industry's average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:
 
 ```{r}
+#| label: discounted-cash-flow-analysis-download-wacc
 #| cache: true
 library(readxl)
 
@@ -375,6 +383,7 @@ $$
 where $T$ is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.
 
 ```{r}
+#| label: discounted-cash-flow-analysis-compute-enterprise-value
 compute_dcf <- function(wacc, growth_rate) {
   free_cash_flow <- dcf_data$fcf
   last_fcf <- tail(free_cash_flow, 1)

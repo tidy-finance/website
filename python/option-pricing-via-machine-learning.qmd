@@ -5,7 +5,8 @@ metadata:
   description-meta: Use machine learning tools such as random forests and deep neural networks to price call options using the programming language Python.
 ---
 
-```{python} 
+```{python}
+#| label: option-pricing-via-machine-learning-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -22,6 +23,7 @@ ML algorithms build a model based on training data in order to make predictions 
 Throughout this chapter, we need the following Python packages.
 
 ```{python}
+#| label: option-pricing-via-machine-learning-packages
 import polars as pl
 import numpy as np
 
@@ -40,6 +42,7 @@ from sklearn.linear_model import Lasso
 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -96,6 +99,7 @@ where $C(S, T)$ is the price of the option as a function of today's stock price 
 The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters $S, K, r_f, T$, and $\sigma$ are specified (arguably, in a realistic context, all parameters are easy to specify except for $\sigma$ which has to be estimated). A simple Python function allows computing the price as we do below. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-black-scholes-function
 def black_scholes_price(S, K, r, T, sigma):
     """Calculate Black Scholes option price."""
 
@@ -117,6 +121,7 @@ To that end, we start with simulated data. We compute option prices for call opt
 In order to keep the analysis reproducible, we use `np.random.seed()`. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-simulate-data
 random_state = 42
 np.random.seed(random_state)
 
@@ -152,6 +157,7 @@ The code above generates more than 1.5 million random parameter constellations (
 Next, we split the data into a training set (which contains 1 percent of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains `{python} f'{option_prices.shape[0]:,}'` different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.
 
 ```{python}
+#| label: option-pricing-via-machine-learning-train-test-split
 train_data, test_data = train_test_split(
     option_prices.to_pandas(), test_size=0.01, random_state=random_state
 )
@@ -160,6 +166,7 @@ train_data, test_data = train_test_split(
 We process the training dataset further before we fit the different ML models. We define a `ColumnTransformer()` that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The *true* price (stored in column `black_scholes`) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors via `StandardScaler()` to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.  
 
 ```{python}
+#| label: option-pricing-via-machine-learning-preprocessor
 preprocessor = ColumnTransformer(
     transformers=[
         (
@@ -177,6 +184,7 @@ preprocessor = ColumnTransformer(
 Next, we show how to fit a neural network to the data. The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with ten hidden units. We set the number of training iterations to `max_iter=1000`. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-nnet-model
 max_iter = 1000
 
 nnet_model = MLPRegressor(
@@ -187,6 +195,7 @@ nnet_model = MLPRegressor(
 We can follow the straightforward workflow as in the chapter before: define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-nnet-fit
 nnet_pipeline = Pipeline(
     [("preprocessor", preprocessor), ("regressor", nnet_model)]
 )
@@ -202,6 +211,7 @@ One word of caution regarding the training of Neural networks: For illustrative 
 Once you are familiar with the `scikit-learn` workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node. The random forests are trained using the function `RandomForestRegressor()`. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-rf-model
 rf_model = RandomForestRegressor(
     n_estimators=50, min_samples_leaf=2000, random_state=random_state
 )
@@ -210,6 +220,7 @@ rf_model = RandomForestRegressor(
 Fitting the model follows exactly the same convention as for the neural network before.
 
 ```{python}
+#| label: option-pricing-via-machine-learning-rf-fit
 rf_pipeline = Pipeline(
     [("preprocessor", preprocessor), ("regressor", rf_model)]
 )
@@ -225,6 +236,7 @@ rf_fit = rf_pipeline.fit(
 A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used [for applications of deep neural networks in finance, see, for instance, @Jiang2022; @Jensen2022]. The following code chunk implements a deep neural network with three hidden layers of size ten each and logistic activation functions. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-deepnnet-fit
 #| warning: false
 deepnnet_model = MLPRegressor(
     hidden_layer_sizes=(10, 10, 10),
@@ -248,7 +260,8 @@ deepnnet_fit = deepnnet_pipeline.fit(
 
 Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables' polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd) on how to tune the model hyperparameters).
 
-```{python} 
+```{python}
+#| label: option-pricing-via-machine-learning-lasso-fit
 #| warning: false
 lm_pipeline = Pipeline(
     [
@@ -274,6 +287,7 @@ lm_fit = lm_pipeline.fit(
 Finally, we collect all predictions to compare the *out-of-sample* prediction error evaluated on 10,000 new data points. 
 
 ```{python}
+#| label: option-pricing-via-machine-learning-predictions
 test_X = test_data.get(["S", "K", "r", "T", "sigma"])
 test_y = test_data.get("observed_price")
 

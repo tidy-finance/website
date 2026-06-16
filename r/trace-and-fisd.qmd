@@ -20,6 +20,7 @@ Many researchers study liquidity in the US corporate bond market [see, e.g., @be
 The current chapter relies on this set of R packages. 
 
 ```{r}
+#| label: trace-and-fisd-packages
 #| message: false
 library(tidyverse)
 library(tidyfinance)
@@ -35,6 +36,7 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the `RPostgres` connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{WRDS}
 
 ```{r}
+#| label: trace-and-fisd-wrds-connection
 #| eval: !expr params$download_data
 wrds <- dbConnect(
   Postgres(),
@@ -73,6 +75,7 @@ The following chunk connects to the data and selects the bond sample to remove c
 1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{r}
+#| label: trace-and-fisd-filter-fisd-issues
 #| eval: !expr params$download_data
 fisd_mergedissue_db <- tbl(wrds, I("fisd.fisd_mergedissue"))
 
@@ -143,6 +146,7 @@ fisd <- fisd_mergedissue_db |>
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{r}
+#| label: trace-and-fisd-merge-issuer-info
 #| eval: !expr params$download_data
 fisd_mergedissuer_db <- tbl(wrds, I("fisd.fisd_mergedissuer"))
 
@@ -159,6 +163,7 @@ fisd <- fisd |>
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
 
 ```{r}
+#| label: trace-and-fisd-download-fisd
 #| eval: !expr params$download_data
 #| output: false
 download_data(domain = "wrds", dataset = "fisd")
@@ -167,6 +172,7 @@ download_data(domain = "wrds", dataset = "fisd")
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{r}
+#| label: trace-and-fisd-save-fisd
 #| eval: !expr params$download_data
 write_parquet(fisd, "data-r/fisd.parquet")
 ```
@@ -174,6 +180,7 @@ write_parquet(fisd, "data-r/fisd.parquet")
 The FISD database also contains other data. The issue-based file contains information on covenants, i.e., restrictions included in bond indentures to limit specific actions by firms [e.g., @handler2021]. Moreover, FISD also provides information on bond ratings. We do not need either here.
 
 ```{r}
+#| label: trace-and-fisd-load-fisd
 #| echo: false
 #| eval: !expr "!params$download_data"
 fisd <- read_parquet("data-r/fisd.parquet")
@@ -188,6 +195,7 @@ Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted wit
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. If we were working with the complete TRACE data for all CUSIPs above, splitting the data into 100 parts takes roughly two hours using our setup. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
 ```{r}
+#| label: trace-and-fisd-split-cusips
 fisd_cusips <- fisd |>
   pull(complete_cusip)
 
@@ -200,6 +208,7 @@ fisd_parts <- split(
 Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches. Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
 
 ```{r}
+#| label: trace-and-fisd-download-trace-batches
 #| eval: !expr params$download_data
 #| output: false
 batches <- length(fisd_parts)
@@ -232,6 +241,7 @@ for (j in 1:batches) {
 If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
 
 ```{r}
+#| label: trace-and-fisd-download-trace-example
 #| eval: !expr params$download_data
 #| output: false
 download_data(
@@ -250,6 +260,7 @@ While many news outlets readily provide information on stocks and the underlying
 We start by looking into the number of bonds outstanding over time and compare it to the number of bonds traded in our sample. First, we compute the number of bonds outstanding for each quarter around the Paris Agreement from 2014 to 2016. 
 
 ```{r}
+#| label: trace-and-fisd-bonds-outstanding
 bonds_outstanding <- expand_grid(
   "date" = seq(ymd("2014-01-01"), ymd("2016-11-30"), by = "quarter"),
   "complete_cusip" = fisd$complete_cusip
@@ -271,6 +282,7 @@ bonds_outstanding <- expand_grid(
 Next, we look at the bonds traded each quarter in the same period. Notice that we do not have to load the complete TRACE table from our dataset into memory to perform the simple aggregation. Arrow's `open_dataset()` creates a lazy query plan that pushes all the filtering and aggregation down to its backend engine, reading only the necessary columns from Parquet and returning just the small summarized result to our session when we call `collect()`.
 
 ```{r}
+#| label: trace-and-fisd-bonds-traded
 trace_enhanced <- open_dataset("data-r/trace_enhanced")  
 
 bonds_traded <- trace_enhanced |>
@@ -308,6 +320,7 @@ We see that the number of bonds outstanding increases steadily between 2014 and 
 Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).\index{Liquidity}
 
 ```{r}
+#| label: trace-and-fisd-bond-characteristics-summary
 fisd |>
   mutate(
     maturity = as.numeric(maturity - offering_date) / 365,
@@ -335,6 +348,7 @@ We see that the sample is dominated by zero-coupon bonds: the median coupon is z
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
 ```{r}
+#| label: trace-and-fisd-trade-summary
 trace_enhanced |>
   group_by(trd_exctn_dt) |>
   summarize(

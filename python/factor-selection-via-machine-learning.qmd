@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: factor-selection-via-machine-learning-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -79,6 +80,7 @@ The Elastic Net [@Zou2005] combines $L_1$ with $L_2$ penalization and encourages
 To get started, we load the required packages and data. The main focus is on the workflow behind the `scikit-learn` [@scikit-learn] package collection. 
 
 ```{python}
+#| label: factor-selection-via-machine-learning-packages
 import polars as pl
 import pandas as pd
 import numpy as np
@@ -96,6 +98,7 @@ from sklearn.linear_model import ElasticNet, Lasso, Ridge
 ```
 
 ```{python}
+#| label: factor-selection-via-machine-learning-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -115,6 +118,7 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 In line with many existing papers, we use monthly portfolio returns from ten different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macroeconomic predictors}\index{Data!Industry portfolios}
 
 ```{python, eval = TRUE}
+#| label: factor-selection-via-machine-learning-load-factor-data
 factors_ff3_monthly = (
     pl.read_parquet("data-python/factors_ff3_monthly.parquet")
     .rename(lambda c: f"factor_ff_{c}")
@@ -139,6 +143,7 @@ industries_ff_monthly = (
 We combine all the monthly observations into one dataframe.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-combine-data
 data = (industries_ff_monthly
   .join(factors_ff3_monthly,
         how="left", left_on="date", right_on="factor_ff_date")
@@ -195,6 +200,7 @@ We hence perform the following pre-processing steps:
 Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Because `scikit-learn` operates on `pandas` objects, we convert the data frame with `to_pandas()` at the boundary before feeding it into the modeling pipeline.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-preprocessor
 macro_variables = [c for c in data.columns if c.startswith("macro")]
 factor_variables = [c for c in data.columns if c.startswith("factor")]
 
@@ -230,6 +236,7 @@ In the application at hand, $X$ contains `{python} len(column_combinations)` col
 We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with similar code. For now, we start with the linear regression model with an arbitrarily chosen value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-build-model
 lm_model = ElasticNet(
   alpha=0.007,
   l1_ratio=1, 
@@ -250,6 +257,7 @@ That's it - we are done! The object `lm_model_pipeline` contains the definition 
 With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-fit-model
 data_manufacturing = data.query("industry == 'manuf'")
 training_date = "2011-12-01"
 
@@ -304,6 +312,7 @@ predicted_values_figure.show()
 What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample for a grid of different $\lambda$'s. 
 
 ```{python}
+#| label: factor-selection-via-machine-learning-coefficient-paths
 #| warning: false
 x = preprocessor.fit_transform(data_manufacturing)
 y = data_manufacturing["ret_excess"]
@@ -381,6 +390,7 @@ For our sample, we consider a time-series cross-validation sample. This means th
 Then, we evaluate the performance for a grid of different penalty values. `scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-tune-model
 #| warning: false
 initial_years = 5
 assessment_months = 48
@@ -460,6 +470,7 @@ We want to identify relevant variables by fitting Lasso models for each industry
 First, we define the Lasso model with one tuning parameter.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-lasso-model
 lm_model = Lasso(fit_intercept=False, max_iter=5000)
 
 params = {"regressor__alpha": alphas}
@@ -473,6 +484,7 @@ lm_pipeline = Pipeline([
 The following task can be easily parallelized to reduce computing time, but we use a simple loop for ease of exposition.
 
 ```{python}
+#| label: factor-selection-via-machine-learning-all-industries
 #| warning: false
 #| output: false
 all_industries = data["industry"].drop_duplicates()

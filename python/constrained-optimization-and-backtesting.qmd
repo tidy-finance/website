@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -19,6 +20,7 @@ You are reading **Tidy Finance with Python**. You can find the equivalent chapte
 Throughout this chapter, we use the following Python packages:
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-packages
 import polars as pl
 import numpy as np
 
@@ -30,6 +32,7 @@ from scipy.optimize import minimize
 ```
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -41,6 +44,7 @@ Compared to previous chapters, we introduce `expon` from `scipy.stats` to calcul
 We start by loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-load-industries
 industry_returns = (
     pl.read_parquet("data-python/industries_ff_monthly.parquet")
     .drop("date")
@@ -59,6 +63,7 @@ $${#eq-recap-mvp}
 where $\Sigma$ is the $(N \times N)$ covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In terms of code, the math is equivalent to the following chunk. \index{Minimum variance portfolio}
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-minimum-variance
 n_industries = industry_returns.shape[1]
 
 industry_matrix = industry_returns.to_numpy()
@@ -140,6 +145,7 @@ The optimal weights correspond to a mean-variance portfolio, where the vector of
 The function below implements the efficient portfolio weights in its general form, allowing for transaction costs (conditional on the holdings *before* reallocation). For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$.
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-efficient-weights
 def compute_efficient_weight(
     sigma, mu, gamma=2, beta=0, w_prev=np.ones(sigma.shape[1]) / sigma.shape[1]
 ):
@@ -178,6 +184,7 @@ weights_efficient.with_columns(pl.col(pl.Float64).round(3))
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth their entire wealth to lever long positions in other assets.\index{Short-selling} What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-transaction-costs
 gammas = [2, 4, 8, 20]
 betas = 20*expon.ppf(np.arange(1, 100)/100, scale=1)
 
@@ -238,6 +245,7 @@ We rely on the powerful `scipy.optimize` package, which provides a common interf
 We illustrate the use of `minimize()` by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `np.allclose()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `np.allclose()` has a built-in tolerance. It returns `True` if both are equal, which is the case in both applications below. 
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-numerical-replication
 # | output: false
 w_initial = np.ones(n_industries) / n_industries
 
@@ -305,6 +313,7 @@ The result above shows that the numerical procedure indeed recovered the optimal
 Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. We can implement the short-sale constraints by imposing a vector of lower bounds `lb = rep(0, n_industries)`.
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-no-short-sale
 w_no_short_sale = minimize(
     x0=w_initial,
     fun=objective_efficient,
@@ -332,6 +341,7 @@ You can verify that `np.sum(w_no_short_sale.x)` returns 1. In other words, `mini
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-regulation-t
 reg_t = 1.5
 
 
@@ -407,6 +417,7 @@ The results clearly indicate the effect of imposing additional constraints: the 
 Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-l1-transaction-costs
 def compute_efficient_weight_L1_TC(mu, sigma, gamma, beta, initial_weights):
     """Compute efficient portfolio weights with L1 constraint."""
 
@@ -451,6 +462,7 @@ While interesting from a methodological point of view, we cannot evaluate the pe
 The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights, which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.\index{Transaction cost}
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-setup-backtest
 window_length = 120
 periods = industry_returns.shape[0] - window_length
 
@@ -472,6 +484,7 @@ w_prev_1 = w_prev_2 = w_prev_3 = np.ones(n_industries) / n_industries
 We also define two helper functions: One to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs. 
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-helper-functions
 def adjust_weights(w, next_return):
     w_prev = 1 + w * next_return
     return np.array(w_prev / np.sum(np.array(w_prev)))
@@ -490,6 +503,7 @@ def evaluate_performance(w, w_previous, next_return, beta=50):
 The following code chunk performs a rolling-window estimation, which we implement in a loop. In each period, the estimation window contains the returns available up to the current period. Note that we use the sample variance-covariance matrix and ignore the estimation of $\hat\mu$ entirely, but you might use more advanced estimators in practice. 
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-rolling-window
 for p in range(periods):
     returns_window = industry_matrix[p : (p + window_length - 1), :]
     next_return = industry_matrix[p + window_length, :]
@@ -529,6 +543,7 @@ for p in range(periods):
 Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations. \index{Sharpe ratio}
 
 ```{python}
+#| label: constrained-optimization-and-backtesting-performance-table
 performance = pl.concat([
     pl.DataFrame(
         values,
