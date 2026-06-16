@@ -281,11 +281,25 @@ estimate_capm <- function(data) {
   )
 }
   
-capm_results <- returns_excess_monthly |> 
-  nest(data = -symbol) |> 
-  mutate(capm = map(data, estimate_capm)) |> 
-  unnest(capm) |> 
+capm_results <- returns_excess_monthly |>
+  nest(data = -symbol) |>
+  mutate(capm = map(data, estimate_capm)) |>
+  unnest(capm) |>
   select(symbol, coefficient, estimate, t_statistic)
+```
+
+Instead of writing the regression helper ourselves, we could rely on the `estimate_model()` function from the `tidyfinance` package, which returns the coefficients and, via its `output` argument, the corresponding t-statistics:
+
+```{r}
+#| eval: false
+library(tidyfinance)
+
+returns_excess_monthly |>
+  nest(data = -symbol) |>
+  mutate(capm = map(
+    data,
+    \(x) estimate_model(x, "ret_excess ~ mkt_excess", output = c("coefficients", "tstats"))
+  ))
 ```
 
 The results are particularly interesting when we visualize the alphas across our sample of Dow Jones constituents. @fig-305 reveals the cross-sectional distribution of risk-adjusted performance, with positive values indicating outperformance and negative values indicating underperformance relative to what CAPM would predict. Statistical significance is indicated through color coding, showing which alphas are statistically different from zero at the 95% confidence level.
