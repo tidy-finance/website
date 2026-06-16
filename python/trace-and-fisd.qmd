@@ -169,6 +169,7 @@ To download the FISD data with the above filters and processing steps, you can u
 ```{python}
 #| label: trace-and-fisd-download-fisd
 #| output: false
+#| eval: false
 fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
 ```
 
@@ -235,12 +236,12 @@ for j in range(1, batches + 1):
     cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
     cusip_string = f"({cusip_batch_formatted})"
 
-    trace_enhanced_sub = clean_enhanced_trace(
+    trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
             cusips=cusip_string,
-            connection=wrds, 
-            start_date="'01/01/2014'", 
+            connection=wrds,
+            start_date="'01/01/2014'",
             end_date="'11/30/2016'"
-    )
+    ))
     
     if not trace_enhanced_sub.is_empty():
             table = (trace_enhanced_sub.to_arrow()
@@ -261,6 +262,7 @@ If you want to download the prepared enhanced TRACE data for selected bonds via 
 ```{python}
 #| label: trace-and-fisd-download-tidyfinance
 #| output: false
+#| eval: false
 tf.download_data(
     domain="wrds",
     dataset="trace_enhanced",
@@ -310,6 +312,7 @@ bonds_traded = (trace_enhanced
             .then(pl.col("trd_exctn_dt").dt.offset_by("-1mo"))
             .otherwise(pl.col("trd_exctn_dt").dt.truncate("1mo"))
             .dt.truncate("1q")
+            .cast(pl.Date)
     )
     .group_by("date")
     .agg(count=pl.col("cusip_id").n_unique())
