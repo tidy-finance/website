@@ -34,7 +34,7 @@ fisd = (pl.read_parquet("data-python/fisd.parquet")
 )
 
 trace_enhanced = (pl.from_arrow(
-        ds.dataset("data-r/trace_enhanced")
+        ds.dataset("data-python/trace_enhanced")
         .to_table(columns=["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
     )
     .drop_nulls()
@@ -145,9 +145,9 @@ shape: (3, 9)
 | measure            | count  | mean  | std  | min  | q05   | median | q95   | max    |
 |--------------------|--------|-------|------|------|-------|--------|-------|--------|
 | str                | u32    | f64   | f64  | f64  | f64   | f64    | f64   | f64    |
-| "avg_yield"        | 127524 | 4.08  | 4.21 | 0.06 | 1.27  | 3.38   | 8.1   | 127.97 |
-| "log_offering_amt" | 127524 | 13.27 | 0.82 | 4.64 | 12.21 | 13.22  | 14.51 | 16.52  |
-| "time_to_maturity" | 127524 | 8.55  | 8.41 | 1.01 | 1.5   | 5.81   | 27.41 | 100.7  |
+| "avg_yield"        | 159871 | 4.03  | 3.99 | 0.06 | 1.3   | 3.46   | 7.72  | 127.97 |
+| "log_offering_amt" | 159871 | 13.13 | 0.92 | 4.64 | 11.92 | 13.12  | 14.51 | 16.52  |
+| "time_to_maturity" | 159871 | 9.26  | 9.27 | 1.01 | 1.51  | 6.1    | 27.74 | 100.7  |
 
 ## Panel Regressions
 
@@ -175,20 +175,20 @@ pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 |----|----|----|
 |  | \(1\) | \(2\) |
 | coef |  |  |
-| treated | 0.462\*\*\* (9.305) | 0.983\*\*\* (29.533) |
-| post_period | -0.174\*\*\* (-5.917) |  |
-| polluter | 0.481\*\*\* (15.279) |  |
-| log_offering_amt | -0.551\*\*\* (-38.979) |  |
-| time_to_maturity | 0.058\*\*\* (41.556) |  |
-| Intercept | 10.735\*\*\* (57.017) |  |
+| treated | 0.437\*\*\* (10.405) | 0.823\*\*\* (29.656) |
+| post_period | -0.134\*\*\* (-5.274) |  |
+| polluter | 0.364\*\*\* (13.858) |  |
+| log_offering_amt | -0.342\*\*\* (-31.985) |  |
+| time_to_maturity | 0.049\*\*\* (46.078) |  |
+| Intercept | 7.921\*\*\* (56.141) |  |
 | fe |  |  |
 | cusip_id | \- | x |
 | date | \- | x |
 | stats |  |  |
-| Observations | 127524 | 127173 |
+| Observations | 159871 | 159667 |
 | S.E. type | iid | iid |
-| R² | 0.032 | 0.647 |
-| R² Within | \- | 0.007 |
+| R² | 0.025 | 0.642 |
+| R² Within | \- | 0.006 |
 | Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models.
@@ -214,7 +214,7 @@ model_without_fe_coefs = (pl.DataFrame({
     .filter(pl.col("term").str.contains("date"))
     .with_columns(
         treatment=pl.col("term").str.contains(":polluter"),
-        date=pl.col("term").str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        date=pl.col("term").str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})"),
         ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )

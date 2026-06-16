@@ -22,7 +22,7 @@ from regtabletotext import prettify_result
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md).[^1]
+We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md).[^1] The only addition is that we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
 
 ``` python
 crsp_monthly = (
@@ -35,6 +35,7 @@ crsp_monthly = (
 compustat_annual = (
     pl.read_parquet("data-python/compustat_annual.parquet")
     .select(["gvkey", "datadate", "be", "op", "inv"])
+    .filter(pl.col("be") > 0)
     .drop_nulls()
 )
 

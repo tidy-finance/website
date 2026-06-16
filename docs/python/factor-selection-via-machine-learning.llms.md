@@ -26,9 +26,11 @@ While no model can reduce \\\sigma\_\varepsilon^2\\, a biased estimator with sma
 
 One biased estimator is known as Ridge regression. Hoerl and Kennard ([1970](#ref-Hoerl1970)) propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the \\L_2\\ norm of the parameters* \\\hat\beta\\. Formally, this means that for a penalty factor \\\lambda\geq 0\\, the minimization problem takes the form \\\min\_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c\\. Here \\c\geq 0\\ is a constant that depends on the choice of \\\lambda\\. The larger \\\lambda\\, the smaller \\c\\ (technically speaking, there is a one-to-one relationship between \\\lambda\\, which corresponds to the Lagrangian of the minimization problem above and \\c\\). Here, \\X = \left(x_1 \ldots x_T\right)'\\ and \\y = \left(y_1, \ldots, y_T\right)'\\. A closed-form solution for the resulting regression coefficient vector \\\beta^\text{ridge}\\ exists: \\ \hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y, \tag{5}\\
 
-where \\I\\ is the identity matrix of dimension \\K\\. A couple of observations are worth noting: \\\hat\beta^\text{ridge} = \hat\beta^\text{ols}\\ for \\\lambda = 0\\ and \\\hat\beta^\text{ridge} \rightarrow 0\\ for \\\lambda\rightarrow \infty\\. Also for \\\lambda \> 0\\, \\\left(X'X + \lambda I\right)\\ is non-singular even if \\X'X\\ is which means that \\\hat\beta^\text{ridge}\\ exists even if \\\hat\beta\\ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter \\\lambda\\ which controls the *amount of regularization*: a larger value of \\\lambda\\ implies *shrinkage* of the regression coefficient toward 0; a smaller value of \\\lambda\\ reduces the bias of the resulting estimator.
+where \\I\\ is the identity matrix of dimension \\K\\. A couple of observations are worth noting: \\\hat\beta^\text{ridge} = \hat\beta^\text{ols}\\ for \\\lambda = 0\\ and \\\hat\beta^\text{ridge} \rightarrow 0\\ for \\\lambda\rightarrow \infty\\. Also for \\\lambda \> 0\\, \\\left(X'X + \lambda I\right)\\ is non-singular even if \\X'X\\ is singular, which means that \\\hat\beta^\text{ridge}\\ exists even if \\\hat\beta\\ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter \\\lambda\\ which controls the *amount of regularization*: a larger value of \\\lambda\\ implies *shrinkage* of the regression coefficient toward 0; a smaller value of \\\lambda\\ reduces the bias of the resulting estimator.
 
-Note that \\X\\ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that \\y\\ is simply demeaned before computing \\\hat\beta^\text{ridge}\\.
+> **NOTE:**
+>
+> Note that \\X\\ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that \\y\\ is simply demeaned before computing \\\hat\beta^\text{ridge}\\.
 
 What about the statistical properties of the Ridge estimator? First, the bad news is that \\\hat\beta^\text{ridge}\\ is a biased estimator of \\\beta\\. However, the good news is that (under homoscedastic error terms) the variance of the Ridge estimator is guaranteed to be *smaller* than the variance of the OLS estimator. We encourage you to verify these two statements in the Exercises. As a result, we face a trade-off: The Ridge regression sacrifices some unbiasedness to achieve a smaller variance than the OLS estimator.
 
@@ -47,10 +49,11 @@ The Elastic Net ([Zou and Hastie 2005](#ref-Zou2005)) combines \\L_1\\ with \\L_
 To get started, we load the required packages and data. The main focus is on the workflow behind the `scikit-learn` ([Pedregosa et al. 2011](#ref-scikit-learn)) package collection.
 
 ``` python
+import polars as pl
 import pandas as pd
 import numpy as np
 
-from plotnine import * 
+from plotnine import *
 from mizani.formatters import percent_format, date_format
 from itertools import product
 from sklearn.model_selection import (
@@ -76,40 +79,44 @@ Next, we include macroeconomic predictors which may predict the general stock ma
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets’ cross-section of returns. In line with many existing papers, we use monthly portfolio returns from ten different industries according to the definition from [Kenneth French’s homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
 
 ``` python
-factors_ff3_monthly = pd.read_parquet(
-    "data-python/factors_ff3_monthly.parquet"
-).add_prefix("factor_ff_")
+factors_ff3_monthly = (
+    pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+    .rename(lambda c: f"factor_ff_{c}")
+)
 
-factors_q_monthly = pd.read_parquet(
-    "data-python/factors_q_monthly.parquet"
-).add_prefix("factor_q_")
+factors_q_monthly = (
+    pl.read_parquet("data-python/factors_q_monthly.parquet")
+    .rename(lambda c: f"factor_q_{c}")
+)
 
-macro_predictors = pd.read_parquet(
-    "data-python/macro_predictors.parquet"
-).add_prefix("macro_")
+macro_predictors = (
+    pl.read_parquet("data-python/macro_predictors.parquet")
+    .rename(lambda c: f"macro_{c}")
+)
 
-industries_ff_monthly = pd.read_parquet(
-    "data-python/industries_ff_monthly.parquet"
-).melt(id_vars="date", var_name="industry", value_name="ret")
+industries_ff_monthly = (
+    pl.read_parquet("data-python/industries_ff_monthly.parquet")
+    .unpivot(index="date", variable_name="industry", value_name="ret")
+)
 ```
 
 We combine all the monthly observations into one dataframe.
 
 ``` python
 data = (industries_ff_monthly
-  .merge(factors_ff3_monthly, 
-         how="left", left_on="date", right_on="factor_ff_date")
-  .merge(factors_q_monthly, 
-         how="left", left_on="date", right_on="factor_q_date")
-  .merge(macro_predictors, 
-         how="left", left_on="date", right_on="macro_date") 
-  .assign(ret_excess=lambda x: x["ret"] - x["factor_ff_risk_free"]) 
-  .drop(columns=["ret", "factor_ff_date", "factor_q_date", "macro_date"])
-  .dropna()
+  .join(factors_ff3_monthly,
+        how="left", left_on="date", right_on="factor_ff_date")
+  .join(factors_q_monthly,
+        how="left", left_on="date", right_on="factor_q_date")
+  .join(macro_predictors,
+        how="left", left_on="date", right_on="macro_date")
+  .with_columns(ret_excess=pl.col("ret") - pl.col("factor_ff_risk_free"))
+  .drop("ret")
+  .drop_nulls()
 )
 ```
 
-Our data contains 23 columns of regressors with the 13 macro-variables and 9 factor returns for each month. [Figure 1](#fig-1401) provides summary statistics for the 10 monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries.
+Our data contains 25 columns of regressors with the 14 macro-variables and 10 factor returns for each month. [Figure 1](#fig-1401) provides summary statistics for the 10 monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries.
 
 ``` python
 data_figure = (
@@ -145,22 +152,20 @@ We hence perform the following pre-processing steps:
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
 
-Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. Also note that we use the `zip()` function to pair each element from `column_names` with its corresponding list of values from `new_column_values`, creating tuples, and then convert these tuples into a dictionary using `dict()` from which we create a dataframe.
+Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Because `scikit-learn` operates on `pandas` objects, we convert the data frame with `to_pandas()` at the boundary before feeding it into the modeling pipeline.
 
 ``` python
-macro_variables = data.filter(like="macro").columns
-factor_variables = data.filter(like="factor").columns
+macro_variables = [c for c in data.columns if c.startswith("macro")]
+factor_variables = [c for c in data.columns if c.startswith("factor")]
 
 column_combinations = list(product(macro_variables, factor_variables))
 
-new_column_values = []
-for macro_column, factor_column in column_combinations:
-    new_column_values.append(data[macro_column] * data[factor_column])
+interaction_terms = [
+    (pl.col(macro_column) * pl.col(factor_column)).alias(" x ".join((macro_column, factor_column)))
+    for macro_column, factor_column in column_combinations
+]
 
-column_names = [" x ".join(t) for t in column_combinations]
-new_columns = pd.DataFrame(dict(zip(column_names, new_column_values)))
-
-data = pd.concat([data, new_columns], axis=1)
+data = data.with_columns(interaction_terms).to_pandas()
 
 preprocessor = ColumnTransformer(
   transformers=[
@@ -179,7 +184,7 @@ Next, we can build an actual model based on our pre-processed data. In line with
 
 \\ \begin{aligned}\hat\beta\_\lambda^\text{Lasso} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits\_{k=1}^K\|\beta_k\|.\end{aligned} \tag{10}\\
 
-In the application at hand, \\X\\ contains 117 columns with all possible interactions between factor returns and macroeconomic variables. We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with similar code. For now, we start with the linear regression model with an arbitrarily chosen value for the penalty factor \\\lambda\\ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of \\1-\rho\\, hence setting `l1_ratio=1` implies the Lasso.
+In the application at hand, \\X\\ contains 140 columns with all possible interactions between factor returns and macroeconomic variables. We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with similar code. For now, we start with the linear regression model with an arbitrarily chosen value for the penalty factor \\\lambda\\ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of \\1-\rho\\, hence setting `l1_ratio=1` implies the Lasso.
 
 ``` python
 lm_model = ElasticNet(
@@ -243,7 +248,7 @@ predicted_values_figure = (
       x="", y="", color="", linetype="",
       title="Monthly realized and fitted manufacturing risk premia"
     )
-  + scale_x_datetime(date_breaks="5 years", date_labels="%Y")
+  + scale_x_date(date_breaks="5 years", date_labels="%Y")
   + scale_y_continuous(labels=percent_format())
 )
 predicted_values_figure.show()
@@ -282,7 +287,7 @@ coefficients_ridge = (pd.DataFrame(coefficients_ridge)
 )
 ```
 
-The dataframes `lasso_coefficients` and `ridge_coefficients` contain an entire sequence of estimated coefficients for multiple values of the penalty factor \\\lambda\\. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
+The dataframes `coefficients_lasso` and `coefficients_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor \\\lambda\\. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
 
 ``` python
 coefficients_figure = (
@@ -396,7 +401,7 @@ validation_figure.show()
 
 Figure 4: The figure shows root MSPE for different penalty factors. Evaluation of manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net, and 0.0 indicates Ridge.
 
-[Figure 4](#fig-1404) shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of np.float64(0.0043) and a mixture factor (\\\rho\\) of np.float64(0.5).
+[Figure 4](#fig-1404) shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of np.float64(0.003) and a mixture factor (\\\rho\\) of np.float64(1.0).
 
 ### Full workflow
 
@@ -473,7 +478,7 @@ selected_factors_figure.show()
 
 Figure 5: The figure shows selected variables for different industries. Dark areas indicate that the estimated Lasso regression coefficient is not set to zero. White fields show which variables get assigned a value of exactly zero.
 
-The heat map in [Figure 5](#fig-1405) conveys two main insights: first, we see that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only `factor_ff_mkt_excess` and its interaction with `macro_bm` a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While barely any variable is selected by Lasso for Utilities, many factors are selected for, e.g., Durable and Manufacturing, but the selected factors do not necessarily coincide. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide a factor that consistently provides pricing abilities across industries.
+The heat map in [Figure 5](#fig-1405) conveys two main insights: first, we see that many factors, macroeconomic variables, and interaction terms are not relevant for explaining the cross-section of returns across the industry portfolios. In fact, only `factor_ff_mkt_excess` and its interaction with `macro_bm` play a role for several industries. Second, there seems to be quite some heterogeneity across different industries. While barely any variable is selected by Lasso for Utilities, many factors are selected for, e.g., Durable and Manufacturing, but the selected factors do not necessarily coincide. In other words, there seems to be a clear picture that we do not need many factors, but Lasso does not provide a factor that consistently provides pricing abilities across industries.
 
 ## Key Takeaways
 

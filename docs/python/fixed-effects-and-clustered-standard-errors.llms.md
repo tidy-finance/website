@@ -127,12 +127,12 @@ data_investment_summary
 
 shape: (3, 9)
 
-| measure           | count  | mean | std  | min   | q05   | median | q95  | max  |
-|-------------------|--------|------|------|-------|-------|--------|------|------|
-| str               | u32    | f64  | f64  | f64   | f64   | f64    | f64  | f64  |
-| "cash_flows"      | 133608 | 0.01 | 0.27 | -1.56 | -0.48 | 0.06   | 0.27 | 0.47 |
-| "investment_lead" | 133608 | 0.06 | 0.08 | 0.0   | 0.0   | 0.03   | 0.2  | 0.46 |
-| "tobins_q"        | 133608 | 1.99 | 1.69 | 0.56  | 0.79  | 1.39   | 5.35 | 10.8 |
+| measure           | count  | mean | std  | min   | q05   | median | q95  | max   |
+|-------------------|--------|------|------|-------|-------|--------|------|-------|
+| str               | u32    | f64  | f64  | f64   | f64   | f64    | f64  | f64   |
+| "cash_flows"      | 139861 | -0.0 | 0.29 | -1.66 | -0.52 | 0.06   | 0.27 | 0.48  |
+| "investment_lead" | 139861 | 0.06 | 0.08 | 0.0   | 0.0   | 0.03   | 0.2  | 0.46  |
+| "tobins_q"        | 139861 | 2.06 | 1.81 | 0.57  | 0.8   | 1.41   | 5.61 | 11.62 |
 
 ## Fixed Effects
 
@@ -158,15 +158,15 @@ model_ols.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: 0
     Inference:  iid
-    Observations:  133608
+    Observations:  139861
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.042 |        0.000 |   130.069 |      0.000 |  0.041 |   0.042 |
-    | cash_flows    |      0.049 |        0.001 |    64.309 |      0.000 |  0.047 |   0.050 |
-    | tobins_q      |      0.007 |        0.000 |    57.710 |      0.000 |  0.007 |   0.007 |
+    | Intercept     |      0.043 |        0.000 |   137.513 |      0.000 |  0.042 |   0.043 |
+    | cash_flows    |      0.045 |        0.001 |    63.163 |      0.000 |  0.043 |   0.046 |
+    | tobins_q      |      0.007 |        0.000 |    57.540 |      0.000 |  0.006 |   0.007 |
     ---
-    RMSE: 0.074 R2: 0.044 
+    RMSE: 0.075 R2: 0.04 
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.
 
@@ -192,14 +192,14 @@ model_fe_firm.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: gvkey
     Inference:  iid
-    Observations:  131823
+    Observations:  138205
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.014 |        0.001 |    15.659 |      0.000 |  0.012 |   0.015 |
-    | tobins_q      |      0.011 |        0.000 |    83.006 |      0.000 |  0.010 |   0.011 |
+    | cash_flows    |      0.011 |        0.001 |    13.729 |      0.000 |  0.010 |   0.013 |
+    | tobins_q      |      0.010 |        0.000 |    81.822 |      0.000 |  0.009 |   0.010 |
     ---
-    RMSE: 0.049 R2: 0.577 R2 Within: 0.056 
+    RMSE: 0.05 R2: 0.563 R2 Within: 0.051 
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
 
@@ -223,18 +223,18 @@ model_fe_firmyear.summary()
     Estimation:  OLS
     Dep. var.: investment_lead, Fixed effects: gvkey+year
     Inference:  iid
-    Observations:  131823
+    Observations:  138205
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.017 |        0.001 |    19.576 |      0.000 |  0.015 |   0.018 |
-    | tobins_q      |      0.010 |        0.000 |    76.335 |      0.000 |  0.009 |   0.010 |
+    | cash_flows    |      0.014 |        0.001 |    17.498 |      0.000 |  0.013 |   0.016 |
+    | tobins_q      |      0.009 |        0.000 |    75.943 |      0.000 |  0.009 |   0.009 |
     ---
-    RMSE: 0.048 R2: 0.599 R2 Within: 0.049 
+    RMSE: 0.049 R2: 0.586 R2 Within: 0.045 
 
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time.
 
-How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are colinear with the fixed effects, and the estimation becomes void.
+How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are collinear with the fixed effects, and the estimation becomes void.
 
 Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the `results.compare()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing \\t\\-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects ([Wasserstein and Lazar 2016](#ref-Wasserstein2016)). The \\t\\-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.
 
@@ -246,17 +246,17 @@ pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.049\*\*\* (64.309) | 0.014\*\*\* (15.659) | 0.017\*\*\* (19.576) |
-| tobins_q | 0.007\*\*\* (57.710) | 0.011\*\*\* (83.006) | 0.010\*\*\* (76.335) |
-| Intercept | 0.042\*\*\* (130.069) |  |  |
+| cash_flows | 0.045\*\*\* (63.163) | 0.011\*\*\* (13.729) | 0.014\*\*\* (17.498) |
+| tobins_q | 0.007\*\*\* (57.540) | 0.010\*\*\* (81.822) | 0.009\*\*\* (75.943) |
+| Intercept | 0.043\*\*\* (137.513) |  |  |
 | fe |  |  |  |
-| year | \- | \- | x |
 | gvkey | \- | x | x |
+| year | \- | \- | x |
 | stats |  |  |  |
-| Observations | 133608 | 131823 | 131823 |
+| Observations | 139861 | 138205 | 138205 |
 | S.E. type | iid | iid | iid |
-| R² | 0.044 | 0.577 | 0.599 |
-| R² Within | \- | 0.056 | 0.049 |
+| R² | 0.040 | 0.563 | 0.586 |
+| R² Within | \- | 0.051 | 0.045 |
 | Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |  |
 
 ## Clustering Standard Errors
@@ -291,16 +291,16 @@ pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.017\*\*\* (19.576) | 0.017\*\*\* (11.367) | 0.017\*\*\* (9.361) |
-| tobins_q | 0.010\*\*\* (76.335) | 0.010\*\*\* (35.755) | 0.010\*\*\* (14.944) |
+| cash_flows | 0.014\*\*\* (17.498) | 0.014\*\*\* (10.122) | 0.014\*\*\* (8.298) |
+| tobins_q | 0.009\*\*\* (75.943) | 0.009\*\*\* (35.632) | 0.009\*\*\* (14.303) |
 | fe |  |  |  |
-| year | x | x | x |
 | gvkey | x | x | x |
+| year | x | x | x |
 | stats |  |  |  |
-| Observations | 131823 | 131823 | 131823 |
+| Observations | 138205 | 138205 | 138205 |
 | S.E. type | iid | by: gvkey | by: gvkey+year |
-| R² | 0.599 | 0.599 | 0.599 |
-| R² Within | 0.049 | 0.049 | 0.049 |
+| R² | 0.586 | 0.586 | 0.586 |
+| R² Within | 0.045 | 0.045 | 0.045 |
 | Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |  |
 
 Inspired by Abadie et al. ([2017](#ref-AbadieEtAl2017)), we want to close this chapter by highlighting that choosing the right dimensions for clustering is a design problem. Even if the data is informative about whether clustering matters for standard errors, they do not tell you whether you should adjust the standard errors for clustering. Clustering at too aggregate levels can hence lead to unnecessarily inflated standard errors.

@@ -104,10 +104,10 @@ prettify_result(model_fit)
 
     Coefficients:
                Estimate  Std. Error  t-Statistic  p-Value
-    Intercept       0.0       0.001         0.41    0.682
+    Intercept       0.0       0.001        0.316    0.752
 
     Summary statistics:
-    - Number of observations: 719
+    - Number of observations: 731
     - R-squared: 0.000, Adjusted R-squared: 0.000
     - F-statistic not available
 
@@ -282,10 +282,10 @@ prettify_result(model_fit)
 
     Coefficients:
                Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     0.003       0.003        0.882    0.378
+    Intercept     0.002       0.003        0.809    0.419
 
     Summary statistics:
-    - Number of observations: 719
+    - Number of observations: 731
     - R-squared: 0.000, Adjusted R-squared: 0.000
     - F-statistic not available
 
@@ -306,13 +306,13 @@ prettify_result(model_fit)
 
     Coefficients:
                 Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     -0.004       0.002       -1.653    0.098
-    mkt_excess     1.134       0.069       16.528    0.000
+    Intercept     -0.004       0.002       -1.870    0.061
+    mkt_excess     1.163       0.070       16.646    0.000
 
     Summary statistics:
-    - Number of observations: 719
-    - R-squared: 0.419, Adjusted R-squared: 0.418
-    - F-statistic: 273.166 on 1 and 717 DF, p-value: 0.000
+    - Number of observations: 731
+    - R-squared: 0.427, Adjusted R-squared: 0.426
+    - F-statistic: 277.088 on 1 and 729 DF, p-value: 0.000
 
 [Figure 3](#fig-703) shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years; each portfolio exhibits periods with positive and negative annual returns.
 
@@ -355,7 +355,7 @@ Overall, this chapter shows how functional programming can be leveraged to form 
 - Univariate portfolio sorts assess whether a single firm characteristic, like lagged market beta, can predict future excess returns.
 - Portfolios are formed each month using quantile breakpoints, with returns computed using value-weighted averages to reflect realistic investment strategies.
 - A long-short strategy based on beta-sorted portfolios fails to generate significant positive excess returns, contradicting CAPM predictions that higher beta should yield higher returns.
-- The analysis highlights the “betting against beta” anomaly, where low-beta portfolios deliver higher alphas than high-beta portfolios, providing evidence against the CAPM
+- The analysis highlights the “betting against beta” anomaly, where low-beta portfolios deliver higher alphas than high-beta portfolios, providing evidence against the CAPM.
 - The functional programming capabilities of Python enable scalable and flexible portfolio sorting, making it easy to analyze multiple characteristics and portfolio configurations.
 
 ## Exercises

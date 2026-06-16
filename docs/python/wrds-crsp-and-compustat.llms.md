@@ -6,7 +6,7 @@
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS),](https://wrds-www.wharton.upenn.edu/) a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the datasets and store them as Parquet-files introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.
 
-If you don’t have access to WRDS but still want to run the code in this book, we refer to [WRDS Pseudo Data](../python/wrds-dummy-data.llms.md), where we show how to create a pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.
+If you don’t have access to WRDS but still want to run the code in this book, we refer to [WRDS Pseudo Data](../python/wrds-dummy-data.llms.md), where we show how to create pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.
 
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. The last two packages are used for plotting.
 
@@ -78,7 +78,7 @@ We use the two remote tables to fetch the data we want to put into our local fol
 ``` python
 crsp_monthly_query = (
   "SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "
-         "msf.mthret AS ret, msf.shrout, msf.mthprc AS altprc, "
+         "msf.mthret AS ret, msf.shrout, msf.mthprc AS prc, "
          "ssih.primaryexch, ssih.siccd "
     "FROM crsp.msf_v2 AS msf "
     "INNER JOIN crsp.stksecurityinfohist AS ssih "
@@ -99,10 +99,11 @@ crsp_monthly_query = (
 crsp_monthly = (pl.read_database(
         query=crsp_monthly_query,
         connection=wrds,
-        schema_overrides={"permno": pl.Int64, "siccd": pl.Int64},
+        # column types chosen to match the parquet files of the R edition
+        schema_overrides={"permno": pl.Float64, "siccd": pl.Int32},
     )
     .with_columns(pl.col(pl.Decimal).cast(pl.Float64))
-    .with_columns(shrout=pl.col("shrout")*1000)
+    .with_columns(shrout=(pl.col("shrout")*1000).cast(pl.Float64))
 )
 ```
 
@@ -112,7 +113,7 @@ The first additional variable we create is market capitalization (`mktcap`), whi
 
 ``` python
 crsp_monthly = (crsp_monthly
-    .with_columns(mktcap=pl.col("shrout")*pl.col("altprc")/1000000)
+    .with_columns(mktcap=pl.col("shrout")*pl.col("prc")/1000000)
     .with_columns(
         mktcap=pl.when(pl.col("mktcap") == 0)
         .then(None)
@@ -436,7 +437,7 @@ crsp_daily = pl.from_pandas(tf.download_data(
 ))
 ```
 
-Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend to use loop the function over different date periods and store the results.
+Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend looping the function over different date periods and storing the results.
 
 ## Preparing Compustat Data
 
@@ -465,7 +466,7 @@ compustat_annual = (pl.read_database(
 )
 ```
 
-Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) Note that we set negative or zero equity to missing, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
+Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)
 
 ``` python
 compustat_annual = (compustat_annual
@@ -478,9 +479,6 @@ compustat_annual = (compustat_annual
             - pl.coalesce([pl.col("pstkrv"), pl.col("pstkl"),
                            pl.col("pstk")]).fill_null(0)
         )
-    )
-    .with_columns(
-        be=pl.when(pl.col("be") <= 0).then(None).otherwise(pl.col("be"))
     )
     .with_columns(
         op=(
@@ -496,7 +494,7 @@ We keep only the last available information for each firm-year group (by using `
 
 ``` python
 compustat_annual = (
-    compustat_annual.with_columns(year=pl.col("datadate").dt.year())
+    compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
     .sort("datadate")
     .group_by(["gvkey", "year"], maintain_order=True)
     .tail(1)
@@ -558,7 +556,7 @@ ccm_linking_table_query = (
 ccm_linking_table = pl.read_database(
     query=ccm_linking_table_query,
     connection=wrds,
-    schema_overrides={"permno": pl.Int64, "gvkey": pl.String},
+    schema_overrides={"permno": pl.Float64, "gvkey": pl.String},
 )
 ```
 
@@ -596,7 +594,7 @@ Before we close this chapter, let us look at an interesting descriptive statisti
 
 ``` python
 share_with_be = (crsp_monthly
-    .with_columns(year=pl.col("date").dt.year())
+    .with_columns(year=pl.col("date").dt.year().cast(pl.Float64))
     .sort("date")
     .group_by(["permno", "year"], maintain_order=True)
     .tail(1)
@@ -658,8 +656,6 @@ Bali, Turan G, Robert F Engle, and Scott Murray. 2016. *Empirical asset pricing:
 
 Bayer, Michael. 2012. “SQLAlchemy.” In *The Architecture of Open Source Applications Volume II: Structure, Scale, and a Few More Fearless Hacks*, edited by Amy Brown and Greg Wilson. Aosabook.org. <http://aosabook.org/en/sqlalchemy.html>.
 
-Fama, Eugene F., and Kenneth R. French. 1992. “The cross-section of expected stock returns.” *The Journal of Finance* 47 (2): 427–65. <https://doi.org/2329112>.
-
 Fama, Eugene F., and Kenneth R. French. 1997. “Industry Costs of Equity.” *Journal of Financial Economics* 43 (2): 153–93. <https://doi.org/10.1016/s0304-405x(96)00896-3>.
 
 Lyle, Matthew R., Federico Siano, and Teri Lombardi Yohn. 2025. “Re-Adjusted Financial Statement Data: Challenges in Replicating Research.” *Working Paper*. <http://dx.doi.org/10.2139/ssrn.5107985>.
@@ -674,4 +670,4 @@ Schwarz, Patrick, Dominik Walter, and Patrick Weiss. 2026. “Rewriting CRSP His
 
 [^3]: Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.
 
-[^4]: Compustat also contains reports in CAD, which can lead a currency mismatch, e.g., when relating book equity to market equity.
+[^4]: Compustat also contains reports in CAD, which can lead to a currency mismatch, e.g., when relating book equity to market equity.

@@ -36,15 +36,20 @@ Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upe
 ``` python
 import os
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, URL
+
 load_dotenv()
 
-connection_string = (
-    "postgresql+psycopg2://"
-    f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
-    "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
+connection_url = URL.create(
+    drivername="postgresql+psycopg2",
+    username=os.getenv("WRDS_USER"),
+    password=os.getenv("WRDS_PASSWORD"),
+    host="wrds-pgdata.wharton.upenn.edu",
+    port=9737,
+    database="wrds",
 )
 
-wrds = create_engine(connection_string, pool_pre_ping=True)
+wrds = create_engine(connection_url, pool_pre_ping=True)
 ```
 
 ## Mergent FISD
@@ -64,9 +69,9 @@ The following chunk connects to the data and selects the bond sample to remove c
 7.  Exclude bonds that are payable in kind (`(pay_in_kind != 'Y' OR pay_in_kind IS NULL) AND pay_in_kind_exp_date IS NULL`).
 8.  Exclude foreign (`yankee == "N" OR is.na(yankee)`) and Canadian issuers (`canadian = 'N' OR canadian IS NULL`).
 9.  Exclude bonds denominated in foreign currency (`foreign_currency = 'N'`).
-10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and annual, semi-annual, quarterly, or monthly interest frequencies.
+10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and an interest frequency of zero (for zero-coupon bonds), annual, semi-annual, quarterly, or monthly.
 11. Exclude bonds that were issued under SEC Rule 144A (`rule_144a = 'N'`).
-12. Exlcude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
+12. Exclude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
 13. Exclude defaulted bonds (`defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL`).
 14. Exclude convertible (`convertible = 'N'`), putable (`putable = 'N' OR putable IS NULL`), exchangeable (`exchangeable = 'N' OR exchangeable IS NULL`), perpetual (`perpetual = 'N'`), or preferred bonds (`preferred_security = 'N' OR preferred_security IS NULL`).
 15. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
@@ -193,12 +198,12 @@ for j in range(1, batches + 1):
     cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
     cusip_string = f"({cusip_batch_formatted})"
 
-    trace_enhanced_sub = clean_enhanced_trace(
+    trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
             cusips=cusip_string,
-            connection=wrds, 
-            start_date="'01/01/2014'", 
+            connection=wrds,
+            start_date="'01/01/2014'",
             end_date="'11/30/2016'"
-    )
+    ))
     
     if not trace_enhanced_sub.is_empty():
             table = (trace_enhanced_sub.to_arrow()
@@ -264,6 +269,7 @@ bonds_traded = (trace_enhanced
             .then(pl.col("trd_exctn_dt").dt.offset_by("-1mo"))
             .otherwise(pl.col("trd_exctn_dt").dt.truncate("1mo"))
             .dt.truncate("1q")
+            .cast(pl.Date)
     )
     .group_by("date")
     .agg(count=pl.col("cusip_id").n_unique())
@@ -333,11 +339,11 @@ shape: (3, 8)
 | measure        | mean  | std    | min   | q05  | median | q95   | max     |
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 | "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
+| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
 
-We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of ten years and pays around 6 percent in coupons.
+We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
@@ -369,13 +375,13 @@ average_trade_size.with_columns(pl.col(pl.Float64).round(0))
 
 shape: (2, 8)
 
-| measure        | mean    | std    | min   | q05     | median  | q95     | max     |
-|----------------|---------|--------|-------|---------|---------|---------|---------|
-| str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
-| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17845.0 | 26051.0 | 34379.0 | 40839.0 |
-| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6136.0  | 13421.0 | 17845.0 | 21312.0 |
+| measure        | mean    | std     | min   | q05     | median  | q95     | max     |
+|----------------|---------|---------|-------|---------|---------|---------|---------|
+| str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
+| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35690.0 | 52102.0 | 68758.0 | 81678.0 |
+| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12272.0 | 26842.0 | 35690.0 | 42625.0 |
 
-On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can, hence, conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
+On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can, hence, conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
 ## Key Takeaways
 

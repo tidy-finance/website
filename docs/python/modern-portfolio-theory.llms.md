@@ -8,7 +8,7 @@ In the previous chapter, we show how to download and analyze stock market data w
 
 MPT relies on the fact that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: Combining assets with low or negative correlations with a given portfolio reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
 
-At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk, defined as the variance of the portfolio returns. By balancing these two components, investors can construct portfolios that either maximize their expected return for a given level of risk or minimize their taken risk for a desired level of return. In this chapter, we first derive the optimal portfolio decisions and implement the mean-variance approach in R.
+At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk, defined as the variance of the portfolio returns. By balancing these two components, investors can construct portfolios that either maximize their expected return for a given level of risk or minimize their taken risk for a desired level of return. In this chapter, we first derive the optimal portfolio decisions and implement the mean-variance approach in Python.
 
 We use the following packages throughout this chapter:
 
@@ -28,7 +28,7 @@ We introduce the `adjustText` package for adding text labels to the figures in t
 
 Suppose that \\N\\ different risky assets are available to the investor. Each asset \\i\\ delivers expected returns \\\mu_i\\, representing the anticipated profit from holding the asset for one period. The investor can allocate their wealth across these assets by choosing the portfolio weights \\\omega_i\\ for each asset \\i\\. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option, such as keeping your money under a mattress. The overarching question of this chapter is: How should the investor allocate their wealth across these assets to optimize their portfolio’s performance?
 
-According to Markowitz ([1952](#ref-Markowitz1952)), portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience. Second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated. You need historical data or other considerations to generate estimates of the distribution of future returns. Only then can one proceed proceed to optimal decision-making *conditional* on your estimation.
+According to Markowitz ([1952](#ref-Markowitz1952)), portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience. Second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated. You need historical data or other considerations to generate estimates of the distribution of future returns. Only then can one proceed to optimal decision-making *conditional* on your estimation.
 
 To keep things conceptually simple, we focus on the latter part for now and assume that the actual distribution of the asset returns is known. In later chapters, we discuss the issues that arise once we take estimation uncertainty into account. To provide some meaningful illustrations, we rely on historical data to compute reasonable proxies for the expected returns and the variance-covariance of the assets returns, but we will work under the assumption that these are the true parameters of the return distribution.
 
@@ -43,7 +43,7 @@ prices_daily = pl.from_pandas(tf.download_data(
     domain="stock_prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2023-12-31",
+    end_date="2024-12-31",
 ))
 ```
 
@@ -235,7 +235,7 @@ shape: (1, 3)
 | mu       | sigma    | type                         |
 |----------|----------|------------------------------|
 | f64      | f64      | str                          |
-| 0.008356 | 0.032144 | "Minimum-Variance Portfolio" |
+| 0.008747 | 0.032358 | "Minimum-Variance Portfolio" |
 
 ## Efficient Portfolios
 
@@ -301,9 +301,9 @@ summaries_figure = (
 summaries_figure.show()
 ```
 
-[![Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents.](modern-portfolio-theory_files/figure-html/fig-205-output-1.png)](modern-portfolio-theory_files/figure-html/fig-205-output-1.png "Figure 4: The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents.")
+[![Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents.](modern-portfolio-theory_files/figure-html/fig-205-output-1.png)](modern-portfolio-theory_files/figure-html/fig-205-output-1.png "Figure 4: The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents.")
 
-Figure 4: The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the higehst return, respectively. The small dots indicate the location of the individual constituents.
+Figure 4: The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents.
 
 The figure illustrates the substantial diversification benefits: Instead of allocating all wealth into one asset that delivered a high average return in the past (at a substantial volatility), the efficient portfolio promises exactly the same expected returns but at a much lower volatility.
 
@@ -368,7 +368,7 @@ Figure 5: The big dots indicate the location of the minimum-variance and the ef
 
 ## Key Takeaways
 
-- Modern Portfolio Theory provides a an intuitive framework to allocate capital by balancing expected return against risk.
+- Modern Portfolio Theory provides an intuitive framework to allocate capital by balancing expected return against risk.
 - Mean-variance optimization allows investors to construct portfolios that either minimize risk or maximize return based on historical return and volatility data.
 - Portfolio risk is not only determined by individual asset volatility but also by the correlation between assets, which highlights the value of diversification.
 - The minimum-variance portfolio identifies the asset allocation that yields the lowest possible volatility while remaining fully invested.

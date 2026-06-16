@@ -13,9 +13,12 @@ The current chapter relies on this set of Python packages.
 ``` python
 import polars as pl
 import numpy as np
+
+from plotnine import *
+from mizani.formatters import percent_format
 ```
 
-Compared to previous chapters, we rely on `numpy` to construct evenly spaced breakpoints for the portfolio sorts later in this chapter.
+Compared to previous chapters, we rely on `numpy` to construct evenly spaced breakpoints for the portfolio sorts later in this chapter. We also rely on `plotnine` for visualization.
 
 ## Data Preparation
 
@@ -30,11 +33,12 @@ crsp_monthly = (
 )
 ```
 
-Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.
+Further, we utilize accounting data. The most common source of accounting data is Compustat. We only need book equity data in this application, which we select from our local folder. We keep only firms with positive book equity, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details). Additionally, we convert the variable `datadate` to its monthly value, as we only consider monthly returns here and do not need to account for the exact date.
 
 ``` python
 book_equity = (pl.read_parquet("data-python/compustat_annual.parquet")
     .select(["gvkey", "datadate", "be"])
+    .filter(pl.col("be") > 0)
     .drop_nulls()
     .with_columns(
         date=pl.col("datadate").dt.truncate("1mo")
@@ -129,13 +133,13 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
     return assigned_portfolios
 ```
 
-Note that the `tidyfinance` package also provides an `assing_portfolio()` function, albeit with more flexibility. For ease of exposition, we continue to use the function that we just defined.
+Note that the `tidyfinance` package also provides an `assign_portfolio()` function, albeit with more flexibility. For ease of exposition, we continue to use the function that we just defined.
 
 After these data preparation steps, we present bivariate portfolio sorts on an independent and dependent basis.
 
 ## Independent Sorts
 
-Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variables spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms. The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
+Bivariate sorts create portfolios within a two-dimensional space spanned by two sorting variables. It is then possible to assess the return impact of either sorting variable by the return differential from a trading strategy that invests in the portfolios at either end of the respective variable’s spectrum. We create a five-by-five matrix using book-to-market and firm size as sorting variables in our example below. We end up with 25 portfolios. Since we are interested in the *value premium* (i.e., the return differential between high and low book-to-market firms), we go long the five portfolios of the highest book-to-market firms and short the five portfolios of the lowest book-to-market firms. The five portfolios at each end are due to the size splits we employed alongside the book-to-market splits.
 
 To implement the independent bivariate portfolio sort, we assign monthly portfolios for each of our sorting variables separately to create the variables `portfolio_bm` and `portfolio_size`, respectively. Then, these separate portfolios are combined to the final sort stored in `portfolio_combined`. After assigning the portfolios, we compute the average return within each portfolio for each month. Additionally, we keep the book-to-market portfolio as it makes the computation of the value premium easier. The alternative would be to disaggregate the combined portfolio in a separate step. Notice that we weigh the stocks within each portfolio by their market capitalization, i.e., we decide to value-weight our returns.
 
@@ -183,7 +187,7 @@ The resulting monthly value premium is 0.41 percent with an annualized return of
 
 In the previous exercise, we assigned the portfolios without considering the second variable in the assignment. This protocol is called independent portfolio sorts. The alternative, i.e., dependent sorts, creates portfolios for the second sorting variable within each bucket of the first sorting variable. In our example below, we sort firms into five size buckets, and within each of those buckets, we assign firms to five book-to-market portfolios. Hence, we have monthly breakpoints that are specific to each size group. The decision between independent and dependent portfolio sorts is another choice for the researcher. Notice that dependent sorts guarantee that portfolios have roughly equal numbers of stocks when breakpoints are computed from all exchanges. However, if breakpoints are based only on NYSE stocks, portfolio counts will generally be uneven — reflecting the large presence of small-cap stocks on NASDAQ and AMEX (see Exercise below).
 
-To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable="me"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
+To implement the dependent sorts, we first create the size portfolios by calling `assign_portfolio()` with `sorting_variable="size"`. Then, we group our data again by month and by the size portfolio before assigning the book-to-market portfolio. The rest of the implementation is the same as before. Finally, we compute the value premium.
 
 ``` python
 value_portfolios = (
@@ -239,12 +243,140 @@ The monthly value premium from dependent sorts is 0.35 percent, which translates
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](../python/size-sorts-and-p-hacking.llms.md), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 
+## Portfolio Composition
+
+So far, we have focused exclusively on the returns of our portfolios. Yet the way stocks are distributed across the size–value grid is itself informative, and it differs systematically between independent and dependent sorts. In this section, we visualize two characteristics for each of the 25 portfolios and for both sorting methods: the number of stocks and the aggregate market capitalization.
+
+We start with the independent assignment. As before, we group by month and assign the size and book-to-market portfolios separately.
+
+``` python
+assignments_independent = (data_for_sorts
+    .group_by("date")
+    .map_groups(lambda x: x.with_columns(
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        ),
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .with_columns(sorting_method=pl.lit("Independent"))
+)
+```
+
+For the dependent assignment, we again first form the size portfolios and then assign book-to-market portfolios within each size bucket, so that the book-to-market breakpoints are specific to each size group.
+
+``` python
+assignments_dependent = (data_for_sorts
+    .group_by("date")
+    .map_groups(lambda x: x.with_columns(
+        portfolio_size=assign_portfolio(
+            data=x, sorting_variable="size", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .group_by("date", "portfolio_size")
+    .map_groups(lambda x: x.with_columns(
+        portfolio_bm=assign_portfolio(
+            data=x, sorting_variable="bm", n_portfolios=5, exchanges=["NYSE"]
+        )
+        )
+    )
+    .with_columns(sorting_method=pl.lit("Dependent"))
+)
+```
+
+Next, we stack both assignments and compute the characteristics of interest. For each month and portfolio, we count the number of stocks and sum their lagged market capitalization. We then average these monthly figures across the whole sample to obtain one value per portfolio. Finally, we express market capitalization as a share of the total within each sorting method, which makes the concentration of market value across the grid directly comparable.
+
+``` python
+portfolio_characteristics = (
+    pl.concat([assignments_independent, assignments_dependent])
+    .group_by(["sorting_method", "date", "portfolio_size", "portfolio_bm"])
+    .agg(
+        n_stocks=pl.len(),
+        mktcap=pl.col("mktcap_lag").sum()
+    )
+    .group_by(["sorting_method", "portfolio_size", "portfolio_bm"])
+    .agg(
+        n_stocks=pl.col("n_stocks").mean(),
+        mktcap=pl.col("mktcap").mean()
+    )
+    .with_columns(
+        mktcap_share=pl.col("mktcap") / pl.col("mktcap").sum().over("sorting_method")
+    )
+    .with_columns(
+        sorting_method=pl.col("sorting_method").cast(
+            pl.Enum(["Independent", "Dependent"])
+        ),
+        n_stocks_label=pl.col("n_stocks").round().cast(pl.Int64),
+        mktcap_share_label=pl.format(
+            "{}%", (pl.col("mktcap_share") * 100).round(1)
+        )
+    )
+)
+```
+
+We are now ready to visualize the results. We use `geom_tile()` to draw the 25 portfolios as a heatmap spanned by the size and book-to-market portfolios, and facet by the sorting method. [Figure 1](#fig-901) shows the average number of stocks per portfolio.
+
+``` python
+plot_counts = (
+    ggplot(
+        portfolio_characteristics,
+        aes(x="portfolio_size", y="portfolio_bm", fill="n_stocks")
+    )
+    + geom_tile()
+    + geom_text(aes(label="n_stocks_label"))
+    + facet_wrap("sorting_method")
+    + scale_x_continuous(breaks=list(range(1, 6)))
+    + scale_y_continuous(breaks=list(range(1, 6)))
+    + labs(
+        x="Size portfolio", y="Book-to-market portfolio", fill="Avg. stocks",
+        title="Average number of stocks per portfolio across sorting methods"
+    )
+)
+plot_counts.show()
+```
+
+[![Two heatmaps of a five-by-five size and book-to-market grid, one for independent and one for dependent sorts. Stock counts are highest in the small-size portfolios and decline toward the large-size portfolios.](value-and-bivariate-sorts_files/figure-html/fig-901-output-1.png)](value-and-bivariate-sorts_files/figure-html/fig-901-output-1.png "Figure 1: Average number of stocks per portfolio for independent and dependent bivariate sorts. Breakpoints are based on NYSE stocks. Portfolio 1 (5) contains the smallest (largest) firms along each dimension.")
+
+Figure 1: Average number of stocks per portfolio for independent and dependent bivariate sorts. Breakpoints are based on NYSE stocks. Portfolio 1 (5) contains the smallest (largest) firms along each dimension.
+
+[Figure 2](#fig-902) shows each portfolio’s average market capitalization as a share of the total.
+
+``` python
+plot_mktcap = (
+    ggplot(
+        portfolio_characteristics,
+        aes(x="portfolio_size", y="portfolio_bm", fill="mktcap_share")
+    )
+    + geom_tile()
+    + geom_text(aes(label="mktcap_share_label"))
+    + facet_wrap("sorting_method")
+    + scale_x_continuous(breaks=list(range(1, 6)))
+    + scale_y_continuous(breaks=list(range(1, 6)))
+    + scale_fill_continuous(labels=percent_format())
+    + labs(
+        x="Size portfolio", y="Book-to-market portfolio", fill="Market cap (%)",
+        title="Market capitalization share per portfolio across sorting methods"
+    )
+)
+plot_mktcap.show()
+```
+
+[![Two heatmaps of a five-by-five size and book-to-market grid, one for independent and one for dependent sorts. Market capitalization concentrates heavily in the large-size, low-book-to-market portfolios.](value-and-bivariate-sorts_files/figure-html/fig-902-output-1.png)](value-and-bivariate-sorts_files/figure-html/fig-902-output-1.png "Figure 2: Average market capitalization per portfolio, expressed as a share of total market capitalization within each sorting method. Breakpoints are based on NYSE stocks.")
+
+Figure 2: Average market capitalization per portfolio, expressed as a share of total market capitalization within each sorting method. Breakpoints are based on NYSE stocks.
+
+The two figures highlight a tension that is invisible when looking at returns alone. Because the breakpoints are based on NYSE stocks, while the bulk of small firms trade on NASDAQ and AMEX, the small-size portfolios absorb a large number of stocks under both sorting schemes. The difference between the methods shows up along the book-to-market dimension: independent sorts apply the same NYSE book-to-market cutoffs to every size group, so the counts within a size column are uneven, whereas dependent sorts recompute the book-to-market breakpoints inside each size bucket and therefore distribute stocks more evenly across book-to-market within a given size group. Market capitalization tells the mirror-image story: regardless of the sorting method, aggregate market value concentrates in the large-size, low-book-to-market corner, where comparatively few stocks account for the lion’s share of total market capitalization. This is a useful reminder that value-weighting lets a handful of large firms dominate portfolio returns, even when most of the stocks sit elsewhere in the grid.
+
 ## Key Takeaways
 
 - Bivariate portfolio sorts assign stocks based on two characteristics, such as firm size and book-to-market ratio, to better capture return patterns in asset pricing.
 - Independent sorts treat each variable separately, while dependent sorts condition the second sort on the first.
 - Proper handling of accounting data, especially lagging the book-to-market ratio, is essential to avoid look-ahead bias and ensure valid backtesting.
 - Value premiums are derived by comparing returns of high versus low book-to-market portfolios, with results sensitive to sorting choices and weighting schemes.
+- Visualizing portfolio composition shows that NYSE breakpoints push many stocks into the small-size portfolios, while market capitalization concentrates in the large-size, low-book-to-market corner—a reminder that value-weighting lets a few large firms dominate returns.
 
 ## Exercises
 
@@ -254,6 +386,8 @@ Overall, we show how to conduct bivariate portfolio sorts in this chapter. In on
 4.  As for the size premium, also the value premium constructed here does not follow Fama and French ([1993](#ref-Fama1993)). Implement a p-hacking setup as in [Size Sorts and P-Hacking](../python/size-sorts-and-p-hacking.llms.md) to find a premium that comes closest to their HML premium.
 
 ## References
+
+Fama, Eugene F., and Kenneth R. French. 1992. “The cross-section of expected stock returns.” *The Journal of Finance* 47 (2): 427–65. <https://doi.org/2329112>.
 
 Fama, Eugene F., and Kenneth R. French. 1993. “Common risk factors in the returns on stocks and bonds.” *Journal of Financial Economics* 33 (1): 3–56. <https://doi.org/10.1016/0304-405X(93)90023-5>.
 

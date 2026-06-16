@@ -607,7 +607,7 @@ Note
 <p>We focus on a classical panel regression common to the corporate finance literature <span class="citation" data-cites="Fazzari1988 Erickson2012 Gulen2015">(e.g., <a href="#ref-Fazzari1988" role="doc-biblioref">Fazzari et al. 1988</a>; <a href="#ref-Erickson2012" role="doc-biblioref">Erickson and Whited 2012</a>; <a href="#ref-Gulen2015" role="doc-biblioref">Gulen and Ion 2015</a>)</span>: firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.</p>
 <p>Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors.</p>
 <p>The current chapter relies on the following set of Python packages.</p>
-<div id="7ed788c0" class="cell" data-execution_count="2">
+<div id="fixed-effects-and-clustered-standard-errors-packages" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pyfixest <span class="im">as</span> pf</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
@@ -615,7 +615,7 @@ Note
 <section id="data-preparation" class="level2">
 <h2 class="anchored" data-anchor-id="data-preparation">Data Preparation</h2>
 <p>We use CRSP and annual Compustat as data sources from our Parquet files introduced in <a href="../python/accessing-and-managing-financial-data.html">Accessing and Managing Financial Data</a> and <a href="../python/wrds-crsp-and-compustat.html">WRDS, CRSP, and Compustat</a>. In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. </p>
-<div id="67610a14" class="cell" data-execution_count="3">
+<div id="fixed-effects-and-clustered-standard-errors-load-data" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    pl.read_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"gvkey"</span>, <span class="st">"date"</span>, <span class="st">"mktcap"</span>])</span>
@@ -628,7 +628,7 @@ Note
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The classical investment regressions model is the capital investment of a firm as a function of operating cash flows and Tobin’s q, a measure of a firm’s investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a <em>panel</em> of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.</p>
-<div id="72b3814a" class="cell" data-execution_count="4">
+<div id="fixed-effects-and-clustered-standard-errors-investment-cashflows" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>data_investment <span class="op">=</span> (compustat_annual</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>        date<span class="op">=</span>pl.col(<span class="st">"datadate"</span>).cast(pl.Date).dt.truncate(<span class="st">"1mo"</span>)</span>
@@ -651,7 +651,7 @@ Note
 <span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Tobin’s q is the ratio of the market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications <span class="citation" data-cites="Fazzari1988 Erickson2012">(e.g., <a href="#ref-Fazzari1988" role="doc-biblioref">Fazzari et al. 1988</a>; <a href="#ref-Erickson2012" role="doc-biblioref">Erickson and Whited 2012</a>)</span>. We follow the implementation of <span class="citation" data-cites="Gulen2015">Gulen and Ion (<a href="#ref-Gulen2015" role="doc-biblioref">2015</a>)</span> and compute Tobin’s q as the market value of equity (<code>mktcap</code>) plus the book value of assets (<code>at</code>) minus book value of equity (<code>be</code>) plus deferred taxes (<code>txdb</code>), all divided by book value of assets (<code>at</code>). Finally, we only keep observations where all variables of interest are non-missing, and the reported book value of assets is strictly positive.</p>
-<div id="3cab1233" class="cell" data-execution_count="5">
+<div id="fixed-effects-and-clustered-standard-errors-tobins-q" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>data_investment <span class="op">=</span> (data_investment</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    .join(crsp_monthly, on<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"date"</span>], how<span class="op">=</span><span class="st">"left"</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
@@ -664,7 +664,7 @@ Note
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions. In the specific example, we winsorize the main variables (<code>investment</code>, <code>cash_flows</code>, and <code>tobins_q</code>) at the one percent level.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
-<div id="ae9851b2" class="cell" data-execution_count="6">
+<div id="fixed-effects-and-clustered-standard-errors-winsorize" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> winsorize(col, cut):</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Winsorize a column at cut level."""</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -687,7 +687,7 @@ Note
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable’s mean and the number of observations is a useful exercise to spot potential problems.</p>
-<div id="b8acef9a" class="cell" data-execution_count="7">
+<div id="cell-fixed-effects-and-clustered-standard-errors-summary-statistics" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>data_investment_summary <span class="op">=</span> (data_investment</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    .unpivot(index<span class="op">=</span>[<span class="st">"gvkey"</span>, <span class="st">"year"</span>], variable_name<span class="op">=</span><span class="st">"measure"</span>,</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>             on<span class="op">=</span>[<span class="st">"investment_lead"</span>, <span class="st">"cash_flows"</span>, <span class="st">"tobins_q"</span>])</span>
@@ -707,7 +707,7 @@ Note
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    .with_columns(pl.col(pl.Float64).<span class="bu">round</span>(<span class="dv">2</span>))</span>
 <span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>data_investment_summary</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="7">
+<div id="fixed-effects-and-clustered-standard-errors-summary-statistics" class="cell-output cell-output-display" data-execution_count="7">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -744,18 +744,18 @@ Note
 <tbody>
 <tr class="odd">
 <td>"cash_flows"</td>
-<td>133608</td>
-<td>0.01</td>
-<td>0.27</td>
-<td>-1.56</td>
-<td>-0.48</td>
+<td>139861</td>
+<td>-0.0</td>
+<td>0.29</td>
+<td>-1.66</td>
+<td>-0.52</td>
 <td>0.06</td>
 <td>0.27</td>
-<td>0.47</td>
+<td>0.48</td>
 </tr>
 <tr class="even">
 <td>"investment_lead"</td>
-<td>133608</td>
+<td>139861</td>
 <td>0.06</td>
 <td>0.08</td>
 <td>0.0</td>
@@ -766,14 +766,14 @@ Note
 </tr>
 <tr class="odd">
 <td>"tobins_q"</td>
-<td>133608</td>
-<td>1.99</td>
-<td>1.69</td>
-<td>0.56</td>
-<td>0.79</td>
-<td>1.39</td>
-<td>5.35</td>
-<td>10.8</td>
+<td>139861</td>
+<td>2.06</td>
+<td>1.81</td>
+<td>0.57</td>
+<td>0.8</td>
+<td>1.41</td>
+<td>5.61</td>
+<td>11.62</td>
 </tr>
 </tbody>
 </table>
@@ -788,7 +788,7 @@ Note
 \text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
 \tag{1}\]</span></span></p>
 <p>where <span class="math inline">\(\varepsilon_t\)</span> is i.i.d. normally distributed across time and firms. We use the <code>PanelOLS()</code>-function to estimate the simple model so that the output has the same structure as the other regressions below.</p>
-<div id="b1640fec" class="cell" data-execution_count="8">
+<div id="fixed-effects-and-clustered-standard-errors-model-ols" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>data_investment_pd <span class="op">=</span> data_investment.to_pandas()</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>model_ols <span class="op">=</span> pf.feols(</span>
@@ -803,15 +803,15 @@ Note
 Estimation:  OLS
 Dep. var.: investment_lead, Fixed effects: 0
 Inference:  iid
-Observations:  133608
+Observations:  139861
 
 | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(&gt;|t|) |   2.5% |   97.5% |
 |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-| Intercept     |      0.042 |        0.000 |   130.069 |      0.000 |  0.041 |   0.042 |
-| cash_flows    |      0.049 |        0.001 |    64.309 |      0.000 |  0.047 |   0.050 |
-| tobins_q      |      0.007 |        0.000 |    57.710 |      0.000 |  0.007 |   0.007 |
+| Intercept     |      0.043 |        0.000 |   137.513 |      0.000 |  0.042 |   0.043 |
+| cash_flows    |      0.045 |        0.001 |    63.163 |      0.000 |  0.043 |   0.046 |
+| tobins_q      |      0.007 |        0.000 |    57.540 |      0.000 |  0.006 |   0.007 |
 ---
-RMSE: 0.074 R2: 0.044 </code></pre>
+RMSE: 0.075 R2: 0.04 </code></pre>
 </div>
 </div>
 <p>As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.</p>
@@ -821,7 +821,7 @@ RMSE: 0.074 R2: 0.044 </code></pre>
 \tag{2}\]</span></span></p>
 <p>where <span class="math inline">\(\alpha_i\)</span> is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms’ investments as deviations from the firms’ average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm’s average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.</p>
 <p>To include the firm fixed effect, we use <code>gvkey</code> (Compustat’s firm identifier) as follows:</p>
-<div id="e588c0fb" class="cell" data-execution_count="9">
+<div id="fixed-effects-and-clustered-standard-errors-model-fe-firm" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>model_fe_firm <span class="op">=</span> pf.feols(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"investment_lead ~ cash_flows + tobins_q | gvkey"</span>,</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
@@ -834,14 +834,14 @@ RMSE: 0.074 R2: 0.044 </code></pre>
 Estimation:  OLS
 Dep. var.: investment_lead, Fixed effects: gvkey
 Inference:  iid
-Observations:  131823
+Observations:  138205
 
 | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(&gt;|t|) |   2.5% |   97.5% |
 |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-| cash_flows    |      0.014 |        0.001 |    15.659 |      0.000 |  0.012 |   0.015 |
-| tobins_q      |      0.011 |        0.000 |    83.006 |      0.000 |  0.010 |   0.011 |
+| cash_flows    |      0.011 |        0.001 |    13.729 |      0.000 |  0.010 |   0.013 |
+| tobins_q      |      0.010 |        0.000 |    81.822 |      0.000 |  0.009 |   0.010 |
 ---
-RMSE: 0.049 R2: 0.577 R2 Within: 0.056 </code></pre>
+RMSE: 0.05 R2: 0.563 R2 Within: 0.051 </code></pre>
 </div>
 </div>
 <p>The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q <em>on top</em> of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.</p>
@@ -850,7 +850,7 @@ RMSE: 0.049 R2: 0.577 R2 Within: 0.056 </code></pre>
 \text{Investment}_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
 \tag{3}\]</span></span></p>
 <p>where <span class="math inline">\(\alpha_t\)</span> is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows. You can include a time fixed effects by using “TimeEffects” in the formula of PanelOLS.</p>
-<div id="27913802" class="cell" data-execution_count="10">
+<div id="fixed-effects-and-clustered-standard-errors-model-fe-firmyear" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>model_fe_firmyear <span class="op">=</span> pf.feols(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"investment_lead ~ cash_flows + tobins_q | gvkey + year"</span>,</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> <span class="st">"iid"</span>,</span>
@@ -863,71 +863,71 @@ RMSE: 0.049 R2: 0.577 R2 Within: 0.056 </code></pre>
 Estimation:  OLS
 Dep. var.: investment_lead, Fixed effects: gvkey+year
 Inference:  iid
-Observations:  131823
+Observations:  138205
 
 | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(&gt;|t|) |   2.5% |   97.5% |
 |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-| cash_flows    |      0.017 |        0.001 |    19.576 |      0.000 |  0.015 |   0.018 |
-| tobins_q      |      0.010 |        0.000 |    76.335 |      0.000 |  0.009 |   0.010 |
+| cash_flows    |      0.014 |        0.001 |    17.498 |      0.000 |  0.013 |   0.016 |
+| tobins_q      |      0.009 |        0.000 |    75.943 |      0.000 |  0.009 |   0.009 |
 ---
-RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
+RMSE: 0.049 R2: 0.586 R2 Within: 0.045 </code></pre>
 </div>
 </div>
 <p>The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time.</p>
-<p>How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm <em>and</em> time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are colinear with the fixed effects, and the estimation becomes void.</p>
+<p>How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm <em>and</em> time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are collinear with the fixed effects, and the estimation becomes void.</p>
 <p>Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the <code>results.compare()</code> function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing <span class="math inline">\(t\)</span>-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects <span class="citation" data-cites="Wasserstein2016">(<a href="#ref-Wasserstein2016" role="doc-biblioref">Wasserstein and Lazar 2016</a>)</span>. The <span class="math inline">\(t\)</span>-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.</p>
-<div id="7deb9d0a" class="cell" data-execution_count="11">
+<div id="cell-fixed-effects-and-clustered-standard-errors-etable-fe" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt <span class="op">=</span> <span class="st">"b (t)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="11">
-<div id="xfgreqvzno" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="fixed-effects-and-clustered-standard-errors-etable-fe" class="cell-output cell-output-display" data-execution_count="11">
+<div id="stlyhxzdew" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#xfgreqvzno table {
+#stlyhxzdew table {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
         }
 
-#xfgreqvzno thead, tbody, tfoot, tr, td, th { border-style: none; }
+#stlyhxzdew thead, tbody, tfoot, tr, td, th { border-style: none; }
  tr { background-color: transparent; }
-#xfgreqvzno p { margin: 0; padding: 0; }
- #xfgreqvzno .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
- #xfgreqvzno .gt_caption { padding-top: 4px; padding-bottom: 4px; }
- #xfgreqvzno .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
- #xfgreqvzno .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
- #xfgreqvzno .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #xfgreqvzno .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
- #xfgreqvzno .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #xfgreqvzno .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
- #xfgreqvzno .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
- #xfgreqvzno .gt_column_spanner_outer:first-child { padding-left: 0; }
- #xfgreqvzno .gt_column_spanner_outer:last-child { padding-right: 0; }
- #xfgreqvzno .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
- #xfgreqvzno .gt_spanner_row { border-bottom-style: hidden; }
- #xfgreqvzno .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
- #xfgreqvzno .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
- #xfgreqvzno .gt_from_md> :first-child { margin-top: 0; }
- #xfgreqvzno .gt_from_md> :last-child { margin-bottom: 0; }
- #xfgreqvzno .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
- #xfgreqvzno .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
- #xfgreqvzno .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
- #xfgreqvzno .gt_row_group_first td { border-top-width: 0.5px; }
- #xfgreqvzno .gt_row_group_first th { border-top-width: 0.5px; }
- #xfgreqvzno .gt_striped { color: #333333; background-color: #F4F4F4; }
- #xfgreqvzno .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
- #xfgreqvzno .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
- #xfgreqvzno .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
- #xfgreqvzno .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
- #xfgreqvzno .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
- #xfgreqvzno .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
- #xfgreqvzno .gt_left { text-align: left; }
- #xfgreqvzno .gt_center { text-align: center; }
- #xfgreqvzno .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
- #xfgreqvzno .gt_font_normal { font-weight: normal; }
- #xfgreqvzno .gt_font_bold { font-weight: bold; }
- #xfgreqvzno .gt_font_italic { font-style: italic; }
- #xfgreqvzno .gt_super { font-size: 65%; }
- #xfgreqvzno .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
- #xfgreqvzno .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#stlyhxzdew p { margin: 0; padding: 0; }
+ #stlyhxzdew .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+ #stlyhxzdew .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+ #stlyhxzdew .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+ #stlyhxzdew .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+ #stlyhxzdew .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #stlyhxzdew .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+ #stlyhxzdew .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #stlyhxzdew .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+ #stlyhxzdew .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+ #stlyhxzdew .gt_column_spanner_outer:first-child { padding-left: 0; }
+ #stlyhxzdew .gt_column_spanner_outer:last-child { padding-right: 0; }
+ #stlyhxzdew .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
+ #stlyhxzdew .gt_spanner_row { border-bottom-style: hidden; }
+ #stlyhxzdew .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
+ #stlyhxzdew .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
+ #stlyhxzdew .gt_from_md> :first-child { margin-top: 0; }
+ #stlyhxzdew .gt_from_md> :last-child { margin-bottom: 0; }
+ #stlyhxzdew .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
+ #stlyhxzdew .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+ #stlyhxzdew .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+ #stlyhxzdew .gt_row_group_first td { border-top-width: 0.5px; }
+ #stlyhxzdew .gt_row_group_first th { border-top-width: 0.5px; }
+ #stlyhxzdew .gt_striped { color: #333333; background-color: #F4F4F4; }
+ #stlyhxzdew .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
+ #stlyhxzdew .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+ #stlyhxzdew .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+ #stlyhxzdew .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+ #stlyhxzdew .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #stlyhxzdew .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+ #stlyhxzdew .gt_left { text-align: left; }
+ #stlyhxzdew .gt_center { text-align: center; }
+ #stlyhxzdew .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+ #stlyhxzdew .gt_font_normal { font-weight: normal; }
+ #stlyhxzdew .gt_font_bold { font-weight: bold; }
+ #stlyhxzdew .gt_font_italic { font-style: italic; }
+ #stlyhxzdew .gt_super { font-size: 65%; }
+ #stlyhxzdew .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+ #stlyhxzdew .gt_asterisk { font-size: 100%; vertical-align: 0; }
  
 </style>
 
@@ -949,19 +949,19 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">cash_flows</th>
-<td class="gt_row gt_center">0.049*** (64.309)</td>
-<td class="gt_row gt_center">0.014*** (15.659)</td>
-<td class="gt_row gt_center">0.017*** (19.576)</td>
+<td class="gt_row gt_center">0.045*** (63.163)</td>
+<td class="gt_row gt_center">0.011*** (13.729)</td>
+<td class="gt_row gt_center">0.014*** (17.498)</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">tobins_q</th>
-<td class="gt_row gt_center">0.007*** (57.710)</td>
-<td class="gt_row gt_center">0.011*** (83.006)</td>
-<td class="gt_row gt_center">0.010*** (76.335)</td>
+<td class="gt_row gt_center">0.007*** (57.540)</td>
+<td class="gt_row gt_center">0.010*** (81.822)</td>
+<td class="gt_row gt_center">0.009*** (75.943)</td>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">Intercept</th>
-<td class="gt_row gt_center">0.042*** (130.069)</td>
+<td class="gt_row gt_center">0.043*** (137.513)</td>
 <td class="gt_row gt_center"></td>
 <td class="gt_row gt_center"></td>
 </tr>
@@ -969,15 +969,15 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 <th colspan="4" class="gt_group_heading" data-quarto-table-cell-role="th">fe</th>
 </tr>
 <tr class="even">
-<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">year</th>
-<td class="gt_row gt_center">-</td>
-<td class="gt_row gt_center">-</td>
-<td class="gt_row gt_center">x</td>
-</tr>
-<tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">gvkey</th>
 <td class="gt_row gt_center">-</td>
 <td class="gt_row gt_center">x</td>
+<td class="gt_row gt_center">x</td>
+</tr>
+<tr class="odd">
+<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">year</th>
+<td class="gt_row gt_center">-</td>
+<td class="gt_row gt_center">-</td>
 <td class="gt_row gt_center">x</td>
 </tr>
 <tr class="gt_group_heading_row even">
@@ -985,9 +985,9 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">Observations</th>
-<td class="gt_row gt_center">133608</td>
-<td class="gt_row gt_center">131823</td>
-<td class="gt_row gt_center">131823</td>
+<td class="gt_row gt_center">139861</td>
+<td class="gt_row gt_center">138205</td>
+<td class="gt_row gt_center">138205</td>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">S.E. type</th>
@@ -997,15 +997,15 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">R<sup>2</sup></th>
-<td class="gt_row gt_center">0.044</td>
-<td class="gt_row gt_center">0.577</td>
-<td class="gt_row gt_center">0.599</td>
+<td class="gt_row gt_center">0.040</td>
+<td class="gt_row gt_center">0.563</td>
+<td class="gt_row gt_center">0.586</td>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">R<sup>2</sup> Within</th>
 <td class="gt_row gt_center">-</td>
-<td class="gt_row gt_center">0.056</td>
-<td class="gt_row gt_center">0.049</td>
+<td class="gt_row gt_center">0.051</td>
+<td class="gt_row gt_center">0.045</td>
 </tr>
 </tbody><tfoot class="gt_sourcenotes">
 <tr class="odd">
@@ -1025,7 +1025,7 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 <p>Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other. Such dependencies in the residuals invalidate the i.i.d. assumption of OLS and lead to biased standard errors. With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients.</p>
 <p>In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of <em>clustered standard errors</em> <span class="citation" data-cites="Petersen2008">(<a href="#ref-Petersen2008" role="doc-biblioref">Petersen 2008</a>)</span>. The idea behind clustering is that the correlation of residuals <em>within</em> a cluster can be of any form. As the number of clusters grows, the cluster-robust standard errors become consistent <span class="citation" data-cites="Lang2007 Wooldridge2010">(<a href="#ref-Lang2007" role="doc-biblioref">Donald and Lang 2007</a>; <a href="#ref-Wooldridge2010" role="doc-biblioref">Wooldridge 2010</a>)</span>. A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient <span class="citation" data-cites="Cameron2011">(<a href="#ref-Cameron2011" role="doc-biblioref">Cameron et al. 2011</a>)</span>.</p>
 <p>Instead of relying on the i.i.d. assumption, we can use the <code>cov_type="clustered"</code> option in the <code>fit()</code>-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.</p>
-<div id="0a9f806c" class="cell" data-execution_count="12">
+<div id="fixed-effects-and-clustered-standard-errors-cluster-models" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>model_cluster_firm <span class="op">=</span> pf.feols(</span>
 <span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"investment_lead ~ cash_flows + tobins_q | gvkey + year"</span>,</span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    vcov <span class="op">=</span> {<span class="st">"CRV1"</span>: <span class="st">"gvkey"</span>},</span>
@@ -1039,58 +1039,58 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 <span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p> The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin’s q. By clustering the standard errors on the firm level, the <span class="math inline">\(t\)</span>-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin’s q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the <span class="math inline">\(t\)</span>-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.</p>
-<div id="a816e746" class="cell" data-execution_count="13">
+<div id="cell-fixed-effects-and-clustered-standard-errors-etable-cluster" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_fmt <span class="op">=</span> <span class="st">"b (t)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-display" data-execution_count="13">
-<div id="xrqncrqoxh" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="fixed-effects-and-clustered-standard-errors-etable-cluster" class="cell-output cell-output-display" data-execution_count="13">
+<div id="rntilglcdm" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#xrqncrqoxh table {
+#rntilglcdm table {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
         }
 
-#xrqncrqoxh thead, tbody, tfoot, tr, td, th { border-style: none; }
+#rntilglcdm thead, tbody, tfoot, tr, td, th { border-style: none; }
  tr { background-color: transparent; }
-#xrqncrqoxh p { margin: 0; padding: 0; }
- #xrqncrqoxh .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
- #xrqncrqoxh .gt_caption { padding-top: 4px; padding-bottom: 4px; }
- #xrqncrqoxh .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
- #xrqncrqoxh .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
- #xrqncrqoxh .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #xrqncrqoxh .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
- #xrqncrqoxh .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
- #xrqncrqoxh .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
- #xrqncrqoxh .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
- #xrqncrqoxh .gt_column_spanner_outer:first-child { padding-left: 0; }
- #xrqncrqoxh .gt_column_spanner_outer:last-child { padding-right: 0; }
- #xrqncrqoxh .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
- #xrqncrqoxh .gt_spanner_row { border-bottom-style: hidden; }
- #xrqncrqoxh .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
- #xrqncrqoxh .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
- #xrqncrqoxh .gt_from_md> :first-child { margin-top: 0; }
- #xrqncrqoxh .gt_from_md> :last-child { margin-bottom: 0; }
- #xrqncrqoxh .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
- #xrqncrqoxh .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
- #xrqncrqoxh .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
- #xrqncrqoxh .gt_row_group_first td { border-top-width: 0.5px; }
- #xrqncrqoxh .gt_row_group_first th { border-top-width: 0.5px; }
- #xrqncrqoxh .gt_striped { color: #333333; background-color: #F4F4F4; }
- #xrqncrqoxh .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
- #xrqncrqoxh .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
- #xrqncrqoxh .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
- #xrqncrqoxh .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
- #xrqncrqoxh .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
- #xrqncrqoxh .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
- #xrqncrqoxh .gt_left { text-align: left; }
- #xrqncrqoxh .gt_center { text-align: center; }
- #xrqncrqoxh .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
- #xrqncrqoxh .gt_font_normal { font-weight: normal; }
- #xrqncrqoxh .gt_font_bold { font-weight: bold; }
- #xrqncrqoxh .gt_font_italic { font-style: italic; }
- #xrqncrqoxh .gt_super { font-size: 65%; }
- #xrqncrqoxh .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
- #xrqncrqoxh .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#rntilglcdm p { margin: 0; padding: 0; }
+ #rntilglcdm .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: hidden; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+ #rntilglcdm .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+ #rntilglcdm .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+ #rntilglcdm .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+ #rntilglcdm .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #rntilglcdm .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+ #rntilglcdm .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #rntilglcdm .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: bottom; padding-top: 4px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+ #rntilglcdm .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+ #rntilglcdm .gt_column_spanner_outer:first-child { padding-left: 0; }
+ #rntilglcdm .gt_column_spanner_outer:last-child { padding-right: 0; }
+ #rntilglcdm .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: bottom; padding-top: 4px; padding-bottom: 4px; overflow-x: hidden; display: inline-block; width: 100%; }
+ #rntilglcdm .gt_spanner_row { border-bottom-style: hidden; }
+ #rntilglcdm .gt_group_heading { padding-top: 0px; padding-bottom: 0px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; border-left-style: none; border-left-width: 1px; border-left-color: white; border-right-style: none; border-right-width: 1px; border-right-color: white; vertical-align: middle; text-align: left; }
+ #rntilglcdm .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 0px; font-weight: initial; border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 0.5px; border-bottom-color: black; vertical-align: middle; }
+ #rntilglcdm .gt_from_md> :first-child { margin-top: 0; }
+ #rntilglcdm .gt_from_md> :last-child { margin-bottom: 0; }
+ #rntilglcdm .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 0px; border-left-color: white; border-right-style: none; border-right-width: 0px; border-right-color: white; vertical-align: middle; overflow-x: hidden; }
+ #rntilglcdm .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: hidden; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+ #rntilglcdm .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+ #rntilglcdm .gt_row_group_first td { border-top-width: 0.5px; }
+ #rntilglcdm .gt_row_group_first th { border-top-width: 0.5px; }
+ #rntilglcdm .gt_striped { color: #333333; background-color: #F4F4F4; }
+ #rntilglcdm .gt_table_body { border-top-style: solid; border-top-width: 0.5px; border-top-color: black; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: black; }
+ #rntilglcdm .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+ #rntilglcdm .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+ #rntilglcdm .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+ #rntilglcdm .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #rntilglcdm .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+ #rntilglcdm .gt_left { text-align: left; }
+ #rntilglcdm .gt_center { text-align: center; }
+ #rntilglcdm .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+ #rntilglcdm .gt_font_normal { font-weight: normal; }
+ #rntilglcdm .gt_font_bold { font-weight: bold; }
+ #rntilglcdm .gt_font_italic { font-style: italic; }
+ #rntilglcdm .gt_super { font-size: 65%; }
+ #rntilglcdm .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+ #rntilglcdm .gt_asterisk { font-size: 100%; vertical-align: 0; }
  
 </style>
 
@@ -1112,27 +1112,27 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">cash_flows</th>
-<td class="gt_row gt_center">0.017*** (19.576)</td>
-<td class="gt_row gt_center">0.017*** (11.367)</td>
-<td class="gt_row gt_center">0.017*** (9.361)</td>
+<td class="gt_row gt_center">0.014*** (17.498)</td>
+<td class="gt_row gt_center">0.014*** (10.122)</td>
+<td class="gt_row gt_center">0.014*** (8.298)</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">tobins_q</th>
-<td class="gt_row gt_center">0.010*** (76.335)</td>
-<td class="gt_row gt_center">0.010*** (35.755)</td>
-<td class="gt_row gt_center">0.010*** (14.944)</td>
+<td class="gt_row gt_center">0.009*** (75.943)</td>
+<td class="gt_row gt_center">0.009*** (35.632)</td>
+<td class="gt_row gt_center">0.009*** (14.303)</td>
 </tr>
 <tr class="gt_group_heading_row even">
 <th colspan="4" class="gt_group_heading" data-quarto-table-cell-role="th">fe</th>
 </tr>
 <tr class="odd">
-<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">year</th>
+<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">gvkey</th>
 <td class="gt_row gt_center">x</td>
 <td class="gt_row gt_center">x</td>
 <td class="gt_row gt_center">x</td>
 </tr>
 <tr class="even">
-<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">gvkey</th>
+<th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">year</th>
 <td class="gt_row gt_center">x</td>
 <td class="gt_row gt_center">x</td>
 <td class="gt_row gt_center">x</td>
@@ -1142,9 +1142,9 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">Observations</th>
-<td class="gt_row gt_center">131823</td>
-<td class="gt_row gt_center">131823</td>
-<td class="gt_row gt_center">131823</td>
+<td class="gt_row gt_center">138205</td>
+<td class="gt_row gt_center">138205</td>
+<td class="gt_row gt_center">138205</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">S.E. type</th>
@@ -1154,15 +1154,15 @@ RMSE: 0.048 R2: 0.599 R2 Within: 0.049 </code></pre>
 </tr>
 <tr class="even">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">R<sup>2</sup></th>
-<td class="gt_row gt_center">0.599</td>
-<td class="gt_row gt_center">0.599</td>
-<td class="gt_row gt_center">0.599</td>
+<td class="gt_row gt_center">0.586</td>
+<td class="gt_row gt_center">0.586</td>
+<td class="gt_row gt_center">0.586</td>
 </tr>
 <tr class="odd">
 <th class="gt_row gt_left gt_stub" data-quarto-table-cell-role="th">R<sup>2</sup> Within</th>
-<td class="gt_row gt_center">0.049</td>
-<td class="gt_row gt_center">0.049</td>
-<td class="gt_row gt_center">0.049</td>
+<td class="gt_row gt_center">0.045</td>
+<td class="gt_row gt_center">0.045</td>
+<td class="gt_row gt_center">0.045</td>
 </tr>
 </tbody><tfoot class="gt_sourcenotes">
 <tr class="odd">

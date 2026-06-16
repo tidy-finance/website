@@ -143,7 +143,7 @@ def compute_portfolio_weights(theta,
       .with_columns(
         weight_benchmark=(
           pl.col("relative_mktcap") if value_weighting
-          else pl.lit(1/data.shape[0])
+          else (1/pl.len()).over("date")
         )
       )
       .with_columns(
@@ -287,19 +287,19 @@ Let us take a look at the different portfolio strategies and evaluation measures
 evaluate_portfolio(weights_crsp).round(2)
 ```
 
-|                            | tilt  | benchmark |
-|----------------------------|-------|-----------|
-| Expected utility           | -0.26 | -0.25     |
-| Average return             | 0.82  | 7.05      |
-| SD return                  | 21.09 | 15.41     |
-| Sharpe ratio               | 0.04  | 0.46      |
-| Intercept                  | -0.00 | 0.00      |
-| Market beta                | 0.94  | 0.99      |
-| Mean abs. weight           | 0.09  | 0.04      |
-| Max. weight                | 4.48  | 4.29      |
-| Min. weight                | -0.20 | 0.00      |
-| Avg. sum of neg. weights   | 77.88 | 0.00      |
-| Avg. share of neg. weights | 48.71 | 0.00      |
+|                            | benchmark | tilt  |
+|----------------------------|-----------|-------|
+| Expected utility           | -0.25     | -0.26 |
+| Average return             | 7.05      | 0.82  |
+| SD return                  | 15.41     | 21.09 |
+| Sharpe ratio               | 0.46      | 0.04  |
+| Intercept                  | 0.00      | -0.00 |
+| Market beta                | 0.99      | 0.94  |
+| Mean abs. weight           | 0.04      | 0.09  |
+| Max. weight                | 4.29      | 4.48  |
+| Min. weight                | 0.00      | -0.20 |
+| Avg. sum of neg. weights   | 0.00      | 77.88 |
+| Avg. share of neg. weights | 0.00      | 48.71 |
 
 The value-weighted portfolio delivers an annualized return of more than six percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically one for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
 
@@ -370,7 +370,7 @@ def evaluate_optimal_performance(data,
       x0=[1.5]*n_parameters,
       args=(data, objective_measure, value_weighting, allow_short_selling),
       method="Nelder-Mead",
-      tol=10e-2
+      tol=1e-3
     ).x
 
     processed_data = compute_portfolio_weights(
@@ -425,9 +425,9 @@ performance_table.get(["EW", "VW"])
 | Sharpe ratio               | 0.489  | 0.489  | 0.457  | 0.457  |
 | Intercept                  | 0.002  | 0.002  | 0.000  | 0.000  |
 | Market beta                | 1.138  | 1.138  | 0.995  | 0.995  |
-| Mean abs. weight           | 0.000  | 0.000  | 0.036  | 0.036  |
-| Max. weight                | 0.000  | 0.000  | 4.290  | 4.290  |
-| Min. weight                | 0.000  | 0.000  | 0.000  | 0.000  |
+| Mean abs. weight           | 0.036  | 0.036  | 0.036  | 0.036  |
+| Max. weight                | 0.036  | 0.036  | 4.290  | 4.290  |
+| Min. weight                | 0.036  | 0.036  | 0.000  | 0.000  |
 | Avg. sum of neg. weights   | 0.000  | 0.000  | 0.000  | 0.000  |
 | Avg. share of neg. weights | 0.000  | 0.000  | 0.000  | 0.000  |
 
@@ -437,17 +437,17 @@ performance_table.get(["EW Optimal", "VW Optimal"])
 
 |                            | EW Optimal | VW Optimal |
 |----------------------------|------------|------------|
-| Expected utility           | -26.613    | -0.260     |
-| Average return             | -4563.673  | 0.823      |
-| SD return                  | 15022.128  | 21.090     |
-| Sharpe ratio               | -0.304     | 0.039      |
-| Intercept                  | -3.236     | -0.005     |
-| Market beta                | -97.738    | 0.939      |
-| Mean abs. weight           | 104.273    | 0.092      |
-| Max. weight                | 1470.741   | 4.480      |
-| Min. weight                | -354.451   | -0.205     |
-| Avg. sum of neg. weights   | 82304.602  | 77.884     |
-| Avg. share of neg. weights | 51.549     | 48.708     |
+| Expected utility           | -0.251     | -0.247     |
+| Average return             | 11.005     | 12.682     |
+| SD return                  | 21.416     | 19.228     |
+| Sharpe ratio               | 0.514      | 0.660      |
+| Intercept                  | 0.003      | 0.005      |
+| Market beta                | 1.140      | 1.016      |
+| Mean abs. weight           | 0.036      | 0.047      |
+| Max. weight                | 0.118      | 4.083      |
+| Min. weight                | -0.002     | -0.032     |
+| Avg. sum of neg. weights   | 0.006      | 16.967     |
+| Avg. share of neg. weights | 0.084      | 36.143     |
 
 ``` python
 performance_table.get(["EW Optimal (no s.)", "VW Optimal (no s.)"])
@@ -455,14 +455,14 @@ performance_table.get(["EW Optimal (no s.)", "VW Optimal (no s.)"])
 
 |                            | EW Optimal (no s.) | VW Optimal (no s.) |
 |----------------------------|--------------------|--------------------|
-| Expected utility           | -0.252             | -0.250             |
-| Average return             | 8.012              | 7.540              |
-| SD return                  | 19.114             | 16.655             |
-| Sharpe ratio               | 0.419              | 0.453              |
-| Intercept                  | 0.000              | 0.000              |
-| Market beta                | 1.138              | 1.056              |
+| Expected utility           | -0.249             | -0.248             |
+| Average return             | 16.555             | 11.834             |
+| SD return                  | 25.561             | 18.536             |
+| Sharpe ratio               | 0.648              | 0.638              |
+| Intercept                  | 0.007              | 0.004              |
+| Market beta                | 1.117              | 1.036              |
 | Mean abs. weight           | 0.036              | 0.036              |
-| Max. weight                | 1.410              | 2.485              |
+| Max. weight                | 0.233              | 3.658              |
 | Min. weight                | 0.000              | 0.000              |
 | Avg. sum of neg. weights   | 0.000              | 0.000              |
 | Avg. share of neg. weights | 0.000              | 0.000              |
