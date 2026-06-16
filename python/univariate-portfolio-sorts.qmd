@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: univariate-portfolio-sorts-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -21,6 +22,7 @@ A univariate portfolio sort considers only one sorting variable $x_{i,t-1}$.\ind
 The current chapter relies on the following set of Python packages.
 
 ```{python}
+#| label: univariate-portfolio-sorts-packages
 import polars as pl
 import statsmodels.api as sm
 
@@ -30,6 +32,7 @@ from regtabletotext import prettify_result
 ```
 
 ```{python}
+#| label: univariate-portfolio-sorts-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -39,6 +42,7 @@ exec(open("python/render-plotnine-custom.py").read())
 We start with loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, we use the monthly CRSP sample as our asset universe.\index{Data!CRSP} Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha).\index{Data!Fama-French factors} `beta` is the dataframe with market betas computed in the previous chapter.\index{Beta}
 
 ```{python}
+#| label: univariate-portfolio-sorts-load-data
 crsp_monthly = (
     pl.read_parquet("data-python/crsp_monthly.parquet")
     .select(["permno", "date", "ret_excess", "mktcap_lag"])
@@ -61,6 +65,7 @@ beta = (
 Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month $t$ information is available in month $t+1$. You may be tempted to simply use a call such as `crsp_monthly.with_columns(beta_lag=pl.col("beta").shift(1).over("permno"))` instead. This procedure, however, does not work correctly if there are implicit missing values in the time series.
 
 ```{python}
+#| label: univariate-portfolio-sorts-lag-beta
 beta_lag = (beta
     .with_columns(date=pl.col("date").dt.offset_by("1mo"))
     .select(["permno", "date", "beta"])
@@ -76,6 +81,7 @@ data_for_sorts = (crsp_monthly
 The first step to conduct portfolio sorts is to calculate periodic breakpoints that you can use to group the stocks into portfolios.\index{Breakpoints} For simplicity, we start with the median lagged market beta as the single breakpoint. We assign portfolios within each date using `qcut()` with the median as the only breakpoint. We then compute the value-weighted returns for each of the two resulting portfolios, which means that the lagged market capitalization determines the weight: we divide the sum of capitalization-weighted excess returns by the sum of weights.
 
 ```{python}
+#| label: univariate-portfolio-sorts-median-portfolios
 beta_portfolios = (data_for_sorts
     .with_columns(
         portfolio=pl.col("beta_lag")
@@ -95,6 +101,7 @@ beta_portfolios = (data_for_sorts
 We can construct a long-short strategy based on the two portfolios: buy the high-beta portfolio and, at the same time, short the low-beta portfolio. Thereby, the overall position in the market is net-zero, i.e., you do not need to invest money to realize this strategy in the absence of frictions.\index{Long-short}
 
 ```{python}
+#| label: univariate-portfolio-sorts-longshort-median
 beta_longshort = (beta_portfolios
     .pivot(values="ret", index="date", on="portfolio")
     .sort("date")
@@ -105,6 +112,7 @@ beta_longshort = (beta_portfolios
 We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using @Newey1987 $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero.\index{Standard errors!Newey-West} One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation. Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so in the `fit()` function by indicating the `cov_type` as `HAC` and providing the maximum lag length through an additional keywords dictionary.
 
 ```{python}
+#| label: univariate-portfolio-sorts-longshort-test-median
 model_fit = (sm.OLS.from_formula(
     formula="long_short ~ 1",
     data=beta_longshort.to_pandas()
@@ -123,6 +131,7 @@ Now, we take portfolio sorts to the next level. We want to be able to sort stock
 In some applications, the variable used for the sorting might be clustered (e.g., at a lower bound of 0). Then, multiple breakpoints may be identical, leading to empty portfolios. Similarly, some portfolios might have a very small number of stocks at the beginning of the sample. Cases where the number of portfolio constituents differs substantially due to the distribution of the characteristics require careful consideration and, depending on the application, might require customized sorting approaches.
 
 ```{python}
+#| label: univariate-portfolio-sorts-assign-function
 def assign_portfolio(sorting_variable, n_portfolios):
     """Assign portfolios to a bin between breakpoints."""
 
@@ -140,6 +149,7 @@ def assign_portfolio(sorting_variable, n_portfolios):
 We can use the above function to sort stocks into ten portfolios each month using lagged betas and compute value-weighted returns for each portfolio. Note that we cast the portfolio column to an ordered categorical (`pl.Enum`) because it provides more convenience for the figure construction below.
 
 ```{python}
+#| label: univariate-portfolio-sorts-decile-portfolios
 portfolio_labels = pl.Enum([str(i) for i in range(1, 11)])
 
 beta_portfolios = (data_for_sorts
@@ -161,6 +171,7 @@ beta_portfolios = (data_for_sorts
 In the next step, we compute summary statistics for each beta portfolio. Namely, we compute CAPM-adjusted alphas, the beta of each beta portfolio, and average returns.\index{Performance evaluation}\index{Alpha}\index{CAPM}
 
 ```{python}
+#| label: univariate-portfolio-sorts-portfolio-summary
 beta_portfolios_summary = []
 for portfolio, portfolio_data in beta_portfolios.group_by("portfolio"):
     model_fit = (sm.OLS.from_formula(
@@ -252,6 +263,7 @@ sml_figure.show()
 To provide more evidence against the CAPM predictions, we again form a long-short strategy that buys the high-beta portfolio and shorts the low-beta portfolio.
 
 ```{python}
+#| label: univariate-portfolio-sorts-longshort-deciles
 beta_longshort = (beta_portfolios
   .with_columns(
     portfolio=pl.when(pl.col("portfolio") == pl.col("portfolio").max())
@@ -271,6 +283,7 @@ beta_longshort = (beta_portfolios
 Again, the resulting long-short strategy does not exhibit statistically significant returns. 
 
 ```{python}
+#| label: univariate-portfolio-sorts-longshort-test
 model_fit = (sm.OLS.from_formula(
     formula="long_short ~ 1",
     data=beta_longshort.to_pandas()
@@ -283,6 +296,7 @@ prettify_result(model_fit)
 However, controlling for the effect of beta, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting-against-beta factor [@Frazzini2014]. Betting-against-beta corresponds to a strategy that shorts high-beta stocks and takes a (levered) long position in low-beta stocks. If borrowing constraints prevent investors from taking positions on the security market line they are instead incentivized to buy high-beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high-beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital-constrained investors with lower risk aversion.\index{Risk aversion}\index{Betting-against-beta}
 
 ```{python}
+#| label: univariate-portfolio-sorts-longshort-capm
 model_fit = (sm.OLS.from_formula(
     formula="long_short ~ 1 + mkt_excess",
     data=beta_longshort.to_pandas()

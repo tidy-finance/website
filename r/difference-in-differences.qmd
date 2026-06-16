@@ -20,6 +20,7 @@ The approach we use here replicates the results of @Seltzer2022 partly. Specific
 The current chapter relies on this set of R packages. 
 
 ```{r}
+#| label: difference-in-differences-packages
 #| message: false
 library(tidyverse)
 library(arrow)
@@ -32,6 +33,7 @@ library(broom)
 We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{r}
+#| label: difference-in-differences-read-data
 fisd <- read_parquet("data-r/fisd.parquet") |>
   select(complete_cusip, maturity, offering_amt, sic_code) |>
   drop_na()
@@ -45,6 +47,7 @@ trace_enhanced <- open_dataset("data-r/trace_enhanced") |>
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}
 
 ```{r}
+#| label: difference-in-differences-prepare-bonds
 treatment_date <- ymd("2015-12-12")
 
 polluting_industries <- c(
@@ -85,6 +88,7 @@ bonds <- fisd |>
 Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
 
 ```{r}
+#| label: difference-in-differences-aggregate-trace
 trace_aggregated <- trace_enhanced |>
   filter(rptd_pr > 25) |>
   group_by(cusip_id, trd_exctn_dt) |>
@@ -105,6 +109,7 @@ trace_aggregated <- trace_enhanced |>
 By combining the bond-specific information from Mergent FISD for our bond sample with the aggregated TRACE data, we arrive at the main sample for our analysis.
 
 ```{r}
+#| label: difference-in-differences-build-panel
 bonds_panel <- bonds |>
   inner_join(trace_aggregated, join_by(cusip_id), multiple = "all") |>
   drop_na()
@@ -113,6 +118,7 @@ bonds_panel <- bonds |>
 Before we can run the first regression, we need to define the `treated` indicator, which is the product of the `post_period` (i.e., all months after the signing of the PA) and the `polluter` indicator defined above.\index{Regression!Fixed effects} 
 
 ```{r}
+#| label: difference-in-differences-treated-indicator
 bonds_panel <- bonds_panel |>
   mutate(post_period = date >= floor_date(treatment_date, "months")) |>
   mutate(treated = polluter & post_period)
@@ -121,6 +127,7 @@ bonds_panel <- bonds_panel |>
 As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.\index{Summary statistics}
 
 ```{r}
+#| label: difference-in-differences-summary-stats
 bonds_panel |>
   pivot_longer(
     cols = c(avg_yield, time_to_maturity, log_offering_amt),
@@ -147,6 +154,7 @@ The PA is a legally binding international treaty on climate change. It was adopt
 The second model follows the typical DiD regression approach by including individual (`cusip_id`) and time (`date`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
 
 ```{r}
+#| label: difference-in-differences-did-regressions
 model_without_fe <- feols(
   avg_yield ~ treated +
     post_period +

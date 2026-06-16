@@ -18,6 +18,7 @@ This chapter shows how to import different open source data sets. Specifically, 
 First, we load the global R packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-packages
 #| message: false
 library(tidyverse)
 library(tidyfinance)
@@ -27,6 +28,7 @@ library(scales)
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-date-range
 start_date <- ymd("1960-01-01")
 end_date <- ymd("2024-12-31")
 ```
@@ -49,6 +51,7 @@ Doing this once is fine; doing it repeatedly across projects is exactly the kind
 A minimal download script mirrors the manual steps one by one. To fetch a Fama-French dataset, we first construct the URL of the corresponding ZIP archive on Kenneth French's server. Each dataset is identified by the file name of its archive; the *Fama/French 3 Factors* set, for instance, lives in `F-F_Research_Data_Factors_CSV.zip`.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-ff-url
 base_url <- "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
 file_name <- "F-F_Research_Data_Factors_CSV.zip"
 url <- paste0(base_url, file_name)
@@ -57,6 +60,7 @@ url <- paste0(base_url, file_name)
 Next, we replace the browser download with an HTTP request using the `httr2` [@httr2] package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French's server rejects requests that do not provide one.\index{httr2}
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-ff-zip
 #| message: false
 library(httr2)
 
@@ -72,6 +76,7 @@ request(url) |>
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-extract-ff-zip
 tmp_dir <- tempfile()
 dir.create(tmp_dir)
 csv_file <- unzip(tmp_zip, exdir = tmp_dir)[1]
@@ -81,6 +86,7 @@ raw_lines <- readLines(csv_file, warn = FALSE)
 The raw file starts with several lines of descriptive text, followed by one or more data tables (e.g., monthly returns and a block of annual summary rows). To emulate *scrolling down until the numbers start*, we flag every line that begins with a date key---an optional run of spaces followed by a digit---and keep the first contiguous block of such lines. The line directly above that block holds the column names.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-locate-ff-block
 is_data <- grepl("^\\s*[0-9]", raw_lines)
 runs <- rle(is_data)
 first_run <- which(runs$values)[1]
@@ -93,6 +99,7 @@ block <- raw_lines[c(first_data - 1, first_data:last_data)]
 We hand this block to `read.csv()` and label the first (unnamed) column `date`.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-parse-ff3-raw
 factors_ff3_monthly_raw <- read.csv(text = block, check.names = FALSE)
 names(factors_ff3_monthly_raw)[1] <- "date"
 factors_ff3_monthly_raw <- as_tibble(factors_ff3_monthly_raw)
@@ -108,6 +115,7 @@ Finally, we still have to clean the data. The set *Fama/French 3 Factors* contai
 -   Filter the data to the desired date range.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-clean-ff3-monthly
 factors_ff3_monthly <- factors_ff3_monthly_raw |>
   mutate(
     date = floor_date(ymd(str_c(date, "01")), "month"),
@@ -129,6 +137,7 @@ All of these steps are doable, but none of them are really about finance---they 
 The `tidyfinance` package performs the entire workflow above under the hood: you request a Fama-French dataset by name and receive a clean, consistently formatted tibble from Kenneth French's data library. This avoids repetitive boilerplate, reduces errors, and lets you focus on modeling rather than data plumbing. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French's finance data library directly. We can use the `download_data()` function to download the same monthly *Fama/French 3 Factors* as above.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-ff3-monthly
 #| output: false
 factors_ff3_monthly <- download_data(
   domain = "famafrench",
@@ -141,6 +150,7 @@ factors_ff3_monthly <- download_data(
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the monthly factors are constructed in the chapter [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-ff5-monthly
 #| output: false
 factors_ff5_monthly <- download_data(
   domain = "famafrench",
@@ -153,6 +163,7 @@ factors_ff5_monthly <- download_data(
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-ff3-daily
 #| output: false
 factors_ff3_daily <- download_data(
   domain = "famafrench",
@@ -165,6 +176,7 @@ factors_ff3_daily <- download_data(
 In a subsequent chapter, we also use the monthly returns of 10 industry portfolios, so let us fetch that data, too.\index{Data!Industry portfolios}
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-industries
 #| output: false
 industries_ff_monthly <- download_data(
   domain = "famafrench",
@@ -179,6 +191,7 @@ It is worth taking a look at all available portfolio return time series from Ken
 The `tidyfinance` package implements the processing steps as above and returns the same cleaned data frame. The list of supported Fama-French datasets can be called as follows:
 
 ```{r}
+#| label: accessing-and-managing-financial-data-list-ff-datasets
 #| output: false
 list_supported_datasets(domain = "Fama-French")
 ```
@@ -190,6 +203,7 @@ In recent years, the academic discourse experienced the rise of alternative fact
 We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the "R\_"-prescript using regular expressions and write all column names in lowercase. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham's `tidyverse` style guide.](https://style.tidyverse.org/index.html)\index{Style guide}
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-q-factors
 #| message: false
 factors_q_monthly_link <-
   "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2024.csv"
@@ -207,6 +221,7 @@ factors_q_monthly <- read_csv(factors_q_monthly_link) |>
 Again, you can use the `tidyfinance` package for a shortcut:
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-q-factors-shortcut
 #| output: false
 download_data(
   domain = "factors_q",
@@ -221,6 +236,7 @@ download_data(
 Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data updated to 2022 on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) The data is an XLSX-file stored on a public Google drive location and we directly export a CSV file.\index{Data!Macro predictors}
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-macro-raw
 #| message: false
 sheet_id <- "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
 sheet_name <- "Monthly"
@@ -252,6 +268,7 @@ Next, we transform the columns into the variables that we later use:
 For variable definitions and the required data transformations, you can consult the material on [Amit Goyal's website](https://sites.google.com/view/agoyal145).
 
 ```{r}
+#| label: accessing-and-managing-financial-data-clean-macro-predictors
 macro_predictors <- macro_predictors_raw |>
   mutate(date = ym(yyyymm)) |>
   mutate(across(where(is.character), as.numeric)) |>
@@ -291,6 +308,7 @@ macro_predictors <- macro_predictors_raw |>
 To get the equivalent data through `tidyfinance`, you can call:
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-macro-shortcut
 #| output: false
 download_data(
   domain = "macro_predictors",
@@ -305,6 +323,7 @@ download_data(
 The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. The data can be downloaded directly from FRED by constructing the appropriate URL. For instance, let us consider the consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS):\index{Data!FRED}\index{Data!CPI}
 
 ```{r}
+#| label: accessing-and-managing-financial-data-fred-url
 series <- "CPIAUCNS"
 cpi_url <- paste0(
   "https://fred.stlouisfed.org/graph/fredgraph.csv?id=",
@@ -315,6 +334,7 @@ cpi_url <- paste0(
 We can then use the `httr2` [@httr2] package to request the CSV, extract the data from the response body, and convert the columns to a tidy format:
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-cpi
 #| message: false
 library(httr2)
 
@@ -343,6 +363,7 @@ The last line sets the current (latest) price level as the reference price level
 The `tidyfinance` package can, of course, also fetch the same index data and many more data series:
 
 ```{r}
+#| label: accessing-and-managing-financial-data-download-cpi-shortcut
 #| message: false
 download_data(
   domain = "fred",
@@ -361,12 +382,14 @@ Now that we have downloaded some (freely available) data from the web into the m
 There are many ways to set up and organize your data, depending on the use case. Storing data as Parquet files creates a universal data format that seamlessly works across different programming languages and platforms. Unlike CSV files that often lose data types when shared between R, Python, Julia, or other languages, Parquet files maintain perfect data integrity regardless of which tool reads them. A dataset saved as Parquet in R can be opened directly in Python's pandas, or Julia's DataFrames.jl.^[In previous editions of this book, we suggested using SQLite databases. However, Parquet files are more versatile and easier to handle across different programming languages. Should you still prefer using SQLite, you can find the relevant code snippets in a separate blog post.]
 
 ```{r}
+#| label: accessing-and-managing-financial-data-arrow-package
 library(arrow)
 ```
 
 Parquet files are easily created - the code below is really all there is. You do not need any external software. We will store everything in the data subfolder, to retrieve data for all subsequent chapters. The initial part of the code ensures that the directory is created if it does not already exist.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-create-data-dir
 if (!dir.exists("data-r")) {
   dir.create("data-r")
 }
@@ -375,12 +398,14 @@ if (!dir.exists("data-r")) {
 Next, we create a file with the monthly Fama-French factor data. We do so with the function `write_parquet`.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-write-ff3-monthly
 write_parquet(factors_ff3_monthly, "data-r/factors_ff3_monthly.parquet")
 ```
 
 You can retrieve the data directly in your memory by calling `read_parquet()`. It is also possible to evaluate `dplyr` calls lazily, i.e., the data is not in our R session's memory, and the database does most of the work. 
 
 ```{r}
+#| label: accessing-and-managing-financial-data-read-ff3-monthly
 read_parquet("data-r/factors_ff3_monthly.parquet") |>
   select(date, risk_free) |>
   head(10)
@@ -389,6 +414,7 @@ read_parquet("data-r/factors_ff3_monthly.parquet") |>
 Before we move on to the next data source, let us also store the other five tables in our new data folder.
 
 ```{r}
+#| label: accessing-and-managing-financial-data-write-remaining-tables
 lst(
   factors_ff5_monthly,
   factors_ff3_daily,

@@ -17,6 +17,7 @@ We start with standard mean-variance efficient portfolios and introduce constrai
 Throughout this chapter, we use the following R packages:
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-packages
 #| message: false
 library(tidyverse)
 library(arrow)
@@ -31,6 +32,7 @@ Compared to previous chapters, we introduce the `nloptr` package [@nloptr] to pe
 We start by loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application. \index{Data!Industry portfolios}
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-load-data
 industry_returns <- read_parquet("data-r/industries_ff_monthly.parquet") |>
   select(-date) |>
   drop_na()
@@ -44,6 +46,7 @@ $$\omega_\text{mvp} = \arg\min \omega'\Sigma \omega \text{ s.t. } \omega'\iota =
 where $\Sigma$ is the $(N \times N)$ covariance matrix of the returns. The optimal weights $\omega_\text{mvp}$ can be found analytically and are $\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota'\Sigma^{-1}\iota}$. In terms of code, the math is equivalent to the following chunk. \index{Minimum variance portfolio}
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-mvp-analytical
 n_industries <- ncol(industry_returns)
 
 Sigma <- cov(industry_returns)
@@ -101,6 +104,7 @@ The function below implements the efficient portfolio weight in its general form
 For $\beta=0$, the computation resembles the standard mean-variance efficient framework. `gamma` denotes the coefficient of risk aversion $\gamma$, `beta` is the transaction cost parameter $\beta$ and `w_prev` are the weights before rebalancing $\omega_{t^+}$. 
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-efficient-weight-function
 compute_efficient_weight <- function(Sigma,
                                      mu,
                                      gamma = 2,
@@ -132,6 +136,7 @@ The portfolio weights above indicate the efficient portfolio for an investor wit
 What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-transaction-costs
 gammas <- c(2, 4, 8, 20)
 betas <- 20 * qexp((1:99) / 100)
                    
@@ -192,6 +197,7 @@ We rely on the powerful `nloptr` package, which provides a common interface to a
 We illustrate the use of the `nloptr()` function by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance. 
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-nloptr-replication
 w_initial <- rep(1 / n_industries, n_industries)
 
 objective_mvp <- function(w) {
@@ -252,6 +258,7 @@ The result above shows that indeed the numerical procedure recovered the optimal
 Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies $N$ inequality constraints of the form $\omega_i >=0$. We can implement the short-sale constraints by imposing a vector of lower bounds `lb = rep(0, n_industries)`.
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-no-short-sale
 w_no_short_sale <- nloptr(
   x0 = w_initial, 
   eval_f = objective_efficient, 
@@ -272,6 +279,7 @@ You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words, `
 The constraint enforces that a maximum of 50 percent of the allocated wealth can be allocated to short positions, thus implying an initial margin requirement of 50 percent. Imposing such a margin requirement reduces portfolio risks because extreme portfolio weights are not attainable anymore. The implementation of Regulation-T rules is numerically interesting because the margin constraints imply a non-linear constraint on the portfolio weights. \index{Regulation T}
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-regulation-t
 reg_t <- 1.5
 
 inequality_constraint <- function(w) {
@@ -344,6 +352,7 @@ Estimation uncertainty may thus lead to inefficient allocations. By imposing res
 Before we move on, we want to propose a final allocation strategy, which reflects a somewhat more realistic structure of transaction costs instead of the quadratic specification used above. The function below computes efficient portfolio weights while adjusting for transaction costs of the form $\beta\sum_{i=1}^N |(\omega_{i, t+1} - \omega_{i, t^+})|$. No closed-form solution exists, and we rely on non-linear optimization procedures.
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-l1-tc-function
 compute_efficient_weight_L1_TC <- function(mu,
                                            Sigma,
                                            gamma,
@@ -381,6 +390,7 @@ While interesting from a methodological point of view, we cannot evaluate the pe
 The few lines below define the general setup. We consider 120 periods from the past to update the parameter estimates before recomputing portfolio weights. Then, we update portfolio weights which is costly and affects the performance. The portfolio weights determine the portfolio return. A period later, the current portfolio weights have changed and form the foundation for transaction costs incurred in the next period. We consider three different competing strategies: the mean-variance efficient portfolio, the mean-variance efficient portfolio with ex-ante adjustment for transaction costs, and the naive portfolio, which allocates wealth equally across the different assets.\index{Transaction cost}
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-backtest-setup
 window_length <- 120
 periods <- nrow(industry_returns) - window_length
 
@@ -408,6 +418,7 @@ w_prev_1 <- w_prev_2 <- w_prev_3 <- rep(
 We also define two helper functions: one to adjust the weights due to returns and one for performance evaluation, where we compute realized returns net of transaction costs. 
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-helper-functions
 adjust_weights <- function(w, next_return) {
   w_prev <- 1 + w * next_return
   as.numeric(w_prev / sum(as.vector(w_prev)))
@@ -425,6 +436,7 @@ The following code chunk performs a rolling-window estimation, which we implemen
 Note that we use the sample variance-covariance matrix and ignore the estimation of $\hat\mu$ entirely, but you might use more advanced estimators in practice. 
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-rolling-window
 for (p in 1:periods) {
   returns_window <- industry_returns[p:(p + window_length - 1), ]
   next_return <- industry_returns[p + window_length, ] |> as.matrix()
@@ -480,6 +492,7 @@ for (p in 1:periods) {
 Finally, we get to the evaluation of the portfolio strategies *net-of-transaction costs*. Note that we compute annualized returns and standard deviations.\index{Sharpe Ratio}
 
 ```{r}
+#| label: constrained-optimization-and-backtesting-performance-table
 performance <- lapply(
   performance_values,
   as_tibble

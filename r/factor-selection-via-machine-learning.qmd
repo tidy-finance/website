@@ -68,6 +68,7 @@ To get started, we load the required R packages and data. The main focus is on t
 @Kuhn2022 provide a thorough introduction into all `tidymodels` components. `glmnet` [@glmnet] was developed and released in sync with @Tibshirani1996 and provides an R implementation of Elastic Net estimation. The package `timetk` [@timetk] provides useful tools for time series data wrangling. 
 
 ```{r}
+#| label: factor-selection-via-machine-learning-packages
 #| message: false
 library(arrow)
 library(tidyverse)
@@ -91,6 +92,7 @@ Finally, we need a set of *test assets*. The aim is to understand which of the p
 In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French's homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.\index{Data!Fama-French factors}\index{Data!q-factors}\index{Data!Macroeconomic predictors}\index{Data!Industry portfolios}
 
 ```{r}
+#| label: factor-selection-via-machine-learning-load-data
 factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
   rename_with(~ str_c("factor_ff_", .), -date)
 
@@ -110,6 +112,7 @@ industries_ff_monthly <- read_parquet("data-r/industries_ff_monthly.parquet") |>
 We combine all the monthly observations into one dataframe.
 
 ```{r, eval = TRUE}
+#| label: factor-selection-via-machine-learning-combine-data
 data <- industries_ff_monthly |>
   left_join(factors_ff3_monthly, join_by(date)) |>
   left_join(factors_q_monthly, join_by(date)) |>
@@ -157,6 +160,7 @@ The split takes the last 20% of the data as a test set, which is not used for an
 We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-train-test-split
 split <- initial_time_split(
   data |>
     filter(industry == "manuf") |>
@@ -180,6 +184,7 @@ $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t
 - We demean and scale each regressor such that the standard deviation is one
 
 ```{r}
+#| label: factor-selection-via-machine-learning-recipe
 rec <- recipe(ret_excess ~ ., data = training(split)) |>
   step_rm(date) |>
   step_interact(terms = ~ contains("factor"):contains("macro")) |>
@@ -193,11 +198,13 @@ All that matters at this early stage are the column names and types.
 We can apply the recipe to any data with a suitable structure. The code below combines two different functions: `prep()` estimates the required parameters from a training set that can be applied to other datasets later. `bake()` applies the processed computations to new data.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-prep-recipe
 data_prep <- prep(rec, training(split))
 ```
 The object `data_prep` contains information related to the different preprocessing steps applied to the training data: E.g., it is necessary to compute sample means and standard deviations to center and scale the variables. 
 
 ```{r}
+#| label: factor-selection-via-machine-learning-bake-recipe
 data_bake <- bake(data_prep,
   new_data = testing(split)
 )
@@ -216,6 +223,7 @@ $$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\bet
 For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-lasso-model-spec
 lm_model <- linear_reg(
   penalty = 0.0001,
   mixture = 1
@@ -226,6 +234,7 @@ lm_model <- linear_reg(
 That's it - we are done! The object `lm_model` contains the definition of our model with all required information. Note that `set_engine("glmnet")` indicates the API character of the `tidymodels` workflow: Under the hood, the package `glmnet` is doing the heavy lifting, while `linear_reg()` provides a unified framework to collect the inputs. The `workflow`  ends with combining everything necessary for the serious data science workflow, namely, a recipe and a model.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-build-workflow
 lm_fit <- workflow() |>
   add_recipe(rec) |>
   add_model(lm_model)
@@ -239,6 +248,7 @@ The training data is pre-processed according to our recipe steps, and the Lasso 
 First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ @fig-1402 illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-predicted-values
 predicted_values <- lm_fit |>
   fit(data = training(split)) |>
   augment(data |> filter(industry == "manuf")) |>
@@ -300,6 +310,7 @@ predicted_values |>
 What do the estimated coefficients look like? To analyze these values and to illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-glmnet-fits
 x <- data_bake |>
   select(-ret_excess) |>
   as.matrix()
@@ -371,6 +382,7 @@ How should you pick $K$? Large values of $K$ are preferable because the training
 `tidymodels` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model()`. 
 
 ```{r}
+#| label: factor-selection-via-machine-learning-tune-model-spec
 lm_model <- linear_reg(
   penalty = tune(),
   mixture = tune()
@@ -384,6 +396,7 @@ lm_fit <- lm_fit |>
 For our sample, we consider a time-series cross-validation sample. This means that we tune our models with 20 samples of length five years with a validation period of four years. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-cv-folds
 data_folds <- time_series_cv(
   data        = training(split),
   date_var    = date,
@@ -398,6 +411,7 @@ data_folds
 Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-tune-grid
 lm_tune <- lm_fit |>
   tune_grid(
     resample = data_folds,
@@ -434,6 +448,7 @@ Then, we use the set of `finalize_*()`-functions that take a list or tibble of t
 First, we define the Lasso model with one tuning parameter.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-lasso-tune-model
 lasso_model <- linear_reg(
   penalty = tune(),
   mixture = 1
@@ -447,6 +462,7 @@ lm_fit <- lm_fit |>
 The following task can be easily parallelized to reduce computing time substantially. We use the parallelization capabilities of `furrr`. Note that we can also just recycle all the steps from above and collect them in a function.
 
 ```{r}
+#| label: factor-selection-via-machine-learning-select-variables
 #| message: false
 #| warning: false
 select_variables <- function(input) {

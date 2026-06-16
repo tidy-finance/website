@@ -13,6 +13,7 @@ We deliberately use the pseudo label because the data is not meaningful in the s
 To generate the pseudo data, we use the following packages:
 
 ```{python}
+#| label: wrds-dummy-data-packages
 import polars as pl
 import numpy as np
 import string
@@ -21,6 +22,7 @@ import string
 We store the data in the folder `data-python`. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
 
 ```{python}
+#| label: wrds-dummy-data-create-folder
 import os
 
 if not os.path.exists("data-python"):
@@ -30,6 +32,7 @@ if not os.path.exists("data-python"):
 Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over ten years that we then use to create yearly, monthly, and daily data, respectively. 
 
 ```{python}
+#| label: wrds-dummy-data-seed-and-dates
 np.random.seed(1234)
 
 start_date = pl.date(2003, 1, 1)
@@ -49,6 +52,7 @@ pseudo_days = pl.date_range(
 Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original data, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data.
 
 ```{python}
+#| label: wrds-dummy-data-stock-identifiers
 number_of_stocks = 100
 
 industries = pl.DataFrame(
@@ -141,6 +145,7 @@ Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel,
 Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `pseudo_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
 
 ```{python}
+#| label: wrds-dummy-data-stock-panels
 stock_panel_yearly = pl.DataFrame(
     {
         "gvkey": np.tile(stock_identifiers["gvkey"], len(pseudo_years)),
@@ -173,6 +178,7 @@ stock_panel_daily = pl.DataFrame(
 We then proceed to create pseudo beta values for our `stock_panel_monthly` table. We generate monthly beta values `beta_monthly` using the `rnorm()` function with a mean and standard deviation of 1. For daily beta values `beta_daily`, we take the pseudo monthly beta and add a small random noise to it. This noise is generated again using the `rnorm()` function, but this time we divide the random values by 100 to ensure they are small deviations from the monthly beta.
 
 ```{python}
+#| label: wrds-dummy-data-beta
 beta_pseudo = (stock_panel_monthly
     .with_columns(
         beta_monthly=np.random.normal(
@@ -195,6 +201,7 @@ beta_pseudo.write_parquet("data-python/beta.parquet")
 To create pseudo annual firm characteristics, we take all columns from the `compustat_annual` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case. \index{Data!Compustat}
 
 ```{python}
+#| label: wrds-dummy-data-compustat-annual
 relevant_columns = [
     "seq",
     "ceq",
@@ -237,6 +244,7 @@ compustat_pseudo.write_parquet("data-python/compustat_annual.parquet")
 The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month `prc` both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and `prc`. \index{Data!CRSP}
 
 ```{python}
+#| label: wrds-dummy-data-crsp-monthly
 crsp_monthly_pseudo = (
     stock_panel_monthly
     .with_columns(
@@ -263,6 +271,7 @@ crsp_monthly_pseudo.write_parquet("data-python/crsp_monthly.parquet")
 The `crsp_daily` table only contains a `date` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.  
 
 ```{python}
+#| label: wrds-dummy-data-crsp-daily
 crsp_daily_pseudo = (stock_panel_daily
     .with_columns(
         ret_excess=np.fmax(np.random.normal(size=len(stock_panel_daily)), -1)
@@ -281,6 +290,7 @@ Lastly, we move to the bond data that we use in our books.
 To create pseudo data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`.\index{Data!FISD}
 
 ```{python}
+#| label: wrds-dummy-data-fisd
 # | eval: false
 number_of_bonds = 100
 
@@ -358,6 +368,7 @@ fisd_pseudo.write_parquet("data-python/fisd.parquet")
 Finally, we create a pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. \index{Data!TRACE}
 
 ```{python}
+#| label: wrds-dummy-data-trace-enhanced
 number_of_bonds = 100
 start_date = pl.date(2014, 1, 1)
 end_date = pl.date(2016, 11, 30)

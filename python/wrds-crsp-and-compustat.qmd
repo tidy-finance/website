@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: wrds-crsp-and-compustat-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -21,6 +22,7 @@ If you don't have access to WRDS but still want to run the code in this book, we
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. The last two packages are used for plotting.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-packages
 import polars as pl
 import numpy as np
 import tidyfinance as tf
@@ -33,6 +35,7 @@ from datetime import datetime
 ```
 
 ```{python}
+#| label: wrds-crsp-and-compustat-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read()) 
 ```
@@ -40,6 +43,7 @@ exec(open("python/render-plotnine-custom.py").read())
 We use the same date range as in the previous chapter to ensure consistency. However, we have to use the date format that the WRDS database expects.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-date-range
 start_date = "01/01/1960"
 end_date = "12/31/2024"
 ```
@@ -49,6 +53,7 @@ end_date = "12/31/2024"
 WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is organized in an SQL database, although they use the [PostgreSQL](https://www.postgresql.org/) engine. This database engine is just as easy to handle with Python as SQL. We use the `sqlalchemy` package to establish a connection to the WRDS database because it already contains a suitable driver.^[An alternative to establish a connection to WRDS is to use the `WRDS-Py` library. We chose to work with `sqlalchemy` [@sqlalchemy] to show how to access PostgreSQL engines  in general.]\index{Database!PostgreSQL} 
 
 ```{python}
+#| label: wrds-crsp-and-compustat-sqlalchemy-import
 #| eval: false
 from sqlalchemy import create_engine
 ```
@@ -58,6 +63,7 @@ To establish a connection to WRDS, you use the function `create_engine()` with a
 Additionally, you have to use two-factor authentication since May 2023 when establishing a remote connection to WRDS. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires two-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.\index{Two-factor authentication}\index{WRDS!Two-factor authentication}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-wrds-connection
 #| eval: false
 #| output: false
 import os
@@ -81,6 +87,7 @@ wrds = create_engine(connection_url, pool_pre_ping=True)
 You can also use the `tidyfinance` package to set the login credentials and create a connection.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-tidyfinance-connection
 #| eval: false
 tf.set_wrds_credentials()
 wrds = tf.get_wrds_connection()
@@ -95,6 +102,7 @@ The remote connection to WRDS is very useful. Yet, the database itself contains 
 We use the two remote tables to fetch the data we want to put into our local folder. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)^[These three criteria jointly replicate the filter `exchcd %in% c(1, 2, 3, 31, 32, 33)` used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the `conditionaltype == "RW"`, which is equivalent to the restriction of `exchcd %in% c(1, 2, 3)` with the old CRSP format.], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf` (see our blog post about [CRSP 2.0](../blog/crsp-v2-update/index.qmd) for more information). We refer to @SchwarzEtAl2026 for details on the changes in the CRSP tape rolled out in 2025. Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.\index{Permno}\index{Returns!Delisting}\index{Industry codes}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-crsp-monthly-query
 #| eval: false
 crsp_monthly_query = (
   "SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "
@@ -132,6 +140,7 @@ Now, we have all the relevant monthly return data in memory and proceed with pre
 The first additional variable we create is market capitalization (`mktcap`), which is the product of the number of outstanding shares (`shrout`) and the last traded price in a month (`prc`).\index{Market capitalization} Note that in contrast to returns (`ret`), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock's price, you need to adjust it with a cumulative adjustment factor.  We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).\index{Stock price}\index{Returns}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-compute-mktcap
 #| eval: false
 crsp_monthly = (crsp_monthly
     .with_columns(mktcap=pl.col("shrout")*pl.col("prc")/1000000)
@@ -146,6 +155,7 @@ crsp_monthly = (crsp_monthly
 The next variable we frequently use is the one-month *lagged* market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.\index{Weighting!Value}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-lag-mktcap
 #| eval: false
 mktcap_lag = (crsp_monthly
     .with_columns(
@@ -163,6 +173,7 @@ crsp_monthly = (crsp_monthly
 Next, we transform primary listing exchange codes to explicit exchange names.\index{Exchange!Exchange codes}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-exchange-names
 #| eval: false
 crsp_monthly = crsp_monthly.with_columns(
     exchange=pl.when(pl.col("primaryexch") == "N").then(pl.lit("NYSE"))
@@ -175,6 +186,7 @@ crsp_monthly = crsp_monthly.with_columns(
 Similarly, we transform industry codes to industry descriptions following @BaliEngleMurray2016.\index{Industry codes} Notice that there are also other categorizations of industries [e.g., @FamaFrench1997] that are commonly used.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-industry-names
 #| eval: false
 crsp_monthly = crsp_monthly.with_columns(
     industry=pl.when(pl.col("siccd").is_between(1, 999)).then(pl.lit("Agriculture"))
@@ -195,6 +207,7 @@ crsp_monthly = crsp_monthly.with_columns(
 Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data.\index{Returns!Excess}\index{Risk-free rate} As we base all our analyses on the excess returns, we can drop the risk-free rate from our data frame. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we load the data frame `factors_ff3_monthly`.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-excess-returns
 #| eval: false
 factors_ff3_monthly = (pl.read_parquet("data-python/factors_ff3_monthly.parquet")
     .select(["date", "risk_free"])
@@ -210,6 +223,7 @@ crsp_monthly = (crsp_monthly
 The `tidyfinance` package provides a shortcut to implement all these processing steps from above:
 
 ```{python}
+#| label: wrds-crsp-and-compustat-tidyfinance-crsp-monthly
 #| eval: false
 crsp_monthly = pl.from_pandas(tf.download_data(
     domain="wrds",
@@ -222,6 +236,7 @@ crsp_monthly = pl.from_pandas(tf.download_data(
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization. 
 
 ```{python}
+#| label: wrds-crsp-and-compustat-drop-nulls
 #| eval: false
 crsp_monthly = (crsp_monthly
     .drop_nulls(subset=["ret_excess", "mktcap", "mktcap_lag"])
@@ -231,12 +246,14 @@ crsp_monthly = (crsp_monthly
 Finally, we store the monthly CRSP file in our folder.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-write-crsp-monthly
 #| eval: false
 #| output: false
 crsp_monthly.write_parquet("data-python/crsp_monthly.parquet")
 ```
 
 ```{python}
+#| label: wrds-crsp-and-compustat-read-crsp-monthly
 #| eval: true
 crsp_monthly = pl.read_parquet("data-python/crsp_monthly.parquet")
 ```
@@ -377,6 +394,7 @@ Before we turn to accounting data, we provide a proposal for downloading daily C
 There is a solution to this challenge. As with many *big data* problems, you can split up the big task into several smaller tasks that are easier to handle.\index{Big data} That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in `for`-loops,\index{For-loops} where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using `print()`. Notice that we also use the method `to_sql()` here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.\index{Returns!Delisting}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-crsp-daily-loop
 #| output: false
 #| eval: false
 factors_ff3_daily = pl.read_parquet("data-python/factors_ff3_daily.parquet")
@@ -457,6 +475,7 @@ Eventually, we end up with more than 72 million rows of daily return data. Note 
 To download the daily CRSP data via the `tidyfinance` package, you can call:
 
 ```{python}
+#| label: wrds-crsp-and-compustat-tidyfinance-crsp-daily
 #| eval: false
 crsp_daily = pl.from_pandas(tf.download_data(
     domain="wrds",
@@ -475,6 +494,7 @@ Firm accounting data are an important source of information that we use in portf
 To access Compustat data, we can again tap WRDS, which hosts the `funda` table that contains annual firm-level information on North American companies. We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, which includes companies that are primarily involved in manufacturing, services, and other non-financial business activities,^[Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.], (ii) in the standard format (i.e., consolidated information in standard presentation), (iii) reported in USD,^[Compustat also contains reports in CAD, which can lead to a currency mismatch, e.g., when relating book equity to market equity.] and (iv) only data in the desired time window.\index{Gvkey}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-compustat-query
 #| eval: false
 compustat_query = (
     "SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,  pstkrv, "
@@ -499,6 +519,7 @@ compustat_annual = (pl.read_database(
 Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French's data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)\index{Book equity}\index{Preferred stock}\index{Operating profitability}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-compute-be-op
 #| eval: false
 compustat_annual = (compustat_annual
     .with_columns(
@@ -524,6 +545,7 @@ compustat_annual = (compustat_annual
 We keep only the last available information for each firm-year group (by using `tail(1)` for each group). Note that `datadate` defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2022). Therefore, `datadate` is not the date when data was made available to the public. Check out the Exercises for more insights into the peculiarities of `datadate`.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-keep-last-firm-year
 #| eval: false
 compustat_annual = (
     compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
@@ -536,6 +558,7 @@ compustat_annual = (
 We also compute the investment ratio (`inv`) according to Kenneth French's variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.\index{Investment ratio}
 
 ```{python}
+#| label: wrds-crsp-and-compustat-compute-investment
 #| eval: false
 compustat_annual_lag = (compustat_annual
     .select(["gvkey", "year", "at"])
@@ -555,6 +578,7 @@ compustat_annual = (compustat_annual
 With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local folder. 
 
 ```{python}
+#| label: wrds-crsp-and-compustat-write-compustat
 #| output: false
 #| eval: false
 compustat_annual.write_parquet("data-python/compustat_annual.parquet")
@@ -563,6 +587,7 @@ compustat_annual.write_parquet("data-python/compustat_annual.parquet")
 The `tidyfinance` package provides a shortcut for these processing steps as well:
 
 ```{python}
+#| label: wrds-crsp-and-compustat-tidyfinance-compustat
 #| eval: false
 compustat_annual = pl.from_pandas(tf.download_data(
     domain="wrds",
@@ -573,6 +598,7 @@ compustat_annual = pl.from_pandas(tf.download_data(
 ```
 
 ```{python}
+#| label: wrds-crsp-and-compustat-read-compustat
 #| eval: true
 compustat_annual = pl.read_parquet("data-python/compustat_annual.parquet")
 ```
@@ -582,6 +608,7 @@ compustat_annual = pl.read_parquet("data-python/compustat_annual.parquet")
 Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses `permno` for stocks, while Compustat uses `gvkey` to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the *CRSP-Compustat Merged* table (provided by CRSP).\index{Data!CRSP-Compustat Merged}\index{Permno}\index{Gvkey}\index{Data!Linking table} The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in @BaliEngleMurray2016. Note also that currently active links have no end date, so we just enter the current date via the SQL verb `CURRENT_DATE`.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-ccm-linking-query
 #| eval: false
 ccm_linking_table_query = (
     "SELECT lpermno AS permno, gvkey, linkdt, "
@@ -601,6 +628,7 @@ ccm_linking_table = pl.read_database(
 To fetch these links via `tidyfinance`, you can call:
 
 ```{python}
+#| label: wrds-crsp-and-compustat-tidyfinance-ccm-links
 #| eval: false
 ccm_links = pl.from_pandas(tf.download_data(domain="wrds", dataset="ccm_links"))
 ```
@@ -608,6 +636,7 @@ ccm_links = pl.from_pandas(tf.download_data(domain="wrds", dataset="ccm_links"))
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-merge-ccm-links
 #| eval: false
 ccm_links = (crsp_monthly
     .join(ccm_linking_table, how="inner", on="permno")
@@ -627,6 +656,7 @@ crsp_monthly = (crsp_monthly
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local folder.
 
 ```{python}
+#| label: wrds-crsp-and-compustat-write-crsp-merged
 #| eval: false
 #| output: false
 crsp_monthly.write_parquet("data-python/crsp_monthly.parquet")

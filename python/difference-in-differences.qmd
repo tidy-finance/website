@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: difference-in-differences-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -23,6 +24,7 @@ The approach we use here replicates the results of @Seltzer2022 partly. Specific
 The current chapter relies on this set of Python packages. 
 
 ```{python}
+#| label: difference-in-differences-packages
 import polars as pl
 import datetime as dt
 import pyfixest as pf
@@ -33,6 +35,7 @@ from scipy.stats import norm
 ```
 
 ```{python}
+#| label: difference-in-differences-render-plotnine
 #| echo: false
 exec(open("python/render-plotnine-custom.py").read())
 ```
@@ -44,6 +47,7 @@ Compared to previous chapters, we introduce the `scipy.stats` module from the `s
 We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
 
 ```{python}
+#| label: difference-in-differences-load-data
 fisd = (pl.read_parquet("data-python/fisd.parquet")
     .drop_nulls()
 )
@@ -59,6 +63,7 @@ trace_enhanced = (pl.from_arrow(
 We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}
 
 ```{python}
+#| label: difference-in-differences-prepare-bonds
 treatment_date = dt.datetime(2015, 12, 12)
 treatment_month = dt.datetime(2015, 12, 1)
 polluting_industries = [
@@ -83,6 +88,7 @@ Next, we aggregate the individual transactions as reported in TRACE to a monthly
 We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
 
 ```{python}
+#| label: difference-in-differences-aggregate-trace
 trace_enhanced = (trace_enhanced
     .filter(pl.col("rptd_pr") > 25)
     .with_columns(weight=pl.col("entrd_vol_qt")*pl.col("rptd_pr"))
@@ -114,6 +120,7 @@ trace_aggregated = (trace_aggregated
 By combining the bond-specific information from Mergent FISD for our bond sample with the aggregated TRACE data, we arrive at the main sample for our analysis.
 
 ```{python}
+#| label: difference-in-differences-build-panel
 bonds_panel = (bonds
     .join(trace_aggregated, how="inner", on="cusip_id")
     .drop_nulls()
@@ -123,6 +130,7 @@ bonds_panel = (bonds
 Before we can run the first regression, we need to define the `treated` indicator,^[Note that by using a generic name here, everybody can replace ours with their sample data and run the code to produce standard regression tables and illustrations.] which is the product of the `post_period` (i.e., all months after the signing of the PA) and the `polluter` indicator defined above.\index{Regression!Fixed effects} 
 
 ```{python}
+#| label: difference-in-differences-define-treated
 bonds_panel = (bonds_panel
     .with_columns(
         post_period=(pl.col("date") >= treatment_month)
@@ -134,6 +142,7 @@ bonds_panel = (bonds_panel
 As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.\index{Summary statistics}
 
 ```{python}
+#| label: difference-in-differences-summary-statistics
 bonds_panel_summary = (bonds_panel
     .unpivot(
         on=["avg_yield", "time_to_maturity", "log_offering_amt"],
@@ -163,6 +172,7 @@ The PA is a legally binding international treaty on climate change. It was adopt
 The second model follows the typical DiD regression approach by including individual (`cusip_id`) and time (`date`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`. 
 
 ```{python}
+#| label: difference-in-differences-panel-regressions
 model_without_fe = pf.feols(
     "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
     vcov = "iid",
@@ -238,6 +248,7 @@ model_without_fe_figure.show()
 Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date.\index{Graph!Difference in differences}
 
 ```{python}
+#| label: difference-in-differences-prepare-time-dummies
 bonds_panel_alt = (bonds_panel
     .with_columns(
         diff_to_treatment=(
@@ -259,6 +270,7 @@ variables = (bonds_panel_alt
 In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects. 
 
 ```{python}
+#| label: difference-in-differences-fe-time-regression
 bonds_panel_alt = bonds_panel_alt.to_pandas()
 variables = variables.to_pandas()
 
@@ -293,6 +305,7 @@ model_with_fe_time = pf.feols(
 We then collect the regression results into a dataframe that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies. 
 
 ```{python}
+#| label: difference-in-differences-collect-coefficients
 lag0_row = pl.DataFrame({
     "term": ["lag0"],
     "estimate": [0.0],
