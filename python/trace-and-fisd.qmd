@@ -49,7 +49,6 @@ Compared to previous chapters, we load `httpimport` [@httpimport] to source code
 Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upenn.edu/) to which we establish the PostgreSQL connection described in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{WRDS}
 
 ```{python}
-#| eval: false
 import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, URL
@@ -93,7 +92,6 @@ The following chunk connects to the data and selects the bond sample to remove c
 1. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
 
 ```{python}
-#| eval: false
 fisd_query = (
   "SELECT complete_cusip, maturity, offering_amt, offering_date, "
          "dated_date, interest_frequency, coupon, last_interest_date, "
@@ -141,7 +139,6 @@ fisd = pl.read_database(
 We also pull issuer information from `fisd_mergedissuer` regarding the industry and country of the firm that issued a particular bond. Then, we filter to include only US-domiciled firms' bonds. We match the data by `issuer_id`.
 
 ```{python}
-#| eval: false
 fisd_issuer_query = (
     "SELECT issuer_id, sic_code, country_domicile "
         "FROM fisd.fisd_mergedissuer"
@@ -164,7 +161,6 @@ fisd = (fisd
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `tf.set_wrds_credentials()`.
 
 ```{python}
-#| eval: false
 #| output: false
 fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
 ```
@@ -172,7 +168,6 @@ fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
 
 ```{python}
-#| eval: false
 #| output: false
 fisd.write_parquet("data-python/fisd.parquet")
 ```
@@ -194,7 +189,6 @@ Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted wit
 We store code for cleaning enhanced TRACE with Python on the following GitHub [Gist.](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) \index{GitHub!Gist} [Clean Enhanced TRACE with Python](clean-enhanced-trace-with-python.qmd) also contains the code for reference. We only need to source the code from the Gist, which we can do with the code below using `httpimport`. In the chunk, we explicitly load the necessary function interpreting the Gist as a module (i.e., you could also use it as a module and precede the function calls with the module's name). Alternatively, you can also go to the Gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively. 
 
 ```{python}
-#| eval: false
 #| warning: false
 import requests
 
@@ -211,7 +205,6 @@ exec(response.text)
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1,000 bonds, which we define below.\index{Paris (Climate) Agreement}
 
 ```{python}
-#| eval: false
 cusips = fisd["complete_cusip"].unique().to_list()
 batch_size = 1000
 batches = np.ceil(len(cusips)/batch_size).astype(int)
@@ -220,7 +213,6 @@ batches = np.ceil(len(cusips)/batch_size).astype(int)
 Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches.  Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
 
 ```{python}
-#| eval: false
 #| output: false
 for j in range(1, batches + 1):
   
@@ -255,7 +247,6 @@ for j in range(1, batches + 1):
 If you want to download the prepared enhanced TRACE data for selected bonds via the `tidyfinance` package, you can call, e.g.:
 
 ```{python}
-#| eval: false
 #| output: false
 tf.download_data(
     domain="wrds",
