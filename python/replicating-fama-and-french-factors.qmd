@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: replicating-fama-and-french-factors-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -23,6 +24,7 @@ After the replication of the three-factor model, we move to the five-factors by 
 The current chapter relies on this set of Python packages. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-packages
 import polars as pl
 import numpy as np
 import statsmodels.formula.api as smf
@@ -35,6 +37,7 @@ from regtabletotext import prettify_result
 We use CRSP and Compustat as data sources, as we need exactly the same variables to compute the size and value factors in the way Fama and French do it. Hence, we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}\index{Data!Fama-French factors} The only addition is that we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}
 
 ```{python}
+#| label: replicating-fama-and-french-factors-load-data
 crsp_monthly = (
     pl.read_parquet("data-python/crsp_monthly.parquet")
     .select(["permno", "gvkey", "date", "ret_excess", "mktcap",
@@ -67,6 +70,7 @@ Second, Fama and French also have a different protocol for computing the book-to
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year. We ensure this by a call of `unique()` at the end of the chunk below.
 
 ```{python}
+#| label: replicating-fama-and-french-factors-sorting-variables
 size = (crsp_monthly
     .filter(pl.col("date").dt.month() == 6)
     .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo").cast(pl.Date))
@@ -102,6 +106,7 @@ sorting_variables = (size
 Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints to independently form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30- and 70-percentiles. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which takes the sequence of breakpoints as an object specified in the function's call. Specifically, we give `percentiles = [0.3, 0.7]` to the function. Additionally, we perform a join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ```{python}
+#| label: replicating-fama-and-french-factors-assign-portfolio
 def assign_portfolio(data, sorting_variable, percentiles):
     """Assign portfolios to a bin according to a sorting variable."""
 
@@ -146,6 +151,7 @@ Alternatively, you can implement the same portfolio sorts using the `assign_port
 Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 ```{python}
+#| label: replicating-fama-and-french-factors-merge-portfolios-ff3
 portfolios = (crsp_monthly
     .with_columns(
         sorting_date=pl.when(pl.col("date").dt.month() <= 6)
@@ -161,6 +167,7 @@ portfolios = (crsp_monthly
 Equipped with the return data and the assigned portfolios, we can now compute the value-weighted average return for each of the six portfolios. Then, we form the Fama-French factors. For the size factor (i.e., SMB), we go long in the three small portfolios and short the three large portfolios by taking an average across either group. For the value factor (i.e., HML), we go long in the two high book-to-market portfolios and short the two low book-to-market portfolios, again weighting them equally (using the `mean()` function).\index{Factor!Size}\index{Factor!Value}\index{Long-short}
 
 ```{python}
+#| label: replicating-fama-and-french-factors-compute-ff3
 factors_replicated = (portfolios
     .group_by(["portfolio_size", "portfolio_bm", "date"])
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
@@ -189,6 +196,7 @@ In the previous section, we replicated the size and value premiums following the
 To test the success of the SMB factor, we hence run the following regression:
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-smb-ff3
 model_smb = (smf.ols(
         formula="smb ~ smb_replicated",
         data=factors_replicated.to_pandas()
@@ -201,6 +209,7 @@ prettify_result(model_smb)
 The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and R-squared are at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)` percent. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-hml-ff3
 model_hml = (smf.ols(
         formula="hml ~ hml_replicated",
         data=factors_replicated.to_pandas()
@@ -219,6 +228,7 @@ The evidence allows us to conclude that we did a relatively good job in replicat
 Now, let us move to the replication of the five-factor model. We extend the `other_sorting_variables` table from above with the additional characteristics operating profitability `op` and investment `inv`. Note that the `drop_nulls()` statement yields different sample sizes, as some firms with `be` values might not have `op` or `inv` values. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-sorting-variables-ff5
 other_sorting_variables = (compustat_annual
     .with_columns(
         sorting_date=pl.date(pl.col("datadate").dt.year() + 1, 7, 1)
@@ -238,6 +248,7 @@ sorting_variables = (size
 In each month, we independently sort all stocks into the two size portfolios. The value, profitability, and investment portfolios, on the other hand, are the results of dependent sorts based on the size portfolios. We then merge the portfolios to the return data for the rest of the year just as above. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-portfolio-sorts-ff5
 portfolios = (sorting_variables
     .group_by("sorting_date")
     .map_groups(lambda x: x
@@ -271,6 +282,7 @@ portfolios = (crsp_monthly
 Now, we want to construct each of the factors, but this time, the size factor actually comes last because it is the result of averaging across all other factor portfolios. This dependency is the reason why we keep the table with value-weighted portfolio returns as a separate object that we reuse later. We construct the value factor, HML, as above by going long the two portfolios with high book-to-market ratios and shorting the two portfolios with low book-to-market.
 
 ```{python}
+#| label: replicating-fama-and-french-factors-value-factor
 portfolios_value = (portfolios
     .group_by(["portfolio_size", "portfolio_bm", "date"])
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
@@ -288,6 +300,7 @@ factors_value = (portfolios_value
 For the profitability factor, RMW (robust-minus-weak), we take a long position in the two high profitability portfolios and a short position in the two low profitability portfolios.\index{Factor!Profitability}
 
 ```{python}
+#| label: replicating-fama-and-french-factors-profitability-factor
 portfolios_profitability = (portfolios
     .group_by(["portfolio_size", "portfolio_op", "date"])
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
@@ -305,6 +318,7 @@ factors_profitability = (portfolios_profitability
 For the investment factor, CMA (conservative-minus-aggressive), we go long the two low investment portfolios and short the two high investment portfolios.\index{Factor!Investment}
 
 ```{python}
+#| label: replicating-fama-and-french-factors-investment-factor
 portfolios_investment = (portfolios
     .group_by(["portfolio_size", "portfolio_inv", "date"])
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
@@ -322,6 +336,7 @@ factors_investment = (portfolios_investment
 Finally, the size factor, SMB, is constructed by going long the nine small portfolios and short the nine large portfolios. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-size-factor
 factors_size = (
     pl.concat(
         [portfolios_value.select(["portfolio_size", "date", "ret"]),
@@ -338,6 +353,7 @@ factors_size = (
 We then join all factors together into one dataframe and construct again a suitable table to run tests for evaluating our replication.
 
 ```{python}
+#| label: replicating-fama-and-french-factors-combine-ff5
 factors_replicated = (factors_size
     .join(factors_value, how="full", on="date", coalesce=True)
     .join(factors_profitability, how="full", on="date", coalesce=True)
@@ -353,6 +369,7 @@ factors_replicated = (factors_replicated
 Let us start the replication evaluation again with the size factor:
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-smb-ff5
 model_smb = (smf.ols(
         formula="smb ~ smb_replicated",
         data=factors_replicated.to_pandas()
@@ -365,6 +382,7 @@ prettify_result(model_smb)
 The results for the SMB factor are quite convincing, as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)` percent. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-hml-ff5
 model_hml = (smf.ols(
         formula="hml ~ hml_replicated",
         data=factors_replicated.to_pandas()
@@ -377,6 +395,7 @@ prettify_result(model_hml)
 The replication of the HML factor is also a success, although at a slightly higher coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `{python} int(np.round(model_hml.rsquared_adj, 2) * 100)` percent. 
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-rmw
 model_rmw = (smf.ols(
         formula="rmw ~ rmw_replicated",
         data=factors_replicated.to_pandas()
@@ -389,6 +408,7 @@ prettify_result(model_rmw)
 We are also able to replicate the RMW factor quite well with a coefficient of `{python} np.round(model_rmw.params["rmw_replicated"], 2)` and an R-squared around `{python} int(np.round(model_rmw.rsquared_adj, 2) * 100)` percent.
 
 ```{python}
+#| label: replicating-fama-and-french-factors-evaluate-cma
 model_cma = (smf.ols(
         formula="cma ~ cma_replicated",
         data=factors_replicated.to_pandas()

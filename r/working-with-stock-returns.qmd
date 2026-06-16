@@ -19,6 +19,7 @@ At the start of each session, we load the required R packages. Throughout the en
 You typically have to install a package once before you can load it into your active R session. In case you have not done this yet, call, for instance, `install.packages("tidyfinance")`.\index{tidyfinance}
 
 ```{r}
+#| label: working-with-stock-returns-packages
 #| message: false
 library(tidyverse)
 library(tidyfinance)
@@ -32,6 +33,7 @@ We first download daily prices for one stock symbol, e.g., the Apple stock (*AAP
 In the following code, we request daily data from the beginning of 2000 to the end of the last year, which is a period of more than 20 years.\index{Stock prices}
 
 ```{r}
+#| label: working-with-stock-returns-download-apple-prices
 prices <- download_data(
   domain = "stock_prices",
   symbols = "AAPL",
@@ -41,7 +43,7 @@ prices <- download_data(
 prices
 ```
 
-\index{Data!Yahoo Finance} `download_data(domain = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
+\index{Data!Yahoo Finance} `download_data(domain = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.\index{Stock price adjustments}
 
 Next, we use the `ggplot2` package [@ggplot2] to visualize the time series of adjusted prices in @fig-100. This package takes care of visualization tasks based on the principles of the grammar of graphics [@Wilkinson2012].\index{Graph!Time series}
 
@@ -64,6 +66,7 @@ prices |>
 Instead of analyzing prices, we compute daily returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted price at the end of day $t$.\index{Returns} In that context, the function `lag()` is helpful by returning the previous value.
 
 ```{r}
+#| label: working-with-stock-returns-compute-daily-returns
 returns <- prices |>
   arrange(date) |>
   mutate(ret = adjusted_close / lag(adjusted_close) - 1) |>
@@ -76,6 +79,7 @@ The resulting data frame has three columns, the last of which contains the daily
 For the upcoming examples, we remove missing values as these would require separate treatment for many applications. For example, missing values can affect sums and averages by reducing the number of valid data points if not properly accounted for. In general, always ensure you understand why `NA` values occur and carefully examine if you can simply get rid of these observations.
 
 ```{r}
+#| label: working-with-stock-returns-drop-missing-returns
 returns <- returns |>
   drop_na(ret)
 ```
@@ -104,6 +108,7 @@ returns |>
 Here, `bins = 100` determines the number of bins used in the illustration and, hence, implicitly sets the width of the bins. Before proceeding, make sure you understand how to use the geom `geom_vline()` to add a dashed line that indicates the historical five percent quantile of the daily returns. Before proceeding with *any* data, a typical task is to compute and analyze the summary statistics for the main variables of interest.
 
 ```{r}
+#| label: working-with-stock-returns-summary-statistics
 returns |>
   summarize(across(
     ret,
@@ -121,6 +126,7 @@ We see that the maximum *daily* return was `r returns |> pull(ret) |> max() * 10
 You can also compute these summary statistics for each year individually by imposing `group_by(year = year(date))`, where the call `year(date)` returns the year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.\index{Summary statistics}
 
 ```{r}
+#| label: working-with-stock-returns-summary-statistics-by-year
 returns |>
   group_by(year = year(date)) |>
   summarize(across(
@@ -145,6 +151,7 @@ As a next step, we generalize the previous code so that all computations can han
 This is where the `tidyverse` magic starts: Tidy data makes it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any number of symbols, e.g., `symbol <- c("AAPL", "MMM", "BA")`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once. For this example, we analyze data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average)\index{Data!Dow Jones Index}
 
 ```{r}
+#| label: working-with-stock-returns-download-dow-constituents
 #| message: false
 symbols <- download_data(
   domain = "constituents",
@@ -156,6 +163,7 @@ symbols
 Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index for a specific point in time with a single call.\index{Exchange!NASDAQ}
 
 ```{r}
+#| label: working-with-stock-returns-download-dow-prices
 #| output: false
 prices_daily <- download_data(
   domain = "stock_prices",
@@ -192,6 +200,7 @@ Do you notice the small differences relative to the code we used before? All we 
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.\index{Summary statistics}
 
 ```{r}
+#| label: working-with-stock-returns-multi-symbol-returns-summary
 returns_daily <- prices_daily |>
   group_by(symbol) |>
   mutate(ret = adjusted_close / lag(adjusted_close) - 1) |>
@@ -222,6 +231,7 @@ Financial data often exists at different frequencies due to varying reporting sc
 So far, we have worked with daily returns, but we can easily convert our data to other frequencies. Let's create monthly returns from our daily data:
 
 ```{r}
+#| label: working-with-stock-returns-compute-monthly-returns
 returns_monthly <- returns_daily |>
   mutate(date = floor_date(date, "month")) |>
   group_by(symbol, date) |>

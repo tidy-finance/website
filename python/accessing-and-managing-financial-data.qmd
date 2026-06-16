@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: accessing-and-managing-financial-data-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -21,6 +22,7 @@ This chapter shows how to import different open-source datasets. Specifically, o
 First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. 
 
 ```{python}
+#| label: accessing-and-managing-financial-data-packages
 import polars as pl
 import io
 import re
@@ -31,6 +33,7 @@ from curl_cffi import requests
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
 
 ```{python}
+#| label: accessing-and-managing-financial-data-date-range
 start_date = "1960-01-01"
 end_date = "2024-12-31"
 ```
@@ -53,6 +56,7 @@ Doing this once is fine; doing it repeatedly across projects is exactly the type
 A minimal download script mirrors the manual steps one by one. For example, to fetch a Fama–French dataset you first construct the URL:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-url
 dataset = "F-F_Research_Data_Factors"
 base_url = "http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/"
 url = f"{base_url}{dataset}_CSV.zip"
@@ -61,6 +65,7 @@ url = f"{base_url}{dataset}_CSV.zip"
 Next, you replace the browser download with an HTTP request and extract the ZIP in memory:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-download-zip
 resp = requests.get(url)
 resp.raise_for_status()
 
@@ -74,6 +79,7 @@ The most important part of this chunk is the `requests.get()` call. This is the 
 The raw file contains documentation text followed by the actual data table(s). To emulate *scrolling down until the numbers start*, you can split the file into blocks and keep the long one that contains the table:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-extract-table
 chunks = raw_text.split("\r\n\r\n")
 table_text = max(chunks, key=len)
 ```
@@ -81,6 +87,7 @@ table_text = max(chunks, key=len)
 Within this block, the first CSV header line starts at the first line beginning with a comma. We add a “Date” label for the first column and pass everything to `pl.read_csv()`, which accepts the raw bytes directly. The numeric fields in the raw file carry leading spaces (e.g., `  2.89`), which `polars` does not strip automatically — such values are read as strings. We therefore trim the whitespace and cast all non-date columns to floats:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-read-csv
 match = re.search(r"^\s*,", table_text, flags=re.M)
 start = match.start()
 csv_text = "Date" + table_text[start:]
@@ -93,6 +100,7 @@ factors_ff_raw = pl.read_csv(csv_text.encode("latin1")).with_columns(
 At this point, the `Date` column still consists of integer date codes with different lengths depending on the frequency. We need a bit of logic to convert them into a proper date column:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-parse-dates
 s = factors_ff_raw["Date"].cast(pl.String)
 n = s.str.len_chars()
 
@@ -118,6 +126,7 @@ Finally, we still have to clean the data:
 This all could look like this:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-ff-clean-data
 # start and end dates
 if start_date:
     factors_ff_raw = factors_ff_raw.filter(
@@ -142,6 +151,7 @@ All of these steps are doable, but none of them are really about finance - they 
 # Using `tidyfinance` instead of reimplementing the plumbing
 
 ```{python}
+#| label: accessing-and-managing-financial-data-import-tidyfinance
 import tidyfinance as tf
 ```
 
@@ -150,6 +160,7 @@ For example, we can use the `tf.download_data()` function of the package to down
 Because the downloaded data arrives with timestamp columns, we cast the `date` column to the polars `Date` type — calendar dates rather than timestamps — a convention we use for all tables we store in this book.
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-ff3-monthly
 factors_ff3_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
@@ -163,6 +174,7 @@ factors_ff3_monthly = pl.from_pandas(
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability (`rmw`) and investment (`cma`) factors. We demonstrate how the monthly factors are constructed in [Replicating Fama and French Factors](replicating-fama-and-french-factors.qmd).
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-ff5-monthly
 factors_ff5_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
@@ -176,6 +188,7 @@ factors_ff5_monthly = pl.from_pandas(
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function. 
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-ff3-daily
 factors_ff3_daily = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
@@ -189,6 +202,7 @@ factors_ff3_daily = pl.from_pandas(
 In a subsequent chapter, we also use the monthly returns from ten industry portfolios, so let us fetch that data, too.\index{Data!Industry portfolios}
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-industries
 industries_ff_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
@@ -210,6 +224,7 @@ We also need to adjust this data. First, we discard information we will not use 
 We download the CSV with `requests` and pass the response body directly to `pl.read_csv()`:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-q-factors
 factors_q_monthly_link = (
     "https://global-q.org/uploads/1/2/2/6/122679606/q5_factors_monthly_2024.csv"
 )
@@ -234,6 +249,7 @@ factors_q_monthly = (
 Again, you can use the `tidyfinance` package for a shortcut:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-q-factors-tidyfinance
 tf.download_data(
     domain="factors_q",
     dataset="q5_factors_monthly",
@@ -247,6 +263,7 @@ tf.download_data(
 Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. @Goyal2008 comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data on [Amit Goyal's website.](https://sites.google.com/view/agoyal145) Since the data is an XLSX-file stored on a public Google Drive location, we need additional packages to access the data directly from our Python session. Usually, you need to authenticate if you interact with Google Drive directly in Python. Since the data is stored via a public link, we can proceed without any authentication.\index{Google Drive}
 
 ```{python}
+#| label: accessing-and-managing-financial-data-macro-link
 sheet_id = "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
 sheet_name = "macro_predictors.xlsx"
 macro_predictors_link = (
@@ -276,6 +293,7 @@ For variable definitions and the required data transformations, you can consult 
 Some numeric columns in the raw file contain thousands separators (e.g., `4,769.83`), so we read all columns as strings, strip the commas, and cast to floats before the actual transformations. In addition to the predictors, we compute the one-month-ahead excess market return (`rp_div`), which serves as the prediction target for the equity premium predictors:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-macro-predictors
 macro_predictors = (
     pl.read_csv(requests.get(macro_predictors_link).content, infer_schema=False)
     .with_columns(
@@ -326,6 +344,7 @@ macro_predictors = (
 To get the equivalent data through `tidyfinance`, you can call:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-macro-tidyfinance
 tf.download_data(
     domain="macro_predictors",
     dataset="monthly",
@@ -339,6 +358,7 @@ tf.download_data(
 The Federal Reserve Bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the `tidyfinance` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.\index{Data!FRED}\index{Data!CPI}
 
 ```{python}
+#| label: accessing-and-managing-financial-data-fred-series
 series = "CPIAUCNS"
 url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 ```
@@ -346,6 +366,7 @@ url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 We can then use the `requests` module to request the CSV, extract the data from the response body, and convert the columns to a tidy format. Note that we pass `impersonate="chrome"` so that the request mimics a regular browser; FRED rejects downloads that do not look like they come from a browser.
 
 ```{python}
+#| label: accessing-and-managing-financial-data-download-cpi
 resp = requests.get(url, impersonate="chrome")
 
 cpi_monthly = (
@@ -369,6 +390,7 @@ The last line sets the current (latest) price level as the reference price level
 The `tidyfinance` package can, of course, also fetch the same index data and many more data series:
 
 ```{python}
+#| label: accessing-and-managing-financial-data-cpi-tidyfinance
 pl.from_pandas(
     tf.download_data(
         domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
@@ -384,6 +406,7 @@ Now that we have downloaded some (freely available) data from the web into the m
 
 There are many ways to set up and organize your data, depending on the use case. Storing data as Parquet files creates a universal data format that seamlessly works across different programming languages and platforms. Unlike CSV files that often lose data types when shared between R, Python, Julia, or other languages, Parquet files maintain perfect data integrity regardless of which tool reads them. A dataset saved as Parquet in Python can be opened directly in Python's pandas, or Julia's DataFrames.jl.^[In previous editions of this book, we suggested using SQLite databases. However, Parquet files are more versatile and easier to handle across different programming languages. Should you still prefer using SQLite, you can find the relevant code snippets in a separate blog post.]
 ```{python}
+#| label: accessing-and-managing-financial-data-create-directory
 import os
 
 if not os.path.exists("data-python"):
@@ -393,6 +416,7 @@ if not os.path.exists("data-python"):
 Next, we create a remote table with the monthly Fama-French factor data. We do so with the `polars` function `write_parquet()`, which stores the data to parquet files.
 
 ```{python}
+#| label: accessing-and-managing-financial-data-write-ff3-monthly
 #| output: false
 factors_ff3_monthly.write_parquet("data-python/factors_ff3_monthly.parquet")
 ```
@@ -400,6 +424,7 @@ factors_ff3_monthly.write_parquet("data-python/factors_ff3_monthly.parquet")
 Now, if we want to have the whole table in memory, we need to call `pl.read_parquet()` with the corresponding query.\index{Database!Read}
 
 ```{python}
+#| label: accessing-and-managing-financial-data-read-ff3-monthly
 pl.read_parquet("data-python/factors_ff3_monthly.parquet")
 ```
 
@@ -408,6 +433,7 @@ The last couple of code chunks are really all there is to organizing a simple da
 Before we move on to the next data source, let us also store the other six tables in our new database. 
 
 ```{python}
+#| label: accessing-and-managing-financial-data-write-all-tables
 data_dict = {
     "factors_ff5_monthly": factors_ff5_monthly,
     "factors_ff3_daily": factors_ff3_daily,

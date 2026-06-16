@@ -16,6 +16,7 @@ In this chapter, we introduce an important concept in financial economics: the e
 We use the following R packages throughout this chapter:
 
 ```{r}
+#| label: beta-estimation-packages
 #| message: false
 library(tidyverse)
 library(arrow)
@@ -30,6 +31,7 @@ Compared to previous chapters, we introduce `slider` [@slider] for sliding windo
 The estimation procedure is based on a rolling-window estimation, where we may use either monthly or daily returns and different window lengths. First, let us start with loading the monthly CRSP data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).\index{Data!CRSP}\index{Data!Fama-French factors}
 
 ```{r}
+#| label: beta-estimation-load-crsp-monthly
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   select(permno, date, industry, ret_excess)
 
@@ -49,6 +51,7 @@ $$
 we regress stock excess returns `ret_excess` on excess returns of the market portfolio `mkt_excess`. R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.
 
 ```{r}
+#| label: beta-estimation-capm-apple
 model_fit <- lm(
   "ret_excess ~ mkt_excess",
   data = crsp_monthly |>
@@ -65,6 +68,7 @@ coefficients
 After we estimated the regression coefficients on an example, we scale the estimation of  $\beta_i$ to a whole different level and perform rolling-window estimations for the entire CRSP sample.\index{Rolling-window estimation} The following function implements the CAPM regression for a data frame (or a part thereof) containing at least `min_obs` observations to avoid huge fluctuations if the time series is too short. The function conveniently returns the regression results as a data frame, which ensures that our approach is scalable. If the `min_obs`-condition is violated, that is, the time series is too short, the function returns an empty data frame for consistency. 
 
 ```{r}
+#| label: beta-estimation-define-estimate-capm
 estimate_capm <- function(data, min_obs = 1) {
   if (nrow(data) < min_obs) {
     return(tibble())
@@ -93,6 +97,7 @@ estimate_capm <- function(data, min_obs = 1) {
 Next, we define a function that performs the rolling estimation. The `slide_period` function is able to handle months in its window input in a straightforward manner. The following function takes input data and slides across the `date` vector, considering only a total of `look_back` months. The function essentially performs three steps: (i) arrange all rows, (ii) compute betas by sliding across months, and (iii) return a tibble with months and corresponding parameter estimates. As we demonstrate further below, we can also apply the same function to daily returns data. 
 
 ```{r}
+#| label: beta-estimation-define-roll-capm
 roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
   data <- data |>
     arrange(date)
@@ -114,6 +119,7 @@ roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
 Before we attack the whole CRSP sample, let us focus on a couple of examples for well-known firms.
 
 ```{r}
+#| label: beta-estimation-example-firms
 examples <- tibble(
   permno = c(14593, 10107, 93436, 17778),
   company = c("Apple", "Microsoft", "Tesla", "Berkshire Hathaway")
@@ -123,6 +129,7 @@ examples <- tibble(
 The main idea is to apply the function to each stock individually and then combine the results into a single data frame. First, we nest the data by `permno`. Nested data means we now have a list of `permno` with corresponding grouped time series data. We get one row of output for each unique combination of non-nested variables which is only `permno` in this case.\index{Data!Nested}
 
 ```{r}
+#| label: beta-estimation-nest-examples
 capm_examples_nested <- crsp_monthly |>
   filter(permno %in% examples$permno) |>
   nest(data = c(date, ret_excess, mkt_excess, industry))
@@ -132,6 +139,7 @@ capm_examples_nested
 Next, we want to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `map()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `map()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `unnest()` to transform the list of outputs to a tidy data frame. 
 
 ```{r}
+#| label: beta-estimation-estimate-examples
 capm_examples <- capm_examples_nested |>
   mutate(capm = map(data, roll_capm_estimation)) |>
   unnest(capm) |>
@@ -172,6 +180,7 @@ Even though we could now just apply the function using the approach from above o
 If you have a Windows or Mac machine, it makes most sense to define `multisession`, which means that separate R processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `plan()`, you can also see other ways to resolve the parallelization in different environments. Note that we use `availableCores()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with R jobs. \index{Parallelization}
 
 ```{r}
+#| label: beta-estimation-setup-parallel
 n_cores = availableCores() - 1
 plan(multisession, workers = n_cores)
 ```
@@ -179,12 +188,27 @@ plan(multisession, workers = n_cores)
 Using eight cores, the estimation for our sample of around 25k stocks takes around 20 minutes. Of course, you can speed up things considerably by having more cores available to share the workload or by having more powerful cores. Notice the difference in the code below? All you need to do is to replace `map()` with `future_map()`, which uses the `furrr` package in the background to handle the parallelization.
 
 ```{r}
+#| label: beta-estimation-estimate-monthly-all
 capm_monthly <- crsp_monthly |>
   nest(data = c(date, ret_excess, mkt_excess, industry)) |>
   mutate(capm = future_map(data, roll_capm_estimation)) |>
   unnest(capm) |>
   select(permno, date, coefficient, estimate, t_statistic)
 capm_monthly
+```
+
+Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task and supports parallelization via the `use_furrr` argument:
+
+```{r}
+#| eval: false
+library(tidyfinance)
+
+estimate_betas(
+  crsp_monthly,
+  "ret_excess ~ mkt_excess",
+  lookback = months(60),
+  min_obs = 48
+)
 ```
 
 ## Estimating Beta Using Daily Returns
@@ -194,6 +218,7 @@ Before we provide some descriptive statistics of our beta estimates, we implemen
 First, we load the daily Fama-French market excess returns.
 
 ```{r}
+#| label: beta-estimation-load-ff3-daily
 factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
   select(date, mkt_excess)
 ```
@@ -201,6 +226,7 @@ factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
 We then create a connection to the daily CRSP data, but we don't load the whole table into our memory. We only extract all distinct `permno` because we loop the beta estimation over batches of stocks with size 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
 
 ```{r}
+#| label: beta-estimation-setup-daily-batches
 crsp_daily_db <- open_dataset("data-r/crsp_daily")
 
 permnos <- crsp_daily_db |>
@@ -215,6 +241,7 @@ min_obs <- 1000
 We then proceed to perform the same steps as with the monthly CRSP data, just in batches: Load in daily returns, nest the data by stock, and parallelize the beta estimation across stocks. 
 
 ```{r}
+#| label: beta-estimation-estimate-daily-all
 #| output: false
 capm_daily <- list()
 
@@ -261,6 +288,7 @@ capm_daily <- bind_rows(capm_daily)
 What is a typical value for stock betas? First, let us extract the relevant estimates from our CAPM results based on monthly returns.
 
 ```{r}
+#| label: beta-estimation-extract-beta-monthly
 beta_monthly <- capm_monthly |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
@@ -319,6 +347,7 @@ beta_monthly |>
 To compare the difference between daily and monthly data, we combine beta estimates to a single table. 
 
 ```{r}
+#| label: beta-estimation-combine-beta-estimates
 beta_daily <- capm_daily |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
@@ -357,6 +386,7 @@ The estimates in @fig-604 look as expected. As you can see, it really depends on
 Finally, we write the estimates to our local folder such that we can use them in later chapters. 
 
 ```{r}
+#| label: beta-estimation-write-beta
 write_parquet(beta, "data-r/beta.parquet")
 ```
 
@@ -395,6 +425,7 @@ beta_coverage |>
 We also encourage everyone to always look at the distributional summary statistics of variables. You can easily spot outliers or weird distributions when looking at such tables.\index{Summary statistics}
 
 ```{r}
+#| label: beta-estimation-summary-statistics
 beta |>
   group_by(return_type) |>
   summarize(
@@ -414,6 +445,7 @@ The summary statistics indicate that estimates based on daily returns are, on av
 Finally, since we have two different estimators for the same theoretical object, we expect the estimators should be at least positively correlated (although not perfectly as the estimators are based on different frequencies).
 
 ```{r}
+#| label: beta-estimation-correlation
 beta |>
   pivot_wider(names_from = return_type, values_from = beta) |>
   select(monthly, daily) |>

@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: fama-macbeth-regressions-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -33,6 +34,7 @@ Before we move to the implementation, we want to highlight that the characterist
 The current chapter relies on this set of Python packages. 
 
 ```{python}
+#| label: fama-macbeth-regressions-packages
 import polars as pl
 import statsmodels.formula.api as smf
 ```
@@ -42,6 +44,7 @@ import statsmodels.formula.api as smf
 We illustrate @Fama1973 with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: Market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). As in the previous chapters, we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Data!CRSP}\index{Data!Compustat}\index{Beta}\index{Book equity}
 
 ```{python}
+#| label: fama-macbeth-regressions-load-data
 crsp_monthly = (
     pl.read_parquet("data-python/crsp_monthly.parquet")
     .select(["permno", "gvkey", "date", "ret_excess", "mktcap"])
@@ -63,6 +66,7 @@ beta = (
 We use the Compustat and CRSP data to compute the book-to-market ratio and the (log) market capitalization.\index{Book-to-market ratio}\index{Market capitalization} Furthermore, we also use the CAPM betas based on monthly returns we computed in the previous chapters.\index{Beta}\index{CAPM}
 
 ```{python}
+#| label: fama-macbeth-regressions-characteristics
 characteristics = (compustat_annual
     .with_columns(date=pl.col("datadate").dt.truncate("1mo"))
     .join(crsp_monthly, how="left", on=["gvkey", "date"])
@@ -105,6 +109,7 @@ data_fama_macbeth = (data_fama_macbeth
 Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums $\hat\lambda^{f}_t$ for each point in time. \index{Regression!Cross-section}
 
 ```{python}
+#| label: fama-macbeth-regressions-cross-section
 def estimate_cross_section(group):
     params = smf.ols(
         formula="ret_excess_lead ~ beta + log_mktcap + bm",
@@ -125,6 +130,7 @@ risk_premiums = pl.concat([
 Now that we have the risk premiums' estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the $t$-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests at a five percent and a one percent significance level.
 
 ```{python}
+#| label: fama-macbeth-regressions-price-of-risk
 price_of_risk = (risk_premiums
     .unpivot(index="date", variable_name="factor", value_name="estimate")
     .group_by("factor")
@@ -143,6 +149,7 @@ price_of_risk = (risk_premiums
 It is common to adjust for autocorrelation when reporting standard errors of risk premiums. As in [Univariate Portfolio Sorts](univariate-portfolio-sorts.qmd), the typical procedure for this is computing @Newey1987 standard errors.\index{Standard errors!Newey-West}
 
 ```{python}
+#| label: fama-macbeth-regressions-newey-west
 def estimate_newey_west(group):
     fit = smf.ols(
         "estimate ~ 1", group.to_pandas()
@@ -170,6 +177,7 @@ price_of_risk_newey_west = pl.concat([
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
 ```{python}
+#| label: fama-macbeth-regressions-tidyfinance
 #| output: false
 import tidyfinance as tf
 

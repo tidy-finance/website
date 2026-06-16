@@ -6,6 +6,7 @@ metadata:
 ---
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-setup
 #| echo: false
 exec(open("python/render-settings.py").read())
 ```
@@ -23,6 +24,7 @@ Typically, this investment regression uses quarterly balance sheet data provided
 The current chapter relies on the following set of Python packages. 
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-packages
 import polars as pl
 import pyfixest as pf
 ```
@@ -34,6 +36,7 @@ Compared to previous chapters, we introduce `pyfixest` [@pyfixest], which provid
 We use CRSP and annual Compustat as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations. \index{Data!CRSP}\index{Data!Compustat}
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-load-data
 crsp_monthly = (
     pl.read_parquet("data-python/crsp_monthly.parquet")
     .select(["gvkey", "date", "mktcap"])
@@ -49,6 +52,7 @@ compustat_annual = (
 The classical investment regressions model is the capital investment of a firm as a function of operating cash flows and Tobin's q, a measure of a firm's investment opportunities.\index{Cash flows}\index{Regression!Investment} We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.\index{Regression!Panel}
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-investment-cashflows
 data_investment = (compustat_annual
     .with_columns(
         date=pl.col("datadate").cast(pl.Date).dt.truncate("1mo")
@@ -74,6 +78,7 @@ data_investment = (data_investment
 Tobin's q is the ratio of the market value of capital to its replacement costs.\index{Tobin's q} It is one of the most common regressors in corporate finance applications [e.g., @Fazzari1988; @Erickson2012]. We follow the implementation of @Gulen2015 and compute Tobin's q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the reported book value of assets is strictly positive.
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-tobins-q
 data_investment = (data_investment
     .join(crsp_monthly, on=["gvkey", "date"], how="left")
     .with_columns(
@@ -89,6 +94,7 @@ data_investment = (data_investment
 As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions.\index{Winsorization} In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.^[Note that `polars` operations never modify a data frame in place; every expression returns a new data frame. Our `winsorize` function therefore returns a `polars` expression that we apply via `with_columns()`, so the original data frame is never altered unintentionally.]
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-winsorize
 def winsorize(col, cut):
     """Winsorize a column at cut level."""
 
@@ -114,6 +120,7 @@ data_investment = (data_investment
 Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable's mean and the number of observations is a useful exercise to spot potential problems.\index{Summary statistics}
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-summary-statistics
 data_investment_summary = (data_investment
     .unpivot(index=["gvkey", "year"], variable_name="measure",
              on=["investment_lead", "cash_flows", "tobins_q"])
@@ -146,6 +153,7 @@ $${#eq-tobin-q}
 where $\varepsilon_t$ is i.i.d. normally distributed across time and firms. We use the `PanelOLS()`-function to estimate the simple model so that the output has the same structure as the other regressions below. 
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-model-ols
 data_investment_pd = data_investment.to_pandas()
 
 model_ols = pf.feols(
@@ -169,6 +177,7 @@ where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean in
 To include the firm fixed effect, we use `gvkey` (Compustat's firm identifier) as follows:
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-model-fe-firm
 model_fe_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey",
     vcov = "iid",
@@ -188,6 +197,7 @@ $${#eq-tobin-q-2way}
 where $\alpha_t$ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows. You can include a time fixed effects by using "TimeEffects" in the formula of PanelOLS.
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-model-fe-firmyear
 model_fe_firmyear = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = "iid",
@@ -203,6 +213,7 @@ How can we further improve the robustness of our regression results? Ideally, we
 Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. Fortunately, the `results.compare()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX). We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects [@Wasserstein2016]. The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-etable-fe
 pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
 ```
 
@@ -215,6 +226,7 @@ In our setting, the residuals may be correlated across years for a given firm (t
 Instead of relying on the i.i.d. assumption, we can use the `cov_type="clustered"` option in the `fit()`-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-cluster-models
 model_cluster_firm = pf.feols(
     "investment_lead ~ cash_flows + tobins_q | gvkey + year",
     vcov = {"CRV1": "gvkey"},
@@ -232,6 +244,7 @@ model_cluster_firmyear = pf.feols(
 The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin's q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin's q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 ```{python}
+#| label: fixed-effects-and-clustered-standard-errors-etable-cluster
 pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_fmt = "b (t)")
 ```
 
