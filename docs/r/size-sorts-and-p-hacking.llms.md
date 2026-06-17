@@ -12,6 +12,11 @@ The chapter relies on the following set of packages:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(arrow)
 library(scales)
 library(sandwich)
@@ -20,6 +25,8 @@ library(furrr)
 library(rlang)
 ```
 
+    Warning: package 'rlang' was built under R version 4.5.3
+
 Compared to previous chapters, we introduce the `rlang` package ([Henry and Wickham 2022](#ref-rlang)) for more advanced parsing of functional expressions.
 
 ## Data Preparation
@@ -27,9 +34,9 @@ Compared to previous chapters, we introduce the `rlang` package ([Henry and Wick
 First, we retrieve the relevant data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md). Firm size is defined as market equity in most asset pricing applications that we retrieve from CRSP. We further use the Fama-French factor returns for performance evaluation.
 
 ``` r
-crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet")
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet")
 
-factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
   select(smb)
 ```
 
@@ -158,10 +165,10 @@ crsp_monthly |>
     # A tibble: 4 × 9
       exchange   mean      sd    min    q05    q50    q95      max     n
       <chr>     <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>    <dbl> <int>
-    1 AMEX       208.    537.  1.61    3.55   46.9   930.    3921.   155
-    2 NASDAQ   12535. 141802.  0.767   5.17  310.  20238. 3785304.  2382
+    1 AMEX       195.    512.  1.61    3.54   45.7   870.    3921.   154
+    2 NASDAQ   12558. 141814.  0.169   6.13  318.  20095. 3766500.  2379
     3 NYSE     21862.  63583. 15.3   179.   4048.  90119.  732872.  1256
-    4 Overall  15120. 118288.  0.767   6.80  725.  47107. 3785304.  3793
+    4 Overall  15139. 118291.  0.169   7.86  730.  47134. 3766500.  3789
 
 ## Univariate Size Portfolios with Flexible Breakpoints
 
@@ -198,16 +205,16 @@ assign_portfolio <- function(
 }
 ```
 
-Note that the `tidyfinance` package also provides an `assing_portfolio()` function, albeit with more flexibility. For the sake of simplicity, we continue to use the function that we just defined.
+Note that the `tidyfinance` package also provides an `assign_portfolio()` function, albeit with more flexibility. For the sake of simplicity, we continue to use the function that we just defined.
 
 ## Weighting Schemes for Portfolios
 
 Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called *value-weighting*. The alternative protocol is *equal-weighting*, which assigns each stock’s return the same weight, i.e., a simple average of the constituents’ returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.
 
-We implement the two weighting schemes in the function `compute_portfolio_returns()` that takes a logical argument to weight the returns by firm value. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](../r/univariate-portfolio-sorts.llms.md).
+We implement the two weighting schemes in the function `compute_size_premium()` that takes a logical argument to weight the returns by firm value. We deliberately avoid the name `compute_portfolio_returns()` here, as the `tidyfinance` package exports a function of that name with a different signature that returns a full panel of portfolio returns rather than a single size premium. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](../r/univariate-portfolio-sorts.llms.md).
 
 ``` r
-compute_portfolio_returns <- function(
+compute_size_premium <- function(
   n_portfolios = 10,
   exchanges = c("NYSE", "NASDAQ", "AMEX"),
   value_weighted = TRUE,
@@ -241,17 +248,17 @@ compute_portfolio_returns <- function(
 }
 ```
 
-To see how the function `compute_portfolio_returns()` works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.
+To see how the function `compute_size_premium()` works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.
 
 ``` r
-ret_all <- compute_portfolio_returns(
+ret_all <- compute_size_premium(
   n_portfolios = 2,
   exchanges = c("NYSE", "NASDAQ", "AMEX"),
   value_weighted = TRUE,
   data = crsp_monthly
 )
 
-ret_nyse <- compute_portfolio_returns(
+ret_nyse <- compute_size_premium(
   n_portfolios = 2,
   exchanges = "NYSE",
   value_weighted = TRUE,
@@ -267,7 +274,7 @@ tibble(
     # A tibble: 2 × 2
       Exchanges           Premium
       <chr>                 <dbl>
-    1 NYSE, NASDAQ & AMEX  0.0410
+    1 NYSE, NASDAQ & AMEX  0.0408
     2 NYSE                 0.129 
 
 The table shows that the size premium is more than 60 percent larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
@@ -313,7 +320,7 @@ p_hacking_setup <- p_hacking_setup |>
         value_weighted,
         data
       ),
-      .f = ~ compute_portfolio_returns(
+      .f = ~ compute_size_premium(
         n_portfolios = ..1,
         exchanges = ..2,
         value_weighted = ..3,
@@ -321,7 +328,17 @@ p_hacking_setup <- p_hacking_setup |>
       )
     )
   )
+```
 
+    Warning: There were 14 warnings in `mutate()`.
+    The first warning was:
+    ℹ In argument: `size_premium = future_pmap(...)`.
+    Caused by warning:
+    ! package 'rlang' was built under R version 4.5.3
+    ℹ Run `dplyr::last_dplyr_warnings()` to see the 13 remaining
+      warnings.
+
+``` r
 p_hacking_results <- p_hacking_setup |>
   mutate(data = map_chr(data, deparse)) |>
   unnest(size_premium) |>
@@ -333,7 +350,7 @@ p_hacking_results
       n_portfolios exchanges value_weighted data             size_premium
              <dbl> <list>    <lgl>          <chr>                   <dbl>
     1           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0164
-    2           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0150
+    2           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0151
     3           10 <chr [3]> FALSE          "crsp_monthly"         0.0146
     4           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0141
     5           10 <chr [3]> TRUE           "filter(crsp_mo…       0.0110
@@ -374,7 +391,7 @@ Figure 3: The dashed vertical line indicates the average Fama-French SMB premiu
 
 1.  We gained several insights on the size distribution above. However, we did not analyze the average size across listing exchanges and industries. Which listing exchanges/industries have the largest firms? Plot the average firm size for the three listing exchanges over time. What do you conclude?
 2.  We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.
-3.  The returns that we analyze above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_portfolio_returns()` to output the CAPM alpha or beta instead of the average excess return.
+3.  The returns that we analyze above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function `compute_size_premium()` to output the CAPM alpha or beta instead of the average excess return.
 4.  While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.
 5.  We computed several size premiums, but they do not follow the definition of Fama and French ([1993](#ref-Fama1993)). Which of our approaches comes closest to their SMB premium?
 

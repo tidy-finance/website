@@ -10,6 +10,11 @@ Throughout this chapter, we use the following R packages:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(arrow)
 library(scales)
 library(nloptr)
@@ -22,7 +27,7 @@ Compared to previous chapters, we introduce the `nloptr` package ([Johnson 2007]
 We start by loading the required data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md). For simplicity, we restrict our investment universe to the monthly Fama-French industry portfolio returns in the following application.
 
 ``` r
-industry_returns <- read_parquet("data-r/industries_ff_monthly.parquet") |>
+industry_returns <- read_parquet("data/industries_ff_monthly.parquet") |>
   select(-date) |>
   drop_na()
 ```
@@ -89,8 +94,8 @@ w_efficient <- compute_efficient_weight(Sigma, mu)
 round(w_efficient, 3)
 ```
 
-     [1]  1.192  0.239 -1.664  0.616  0.453 -0.438  0.755  0.359 -0.047
-    [10] -0.465
+     [1]  1.185  0.237 -1.639  0.614  0.449 -0.437  0.754  0.358 -0.047
+    [10] -0.475
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient \\\gamma=2\\ in absence of transaction costs. Some of the positions are negative which implies short-selling, most of the positions are rather extreme. For instance, a position of \\-1\\ implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter \\\beta\\ and risk aversion \\\gamma\\.
 
@@ -149,7 +154,7 @@ Figure 1: The horizontal axis indicates the distance from the empirical minimum
 
 Next, we introduce constraints to the above optimization procedure. Very often, typical constraints such as short-selling restrictions prevent analytical solutions for optimal portfolio weights (short-selling restrictions simply imply that negative weights are not allowed such that we require that \\w_i \geq 0\quad \forall i\\). However, numerical optimization allows computing the solutions to such constrained problems.
 
-We rely on the powerful `nloptr` package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of Kraft ([1994](#ref-Kraft1994)) because it is able to hand multiple equality and inequality constraints at the same time and typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.
+We rely on the powerful `nloptr` package, which provides a common interface to a number of different optimization routines. In particular, we employ the Sequential Least-Squares Quadratic Programming (SLSQP) algorithm of Kraft ([1994](#ref-Kraft1994)) because it is able to handle multiple equality and inequality constraints at the same time and is typically used for problems where the objective function and the constraints are twice continuously differentiable. We hence have to provide the algorithm with the objective function and its gradient, as well as the constraints and their Jacobian.
 
 We illustrate the use of the `nloptr()` function by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `near()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `near()` has a built-in tolerance.
 
@@ -474,8 +479,8 @@ performance_table |>
     # A tibble: 3 × 5
       Strategy  Mean    SD `Sharpe ratio` Turnover
       <chr>    <dbl> <dbl>          <dbl>    <dbl>
-    1 MV       -1.06  12.6         NA     210.    
-    2 MV (TC)  12.1   15.1          0.798   0.0188
+    1 MV       -1.07  12.6         NA     210.    
+    2 MV (TC)  12.1   15.1          0.798   0.0191
     3 Naive    12.1   15.1          0.796   0.236 
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters \\\hat\mu_t\\ and \\\hat\Sigma_t\\ indicate that the current allocation is too far away from the optimal theoretical portfolio.

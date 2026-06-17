@@ -13,6 +13,11 @@ The current chapter relies on the following set of R packages.
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(arrow)
 library(scales)
 library(lmtest)
@@ -27,13 +32,13 @@ Compared to previous chapters, we introduce `lmtest` ([Zeileis and Hothorn 2002]
 We start with loading the required data from our local folder introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md). In particular, we use the monthly CRSP sample as our asset universe. Once we form our portfolios, we use the Fama-French market factor returns to compute the risk-adjusted performance (i.e., alpha). `beta` is the tibble with market betas computed in the previous chapter.
 
 ``` r
-crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
   select(permno, date, ret_excess, mktcap_lag)
 
-factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
   select(date, mkt_excess)
 
-beta <- read_parquet("data-r/beta.parquet") |>
+beta <- read_parquet("data/beta.parquet") |>
   filter(return_type == "monthly") |>
   select(permno, date, beta)
 ```
@@ -270,7 +275,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept)  0.00252    0.00320    0.79     0.43
+    (Intercept)  0.00251    0.00320    0.78     0.43
 
 However, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although, controlling for the effect of beta, the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting against beta factor ([Frazzini and Pedersen 2014](#ref-Frazzini2014)). Betting against beta corresponds to a strategy that shorts high beta stocks and takes a (levered) long position in low beta stocks. If borrowing constraints prevent investors from taking positions on the SML they are instead incentivized to buy high beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital constraint investors with lower risk aversion.
 
@@ -285,8 +290,8 @@ coeftest(
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)    
-    (Intercept) -0.00423    0.00249    -1.7     0.09 .  
-    mkt_excess   1.16370    0.08695    13.4   <2e-16 ***
+    (Intercept) -0.00424    0.00249    -1.7    0.089 .  
+    mkt_excess   1.16353    0.08697    13.4   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

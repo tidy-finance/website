@@ -14,6 +14,11 @@ The current chapter relies on the following set of R packages.
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(arrow)
 library(fixest)
 ```
@@ -25,10 +30,10 @@ Compared to previous chapters, we introduce `fixest` ([Bergé 2018](#ref-fixest)
 We use CRSP and annual Compustat as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations.
 
 ``` r
-crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
   select(gvkey, date, mktcap)
 
-compustat_annual <- read_parquet("data-r/compustat_annual.parquet") |>
+compustat_annual <- read_parquet("data/compustat_annual.parquet") |>
   select(datadate, gvkey, year, at, be, capx, oancf, txdb)
 ```
 
@@ -117,9 +122,9 @@ data_investment |>
     # A tibble: 3 × 9
       measure      mean     sd    min      q05    q50   q95    max      n
       <chr>       <dbl>  <dbl>  <dbl>    <dbl>  <dbl> <dbl>  <dbl>  <int>
-    1 cash_flo… 0.00857 0.275  -1.56  -4.80e-1 0.0625 0.271  0.475 133619
-    2 investme… 0.0563  0.0760  0      5.66e-4 0.0317 0.202  0.457 133619
-    3 tobins_q  1.99    1.69    0.563  7.90e-1 1.39   5.35  10.8   133619
+    1 cash_fl… -4.86e-4 0.292  -1.66  -5.23e-1 0.0601 0.270  0.478 139861
+    2 investm…  5.61e-2 0.0762  0      5.40e-4 0.0313 0.202  0.460 139861
+    3 tobins_q  2.06e+0 1.81    0.568  7.96e-1 1.41   5.61  11.6   139861
 
 ## Fixed Effects
 
@@ -135,15 +140,15 @@ model_ols
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 133,619
+    Observations: 139,861
     Standard-errors: IID 
                 Estimate Std. Error t value  Pr(>|t|)    
-    (Intercept)  0.04170   0.000321   130.1 < 2.2e-16 ***
-    cash_flows   0.04888   0.000760    64.3 < 2.2e-16 ***
-    tobins_q     0.00715   0.000124    57.7 < 2.2e-16 ***
+    (Intercept)   0.0425   0.000309   137.5 < 2.2e-16 ***
+    cash_flows    0.0448   0.000710    63.2 < 2.2e-16 ***
+    tobins_q      0.0066   0.000115    57.5 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.074324   Adj. R2: 0.043674
+    RMSE: 0.07469   Adj. R2: 0.03963
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.
 
@@ -161,20 +166,25 @@ model_fe_firm <- feols(
   vcov = "iid",
   data = data_investment
 )
+```
+
+    NOTE: 1,656 fixed-effect singletons were removed (1,656 observations).
+
+``` r
 model_fe_firm
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 133,619
-    Fixed-effects: gvkey: 14,696
+    Observations: 138,205
+    Fixed-effects: gvkey: 13,313
     Standard-errors: IID 
                Estimate Std. Error t value  Pr(>|t|)    
-    cash_flows   0.0138   0.000878    15.7 < 2.2e-16 ***
-    tobins_q     0.0105   0.000127    83.0 < 2.2e-16 ***
+    cash_flows  0.01132   0.000824    13.7 < 2.2e-16 ***
+    tobins_q    0.00964   0.000118    81.8 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.048853     Adj. R2: 0.535776
-                     Within R2: 0.05584 
+    RMSE: 0.050177     Adj. R2: 0.516082
+                     Within R2: 0.051363
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
 
@@ -186,20 +196,25 @@ model_fe_firmyear <- feols(
   vcov = "iid",
   data = data_investment
 )
+```
+
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+
+``` r
 model_fe_firmyear
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 133,619
-    Fixed-effects: gvkey: 14,696,  year: 37
+    Observations: 138,205
+    Fixed-effects: gvkey: 13,313,  year: 37
     Standard-errors: IID 
                Estimate Std. Error t value  Pr(>|t|)    
-    cash_flows  0.01682   0.000858    19.6 < 2.2e-16 ***
-    tobins_q    0.00958   0.000126    76.4 < 2.2e-16 ***
+    cash_flows  0.01409   0.000805    17.5 < 2.2e-16 ***
+    tobins_q    0.00883   0.000116    75.9 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.047558     Adj. R2: 0.559916
-                     Within R2: 0.048894
+    RMSE: 0.048849     Adj. R2: 0.541223
+                     Within R2: 0.045387
 
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time.
 
@@ -221,17 +236,17 @@ etable(
                            model_ols   model_fe_firm model_fe_firm..
     Dependent Var.:  investment_lead investment_lead investment_lead
                                                                     
-    Constant        0.042*** (130.1)                                
-    cash_flows       0.049*** (64.3) 0.014*** (15.7) 0.017*** (19.6)
-    tobins_q         0.007*** (57.7) 0.011*** (83.0) 0.010*** (76.4)
+    Constant        0.042*** (137.5)                                
+    cash_flows       0.045*** (63.2) 0.011*** (13.7) 0.014*** (17.5)
+    tobins_q         0.007*** (57.5) 0.010*** (81.8) 0.009*** (75.9)
     Fixed-Effects:  ---------------- --------------- ---------------
     gvkey                         No             Yes             Yes
     year                          No              No             Yes
     _______________ ________________ _______________ _______________
     VCOV type                    IID             IID             IID
-    Observations             133,619         133,619         133,619
-    R2                         0.044           0.587           0.608
-    Within R2                     --           0.056           0.049
+    Observations             139,861         138,205         138,205
+    R2                         0.040           0.563           0.586
+    Within R2                     --           0.051           0.045
     ---
     Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -249,13 +264,19 @@ model_cluster_firm <- feols(
   cluster = "gvkey",
   data = data_investment
 )
+```
 
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+
+``` r
 model_cluster_firmyear <- feols(
   investment_lead ~ cash_flows + tobins_q | gvkey + year,
   cluster = c("gvkey", "year"),
   data = data_investment
 )
 ```
+
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
 
 The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin’s q. By clustering the standard errors on the firm level, the \\t\\-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin’s q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the \\t\\-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
@@ -273,16 +294,16 @@ etable(
                     model_fe_firm.. model_cluster.. model_cluster...1
     Dependent Var.: investment_lead investment_lead   investment_lead
                                                                      
-    cash_flows      0.017*** (19.6) 0.017*** (11.4)   0.017*** (9.39)
-    tobins_q        0.010*** (76.4) 0.010*** (35.8)   0.010*** (15.0)
+    cash_flows      0.014*** (17.5) 0.014*** (10.1)   0.014*** (8.30)
+    tobins_q        0.009*** (75.9) 0.009*** (35.6)   0.009*** (14.3)
     Fixed-Effects:  --------------- ---------------   ---------------
     gvkey                       Yes             Yes               Yes
     year                        Yes             Yes               Yes
     _______________ _______________ _______________   _______________
     VCOV type                   IID       by: gvkey  by: gvkey & year
-    Observations            133,619         133,619           133,619
-    R2                        0.608           0.608             0.608
-    Within R2                 0.049           0.049             0.049
+    Observations            138,205         138,205           138,205
+    R2                        0.586           0.586             0.586
+    Within R2                 0.045           0.045             0.045
     ---
     Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

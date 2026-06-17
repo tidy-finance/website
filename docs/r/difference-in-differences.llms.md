@@ -14,6 +14,11 @@ The current chapter relies on this set of R packages.
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(arrow)
 library(fixest)
 library(broom)
@@ -24,11 +29,11 @@ library(broom)
 We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [TRACE and FISD](../r/trace-and-fisd.llms.md).
 
 ``` r
-fisd <- read_parquet("data-r/fisd.parquet") |>
+fisd <- read_parquet("data/fisd.parquet") |>
   select(complete_cusip, maturity, offering_amt, sic_code) |>
   drop_na()
 
-trace_enhanced <- open_dataset("data-r/trace_enhanced") |>
+trace_enhanced <- open_dataset("data/trace_enhanced") |>
   select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt) |>
   collect() |>
   drop_na()
@@ -161,7 +166,11 @@ model_with_fe <- feols(
   vcov = "iid",
   data = bonds_panel
 )
+```
 
+    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
+
+``` r
 etable(
   model_without_fe,
   model_with_fe,
@@ -185,7 +194,7 @@ etable(
     date                            No             Yes
     ________________ _________________ _______________
     VCOV type                      IID             IID
-    Observations               127,530         127,530
+    Observations               127,530         127,179
     R2                           0.032           0.647
     Within R2                       --           0.007
     ---
@@ -296,7 +305,11 @@ model_with_fe_time <- feols(
   vcov = "iid",
   data = bonds_panel_alt
 )
+```
 
+    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
+
+``` r
 model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
   mutate(
     term = str_remove(term, "TRUE"),
@@ -351,7 +364,7 @@ Notice that during the year after the PA was signed, Donald Trump, the 45th pres
 - It is important to assess the parallel trends assumption using graphical methods.
 - The `fixest` R package allows you to implement difference-in-differences regressions and visualize parallel trends.
 - By combining panel data from TRACE and Mergent FISD with fixed effects regressions, you can evaluate how the Paris Agreement influenced corporate bond yields.
-- The application shows that polluting firms experienced significantly higher yields following up to and after the agreement, invalidating the parallel trends assumption.
+- The application shows that polluting firms experienced significantly higher yields leading up to and after the agreement, invalidating the parallel trends assumption.
 
 ## Exercises
 
