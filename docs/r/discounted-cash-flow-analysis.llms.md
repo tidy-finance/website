@@ -250,9 +250,9 @@ dcf_data |>
     Warning: Removed 1 row containing missing values or values outside the scale
     range (`geom_line()`).
 
-[![Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-502-1.png)](discounted-cash-flow-analysis_files/figure-html/fig-502-1.png "Figure 3: Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts.")
+[![Title: GDP growth and Microsoft's revenue growth and modeled forecasts between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and GDP growth, revenue growth, and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-502-1.png)](discounted-cash-flow-analysis_files/figure-html/fig-502-1.png "Figure 3: Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled using IMF WEO forecasts.")
 
-Figure 3: Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled unsing IMF WEO forecasts.
+Figure 3: Realized revenue growth rates are based on financial statements provided through the FMP API, while forecasts are modeled using IMF WEO forecasts.
 
 While more sophisticated approaches exist (e.g., proprietary analyst forecasts or bottom-up market analyses), this method provides a transparent and data-driven starting point for revenue projections.
 
@@ -304,7 +304,7 @@ The most common approach is the Perpetuity Growth Model (or Gordon Growth Model)
 
 \\TV\_{T} = \frac{FCF\_{T+1}}{r - g},\\
 
-where \\TV\_{T}\\ is the terminal value at time \\T\\, \\FCF\_{T+1}\\ is the free cash flow in the first year after our forecast period, \\r\\ is the discount rate (typically WACC, see below), and \\g\\ is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute \\FCF\_{T+1}\\, which is equal to \\FCF\_{T}\cdot(1+g)\\
+where \\TV\_{T}\\ is the terminal value at time \\T\\, \\FCF\_{T+1}\\ is the free cash flow in the first year after our forecast period, \\r\\ is the discount rate (typically WACC, see below), and \\g\\ is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute \\FCF\_{T+1}\\, which is equal to \\FCF\_{T}\cdot(1+g)\\.
 
 The perpetual growth rate \\g\\ should reflect the long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely. Exceeding GDP growth indefinitely also implies that the whole economy eventually consists of one company. For example, the last 20 years of GDP growth is a sensible assumption (the nominal growth rate is 4% for the US).
 
@@ -349,7 +349,7 @@ library(readxl)
 file <- tempfile(fileext = "xls")
 
 url <- "https://pages.stern.nyu.edu/~adamodar/pc/datasets/wacc.xls"
-download.file(url, file)
+download.file(url, file, mode = "wb")
 wacc_raw <- read_xls(file, sheet = 2, skip = 18)
 unlink(file)
 
@@ -469,4 +469,4 @@ We leave it as an exercise to calculate the equity value using the DCF value fro
 
 ## Footnotes
 
-[^1]: See (corporatefinanceinstitute.com/)\[https://corporatefinanceinstitute.com/resources/valuation/exit-multiple/)\] for an intuitive explanation of the exit multiple approach.
+[^1]: See [corporatefinanceinstitute.com](https://corporatefinanceinstitute.com/resources/valuation/exit-multiple/) for an intuitive explanation of the exit multiple approach.

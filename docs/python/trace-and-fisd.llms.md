@@ -20,10 +20,12 @@ import httpimport
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+import time
 
 from datetime import date
 from plotnine import *
 from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
 from mizani.formatters import comma_format
 ```
 
@@ -117,7 +119,7 @@ fisd = pl.read_database(
     connection=wrds,
     schema_overrides={"complete_cusip": pl.String,
                       "interest_frequency": pl.String,
-                      "issue_id": pl.Int64, "issuer_id": pl.Int64},
+                      "issue_id": pl.Float64, "issuer_id": pl.Float64},
 )
 ```
 
@@ -132,7 +134,7 @@ fisd_issuer_query = (
 fisd_issuer = pl.read_database(
     query=fisd_issuer_query,
     connection=wrds,
-    schema_overrides={"issuer_id": pl.Int64, "sic_code": pl.String,
+    schema_overrides={"issuer_id": pl.Float64, "sic_code": pl.String,
                       "country_domicile": pl.String},
 )
 
@@ -178,12 +180,12 @@ response = requests.get(url, verify=False)
 exec(response.text)
 ```
 
-The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in sets of 1,000 bonds, which we define below.
+The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.
 
 ``` python
 cusips = fisd["complete_cusip"].unique().to_list()
-batch_size = 1000
-batches = np.ceil(len(cusips)/batch_size).astype(int)
+batches = 10
+batch_size = int(np.ceil(len(cusips) / batches))
 ```
 
 Finally, we run a loop in the same style as in [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md) where we download daily returns from CRSP. For each of the CUSIP sets defined above, we call the cleaning function and save the resulting output. We add new data to the existing dataset for batch two and all following batches. Because our later applications load the entire table at once, we partition the data by batch rather than by security identifier. Using a smaller number of larger files improves efficiency when loading the full dataset into memory.
@@ -198,12 +200,22 @@ for j in range(1, batches + 1):
     cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
     cusip_string = f"({cusip_batch_formatted})"
 
-    trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
-            cusips=cusip_string,
-            connection=wrds,
-            start_date="'01/01/2014'",
-            end_date="'11/30/2016'"
-    ))
+    # WRDS may close a long-running connection; retry the batch with a fresh
+    # connection if the server drops it unexpectedly.
+    for attempt in range(5):
+        try:
+            trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
+                    cusips=cusip_string,
+                    connection=wrds,
+                    start_date="'01/01/2014'",
+                    end_date="'11/30/2016'"
+            ))
+            break
+        except OperationalError:
+            wrds.dispose()
+            time.sleep(10)
+    else:
+        raise RuntimeError(f"Batch {j} failed after repeated connection errors.")
     
     if not trace_enhanced_sub.is_empty():
             table = (trace_enhanced_sub.to_arrow()
@@ -339,8 +351,8 @@ shape: (3, 8)
 | measure        | mean  | std    | min   | q05  | median | q95   | max     |
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
+| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
 
 We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
@@ -375,11 +387,11 @@ average_trade_size.with_columns(pl.col(pl.Float64).round(0))
 
 shape: (2, 8)
 
-| measure        | mean    | std     | min   | q05     | median  | q95     | max     |
-|----------------|---------|---------|-------|---------|---------|---------|---------|
-| str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
-| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35690.0 | 52102.0 | 68758.0 | 81678.0 |
-| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12272.0 | 26842.0 | 35690.0 | 42625.0 |
+| measure        | mean    | std    | min   | q05     | median  | q95     | max     |
+|----------------|---------|--------|-------|---------|---------|---------|---------|
+| str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
+| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6136.0  | 13421.0 | 17845.0 | 21312.0 |
+| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17845.0 | 26051.0 | 34379.0 | 40839.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can, hence, conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

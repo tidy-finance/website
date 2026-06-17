@@ -596,7 +596,7 @@ shape: (2, 9)
 | return_type | count   | mean | std  | min    | q25  | median | q75  | max   |
 |-------------|---------|------|------|--------|------|--------|------|-------|
 | str         | u32     | f64  | f64  | f64    | f64  | f64    | f64  | f64   |
-| "daily"     | 2863943 | 0.78 | 0.51 | -4.32  | 0.39 | 0.74   | 1.11 | 7.5   |
+| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.41 | 0.75   | 1.12 | 4.97  |
 | "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.64 | 1.04   | 1.48 | 11.72 |
 
 The summary statistics also look plausible for the two estimation procedures.
