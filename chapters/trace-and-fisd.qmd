@@ -30,7 +30,7 @@ We use the following packages throughout this chapter:
 library(tidyverse)
 library(tidyfinance)
 library(dbplyr)
-library(arrow)
+library(nanoparquet)
 library(RPostgres)
 ```
 
@@ -458,7 +458,7 @@ for (j in 1:batches) {
 
   trace_enhanced |>
     group_by(batch = j) |>
-    write_dataset("data/trace_enhanced", partitioning = "batch")
+    arrow::write_dataset("data/trace_enhanced", partitioning = "batch")
 
   message(
     "Batch ",
@@ -612,11 +612,16 @@ Next, we look at the bonds traded each quarter in the same period.
 ::: {.panel-tabset group="language"}
 ### R
 
-Notice that we do not have to load the complete TRACE table from our dataset into memory to perform the simple aggregation. Arrow's `open_dataset()` creates a lazy query plan that pushes all the filtering and aggregation down to its backend engine, reading only the necessary columns from Parquet and returning just the small summarized result to our session when we call `collect()`.
+We read the partitioned TRACE dataset back into memory by binding its batch files, since the download loop above leaves only the final batch in our session. With the full sample in a single tibble, we compute the aggregation directly.
 
 ```{r}
 #| label: trace-and-fisd-bonds-traded
-trace_enhanced <- open_dataset("data/trace_enhanced")
+trace_enhanced <- list.files(
+  "data/trace_enhanced", pattern = "parquet",
+  recursive = TRUE, full.names = TRUE
+) |>
+  map(read_parquet) |>
+  list_rbind()
 
 bonds_traded <- trace_enhanced |>
   mutate(date = floor_date(trd_exctn_dt, "quarters")) |>
