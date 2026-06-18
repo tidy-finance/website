@@ -1,53 +1,25 @@
 data_downloads:
-	quarto render r/accessing-and-managing-financial-data.qmd
-	quarto render r/wrds-crsp-and-compustat.qmd
-	quarto render r/trace-and-fisd.qmd
-	quarto render python/accessing-and-managing-financial-data.qmd
-	quarto render python/wrds-crsp-and-compustat.qmd 
-	quarto render python/trace-and-fisd.qmd
+	quarto render chapters/accessing-and-managing-financial-data.qmd
+	quarto render chapters/wrds-crsp-and-compustat.qmd
+	quarto render chapters/trace-and-fisd.qmd
 
-intro_chapters: intro_chapters_r intro_chapters_python
+intro_chapters:
+	quarto render chapters/working-with-stock-returns.qmd
+	quarto render chapters/modern-portfolio-theory.qmd
+	quarto render chapters/capital-asset-pricing-model.qmd
+	quarto render chapters/financial-statement-analysis.qmd
+	quarto render chapters/discounted-cash-flow-analysis.qmd
 
-other_chapters: other_chapters_r other_chapters_python
-	
-intro_chapters_r:
-	quarto render r/working-with-stock-returns.qmd
-	quarto render r/modern-portfolio-theory.qmd
-	quarto render r/capital-asset-pricing-model.qmd
-	quarto render r/financial-statement-analysis.qmd
-	quarto render r/discounted-cash-flow-analysis.qmd
-
-other_chapters_r:
-	quarto render r/beta-estimation.qmd
-	quarto render r/univariate-portfolio-sorts.qmd
-	quarto render r/size-sorts-and-p-hacking.qmd
-	quarto render r/value-and-bivariate-sorts.qmd
-	quarto render r/replicating-fama-and-french-factors.qmd
-	quarto render r/fama-macbeth-regressions.qmd
-	quarto render r/fixed-effects-and-clustered-standard-errors.qmd
-	quarto render r/difference-in-differences.qmd
-	quarto render r/factor-selection-via-machine-learning.qmd
-	quarto render r/option-pricing-via-machine-learning.qmd
-	quarto render r/parametric-portfolio-policies.qmd
-	quarto render r/constrained-optimization-and-backtesting.qmd
-	
-intro_chapters_python:
-	quarto render python/working-with-stock-returns.qmd
-	quarto render python/modern-portfolio-theory.qmd
-	quarto render python/capital-asset-pricing-model.qmd
-	quarto render python/financial-statement-analysis.qmd
-	quarto render python/discounted-cash-flow-analysis.qmd
-
-other_chapters_python:
-	quarto render python/beta-estimation.qmd
-	quarto render python/univariate-portfolio-sorts.qmd
-	quarto render python/size-sorts-and-p-hacking.qmd
-	quarto render python/value-and-bivariate-sorts.qmd
-	quarto render python/replicating-fama-and-french-factors.qmd
-	quarto render python/fama-macbeth-regressions.qmd
-	quarto render python/fixed-effects-and-clustered-standard-errors.qmd
-	quarto render python/difference-in-differences.qmd
-	quarto render python/factor-selection-via-machine-learning.qmd
-	quarto render python/option-pricing-via-machine-learning.qmd
-	quarto render python/parametric-portfolio-policies.qmd
-	quarto render python/constrained-optimization-and-backtesting.qmd
+other_chapters:
+	quarto render chapters/beta-estimation.qmd
+	quarto render chapters/univariate-portfolio-sorts.qmd
+	quarto render chapters/size-sorts-and-p-hacking.qmd
+	quarto render chapters/value-and-bivariate-sorts.qmd
+	quarto render chapters/replicating-fama-and-french-factors.qmd
+	quarto render chapters/fama-macbeth-regressions.qmd
+	quarto render chapters/fixed-effects-and-clustered-standard-errors.qmd
+	quarto render chapters/difference-in-differences.qmd
+	quarto render chapters/factor-selection-via-machine-learning.qmd
+	quarto render chapters/option-pricing-via-machine-learning.qmd
+	quarto render chapters/parametric-portfolio-policies.qmd
+	quarto render chapters/constrained-optimization-and-backtesting.qmd
