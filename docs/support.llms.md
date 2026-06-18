@@ -15,7 +15,7 @@ Note that some affiliate links track your behavior on the site and can be flagge
 The project grows with the attention it receives from the community. Therefore, making people aware of Tidy Finance is a great way to support it. There are certainly many possibilities how you can spread the word. For example, you could
 
 - [Contribute](contribute.llms.md) to the Tidy Finance blog
-- Cite [Tidy Finance with R](r/index.llms.md#license) or [Tidy Finance with Python](python/index.llms.md#license) in one of your projects
+- Cite [Tidy Finance with R](index.llms.md) or [Tidy Finance with Python](index.llms.md) in one of your projects
 - Use Tidy Finance as a teaching resource and let us know
 - Connect with us and share posts about Tidy Finance via social media
 - You can also buy [Tidy Finance Swag](https://www.etsy.com/shop/tidyswag/?etsrc=sdt&utm_source=tidy-finance.org)

@@ -4,7 +4,7 @@ With commit [6acb50b](https://github.com/tidy-finance/website/commit/6acb50b4d7e
 
 Tidy Finance shows how to download the most used data in empirical research in finance from the [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/). A main component of this data is the stock return history provided by the [Center for Research in Security Prices (CRSP)](https://crsp.org/). CRSP is the de-facto gold standard for stock return data covering historical returns from the 1920s until now.
 
-You can read all about how to connect to WRDS and download the CRSP data in our chapter **WRDS, CRSP, and Compustat** in the [R version](../../r/wrds-crsp-and-compustat.llms.md) and the [Python version](../../python/wrds-crsp-and-compustat.llms.md).
+You can read all about how to connect to WRDS and download the CRSP data in our chapter **WRDS, CRSP, and Compustat** in the [R version](../../r/wrds-crsp-and-compustat.qmd) and the [Python version](../../python/wrds-crsp-and-compustat.qmd).
 
 ## CRSP format 2.0 (CIZ)
 
@@ -25,7 +25,7 @@ msf_db <- tbl(wrds, in_schema("crsp", "msf_v2"))
 stksecurityinfohist_db <- tbl(wrds, in_schema("crsp", "stksecurityinfohist"))
 ```
 
-We do not repost the new routines for downloading the data in this blog. Instead, we ask you to check out the new code in the respective chapter on **WRDS, CRSP, and Compustat** in the [R version](../../r/wrds-crsp-and-compustat.llms.md) and the [Python version](../../python/wrds-crsp-and-compustat.llms.md).
+We do not repost the new routines for downloading the data in this blog. Instead, we ask you to check out the new code in the respective chapter on **WRDS, CRSP, and Compustat** in the [R version](../../r/wrds-crsp-and-compustat.qmd) and the [Python version](../../python/wrds-crsp-and-compustat.qmd).
 
 ## A small glimpse at the differences
 

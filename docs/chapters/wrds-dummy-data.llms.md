@@ -1,0 +1,709 @@
+# WRDS Pseudo Data
+
+In this appendix chapter, we alleviate the constraints of readers who do not have access to WRDS and hence cannot run the code that we provide. We show how to create pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this pseudo data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../chapters/accessing-and-managing-financial-data.llms.md).
+
+We deliberately use the pseudo label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does not contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books.
+
+To generate the pseudo data, we use the following packages:
+
+## R
+
+``` r
+library(tidyverse)
+library(arrow)
+```
+
+## Python
+
+``` python
+import polars as pl
+import numpy as np
+import string
+```
+
+We store the data in the folder `data`. Be careful, if you already downloaded the data from WRDS, then the code in this chapter will overwrite your data!
+
+## R
+
+``` r
+if (!dir.exists("data")) {
+  dir.create("data")
+}
+```
+
+## Python
+
+``` python
+import os
+
+if not os.path.exists("data"):
+    os.makedirs("data")
+```
+
+Since we draw random numbers for most of the columns, we also define a seed to ensure that the generated numbers are replicable. We also initialize vectors of dates of different frequencies over ten years that we then use to create yearly, monthly, and daily data, respectively.
+
+## R
+
+``` r
+set.seed(1234)
+
+start_date <- as.Date("2003-01-01")
+end_date <- as.Date("2022-12-31")
+
+time_series_years <- seq(year(start_date), year(end_date), 1)
+time_series_months <- seq(start_date, end_date, "1 month")
+time_series_days <- seq(start_date, end_date, "1 day")
+```
+
+## Python
+
+``` python
+np.random.seed(1234)
+
+start_date = pl.date(2003, 1, 1)
+end_date = pl.date(2022, 12, 31)
+
+time_series_years = np.arange(2003, 2023, 1)
+time_series_months = pl.date_range(
+    start_date, end_date, interval="1mo", eager=True
+).to_numpy()
+time_series_days = pl.date_range(
+    start_date, end_date, interval="1d", eager=True
+).to_numpy()
+```
+
+## Create Stock Pseudo Data
+
+Let us start with the core data used throughout the book: stock and firm characteristics. We first generate a table with a cross-section of stock identifiers with unique `permno` and `gvkey` values, as well as associated `exchcd`, `exchange`, `industry`, and `siccd` values. The generated data is based on the characteristics of stocks in the `crsp_monthly` table of the original data, ensuring that the generated stocks roughly reflect the distribution of industries and exchanges in the original data, but the identifiers and corresponding exchanges or industries do not reflect actual firms. Similarly, the `permno`-`gvkey` combinations are purely nonsensical and should not be used together with actual CRSP or Compustat data.
+
+## R
+
+``` r
+number_of_stocks <- 100
+
+industries <- tibble(
+  industry = c(
+    "Agriculture",
+    "Construction",
+    "Finance",
+    "Manufacturing",
+    "Mining",
+    "Public",
+    "Retail",
+    "Services",
+    "Transportation",
+    "Utilities",
+    "Wholesale"
+  ),
+  n = c(81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 457, 904),
+  prob = c(
+    0.00319,
+    0.0113,
+    0.185,
+    0.339,
+    0.0508,
+    0.0779,
+    0.0620,
+    0.169,
+    0.0493,
+    0.0180,
+    0.0357
+  )
+)
+
+exchanges <- exchanges <- tibble(
+  exchange = c("AMEX", "NASDAQ", "NYSE"),
+  n = c(2893, 17236, 5553),
+  prob = c(0.113, 0.671, 0.216)
+)
+
+stock_identifiers <- 1:number_of_stocks |>
+  map_df(
+    function(x) {
+      tibble(
+        permno = x,
+        gvkey = as.character(x + 10000),
+        exchange = sample(exchanges$exchange, 1, prob = exchanges$prob),
+        industry = sample(industries$industry, 1, prob = industries$prob)
+      ) |>
+        mutate(
+          exchcd = case_when(
+            exchange == "NYSE" ~ sample(c(1, 31), n()),
+            exchange == "AMEX" ~ sample(c(2, 32), n()),
+            exchange == "NASDAQ" ~ sample(c(3, 33), n())
+          ),
+          siccd = case_when(
+            industry == "Agriculture" ~ sample(1:999, n()),
+            industry == "Mining" ~ sample(1000:1499, n()),
+            industry == "Construction" ~ sample(1500:1799, n()),
+            industry == "Manufacturing" ~ sample(1800:3999, n()),
+            industry == "Transportation" ~ sample(4000:4899, n()),
+            industry == "Utilities" ~ sample(4900:4999, n()),
+            industry == "Wholesale" ~ sample(5000:5199, n()),
+            industry == "Retail" ~ sample(5200:5999, n()),
+            industry == "Finance" ~ sample(6000:6799, n()),
+            industry == "Services" ~ sample(7000:8999, n()),
+            industry == "Public" ~ sample(9000:9999, n())
+          )
+        )
+    }
+  )
+```
+
+## Python
+
+``` python
+number_of_stocks = 100
+
+industries = pl.DataFrame(
+    {
+        "industry": [
+            "Agriculture",
+            "Construction",
+            "Finance",
+            "Manufacturing",
+            "Mining",
+            "Public",
+            "Retail",
+            "Services",
+            "Transportation",
+            "Utilities",
+            "Wholesale",
+        ],
+        "n": [81, 287, 4682, 8584, 1287, 1974, 1571, 4277, 1249, 457, 904],
+        "prob": [
+            0.00319,
+            0.0113,
+            0.185,
+            0.339,
+            0.0508,
+            0.0779,
+            0.0620,
+            0.169,
+            0.0493,
+            0.0180,
+            0.03451,
+        ],
+    }
+)
+
+exchanges = pl.DataFrame(
+    {
+        "exchange": ["AMEX", "NASDAQ", "NYSE"],
+        "n": [2893, 17236, 5553],
+        "prob": [0.113, 0.671, 0.216],
+    }
+)
+
+stock_identifiers_list = []
+for x in range(1, number_of_stocks + 1):
+    exchange = np.random.choice(
+        exchanges["exchange"].to_numpy(), p=exchanges["prob"].to_numpy()
+    )
+    industry = np.random.choice(
+        industries["industry"].to_numpy(), p=industries["prob"].to_numpy()
+    )
+
+    exchcd_mapping = {
+        "NYSE": np.random.choice([1, 31]),
+        "AMEX": np.random.choice([2, 32]),
+        "NASDAQ": np.random.choice([3, 33]),
+    }
+
+    siccd_mapping = {
+        "Agriculture": np.random.randint(1, 1000),
+        "Mining": np.random.randint(1000, 1500),
+        "Construction": np.random.randint(1500, 1800),
+        "Manufacturing": np.random.randint(1800, 4000),
+        "Transportation": np.random.randint(4000, 4900),
+        "Utilities": np.random.randint(4900, 5000),
+        "Wholesale": np.random.randint(5000, 5200),
+        "Retail": np.random.randint(5200, 6000),
+        "Finance": np.random.randint(6000, 6800),
+        "Services": np.random.randint(7000, 9000),
+        "Public": np.random.randint(9000, 10000),
+    }
+
+    stock_identifiers_list.append(
+        {
+            "permno": x,
+            "gvkey": str(x + 10000),
+            "exchange": exchange,
+            "industry": industry,
+            "exchcd": exchcd_mapping[exchange],
+            "siccd": siccd_mapping[industry],
+        }
+    )
+
+stock_identifiers = pl.DataFrame(stock_identifiers_list)
+```
+
+Next, we construct three panels of stock data with varying frequencies: yearly, monthly, and daily. We begin by creating the `stock_panel_yearly` panel. To achieve this, we combine the `stock_identifiers` table with a new table containing the variable `year` from `time_series_years`. We get all possible combinations of the two tables. After combining, we select only the `gvkey` and `year` columns for our final yearly panel.
+
+Next, we construct the `stock_panel_monthly` panel. Similar to the yearly panel, we combine `stock_identifiers` with a new table that has the `date` variable from `time_series_months`. After merging, we select the columns `permno`, `gvkey`, `date`, `siccd`, `industry`, `exchcd`, and `exchange` to form our monthly panel.
+
+Lastly, we create the `stock_panel_daily` panel. We combine `stock_identifiers` with a table containing the `date` variable from `time_series_days`. After merging, we retain only the `permno` and `date` columns for our daily panel.
+
+## R
+
+The `expand_grid()` function ensures that we get all possible combinations of the two tables.
+
+``` r
+stock_panel_yearly <- expand_grid(
+  stock_identifiers,
+  tibble(year = time_series_years)
+) |>
+  select(gvkey, year)
+
+stock_panel_monthly <- expand_grid(
+  stock_identifiers,
+  tibble(date = time_series_months)
+) |>
+  select(permno, gvkey, date, siccd, industry, exchcd, exchange)
+
+stock_panel_daily <- expand_grid(
+  stock_identifiers,
+  tibble(date = time_series_days)
+) |>
+  select(permno, date)
+```
+
+## Python
+
+We use `np.tile()` and `np.repeat()` to construct all possible combinations of the two tables.
+
+``` python
+stock_panel_yearly = pl.DataFrame(
+    {
+        "gvkey": np.tile(stock_identifiers["gvkey"], len(time_series_years)),
+        "year": np.repeat(time_series_years, len(stock_identifiers)),
+    }
+)
+
+stock_panel_monthly = pl.DataFrame(
+    {
+        "permno": np.tile(stock_identifiers["permno"], len(time_series_months)),
+        "gvkey": np.tile(stock_identifiers["gvkey"], len(time_series_months)),
+        "date": np.repeat(time_series_months, len(stock_identifiers)),
+        "siccd": np.tile(stock_identifiers["siccd"], len(time_series_months)),
+        "industry": np.tile(stock_identifiers["industry"], len(time_series_months)),
+        "exchcd": np.tile(stock_identifiers["exchcd"], len(time_series_months)),
+        "exchange": np.tile(stock_identifiers["exchange"], len(time_series_months)),
+    }
+)
+
+stock_panel_daily = pl.DataFrame(
+    {
+        "permno": np.tile(stock_identifiers["permno"], len(time_series_days)),
+        "date": np.repeat(time_series_days, len(stock_identifiers)),
+    }
+)
+```
+
+### Pseudo `beta` table
+
+We then proceed to create pseudo beta values for our `stock_panel_monthly` table. We generate monthly beta values `beta_monthly` using a normal distribution with a mean and standard deviation of 1. For daily beta values `beta_daily`, we take the pseudo monthly beta and add a small random noise to it. This noise is generated again using a normal distribution, but this time we scale the random values to ensure they are small deviations from the monthly beta.
+
+## R
+
+``` r
+beta_pseudo <- stock_panel_monthly |>
+  mutate(
+    beta_monthly = rnorm(n(), mean = 1, sd = 1),
+    beta_daily = beta_monthly + rnorm(n()) / 100
+  )
+
+write_parquet(beta_pseudo, "data/beta.parquet")
+```
+
+## Python
+
+``` python
+beta_pseudo = (stock_panel_monthly
+    .with_columns(
+        beta_monthly=np.random.normal(
+            loc=1, scale=1, size=len(stock_panel_monthly)
+        )
+    )
+    .with_columns(
+        beta_daily=(
+            pl.col("beta_monthly")
+            + np.random.normal(scale=0.01, size=len(stock_panel_monthly))
+        )
+    )
+)
+
+beta_pseudo.write_parquet("data/beta.parquet")
+```
+
+### Pseudo `compustat_annual` table
+
+To create pseudo firm characteristics, we take all columns from the `compustat_annual` table and create random numbers between 0 and 1. For simplicity, we set the `datadate` for each firm-year observation to the last day of the year, although it is empirically not the case.
+
+## R
+
+``` r
+relevant_columns <- c(
+  "seq",
+  "ceq",
+  "at",
+  "lt",
+  "txditc",
+  "txdb",
+  "itcb",
+  "pstkrv",
+  "pstkl",
+  "pstk",
+  "capx",
+  "oancf",
+  "sale",
+  "cogs",
+  "xint",
+  "xsga",
+  "be",
+  "op",
+  "at_lag",
+  "inv"
+)
+
+commands <- unlist(
+  map(
+    relevant_columns,
+    ~ rlang::exprs(!!..1 := runif(n()))
+  )
+)
+
+compustat_pseudo <- stock_panel_yearly |>
+  mutate(
+    datadate = ymd(str_c(year, "12", "31")),
+    !!!commands
+  )
+
+write_parquet(compustat_pseudo, "data/compustat_annual.parquet")
+```
+
+## Python
+
+``` python
+relevant_columns = [
+    "seq",
+    "ceq",
+    "at",
+    "lt",
+    "txditc",
+    "txdb",
+    "itcb",
+    "pstkrv",
+    "pstkl",
+    "pstk",
+    "capx",
+    "oancf",
+    "sale",
+    "cogs",
+    "xint",
+    "xsga",
+    "be",
+    "op",
+    "at_lag",
+    "inv",
+]
+
+commands = {
+    col: np.random.rand(len(stock_panel_yearly)) for col in relevant_columns
+}
+
+compustat_pseudo = (stock_panel_yearly
+    .with_columns(
+        datadate=pl.date(pl.col("year"), 12, 31)
+    )
+    .with_columns(**commands)
+)
+
+compustat_pseudo.write_parquet("data/compustat_annual.parquet")
+```
+
+### Pseudo `crsp_monthly` table
+
+The `crsp_monthly` table only lacks a few more columns compared to `stock_panel_monthly`: the returns `ret` drawn from a normal distribution, the excess returns `ret_excess` with small deviations from the returns, the shares outstanding `shrout` and the last price per month (`altprc` in R, `prc` in Python) both drawn from uniform distributions, and the market capitalization `mktcap` as the product of `shrout` and the price.
+
+## R
+
+``` r
+crsp_monthly_pseudo <- stock_panel_monthly |>
+  mutate(
+    ret = pmax(rnorm(n()), -1),
+    ret_excess = ret - runif(n(), 0, 0.0025),
+    shrout = runif(n(), 1, 50) * 1000,
+    altprc = runif(n(), 0, 1000),
+    mktcap = shrout * altprc
+  ) |>
+  group_by(permno) |>
+  arrange(date) |>
+  mutate(mktcap_lag = lag(mktcap)) |>
+  ungroup()
+
+write_parquet(crsp_monthly_pseudo, "data/crsp_monthly.parquet")
+```
+
+## Python
+
+``` python
+crsp_monthly_pseudo = (
+    stock_panel_monthly
+    .with_columns(
+        ret=np.fmax(np.random.normal(size=len(stock_panel_monthly)), -1),
+        shrout=1000 * np.random.uniform(1, 50, len(stock_panel_monthly)),
+        prc=np.random.uniform(0, 1000, len(stock_panel_monthly)),
+    )
+    .with_columns(
+        ret_excess=(
+            pl.col("ret")
+            - np.random.uniform(0, 0.0025, len(stock_panel_monthly))
+        ),
+        mktcap=pl.col("shrout") * pl.col("prc"),
+    )
+    .sort(["permno", "date"])
+    .with_columns(mktcap_lag=pl.col("mktcap").shift(1).over("permno"))
+)
+
+crsp_monthly_pseudo.write_parquet("data/crsp_monthly.parquet")
+```
+
+### Pseudo `crsp_daily` table
+
+The `crsp_daily` table only contains a `date` column and the daily excess returns `ret_excess` as additional columns to `stock_panel_daily`.
+
+## R
+
+``` r
+crsp_daily_pseudo <- stock_panel_daily |>
+  mutate(
+    ret_excess = pmax(rnorm(n()), -1)
+  )
+
+write_parquet(crsp_daily_pseudo, "data/crsp_daily.parquet")
+```
+
+## Python
+
+``` python
+crsp_daily_pseudo = (stock_panel_daily
+    .with_columns(
+        ret_excess=np.fmax(np.random.normal(size=len(stock_panel_daily)), -1)
+    )
+)
+
+crsp_daily_pseudo.write_parquet("data/crsp_daily.parquet")
+```
+
+## Create Bond Pseudo Data
+
+Lastly, we move to the bond data that we use in our books.
+
+### Pseudo `fisd` data
+
+To create pseudo data with the structure of Mergent FISD, we calculate the empirical probabilities of actual bonds for several variables: `maturity`, `offering_amt`, `interest_frequency`, `coupon`, and `sic_code`. We use these probabilities to sample a small cross-section of bonds with completely made up `complete_cusip`, `issue_id`, and `issuer_id`.
+
+## R
+
+``` r
+number_of_bonds <- 100
+
+fisd_pseudo <- 1:number_of_bonds |>
+  map_df(
+    function(x) {
+      tibble(
+        complete_cusip = str_to_upper(
+          str_c(
+            sample(c(letters, 0:9), 12, replace = TRUE),
+            collapse = ""
+          )
+        ),
+      )
+    }
+  ) |>
+  mutate(
+    maturity = sample(time_series_days, n(), replace = TRUE),
+    offering_amt = sample(seq(1:100) * 100000, n(), replace = TRUE),
+    offering_date = maturity - sample(seq(1:25) * 365, n(), replace = TRUE),
+    dated_date = offering_date - sample(-10:10, n(), replace = TRUE),
+    interest_frequency = sample(c(0, 1, 2, 4, 12), n(), replace = TRUE),
+    coupon = sample(seq(0, 2, by = 0.1), n(), replace = TRUE),
+    last_interest_date = pmax(maturity, offering_date, dated_date),
+    issue_id = row_number(),
+    issuer_id = sample(1:250, n(), replace = TRUE),
+    sic_code = as.character(sample(seq(1:9) * 1000, n(), replace = TRUE))
+  )
+
+write_parquet(fisd_pseudo, "data/fisd.parquet")
+```
+
+## Python
+
+``` python
+number_of_bonds = 100
+
+
+def generate_cusip():
+    """Generate cusip."""
+
+    characters = list(string.ascii_uppercase + string.digits)  # Convert to list
+    cusip = ("".join(np.random.choice(characters, size=12))).upper()
+
+    return cusip
+
+
+fisd_pseudo = (
+    pl.DataFrame(
+        {"complete_cusip": [generate_cusip() for _ in range(number_of_bonds)]}
+    )
+    .with_columns(
+        maturity=np.random.choice(time_series_days, number_of_bonds, replace=True),
+        offering_amt=np.random.choice(
+            np.arange(1, 101) * 100000, number_of_bonds, replace=True
+        ),
+    )
+    .with_columns(
+        offering_date=(
+            pl.col("maturity")
+            - pl.duration(
+                days=pl.Series(
+                    np.random.choice(
+                        np.arange(1, 26) * 365, number_of_bonds, replace=True
+                    )
+                )
+            )
+        )
+    )
+    .with_columns(
+        dated_date=(
+            pl.col("offering_date")
+            - pl.duration(
+                days=pl.Series(
+                    np.random.choice(
+                        np.arange(-10, 11), number_of_bonds, replace=True
+                    )
+                )
+            )
+        ),
+        interest_frequency=np.random.choice(
+            [0, 1, 2, 4, 12], number_of_bonds, replace=True
+        ),
+        coupon=np.random.choice(
+            np.arange(0, 2.1, 0.1), number_of_bonds, replace=True
+        ),
+    )
+    .with_columns(
+        last_interest_date=pl.max_horizontal(
+            "maturity", "offering_date", "dated_date"
+        ),
+        issue_id=pl.int_range(1, number_of_bonds + 1),
+        issuer_id=np.random.choice(
+            np.arange(1, 251), number_of_bonds, replace=True
+        ),
+        sic_code=(
+            np.random.choice(
+                np.arange(1, 10) * 1000, number_of_bonds, replace=True
+            )
+        ).astype(str),
+    )
+)
+
+fisd_pseudo.write_parquet("data/fisd.parquet")
+```
+
+### Pseudo `trace_enhanced` data
+
+Finally, we create pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book.
+
+## R
+
+``` r
+start_date <- as.Date("2014-01-01")
+end_date <- as.Date("2016-11-30")
+
+bonds_panel <- expand_grid(
+  fisd_pseudo |>
+    select(cusip_id = complete_cusip),
+  tibble(
+    trd_exctn_dt = seq(start_date, end_date, "1 day")
+  )
+)
+
+trace_enhanced_pseudo <- bind_rows(
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel
+) |>
+  mutate(
+    trd_exctn_tm = str_c(
+      sample(0:24, n(), replace = TRUE),
+      ":",
+      sample(0:60, n(), replace = TRUE),
+      ":",
+      sample(0:60, n(), replace = TRUE)
+    ),
+    rptd_pr = runif(n(), 10, 200),
+    entrd_vol_qt = sample(1:20, n(), replace = TRUE) * 1000,
+    yld_pt = runif(n(), -10, 10),
+    rpt_side_cd = sample(c("B", "S"), n(), replace = TRUE),
+    cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
+  )
+
+write_parquet(trace_enhanced_pseudo, "data/trace_enhanced.parquet")
+```
+
+## Python
+
+``` python
+number_of_bonds = 100
+start_date = pl.date(2014, 1, 1)
+end_date = pl.date(2016, 11, 30)
+
+trading_dates = pl.date_range(
+    start_date, end_date, interval="1d", eager=True
+).to_numpy()
+
+bonds_panel = pl.DataFrame(
+    {
+        "cusip_id": np.tile(
+            fisd_pseudo["complete_cusip"], len(trading_dates)
+        ),
+        "trd_exctn_dt": np.repeat(
+            trading_dates, len(fisd_pseudo)
+        ),
+    }
+)
+
+n_transactions = len(bonds_panel) * 5
+
+trace_enhanced_pseudo = (
+    pl.concat([bonds_panel] * 5)
+    .with_columns(
+        trd_exctn_tm=(
+            pl.col("trd_exctn_dt").cast(pl.Datetime)
+            + pl.duration(
+                hours=pl.Series(np.random.randint(0, 24, size=n_transactions)),
+                minutes=pl.Series(np.random.randint(0, 60, size=n_transactions)),
+                seconds=pl.Series(np.random.randint(0, 60, size=n_transactions)),
+            )
+        ),
+        rptd_pr=np.random.uniform(10, 200, n_transactions),
+        entrd_vol_qt=1000
+        * np.random.choice(range(1, 21), n_transactions, replace=True),
+        yld_pt=np.random.uniform(-10, 10, n_transactions),
+        rpt_side_cd=np.random.choice(
+            ["B", "S"], n_transactions, replace=True
+        ),
+        cntra_mp_id=np.random.choice(
+            ["C", "D"], n_transactions, replace=True
+        ),
+    )
+)
+
+trace_enhanced_pseudo.write_parquet("data/trace_enhanced.parquet")
+```
+
+As stated in the introduction, the data does *not* contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout this book.

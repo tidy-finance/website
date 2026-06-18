@@ -1,0 +1,258 @@
+# Setting Up Your Environment
+
+We aim to lower the bar for starting empirical research in financial economics. We want to make using R and Python easy for you. However, given that Tidy Finance is a platform that supports multiple programming languages, we also consider the possibility that you are not yet familiar with the language at all. Hence, we provide you with a simple guide to get started. If you have not used the language before, you will be able to use it after reading this chapter.
+
+## R
+
+If you were not using R before, you will be able to use it after reading this chapter. We start with downloading and installing R and follow up with doing the same for RStudio.
+
+## Python
+
+Maybe you are transitioning from R to Python, i.e., following the journey of Tidy Finance, which started in R. We start by setting up an isolated Python environment and follow up with choosing an integrated development environment.
+
+## The Programming Language
+
+## R
+
+Some good news first: The software you need is free and easy to download.
+
+R is provided via [The Comprehensive R Archive Network](https://cran.r-project.org/) (or short CRAN). CRAN does not only provide the main software but also nearly all extensions that you need. We will cover these extensions or packages later, as we usually visit the CRAN website only to download the base version. Now, go ahead and visit CRAN. On the landing page, you can choose your operating systems (i.e., Linux, macOS, and Windows). Click the respective link that fits your system:
+
+- R comes as a part of many Linux distributions. If it does not, CRAN provides installation guides for individual Linux distributions.
+- For macOS, the choice currently depends on some hardware specifications, but the right version for your system is clearly indicated.
+- For Windows, you want to use the base version provided.
+
+After downloading and installing the software to your system, you are nearly ready to go. In fact, you could just use R now. Unfortunately for many users, R is not a program but a programming language and comes with an interpreter that you would use like a command line. While using R like this might make you feel like a hacker (not that we do not endorse any criminal activity), it is in your best interest to combine R with RStudio.
+
+R is constantly being updated, with new versions being released multiple times a year. This means that you might want to return to CRAN in the future to fetch yourself an update. You know it is time for an update if packages remind you that you are using an outdated version of R.
+
+## Python
+
+A Python environment is a self-contained directory or folder containing a specific version of the Python installation with a set of packages and dependencies. In order to isolate and manage the specific dependencies of the Tidy Finance with Python project, a so-called *virtual environment* is a reliable way to ensure that it will work consistently and reliably on different systems and over time.
+
+There are many ways to install a Python version and environments on your system. We present the way that we found most convenient to write this book and maintain our website: Installation via `uv`.
+
+We use `uv`, a modern Python package and project manager. Unlike traditional approaches that use separate files for different purposes, `uv` uses a single `pyproject.toml` file to define your project’s dependencies and a `uv.lock` file to ensure reproducible installations across different systems. Additionally, `uv` handles Python version management automatically, meaning you don’t need to install Python separately before setting up your environment. You can install `uv` with a single command:
+
+**On macOS and Linux:**
+
+``` bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**On Windows:**
+
+``` powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+You can find detailed installation instructions on the [official uv documentation.](https://docs.astral.sh/uv/getting-started/installation/) After the installation, you can verify that `uv` is installed correctly by running `uv --version`. If the command returns a version number, the installation was successful. Otherwise, try to restart your terminal to ensure that the system recognizes the new command.
+
+## Packages and Environments
+
+## R
+
+Following your read of the preface to this book, you might now wonder why we did not download the `tidyverse` yet. Therefore, you must understand one more concept, namely packages in R. You can think of them as extensions that you use for specific purposes, whereas R itself is the core pillar upon which everything rests. Comfortably, you can install packages within R with the following code.
+
+``` r
+install.packages("tidyverse")
+```
+
+Simply specify the package you want where we placed `tidyverse`. You typically only need to install packages once - except for updates or project-specific R environments. Once installed, you can then load a package with a call to `library(tidyverse)` to use it.
+
+To keep track of the packages’ versions and make our results replicatable, we rely on the package `renv`. It creates a project-specific installation of R packages and you can find the full list of packages used here in the colophon below. The recorded package versions can also be shared with collaborators to ensure consistency. Our use of `renv` also makes it easier for you to install the exact package versions we were using (if you want that) by initializing `renv` with our [renv.lock](https://github.com/tidy-finance/website/blob/main/renv.lock)-file from Github.
+
+One more piece of advice is the use of RStudio projects. They are a powerful tool to save you some time and make working with R more fun. Without going into more detail here, we refer you to Wickham et al. ([2023](#ref-Wickham2023))’s chapter on [Workflow: scripts and projects](https://r4ds.hadley.nz/workflow-scripts.html).
+
+## Python
+
+This book uses Python version 3.10 to set up the environment for both Windows and Mac. As we write this book, it is not the latest version of Python. The reason for this is that we wanted (i) a stable code base and (ii) the content of the book to be usable for all kinds of users, especially for those who might rely on corporate version controls and are not able to install new Python distributions.
+
+You need the packages defined in the provided [`pyproject.toml`-file](https://github.com/tidy-finance/website/blob/main/pyproject.toml). This file is the modern Python standard for declaring project metadata and dependencies. It contains a `[project]` section that lists all required packages (like `pandas`, `numpy`, `plotnine`, etc.) along with their minimum versions. You can find the detailed list of packages in the [Colophon](../chapters/colophon.llms.md).
+
+``` toml
+[project]
+name = "TFWP"
+version = "0.1.0"
+description = "Dependencies for the chapters of Tidy Finance with Python"
+requires-python = ">=3.10"
+dependencies = [
+    "adjusttext>=1.3.0",
+    "fmpapi>=1.0.0",
+    "joblib>=1.5.3",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "plotnine>=0.15.1",
+    "tidyfinance>=0.2.5",
+]
+```
+
+We recommend you start with the package installation right away. Create a new folder for your Tidy Finance project, add the `pyproject.toml` file (either download it from the [repository](https://github.com/tidy-finance/website/blob/main/pyproject.toml) or copy the content shown above into a new file), and set up your environment with the following commands:
+
+1.  `mkdir tidy-finance`
+2.  `cd tidy-finance`
+3.  Create or download `pyproject.toml` in this folder
+4.  `uv sync --python 3.10.11`
+
+That’s it! The `uv sync` command creates a virtual environment in the `.venv` folder, installs Python 3.10.11 if needed, and installs all required packages along with their dependencies as specified in `pyproject.toml`. The command also generates a `uv.lock` file that records the exact versions of all packages and their dependencies, ensuring everyone gets identical package versions for reproducibility. When you or your collaborators run `uv sync` in the future, `uv` will read both `pyproject.toml` (for the list of required packages) and `uv.lock` (for exact versions) to recreate the environment precisely.
+
+> **NOTE:**
+>
+> If you prefer using Anaconda (install it first from the [Anaconda website](https://www.anaconda.com/products/individual)), you can create a conda environment with `conda create -n tidy_finance python=3.10` and install packages using `pip install` from the dependencies listed in `pyproject.toml`. However, we recommend `uv` for its speed and simplicity.
+
+## Integrated Development Environment
+
+## R
+
+Assuming you are looking for a more comfortable way of using R, you will get RStudio next. You can download it for free from [Posit](https://posit.co/download/rstudio-desktop/) (i.e., the company that created RStudio, which was previously called RStudio itself). When you follow the instructions, you will see that Posit asks you to install R. However, you should have done that already and can move straight to downloading and installing RStudio.
+
+RStudio is a program similar to other programs you most likely use, like a browser, text editor, or anything else. It comes with many advantages, including a project manager, Github integration, and much more. Unfortunately, Tidy Finance is not the right scope to elaborate more on these possibilities or introduce the basics of programming, but we point you to some excellent resources below. For the purposes of this book, you have completed your excursions to websites that provide you with the necessary software installers.
+
+While we believe that downloading and installing R and RStudio is sufficiently easy, you might find help from Grolemund ([2014](#ref-Grolemund2014)) on [R and RStudio](https://rstudio-education.github.io/hopr/starting.html), [packages](https://rstudio-education.github.io/hopr/packages2.html), as well as [updating](https://rstudio-education.github.io/hopr/updating.html) the software.
+
+This book’s scope cannot be to give you an introduction to R itself. It is not our comparative advantage. However, we can point you to a possible path that you could follow to familiarize yourself with R. Therefore, we make the following suggestion:
+
+- If you are new to R itself, a very gentle and good introduction to the workings of R can be found in Grolemund ([2014](#ref-Grolemund2014)). He provides a wonderful example in the form of the [weighted dice project](https://rstudio-education.github.io/hopr/project-1-weighted-dice.html). Once you are done setting up R on your machine, try to follow the instructions in this project.
+- The main book on the `tidyverse`, Wickham et al. ([2023](#ref-Wickham2023)), is available online and for free: [R for Data Science](https://r4ds.had.co.nz/introduction.html) explains the majority of the tools we use in our book. Working through this text is an eye-opening experience and really useful.
+
+Additional resources we can encourage you to use are the following:
+
+- If you are an instructor searching to effectively teach R and data science methods, we recommend taking a look at the excellent [data science toolbox](https://datasciencebox.org/) by [Mine Cetinkaya-Rundel.](https://mine-cr.com/about/)
+- RStudio provides a range of excellent [cheat sheets](https://www.rstudio.com/resources/cheatsheets/) with extensive information on how to use the `tidyverse` packages.
+
+## Python
+
+You will now need a Python integrated development environment (IDE) to make your coding experience pleasant. If you are new to coding, you will not have an IDE for Python. We recommend using Positron, a new IDE from Posit (the creators of RStudio) specifically designed for data science with Python and R. Positron provides an excellent environment for working with the Tidy Finance materials, especially if you’re interested in using both Python and R. It supports notebooks and includes interactive data viewers, and integrated plots. You can download Positron from the [official website.](https://positron.posit.co/) After installation, follow these steps to set up Positron with your Tidy Finance environment:
+
+1.  Open Positron and use `File > Open Folder` to open your `tidy-finance` project folder.
+2.  Click on the Python interpreter indicator in the top-right corner (or press `Ctrl+Shift+P` / `Cmd+Shift+P` and search for “Python: Select Interpreter”).
+3.  Select the interpreter from your `.venv` folder inside the tidy-finance folder (`.venv/bin/python` on Mac/Linux or `.venv\Scripts\python.exe` on Windows).
+
+Positron will now use this environment for running Python code in the editor. For the integrated terminal, you need to activate the environment first with `source .venv/bin/activate` (Mac/Linux) or `.venv\Scripts\activate` (Windows) before running standard Python or pip commands. Alternatively, you can use `uv` commands (like `uv pip list` or `uv run python script.py`) which automatically work with your project’s environment by detecting the `pyproject.toml` file, without needing manual activation.
+
+Alternatively, you can use Spyder, which you can install with `uv pip install spyder` and then run with `uv run spyder`, or Visual Studio Code (VS Code), which you can download from the [official website.](https://code.visualstudio.com/) There are many more ways to set up a Python IDE, so we refer to [this page](https://wiki.python.org/moin/IntegratedDevelopmentEnvironments) in the Python wiki for more inspiration.
+
+## Creating Environment Variables
+
+If you plan to share your own code with collaborators or the public, you may encounter the situation that your projects require sensitive information, such as login credentials, that you don’t want to publish. Environment variables are widely used in software development projects because they provide a flexible and secure way to configure applications and store secrets. In later chapters, we use such environment variables to store private login data for a remote database.
+
+## R
+
+You can use `.Renviron`-files to store environment variables. Upon startup, R and RStudio look for `.Renviron` files in your home and project directory. `.Renviron`-files can be either at the user or project level. If there is a project-level `.Renviron`, the user-level file will not be sourced. A simple way to create your own `.Renviron`-file is the function `usethis::edit_r_environ()`.
+
+``` r
+usethis::edit_r_environ(scope = "project")
+```
+
+This command will open your `.Renviron`-file and you can add variables. For the purpose of this book, we create and save the following variables (where `user` and `password` are our private login credentials)
+
+    WRDS_USER=user
+    WRDS_PASSWORD=password
+
+After you have restarted your RStudio session, you can access these environment variables via `Sys.getenv()` for future sessions using the specific project or user.
+
+``` r
+Sys.getenv("WRDS_USER")
+Sys.getenv("WRDS_PASSWORD")
+```
+
+Note that you can also store other login credentials, API keys, or file paths in the same environment file.
+
+If you use version control, then you should make sure that the `.Renviron`-file is included in your `.gitignore` with the following code line.
+
+``` r
+usethis::edit_git_ignore(scope = "project")
+```
+
+## Python
+
+You can use `.env`-files to store environment variables. Upon startup, Python projects often use libraries like `python-dotenv` to load these environment variables from a `.env`-file. `.env`-files can be placed at the project level and are not meant to be committed to version control, ensuring that sensitive information remains private.
+
+First, you need to install the `python-dotenv` library if you haven’t already:
+
+``` python
+uv pip install python-dotenv
+```
+
+Then, create a `.env`-file in your project directory. You can add variables to this file. For the purpose of this book, we create and save the following variables (where `user` and `password` are our private login credentials):
+
+    WRDS_USER=user
+    WRDS_PASSWORD=password
+
+To access these environment variables in your Python code, load the environment variables at the start of your Python script using `python-dotenv`:
+
+``` python
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+wrds_user = os.getenv("WRDS_USER")
+wrds_password = os.getenv("WRDS_PASSWORD")
+```
+
+Note that you can also store other login credentials, API keys, or file paths in the same environment file.
+
+If you use version control, make sure that the `.env`-file is included in your `.gitignore` to avoid committing sensitive information to your repository.
+
+## Colophon
+
+This book was written in RStudio using `bookdown` ([Xie 2016](#ref-Xie2016)). The website was rendered using `quarto` ([Allaire et al. 2022](#ref-quarto)) and it is hosted via GitHub Pages. The complete source is [available from GitHub](https://github.com/tidy-finance/website). We generated all plots in this book using `ggplot2` and its classic dark-on-light theme (`theme_bw()`).
+
+This version of the book was built with R ([R Core Team 2022](#ref-R-base)) version 4.5.3 (2026-03-11, Reassured Reassurer) and the following packages:
+
+| Package     | Version  |
+|:------------|:---------|
+| RPostgres   | 1.4.9    |
+| RSQLite     | 2.4.3    |
+| arrow       | 21.0.0.1 |
+| broom       | 1.0.10   |
+| brulee      | 0.6.0    |
+| dbplyr      | 2.5.1    |
+| dplyr       | 1.2.1    |
+| fixest      | 0.14.1   |
+| fmpapi      | 1.0.1    |
+| forcats     | 1.0.0    |
+| furrr       | 0.3.1    |
+| ggplot2     | 4.0.3    |
+| ggrepel     | 0.9.6    |
+| glmnet      | 4.1-10   |
+| hardhat     | 1.4.2    |
+| httr2       | 1.2.2    |
+| jsonlite    | 2.0.0    |
+| kableExtra  | 1.4.0    |
+| lmtest      | 0.9-40   |
+| lubridate   | 1.9.4    |
+| nanoparquet | 0.5.1    |
+| nloptr      | 2.2.1    |
+| purrr       | 1.1.0    |
+| ranger      | 0.18.0   |
+| readr       | 2.1.6    |
+| readxl      | 1.4.5    |
+| renv        | 1.2.3    |
+| rlang       | 1.2.0    |
+| rmarkdown   | 2.29     |
+| sandwich    | 3.1-1    |
+| scales      | 1.4.0    |
+| slider      | 0.3.2    |
+| stringr     | 1.5.2    |
+| svglite     | 2.2.2    |
+| tibble      | 3.3.0    |
+| tidyfinance | 0.6.0    |
+| tidymodels  | 1.4.1    |
+| tidyr       | 1.3.1    |
+| tidyverse   | 2.0.0    |
+| timetk      | 2.9.1    |
+| torch       | 0.17.0   |
+| wesanderson | 0.3.7    |
+
+## References
+
+Allaire, J. J., Charles Teague, Carlos Scheidegger, Yihui Xie, and Christophe Dervieux. 2022. *Quarto*. V. 1.2. Released January. <https://doi.org/10.5281/zenodo.5960048>.
+
+Grolemund, Garrett. 2014. *Hands-on programming with R: Write your own functions and simulations*. O’Reilly. <https://r4ds.had.co.nz/>.
+
+R Core Team. 2022. *R: A language and environment for statistical computing*. R Foundation for Statistical Computing. <https://www.R-project.org/>.
+
+Wickham, Hadley, Mine Çetinkaya-Rundel, and Garrett Grolemund. 2023. *R for data science: Import, tidy, transform, visualize, and model data*. Second. O’Reilly. <https://r4ds.hadley.nz/>.
+
+Xie, Yihui. 2016. *bookdown: Authoring books and technical documents with R Markdown*. Chapman; Hall/CRC. <https://bookdown.org/yihui/bookdown>.
