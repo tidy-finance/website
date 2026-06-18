@@ -54,7 +54,6 @@ WRDS is the most widely used source for asset and firm-specific financial data u
 
 ```{python}
 #| label: wrds-crsp-and-compustat-sqlalchemy-import
-#| eval: false
 from sqlalchemy import create_engine
 ```
 
@@ -64,7 +63,6 @@ Additionally, you have to use two-factor authentication since May 2023 when esta
 
 ```{python}
 #| label: wrds-crsp-and-compustat-wrds-connection
-#| eval: false
 #| output: false
 import os
 from dotenv import load_dotenv
@@ -103,7 +101,6 @@ We use the two remote tables to fetch the data we want to put into our local fol
 
 ```{python}
 #| label: wrds-crsp-and-compustat-crsp-monthly-query
-#| eval: false
 crsp_monthly_query = (
   "SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "
          "msf.mthret AS ret, msf.shrout, msf.mthprc AS prc, "
@@ -141,7 +138,6 @@ The first additional variable we create is market capitalization (`mktcap`), whi
 
 ```{python}
 #| label: wrds-crsp-and-compustat-compute-mktcap
-#| eval: false
 crsp_monthly = (crsp_monthly
     .with_columns(mktcap=pl.col("shrout")*pl.col("prc")/1000000)
     .with_columns(
@@ -156,7 +152,6 @@ The next variable we frequently use is the one-month *lagged* market capitalizat
 
 ```{python}
 #| label: wrds-crsp-and-compustat-lag-mktcap
-#| eval: false
 mktcap_lag = (crsp_monthly
     .with_columns(
         date=pl.col("date").dt.offset_by("1mo"),
@@ -174,7 +169,6 @@ Next, we transform primary listing exchange codes to explicit exchange names.\in
 
 ```{python}
 #| label: wrds-crsp-and-compustat-exchange-names
-#| eval: false
 crsp_monthly = crsp_monthly.with_columns(
     exchange=pl.when(pl.col("primaryexch") == "N").then(pl.lit("NYSE"))
     .when(pl.col("primaryexch") == "A").then(pl.lit("AMEX"))
@@ -187,7 +181,6 @@ Similarly, we transform industry codes to industry descriptions following @BaliE
 
 ```{python}
 #| label: wrds-crsp-and-compustat-industry-names
-#| eval: false
 crsp_monthly = crsp_monthly.with_columns(
     industry=pl.when(pl.col("siccd").is_between(1, 999)).then(pl.lit("Agriculture"))
     .when(pl.col("siccd").is_between(1000, 1499)).then(pl.lit("Mining"))
@@ -208,8 +201,7 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```{python}
 #| label: wrds-crsp-and-compustat-excess-returns
-#| eval: false
-factors_ff3_monthly = (pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+factors_ff3_monthly = (pl.read_parquet("data/factors_ff3_monthly.parquet")
     .select(["date", "risk_free"])
 )
 
@@ -237,7 +229,6 @@ Since excess returns and market capitalization are crucial for all our analyses,
 
 ```{python}
 #| label: wrds-crsp-and-compustat-drop-nulls
-#| eval: false
 crsp_monthly = (crsp_monthly
     .drop_nulls(subset=["ret_excess", "mktcap", "mktcap_lag"])
 )
@@ -247,15 +238,14 @@ Finally, we store the monthly CRSP file in our folder.
 
 ```{python}
 #| label: wrds-crsp-and-compustat-write-crsp-monthly
-#| eval: false
 #| output: false
-crsp_monthly.write_parquet("data-python/crsp_monthly.parquet")
+crsp_monthly.write_parquet("data/crsp_monthly.parquet")
 ```
 
 ```{python}
 #| label: wrds-crsp-and-compustat-read-crsp-monthly
 #| eval: true
-crsp_monthly = pl.read_parquet("data-python/crsp_monthly.parquet")
+crsp_monthly = pl.read_parquet("data/crsp_monthly.parquet")
 ```
 
 ## First Glimpse of the CRSP Sample
@@ -296,7 +286,7 @@ Next, we look at the aggregate market capitalization grouped by the respective l
 #| label: fig-212
 #| fig-cap: "The figure shows the monthly market capitalization by listing exchange. Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024."
 #| fig-alt: "Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks." 
-cpi_monthly = pl.read_parquet("data-python/cpi_monthly.parquet")
+cpi_monthly = pl.read_parquet("data/cpi_monthly.parquet")
 
 market_cap_per_exchange = (crsp_monthly
     .join(cpi_monthly, how="left", on="date")
@@ -396,8 +386,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 ```{python}
 #| label: wrds-crsp-and-compustat-crsp-daily-loop
 #| output: false
-#| eval: false
-factors_ff3_daily = pl.read_parquet("data-python/factors_ff3_daily.parquet")
+factors_ff3_daily = pl.read_parquet("data/factors_ff3_daily.parquet")
 
 permnos = pl.read_database(
     query="SELECT DISTINCT permno FROM crsp.stksecurityinfohist",
@@ -460,7 +449,7 @@ for j in range(1, batches + 1):
         table = crsp_daily_sub.to_arrow()
         pq.write_to_dataset(
             table,
-            root_path="data-python/crsp_daily",
+            root_path="data/crsp_daily",
             partition_cols=["permno"],
             existing_data_behavior="overwrite_or_ignore",
         )
@@ -495,7 +484,6 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 
 ```{python}
 #| label: wrds-crsp-and-compustat-compustat-query
-#| eval: false
 compustat_query = (
     "SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,  pstkrv, "
             "pstkl, pstk, capx, oancf, sale, cogs, xint, xsga "
@@ -520,7 +508,6 @@ Next, we calculate the book value of preferred stock and equity `be` and the ope
 
 ```{python}
 #| label: wrds-crsp-and-compustat-compute-be-op
-#| eval: false
 compustat_annual = (compustat_annual
     .with_columns(
         be=(
@@ -546,7 +533,6 @@ We keep only the last available information for each firm-year group (by using `
 
 ```{python}
 #| label: wrds-crsp-and-compustat-keep-last-firm-year
-#| eval: false
 compustat_annual = (
     compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
     .sort("datadate")
@@ -559,7 +545,6 @@ We also compute the investment ratio (`inv`) according to Kenneth French's varia
 
 ```{python}
 #| label: wrds-crsp-and-compustat-compute-investment
-#| eval: false
 compustat_annual_lag = (compustat_annual
     .select(["gvkey", "year", "at"])
     .with_columns(year=pl.col("year")+1)
@@ -580,8 +565,7 @@ With the last step, we are already done preparing the firm fundamentals. Thus, w
 ```{python}
 #| label: wrds-crsp-and-compustat-write-compustat
 #| output: false
-#| eval: false
-compustat_annual.write_parquet("data-python/compustat_annual.parquet")
+compustat_annual.write_parquet("data/compustat_annual.parquet")
 ```
 
 The `tidyfinance` package provides a shortcut for these processing steps as well:
@@ -600,7 +584,7 @@ compustat_annual = pl.from_pandas(tf.download_data(
 ```{python}
 #| label: wrds-crsp-and-compustat-read-compustat
 #| eval: true
-compustat_annual = pl.read_parquet("data-python/compustat_annual.parquet")
+compustat_annual = pl.read_parquet("data/compustat_annual.parquet")
 ```
 
 ## Merging CRSP with Compustat
@@ -609,7 +593,6 @@ Unfortunately, CRSP and Compustat use different keys to identify stocks and firm
 
 ```{python}
 #| label: wrds-crsp-and-compustat-ccm-linking-query
-#| eval: false
 ccm_linking_table_query = (
     "SELECT lpermno AS permno, gvkey, linkdt, "
             "COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "
@@ -621,7 +604,7 @@ ccm_linking_table_query = (
 ccm_linking_table = pl.read_database(
     query=ccm_linking_table_query,
     connection=wrds,
-    schema_overrides={"permno": pl.Int64, "gvkey": pl.String},
+    schema_overrides={"permno": pl.Float64, "gvkey": pl.String},
 )
 ```
 
@@ -637,7 +620,6 @@ We use these links to create a new table with a mapping between stock identifier
 
 ```{python}
 #| label: wrds-crsp-and-compustat-merge-ccm-links
-#| eval: false
 ccm_links = (crsp_monthly
     .join(ccm_linking_table, how="inner", on="permno")
     .filter(
@@ -657,9 +639,8 @@ As the last step, we update the previously prepared monthly CRSP file with the l
 
 ```{python}
 #| label: wrds-crsp-and-compustat-write-crsp-merged
-#| eval: false
 #| output: false
-crsp_monthly.write_parquet("data-python/crsp_monthly.parquet")
+crsp_monthly.write_parquet("data/crsp_monthly.parquet")
 ```
 
 Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, @fig-215 plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.\index{Exchange!NYSE}\index{Exchange!AMEX}\index{Exchange!NASDAQ}

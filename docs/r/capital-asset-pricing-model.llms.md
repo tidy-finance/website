@@ -21,14 +21,14 @@ Building on our analysis from the previous chapter on [Modern Portfolio Theory](
 
 ``` r
 symbols <- download_data(
-  type = "constituents",
+  domain = "constituents",
   index = "Dow Jones Industrial Average"
 )
 
 prices_daily <- download_data(
-    type = "stock_prices", symbol = symbols$symbol,
+    domain = "stock_prices", symbols = symbols$symbol,
     start_date = "2000-01-01", end_date = "2024-12-31"
-) |> 
+) |>
   select(symbol, date, adjusted_close)
 
 prices_daily <- prices_daily |>
@@ -47,7 +47,7 @@ returns_monthly <- prices_daily |>
   select(-price)
 ```
 
-The relationship between risk and return is central to the CAPM. Intuitively, one may expect that assets with higher volatility should also deliver higher expected returns. Instead, the CAPM’s key insight states that not all risks are rewarded in equilibrium. Only so-called systematic risk of an asset will determine the assets expected return. To understand this, we need to distinguish between systematic and idiosyncratic risk.
+The relationship between risk and return is central to the CAPM. Intuitively, one may expect that assets with higher volatility should also deliver higher expected returns. Instead, the CAPM’s key insight states that not all risks are rewarded in equilibrium. Only so-called systematic risk of an asset will determine the asset’s expected return. To understand this, we need to distinguish between systematic and idiosyncratic risk.
 
 Company-specific events might affect individual stock prices, e.g., CEO resignations, product launches, and earnings reports. These idiosyncratic events don’t necessarily impact the overall market and this asset-specific risk can be eliminated through diversification. Therefore, we call this risk idiosyncratic. Systematic risk, on the other hand, affects all assets in the market at the same time and investors really dislike it because it cannot be diversified away.
 
@@ -59,7 +59,7 @@ To recap, we considered a portfolio weight vector \\\omega\in\mathbb{R}^N\\ whic
 
 \\\mu\_\omega = \omega^{\prime}\mu + (1-\iota^{\prime}\omega)r_f = r_f + \omega^{\prime}\underbrace{(\mu-r_f)}\_{\tilde\mu}.\\
 
-where \\\mu\\ is the the vector of expected return of assets and \\r_f\\ is the risk-free rate. In what follows, we refer to \\\tilde\mu\\ as the vector of expected *excess* returns.
+where \\\mu\\ is the vector of expected return of assets and \\r_f\\ is the risk-free rate. In what follows, we refer to \\\tilde\mu\\ as the vector of expected *excess* returns.
 
 By assumption, the risk-free asset has zero volatility. Therefore, the volatility of the portfolio is given by
 
@@ -93,9 +93,9 @@ For illustrative purposes, we compute the efficient tangency portfolio for our h
 
 ``` r
 risk_free_monthly <- download_data(
-  type = "stock_prices", symbol = "^IRX", 
+  domain = "stock_prices", symbols = "^IRX",
   start_date = "2019-10-01", end_date = "2024-09-30"
-) |> 
+) |>
   mutate(
     risk_free = (1 + adjusted_close / 100)^(1 / 12) - 1
   ) |> 
@@ -148,7 +148,7 @@ efficient_portfolios <- tribble(
 sharpe_ratio <- (mu_w - rf) / sigma_w
 ```
 
-[Figure 1](#fig-300) shows the resulting efficient frontiert with the efficient portfolio and a risk-free asset.
+[Figure 1](#fig-300) shows the resulting efficient frontier with the efficient portfolio and a risk-free asset.
 
 ``` r
 assets |> 
@@ -180,13 +180,13 @@ Now, note the following three simple derivations:
 
 1.  The expected excess return of the efficient tangency portfolio, \\\tilde\mu\_\text{tan}\\ is given by \\E(\omega\_\text{tan}^{\prime} r - r_f) = \omega\_\text{tan} \tilde\mu = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}\\.
 2.  The variance of the returns of the efficient tangency portfolio \\\sigma\_\text{tan}^2\\ is given by \\\text{Var}(\omega\_\text{tan}^{\prime} r) = \omega\_\text{tan}^{\prime} \Sigma \omega\_\text{tan}^{\prime} = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{(\iota^{\prime}\Sigma^{-1}\tilde\mu)^2}\\. It follows that \\\frac{\tilde\mu\_\text{tan}}{\sigma\_\text{tan}^2} = \iota^{\prime}\Sigma^{-1}\tilde\mu\\
-3.  The \\i\\-th element of the vector \\\Sigma\omega\_\text{tan}\\ is \\\sum\limits\_{j=1}^N \sigma\_{ij}\omega\_{j,\text{tan}}= \text{Cov}\left(r_i, \sum\limits\_{j=1}^N r_i'\omega\_{j,\text{tan}}\right) = \text{Cov}\left(r_i, r\_\text{tan}\right)\\, which is the covariance of assets \\i\\ returns with the returns of the efficient tangency portfolio.
+3.  The \\i\\-th element of the vector \\\Sigma\omega\_\text{tan}\\ is \\\sum\limits\_{j=1}^N \sigma\_{ij}\omega\_{j,\text{tan}}= \text{Cov}\left(r_i, \sum\limits\_{j=1}^N r_i'\omega\_{j,\text{tan}}\right) = \text{Cov}\left(r_i, r\_\text{tan}\right)\\, which is the covariance of asset \\i\\’s returns with the returns of the efficient tangency portfolio.
 
 Putting everything together yields for the expected excess return of asset \\i\\:
 
 \\\tilde{\mu}\_i = \frac{E(\omega\_\text{tan}^{\prime}r - r_f)}{\sigma\_{\text{tan}}^2} \text{Cov}\left(r_i,r\_\text{tan}\right) = \beta_i \tilde{\mu}\_\text{tan}.\\
 
-The equation above is the famous CAPM equation and central to asset pricing. It states that an assets expected excess return is proportional to the assets return covariance with the efficient portfolio excess returns. The price of risk is the excess return of the efficient tangency portfolio. An asset with 0 beta has the same expected return as the risk-free rate. An asset with a beta of 1 has the same expected return as the efficient tangency portfolio. An asset with a negative beta has expected returns lower than the risk-free asset - the very definition of an insurance. Therefore, the CAPM equation explains why some assets may have the same volatility but different returns: Because their systematic risk (\\\beta_i\\) is different.
+The equation above is the famous CAPM equation and central to asset pricing. It states that an asset’s expected excess return is proportional to the asset’s return covariance with the efficient portfolio excess returns. The price of risk is the excess return of the efficient tangency portfolio. An asset with 0 beta has the same expected return as the risk-free rate. An asset with a beta of 1 has the same expected return as the efficient tangency portfolio. An asset with a negative beta has expected returns lower than the risk-free asset - the very definition of an insurance. Therefore, the CAPM equation explains why some assets may have the same volatility but different returns: Because their systematic risk (\\\beta_i\\) is different.
 
 We derived the CAPM equation as a consequence of efficient wealth allocation. Suppose an asset delivers high expected returns. The investor will increase her holdings of the assets in order to benefit from the high promised returns. As a consequence, the covariance of the asset with the efficient tangency portfolio will increase (mechanically, as the asset gradually becomes a larger part of the efficient tangency portfolio). At some point, the weight of the asset is so high that gain of \\\tilde\mu_i\\ of marginally increasing the holding does not offset the implied increase in systematic risk. The investor will stop increasing her holdings and the asset’s expected return will be proportional to its systematic risk.
 
@@ -211,7 +211,7 @@ assets |>
   annotate("text", x = 0, y = rf, label = "Risk-free")
 ```
 
-[![](capital-asset-pricing-model_files/figure-html/unnamed-chunk-6-1.png)](capital-asset-pricing-model_files/figure-html/unnamed-chunk-6-1.png)
+[![](capital-asset-pricing-model_files/figure-html/capital-asset-pricing-model-security-market-line-1.png)](capital-asset-pricing-model_files/figure-html/capital-asset-pricing-model-security-market-line-1.png)
 
 The security market line shows the relationship between systematic risk (\\\beta_i\\) and the expected return of an asset. The slope of the line is the price of risk, which is the expected return of the efficient tangency portfolio. The risk-free asset is represented by the intercept with the vertical axis. The CAPM equation states that an asset’s expected return is proportional to its beta, with the efficient tangency portfolio’s expected return as the price of risk.
 
@@ -242,9 +242,9 @@ Let’s turn to estimating CAPM parameters using real market data. Instead of us
 
 ``` r
 factors <- download_data(
-  type = "factors_ff_5_2x3_monthly", 
+  domain = "factors_ff", dataset = "Fama/French 5 Factors (2x3)",
   start_date = "2000-01-01", end_date = "2024-09-30"
-) |> 
+) |>
   select(date, mkt_excess, risk_free)
 ```
 
@@ -265,12 +265,36 @@ estimate_capm <- function(data) {
   )
 }
   
-capm_results <- returns_excess_monthly |> 
-  nest(data = -symbol) |> 
-  mutate(capm = map(data, estimate_capm)) |> 
-  unnest(capm) |> 
+capm_results <- returns_excess_monthly |>
+  nest(data = -symbol) |>
+  mutate(capm = map(data, estimate_capm)) |>
+  unnest(capm) |>
   select(symbol, coefficient, estimate, t_statistic)
 ```
+
+Instead of writing the regression helper ourselves, we could rely on the `estimate_model()` function from the `tidyfinance` package, which returns the coefficients and, via its `output` argument, the corresponding t-statistics:
+
+``` r
+library(tidyfinance)
+
+returns_excess_monthly |>
+  nest(data = -symbol) |>
+  mutate(capm = map(
+    data,
+    \(x) estimate_model(x, "ret_excess ~ mkt_excess", output = c("coefficients", "tstats"))
+  ))
+```
+
+    # A tibble: 28 × 3
+    # Groups:   symbol [28]
+      symbol data               capm            
+      <chr>  <list>             <list>          
+    1 AAPL   <tibble [299 × 3]> <named list [2]>
+    2 AMGN   <tibble [299 × 3]> <named list [2]>
+    3 AMZN   <tibble [299 × 3]> <named list [2]>
+    4 AXP    <tibble [299 × 3]> <named list [2]>
+    5 BA     <tibble [299 × 3]> <named list [2]>
+    # ℹ 23 more rows
 
 The results are particularly interesting when we visualize the alphas across our sample of Dow Jones constituents. [Figure 2](#fig-305) reveals the cross-sectional distribution of risk-adjusted performance, with positive values indicating outperformance and negative values indicating underperformance relative to what CAPM would predict. Statistical significance is indicated through color coding, showing which alphas are statistically different from zero at the 95% confidence level.
 
@@ -302,7 +326,7 @@ Another crucial limitation concerns the stability of beta over time. The model a
 
 Perhaps most importantly, empirical evidence suggests that systematic risk alone cannot fully explain asset returns. Numerous studies have documented patterns in stock returns that CAPM cannot explain. Small-cap stocks tend to outperform large-cap stocks, and value stocks (those with high book-to-market ratios) tend to outperform growth stocks, even after adjusting for market risk. These “anomalies” suggest that investors may care about multiple dimensions of risk beyond market sensitivity.
 
-These limitations have spawned a rich literature of alternative and extended models. The Fama-French three-factor model (@ [Fama and French 1992](#ref-Fama1992)) represents a seminal extension, adding two factors to capture the size and value effects:
+These limitations have spawned a rich literature of alternative and extended models. The Fama-French three-factor model ([Fama and French 1992](#ref-Fama1992)) represents a seminal extension, adding two factors to capture the size and value effects:
 
 - The SMB (Small Minus Big) factor captures the tendency of small stocks to outperform large stocks, as we discuss in our chapter [Size Sorts and P-Hacking](../r/size-sorts-and-p-hacking.llms.md).
 - The HML (High Minus Low) factor captures the tendency of value stocks to outperform growth stocks, as we show in [Value and Bivariate Sorts](../r/value-and-bivariate-sorts.llms.md).
@@ -352,6 +376,6 @@ Sharpe, William F. 1964. “Capital asset prices: A theory of market equilibrium
 
 ## Footnotes
 
-[^1]: We proof in the Appendix [Proofs](../r/proofs.llms.md) that the efficient tangency portfolio \\\omega\_\text{tan}\\ can also be derived as a solution to the optimization problem \\\max\_{\omega} \frac{\omega^{\prime}\tilde\mu}{\sqrt{\omega^{\prime}\Sigma\omega}} \text{ s.t. } \omega^{\prime}\iota=1.\\
+[^1]: We prove in the Appendix [Proofs](../r/proofs.llms.md) that the efficient tangency portfolio \\\omega\_\text{tan}\\ can also be derived as a solution to the optimization problem \\\max\_{\omega} \frac{\omega^{\prime}\tilde\mu}{\sqrt{\omega^{\prime}\Sigma\omega}} \text{ s.t. } \omega^{\prime}\iota=1.\\
 
 [^2]: Obviously, the market portfolio is the efficient tangency portfolio *only* if the strict assumptions of the CAPM hold: The model describes equilibrium in a single-period economy, markets are frictionless, with no transaction costs or taxes, all investors can borrow and lend at the risk-free rate, investors share the same expectations about returns and risks, investors are rational, seeking to maximize returns for a given level of risk.

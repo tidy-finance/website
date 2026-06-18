@@ -32,10 +32,10 @@ The estimation procedure is based on a rolling-window estimation, where we may u
 
 ```{r}
 #| label: beta-estimation-load-crsp-monthly
-crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
   select(permno, date, industry, ret_excess)
 
-factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
   select(date, mkt_excess)
 
 crsp_monthly <- crsp_monthly |>
@@ -181,6 +181,7 @@ If you have a Windows or Mac machine, it makes most sense to define `multisessio
 
 ```{r}
 #| label: beta-estimation-setup-parallel
+#| eval: false
 n_cores = availableCores() - 1
 plan(multisession, workers = n_cores)
 ```
@@ -189,6 +190,7 @@ Using eight cores, the estimation for our sample of around 25k stocks takes arou
 
 ```{r}
 #| label: beta-estimation-estimate-monthly-all
+#| eval: false
 capm_monthly <- crsp_monthly |>
   nest(data = c(date, ret_excess, mkt_excess, industry)) |>
   mutate(capm = future_map(data, roll_capm_estimation)) |>
@@ -200,6 +202,7 @@ capm_monthly
 Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task and supports parallelization via the `use_furrr` argument:
 
 ```{r}
+#| label: beta-estimation-estimate-betas-tidyfinance
 #| eval: false
 library(tidyfinance)
 
@@ -219,7 +222,7 @@ First, we load the daily Fama-French market excess returns.
 
 ```{r}
 #| label: beta-estimation-load-ff3-daily
-factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
+factors_ff3_daily <- read_parquet("data/factors_ff3_daily.parquet") |>
   select(date, mkt_excess)
 ```
 
@@ -227,7 +230,7 @@ We then create a connection to the daily CRSP data, but we don't load the whole 
 
 ```{r}
 #| label: beta-estimation-setup-daily-batches
-crsp_daily_db <- open_dataset("data-r/crsp_daily")
+crsp_daily_db <- open_dataset("data/crsp_daily")
 
 permnos <- crsp_daily_db |>
   distinct(permno) |>
@@ -243,6 +246,7 @@ We then proceed to perform the same steps as with the monthly CRSP data, just in
 ```{r}
 #| label: beta-estimation-estimate-daily-all
 #| output: false
+#| eval: false
 capm_daily <- list()
 
 for (j in 1:batches) {
@@ -289,10 +293,18 @@ What is a typical value for stock betas? First, let us extract the relevant esti
 
 ```{r}
 #| label: beta-estimation-extract-beta-monthly
+#| eval: false
 beta_monthly <- capm_monthly |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
   mutate(return_type = "monthly")
+```
+
+```{r}
+#| label: beta-estimation-load-beta-monthly
+#| echo: false
+beta_monthly <- read_parquet("data/beta.parquet") |>
+  filter(return_type == "monthly")
 ```
 
 To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. @fig-602 shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.\index{Graph!Box plot}
@@ -348,12 +360,19 @@ To compare the difference between daily and monthly data, we combine beta estima
 
 ```{r}
 #| label: beta-estimation-combine-beta-estimates
+#| eval: false
 beta_daily <- capm_daily |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
   mutate(return_type = "daily")
 
 beta <- bind_rows(beta_monthly, beta_daily)
+```
+
+```{r}
+#| label: beta-estimation-load-beta
+#| echo: false
+beta <- read_parquet("data/beta.parquet")
 ```
 
 Then, we use the table to plot a comparison of beta estimates for our example stocks in @fig-604. 
@@ -387,7 +406,7 @@ Finally, we write the estimates to our local folder such that we can use them in
 
 ```{r}
 #| label: beta-estimation-write-beta
-write_parquet(beta, "data-r/beta.parquet")
+write_parquet(beta, "data/beta.parquet")
 ```
 
 Whenever you perform some kind of estimation, it also makes sense to do rough plausibility tests. A possible check is to plot the share of stocks with beta estimates over time. This descriptive helps us discover potential errors in our data preparation or estimation procedure. For instance, suppose there was a gap in our output where we do not have any betas. In this case, we would have to go back and check all previous steps to find out what went wrong. 

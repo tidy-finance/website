@@ -581,9 +581,9 @@ Note
 </div>
 </div>
 <p>This chapter shows how to connect to <a href="https://wrds-www.wharton.upenn.edu/">Wharton Research Data Services (WRDS),</a> a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the datasets and store them as Parquet-files introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.</p>
-<p>If you don’t have access to WRDS but still want to run the code in this book, we refer to <a href="../python/wrds-dummy-data.html">WRDS Pseudo Data</a>, where we show how to create a pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.</p>
+<p>If you don’t have access to WRDS but still want to run the code in this book, we refer to <a href="../python/wrds-dummy-data.html">WRDS Pseudo Data</a>, where we show how to create pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.</p>
 <p>First, we load the Python packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them. The last two packages are used for plotting.</p>
-<div id="f6553bed" class="cell" data-execution_count="2">
+<div id="wrds-crsp-and-compustat-packages" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tidyfinance <span class="im">as</span> tf</span>
@@ -595,19 +595,19 @@ Note
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> datetime <span class="im">import</span> datetime</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We use the same date range as in the previous chapter to ensure consistency. However, we have to use the date format that the WRDS database expects.</p>
-<div id="0dd63b9c" class="cell" data-execution_count="4">
+<div id="wrds-crsp-and-compustat-date-range" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>start_date <span class="op">=</span> <span class="st">"01/01/1960"</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>end_date <span class="op">=</span> <span class="st">"12/31/2024"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <section id="accessing-wrds" class="level2">
 <h2 class="anchored" data-anchor-id="accessing-wrds">Accessing WRDS</h2>
 <p>WRDS is the most widely used source for asset and firm-specific financial data used in academic settings. WRDS is a data platform that provides data validation, flexible delivery options, and access to many different data sources. The data at WRDS is organized in an SQL database, although they use the <a href="https://www.postgresql.org/">PostgreSQL</a> engine. This database engine is just as easy to handle with Python as SQL. We use the <code>sqlalchemy</code> package to establish a connection to the WRDS database because it already contains a suitable driver.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
-<div id="666da2a8" class="cell" data-execution_count="5">
+<div id="wrds-crsp-and-compustat-sqlalchemy-import" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sqlalchemy <span class="im">import</span> create_engine</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>To establish a connection to WRDS, you use the function <code>create_engine()</code> with a connection string that specifies the WRDS server and your login credentials. We defined environment variables for the purpose of this book because we obviously do not want (and are not allowed) to share our credentials with the rest of the world. See <a href="../python/setting-up-your-environment.html">Setting Up Your Environment</a> for information about why and how to create an <code>.env</code>-file that can be loaded with <code>load_dotenv()</code>. Alternatively, you can replace <code>os.getenv('WRDS_USER)</code> and <code>os.getenv('WRDS_PASSWORD')</code> with your own credentials (but be careful not to share them with others or the public).</p>
 <p>Additionally, you have to use two-factor authentication since May 2023 when establishing a remote connection to WRDS. You have two choices to provide the additional identification. First, if you have Duo Push enabled for your WRDS account, you will receive a push notification on your mobile phone when trying to establish a connection with the code below. Upon accepting the notification, you can continue your work. Second, you can log in to a WRDS website that requires two-factor authentication with your username and the same IP address. Once you have successfully identified yourself on the website, your username-IP combination will be remembered for 30 days, and you can comfortably use the remote connection below.</p>
-<div id="0801c9ce" class="cell" data-execution_count="6">
+<div id="wrds-crsp-and-compustat-wrds-connection" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> os</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dotenv <span class="im">import</span> load_dotenv</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> sqlalchemy <span class="im">import</span> create_engine, URL</span>
@@ -626,7 +626,7 @@ Note
 <span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>wrds <span class="op">=</span> create_engine(connection_url, pool_pre_ping<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>You can also use the <code>tidyfinance</code> package to set the login credentials and create a connection.</p>
-<div id="abb8e73c" class="cell" data-execution_count="7">
+<div id="wrds-crsp-and-compustat-tidyfinance-connection" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tf.set_wrds_credentials()</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>wrds <span class="op">=</span> tf.get_wrds_connection()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
@@ -636,10 +636,10 @@ Note
 <h2 class="anchored" data-anchor-id="downloading-and-preparing-crsp">Downloading and Preparing CRSP</h2>
 <p><a href="https://crsp.org/">The Center for Research in Security Prices (CRSP)</a> provides the most widely used data for US stocks. We use the <code>wrds</code> engine object that we just created to first access monthly CRSP return data. Actually, we need two tables to get the desired data: (i) the CRSP monthly security file (<code>msf</code>), and (ii) the historical identifying information (<code>stksecurityinfohist</code>).</p>
 <p>We use the two remote tables to fetch the data we want to put into our local folder. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (<code>primaryexch %in% c("N", "A", "Q")</code>) when or after issuance (<code>conditionaltype %in% c("RW", "NW")</code>) for actively traded stocks (<code>tradingstatusflg == "A"</code>)<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>, (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (<code>sharetype = 'NS'</code>), security type equity (<code>securitytype = 'EQTY'</code>), security sub type common stock (<code>securitysubtype = 'COM'</code>), issuers that are a corporation (<code>issuertype %in% c("ACOR", "CORP")</code>), and (iv) we keep only months within permno-specific start dates (<code>secinfostartdt</code>) and end dates (<code>secinfoenddt</code>). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of <code>msf</code> (see our blog post about <a href="../blog/crsp-v2-update/index.html">CRSP 2.0</a> for more information). We refer to <span class="citation" data-cites="SchwarzEtAl2026">Schwarz et al. (<a href="#ref-SchwarzEtAl2026" role="doc-biblioref">2026</a>)</span> for details on the changes in the CRSP tape rolled out in 2025. Additionally, the industry information in <code>stksecurityinfohist</code> records the historic industry and should be used instead of the one stored under same variable name in <code>msf_v2</code>.</p>
-<div id="eb9c5303" class="cell" data-execution_count="8">
+<div id="wrds-crsp-and-compustat-crsp-monthly-query" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly_query <span class="op">=</span> (</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">"SELECT msf.permno, date_trunc('month', msf.mthcaldt)::date AS date, "</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>         <span class="st">"msf.mthret AS ret, msf.shrout, msf.mthprc AS altprc, "</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>         <span class="st">"msf.mthret AS ret, msf.shrout, msf.mthprc AS prc, "</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>         <span class="st">"ssih.primaryexch, ssih.siccd "</span></span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"FROM crsp.msf_v2 AS msf "</span></span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"INNER JOIN crsp.stksecurityinfohist AS ssih "</span></span>
@@ -660,17 +660,18 @@ Note
 <span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (pl.read_database(</span>
 <span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>        query<span class="op">=</span>crsp_monthly_query,</span>
 <span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>        connection<span class="op">=</span>wrds,</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        schema_overrides<span class="op">=</span>{<span class="st">"permno"</span>: pl.Int64, <span class="st">"siccd"</span>: pl.Int64},</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    .with_columns(pl.col(pl.Decimal).cast(pl.Float64))</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    .with_columns(shrout<span class="op">=</span>pl.col(<span class="st">"shrout"</span>)<span class="op">*</span><span class="dv">1000</span>)</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>        <span class="co"># column types chosen to match the parquet files of the R edition</span></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>        schema_overrides<span class="op">=</span>{<span class="st">"permno"</span>: pl.Float64, <span class="st">"siccd"</span>: pl.Int32},</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    .with_columns(pl.col(pl.Decimal).cast(pl.Float64))</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>    .with_columns(shrout<span class="op">=</span>(pl.col(<span class="st">"shrout"</span>)<span class="op">*</span><span class="dv">1000</span>).cast(pl.Float64))</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Now, we have all the relevant monthly return data in memory and proceed with preparing the data for future analyses. We perform the preparation step at the current stage since we want to avoid executing the same mutations every time we use the data in subsequent chapters.</p>
 <p>The first additional variable we create is market capitalization (<code>mktcap</code>), which is the product of the number of outstanding shares (<code>shrout</code>) and the last traded price in a month (<code>prc</code>). Note that in contrast to returns (<code>ret</code>), these two variables are not adjusted ex-post for any corporate actions like stock splits. Therefore, if you want to use a stock’s price, you need to adjust it with a cumulative adjustment factor. We also keep the market cap in millions of USD just for convenience, as we do not want to print huge numbers in our figures and tables. In addition, we set zero market capitalization to missing as it makes conceptually little sense (i.e., the firm would be bankrupt).</p>
-<div id="a936a821" class="cell" data-execution_count="9">
+<div id="wrds-crsp-and-compustat-compute-mktcap" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(mktcap<span class="op">=</span>pl.col(<span class="st">"shrout"</span>)<span class="op">*</span>pl.col(<span class="st">"altprc"</span>)<span class="op">/</span><span class="dv">1000000</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(mktcap<span class="op">=</span>pl.col(<span class="st">"shrout"</span>)<span class="op">*</span>pl.col(<span class="st">"prc"</span>)<span class="op">/</span><span class="dv">1000000</span>)</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>        mktcap<span class="op">=</span>pl.when(pl.col(<span class="st">"mktcap"</span>) <span class="op">==</span> <span class="dv">0</span>)</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>        .then(<span class="va">None</span>)</span>
@@ -679,7 +680,7 @@ Note
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The next variable we frequently use is the one-month <em>lagged</em> market capitalization. Lagged market capitalization is typically used to compute value-weighted portfolio returns, as we demonstrate in a later chapter. The most simple and consistent way to add a column with lagged market cap values is to add one month to each observation and then join the information to our monthly CRSP data.</p>
-<div id="62d018ca" class="cell" data-execution_count="10">
+<div id="wrds-crsp-and-compustat-lag-mktcap" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>mktcap_lag <span class="op">=</span> (crsp_monthly</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>        date<span class="op">=</span>pl.col(<span class="st">"date"</span>).dt.offset_by(<span class="st">"1mo"</span>),</span>
@@ -693,7 +694,7 @@ Note
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Next, we transform primary listing exchange codes to explicit exchange names.</p>
-<div id="a40b67cc" class="cell" data-execution_count="11">
+<div id="wrds-crsp-and-compustat-exchange-names" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> crsp_monthly.with_columns(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    exchange<span class="op">=</span>pl.when(pl.col(<span class="st">"primaryexch"</span>) <span class="op">==</span> <span class="st">"N"</span>).then(pl.lit(<span class="st">"NYSE"</span>))</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>    .when(pl.col(<span class="st">"primaryexch"</span>) <span class="op">==</span> <span class="st">"A"</span>).then(pl.lit(<span class="st">"AMEX"</span>))</span>
@@ -702,7 +703,7 @@ Note
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Similarly, we transform industry codes to industry descriptions following <span class="citation" data-cites="BaliEngleMurray2016">Bali et al. (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. Notice that there are also other categorizations of industries <span class="citation" data-cites="FamaFrench1997">(e.g., <a href="#ref-FamaFrench1997" role="doc-biblioref">Fama and French 1997</a>)</span> that are commonly used.</p>
-<div id="d3c91d1d" class="cell" data-execution_count="12">
+<div id="wrds-crsp-and-compustat-industry-names" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> crsp_monthly.with_columns(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    industry<span class="op">=</span>pl.when(pl.col(<span class="st">"siccd"</span>).is_between(<span class="dv">1</span>, <span class="dv">999</span>)).then(pl.lit(<span class="st">"Agriculture"</span>))</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    .when(pl.col(<span class="st">"siccd"</span>).is_between(<span class="dv">1000</span>, <span class="dv">1499</span>)).then(pl.lit(<span class="st">"Mining"</span>))</span>
@@ -719,7 +720,7 @@ Note
 <span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Next, we compute excess returns by subtracting the monthly risk-free rate provided by our Fama-French data. As we base all our analyses on the excess returns, we can drop the risk-free rate from our data frame. Note that we ensure excess returns are bounded by -1 from below as a return less than -100% makes no sense conceptually. Before we can adjust the returns, we load the data frame <code>factors_ff3_monthly</code>.</p>
-<div id="c8165c75" class="cell" data-execution_count="13">
+<div id="wrds-crsp-and-compustat-excess-returns" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>factors_ff3_monthly <span class="op">=</span> (pl.read_parquet(<span class="st">"data-python/factors_ff3_monthly.parquet"</span>)</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"date"</span>, <span class="st">"risk_free"</span>])</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -731,7 +732,7 @@ Note
 <span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The <code>tidyfinance</code> package provides a shortcut to implement all these processing steps from above:</p>
-<div id="be3a5b52" class="cell" data-execution_count="14">
+<div id="wrds-crsp-and-compustat-tidyfinance-crsp-monthly" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> pl.from_pandas(tf.download_data(</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    domain<span class="op">=</span><span class="st">"wrds"</span>,</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    dataset<span class="op">=</span><span class="st">"crsp_monthly"</span>,</span>
@@ -740,16 +741,16 @@ Note
 <span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization.</p>
-<div id="88c492a3" class="cell" data-execution_count="15">
+<div id="wrds-crsp-and-compustat-drop-nulls" class="cell" data-execution_count="15">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> (crsp_monthly</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    .drop_nulls(subset<span class="op">=</span>[<span class="st">"ret_excess"</span>, <span class="st">"mktcap"</span>, <span class="st">"mktcap_lag"</span>])</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Finally, we store the monthly CRSP file in our folder.</p>
-<div id="4482cce6" class="cell" data-execution_count="16">
+<div id="wrds-crsp-and-compustat-write-crsp-monthly" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly.write_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="b49ef5d5" class="cell" data-execution_count="17">
+<div id="wrds-crsp-and-compustat-read-crsp-monthly" class="cell" data-execution_count="17">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly <span class="op">=</span> pl.read_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
@@ -914,7 +915,7 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <h2 class="anchored" data-anchor-id="daily-crsp-data">Daily CRSP Data</h2>
 <p>Before we turn to accounting data, we provide a proposal for downloading daily CRSP data with the same filters used for the monthly data (i.e., using information from <code>stksecurityinfohist</code>). While the monthly data from above typically fit into your memory and can be downloaded in a meaningful amount of time, this is usually not true for daily return data. The daily CRSP data file is substantially larger than monthly data and can exceed 20 GB. This has two important implications: you cannot hold all the daily return data in your memory (hence it is not possible to copy the entire dataset to your local folder), and in our experience, the download usually crashes (or never stops) because it is too much data for the WRDS cloud to prepare and send to your Python session.</p>
 <p>There is a solution to this challenge. As with many <em>big data</em> problems, you can split up the big task into several smaller tasks that are easier to handle. That is, instead of downloading data about all stocks at once, download the data in small batches of stocks consecutively. Such operations can be implemented in <code>for</code>-loops, where we download, prepare, and store the data for a small number of stocks in each iteration. This operation might nonetheless take around 5 minutes, depending on your internet connection. To keep track of the progress, we create ad-hoc progress updates using <code>print()</code>. Notice that we also use the method <code>to_sql()</code> here with the option to append the new data to an existing table, when we process the second and all following batches. As for the monthly CRSP data, there is no need to adjust for delisting returns in the daily CRSP data since July 2022.</p>
-<div id="d95f3cd3" class="cell" data-execution_count="22">
+<div id="wrds-crsp-and-compustat-crsp-daily-loop" class="cell" data-execution_count="22">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>factors_ff3_daily <span class="op">=</span> pl.read_parquet(<span class="st">"data-python/factors_ff3_daily.parquet"</span>)</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>permnos <span class="op">=</span> pl.read_database(</span>
@@ -988,7 +989,7 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <p>The choice of partitioning strategy depends on your intended analysis. Partitioning by <code>permno</code> as above is efficient when you need to parallelize computations at the firm level or frequently query data for specific stocks, since only the relevant partition files are read. However, this creates many small files, which introduces overhead when reading the entire dataset. If your analysis primarily involves cross-sectional operations on specific dates, partitioning by <code>date</code> or <code>year</code> would be more efficient. Alternatively, you can skip partitioning entirely and store the data as fewer large files, which minimizes file-open overhead for full scans while still allowing filtering on any column—though without the benefit of partition pruning.</p>
 <p>Eventually, we end up with more than 72 million rows of daily return data. Note that we only store the identifying information that we actually need, namely <code>permno</code> and <code>date</code> alongside the excess returns. We thus ensure that our local folder contains only the data that we actually use.</p>
 <p>To download the daily CRSP data via the <code>tidyfinance</code> package, you can call:</p>
-<div id="38f2fb64" class="cell" data-execution_count="23">
+<div id="wrds-crsp-and-compustat-tidyfinance-crsp-daily" class="cell" data-execution_count="23">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>crsp_daily <span class="op">=</span> pl.from_pandas(tf.download_data(</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    domain<span class="op">=</span><span class="st">"wrds"</span>,</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    dataset<span class="op">=</span><span class="st">"crsp_daily"</span>,</span>
@@ -996,13 +997,13 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    end_date <span class="op">=</span> end_date</span>
 <span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend to use loop the function over different date periods and store the results.</p>
+<p>Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend looping the function over different date periods and storing the results.</p>
 </section>
 <section id="preparing-compustat-data" class="level2">
 <h2 class="anchored" data-anchor-id="preparing-compustat-data">Preparing Compustat Data</h2>
 <p>Firm accounting data are an important source of information that we use in portfolio analyses in subsequent chapters. The commonly used source for firm financial information is Compustat provided by <a href="https://www.spglobal.com/marketintelligence/en/">S&amp;P Global Market Intelligence,</a> which is a global data vendor that provides financial, statistical, and market information on active and inactive companies throughout the world. For US and Canadian companies, annual history is available back to 1950 and quarterly as well as monthly histories date back to 1962. We refer to <span class="citation" data-cites="LyleEtAl2025">Lyle et al. (<a href="#ref-LyleEtAl2025" role="doc-biblioref">2025</a>)</span> for a detailed account of the Compustat data collection process and ongoing readjustments, which may pose challenges for replicating prior research and may introduce look-ahead bias in archival data analyses.</p>
 <p>To access Compustat data, we can again tap WRDS, which hosts the <code>funda</code> table that contains annual firm-level information on North American companies. We follow the typical filter conventions and pull only data that we actually need: (i) we get only records in industrial data format, which includes companies that are primarily involved in manufacturing, services, and other non-financial business activities,<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a>, (ii) in the standard format (i.e., consolidated information in standard presentation), (iii) reported in USD,<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a> and (iv) only data in the desired time window.</p>
-<div id="de7d5b72" class="cell" data-execution_count="24">
+<div id="wrds-crsp-and-compustat-compustat-query" class="cell" data-execution_count="24">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>compustat_query <span class="op">=</span> (</span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"SELECT gvkey, datadate, seq, ceq, at, lt, txditc, txdb, itcb,  pstkrv, "</span></span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">"pstkl, pstk, capx, oancf, sale, cogs, xint, xsga "</span></span>
@@ -1022,8 +1023,8 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a>    .with_columns(pl.col(pl.Decimal).cast(pl.Float64))</span>
 <span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Next, we calculate the book value of preferred stock and equity <code>be</code> and the operating profitability <code>op</code> inspired by the <a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">variable definitions in Kenneth French’s data library.</a> Note that we set negative or zero equity to missing, which is a common practice when working with book-to-market ratios <span class="citation" data-cites="Fama1992">(see <a href="#ref-Fama1992" role="doc-biblioref">Fama and French 1992</a> for details)</span>.</p>
-<div id="3b9b29f3" class="cell" data-execution_count="25">
+<p>Next, we calculate the book value of preferred stock and equity <code>be</code> and the operating profitability <code>op</code> inspired by the <a href="https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html">variable definitions in Kenneth French’s data library.</a></p>
+<div id="wrds-crsp-and-compustat-compute-be-op" class="cell" data-execution_count="25">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>compustat_annual <span class="op">=</span> (compustat_annual</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>        be<span class="op">=</span>(</span>
@@ -1036,28 +1037,25 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>        )</span>
 <span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>    )</span>
 <span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
-<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>        be<span class="op">=</span>pl.when(pl.col(<span class="st">"be"</span>) <span class="op">&lt;=</span> <span class="dv">0</span>).then(<span class="va">None</span>).otherwise(pl.col(<span class="st">"be"</span>))</span>
-<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
-<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>        op<span class="op">=</span>(</span>
-<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>            (pl.col(<span class="st">"sale"</span>)<span class="op">-</span>pl.col(<span class="st">"cogs"</span>).fill_null(<span class="dv">0</span>)</span>
-<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>                <span class="op">-</span>pl.col(<span class="st">"xsga"</span>).fill_null(<span class="dv">0</span>)<span class="op">-</span>pl.col(<span class="st">"xint"</span>).fill_null(<span class="dv">0</span>))</span>
-<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>            <span class="op">/</span> pl.col(<span class="st">"be"</span>)</span>
-<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>        )</span>
-<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>        op<span class="op">=</span>(</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>            (pl.col(<span class="st">"sale"</span>)<span class="op">-</span>pl.col(<span class="st">"cogs"</span>).fill_null(<span class="dv">0</span>)</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>                <span class="op">-</span>pl.col(<span class="st">"xsga"</span>).fill_null(<span class="dv">0</span>)<span class="op">-</span>pl.col(<span class="st">"xint"</span>).fill_null(<span class="dv">0</span>))</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">/</span> pl.col(<span class="st">"be"</span>)</span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We keep only the last available information for each firm-year group (by using <code>tail(1)</code> for each group). Note that <code>datadate</code> defines the time the corresponding financial data refers to (e.g., annual report as of December 31, 2022). Therefore, <code>datadate</code> is not the date when data was made available to the public. Check out the Exercises for more insights into the peculiarities of <code>datadate</code>.</p>
-<div id="b370375b" class="cell" data-execution_count="26">
+<div id="wrds-crsp-and-compustat-keep-last-firm-year" class="cell" data-execution_count="26">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>compustat_annual <span class="op">=</span> (</span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    compustat_annual.with_columns(year<span class="op">=</span>pl.col(<span class="st">"datadate"</span>).dt.year())</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    compustat_annual.with_columns(year<span class="op">=</span>pl.col(<span class="st">"datadate"</span>).dt.year().cast(pl.Float64))</span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    .sort(<span class="st">"datadate"</span>)</span>
 <span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    .group_by([<span class="st">"gvkey"</span>, <span class="st">"year"</span>], maintain_order<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    .tail(<span class="dv">1</span>)</span>
 <span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We also compute the investment ratio (<code>inv</code>) according to Kenneth French’s variable definitions as the change in total assets from one fiscal year to another. Note that we again use the approach using joins as introduced with the CRSP data above to construct lagged assets.</p>
-<div id="44780d40" class="cell" data-execution_count="27">
+<div id="wrds-crsp-and-compustat-compute-investment" class="cell" data-execution_count="27">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>compustat_annual_lag <span class="op">=</span> (compustat_annual</span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    .select([<span class="st">"gvkey"</span>, <span class="st">"year"</span>, <span class="st">"at"</span>])</span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    .with_columns(year<span class="op">=</span>pl.col(<span class="st">"year"</span>)<span class="op">+</span><span class="dv">1</span>)</span>
@@ -1073,11 +1071,11 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>With the last step, we are already done preparing the firm fundamentals. Thus, we can store them in our local folder.</p>
-<div id="00bfef91" class="cell" data-execution_count="28">
+<div id="wrds-crsp-and-compustat-write-compustat" class="cell" data-execution_count="28">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>compustat_annual.write_parquet(<span class="st">"data-python/compustat_annual.parquet"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The <code>tidyfinance</code> package provides a shortcut for these processing steps as well:</p>
-<div id="dea219d9" class="cell" data-execution_count="29">
+<div id="wrds-crsp-and-compustat-tidyfinance-compustat" class="cell" data-execution_count="29">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>compustat_annual <span class="op">=</span> pl.from_pandas(tf.download_data(</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    domain<span class="op">=</span><span class="st">"wrds"</span>,</span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    dataset<span class="op">=</span><span class="st">"compustat_annual"</span>,</span>
@@ -1085,14 +1083,14 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    end_date <span class="op">=</span> end_date</span>
 <span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="b5551d73" class="cell" data-execution_count="30">
+<div id="wrds-crsp-and-compustat-read-compustat" class="cell" data-execution_count="30">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>compustat_annual <span class="op">=</span> pl.read_parquet(<span class="st">"data-python/compustat_annual.parquet"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="merging-crsp-with-compustat" class="level2">
 <h2 class="anchored" data-anchor-id="merging-crsp-with-compustat">Merging CRSP with Compustat</h2>
 <p>Unfortunately, CRSP and Compustat use different keys to identify stocks and firms. CRSP uses <code>permno</code> for stocks, while Compustat uses <code>gvkey</code> to identify firms. Fortunately, a curated matching table on WRDS allows us to merge CRSP and Compustat, so we create a connection to the <em>CRSP-Compustat Merged</em> table (provided by CRSP). The linking table contains links between CRSP and Compustat identifiers from various approaches. However, we need to make sure that we keep only relevant and correct links, again following the description outlined in <span class="citation" data-cites="BaliEngleMurray2016">Bali et al. (<a href="#ref-BaliEngleMurray2016" role="doc-biblioref">2016</a>)</span>. Note also that currently active links have no end date, so we just enter the current date via the SQL verb <code>CURRENT_DATE</code>.</p>
-<div id="67f90af6" class="cell" data-execution_count="31">
+<div id="wrds-crsp-and-compustat-ccm-linking-query" class="cell" data-execution_count="31">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>ccm_linking_table_query <span class="op">=</span> (</span>
 <span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"SELECT lpermno AS permno, gvkey, linkdt, "</span></span>
 <span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>            <span class="st">"COALESCE(linkenddt, CURRENT_DATE) AS linkenddt "</span></span>
@@ -1104,15 +1102,15 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>ccm_linking_table <span class="op">=</span> pl.read_database(</span>
 <span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>    query<span class="op">=</span>ccm_linking_table_query,</span>
 <span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>    connection<span class="op">=</span>wrds,</span>
-<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    schema_overrides<span class="op">=</span>{<span class="st">"permno"</span>: pl.Int64, <span class="st">"gvkey"</span>: pl.String},</span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>    schema_overrides<span class="op">=</span>{<span class="st">"permno"</span>: pl.Float64, <span class="st">"gvkey"</span>: pl.String},</span>
 <span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>To fetch these links via <code>tidyfinance</code>, you can call:</p>
-<div id="e573e022" class="cell" data-execution_count="32">
+<div id="wrds-crsp-and-compustat-tidyfinance-ccm-links" class="cell" data-execution_count="32">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>ccm_links <span class="op">=</span> pl.from_pandas(tf.download_data(domain<span class="op">=</span><span class="st">"wrds"</span>, dataset<span class="op">=</span><span class="st">"ccm_links"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat <code>gvkey</code> to our monthly stock data.</p>
-<div id="bc0c398b" class="cell" data-execution_count="33">
+<div id="wrds-crsp-and-compustat-merge-ccm-links" class="cell" data-execution_count="33">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>ccm_links <span class="op">=</span> (crsp_monthly</span>
 <span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    .join(ccm_linking_table, how<span class="op">=</span><span class="st">"inner"</span>, on<span class="op">=</span><span class="st">"permno"</span>)</span>
 <span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(</span>
@@ -1128,13 +1126,13 @@ Figure&nbsp;4: The figure shows the total Market capitalization in billion USD, 
 <span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>As the last step, we update the previously prepared monthly CRSP file with the linking information in our local folder.</p>
-<div id="27655395" class="cell" data-execution_count="34">
+<div id="wrds-crsp-and-compustat-write-crsp-merged" class="cell" data-execution_count="34">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>crsp_monthly.write_parquet(<span class="st">"data-python/crsp_monthly.parquet"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Before we close this chapter, let us look at an interesting descriptive statistic of our data. As the book value of equity plays a crucial role in many asset pricing applications, it is interesting to know for how many of our stocks this information is available. Hence, <a href="#fig-215" class="quarto-xref">Figure&nbsp;5</a> plots the share of securities with book equity values for each exchange. It turns out that the coverage is pretty bad for AMEX- and NYSE-listed stocks in the 1960s but hovers around 80 percent for all periods thereafter. We can ignore the erratic coverage of securities that belong to the other category since there is only a handful of them anyway in our sample.</p>
 <div id="cell-fig-215" class="cell" data-execution_count="35">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>share_with_be <span class="op">=</span> (crsp_monthly</span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(year<span class="op">=</span>pl.col(<span class="st">"date"</span>).dt.year())</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>    .with_columns(year<span class="op">=</span>pl.col(<span class="st">"date"</span>).dt.year().cast(pl.Float64))</span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>    .sort(<span class="st">"date"</span>)</span>
 <span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    .group_by([<span class="st">"permno"</span>, <span class="st">"year"</span>], maintain_order<span class="op">=</span><span class="va">True</span>)</span>
 <span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    .tail(<span class="dv">1</span>)</span>
@@ -1213,9 +1211,6 @@ Bali, Turan G, Robert F Engle, and Scott Murray. 2016. <em><span class="nocase">
 <div id="ref-sqlalchemy" class="csl-entry" role="listitem">
 Bayer, Michael. 2012. <span>“SQLAlchemy.”</span> In <em>The Architecture of Open Source Applications Volume II: Structure, Scale, and a Few More Fearless Hacks</em>, edited by Amy Brown and Greg Wilson. Aosabook.org. <a href="http://aosabook.org/en/sqlalchemy.html">http://aosabook.org/en/sqlalchemy.html</a>.
 </div>
-<div id="ref-Fama1992" class="csl-entry" role="listitem">
-Fama, Eugene F., and Kenneth R. French. 1992. <span>“<span class="nocase">The cross-section of expected stock returns</span>.”</span> <em><span class="nocase">The Journal of Finance</span></em> 47 (2): 427–65. <a href="https://doi.org/2329112">https://doi.org/2329112</a>.
-</div>
 <div id="ref-FamaFrench1997" class="csl-entry" role="listitem">
 Fama, Eugene F., and Kenneth R. French. 1997. <span>“Industry Costs of Equity.”</span> <em>Journal of Financial Economics</em> 43 (2): 153–93. <a href="https://doi.org/10.1016/s0304-405x(96)00896-3">https://doi.org/10.1016/s0304-405x(96)00896-3</a>.
 </div>
@@ -1231,7 +1226,7 @@ Schwarz, Patrick, Dominik Walter, and Patrick Weiss. 2026. <span>“<span class=
 <li id="fn1"><p>An alternative to establish a connection to WRDS is to use the <code>WRDS-Py</code> library. We chose to work with <code>sqlalchemy</code> <span class="citation" data-cites="sqlalchemy">(<a href="#ref-sqlalchemy" role="doc-biblioref">Bayer 2012</a>)</span> to show how to access PostgreSQL engines in general.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 <li id="fn2"><p>These three criteria jointly replicate the filter <code>exchcd %in% c(1, 2, 3, 31, 32, 33)</code> used for the legacy version of CRSP. If you do not want to include stocks at issuance, you can set the <code>conditionaltype == "RW"</code>, which is equivalent to the restriction of <code>exchcd %in% c(1, 2, 3)</code> with the old CRSP format.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 <li id="fn3"><p>Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
-<li id="fn4"><p>Compustat also contains reports in CAD, which can lead a currency mismatch, e.g., when relating book equity to market equity.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>Compustat also contains reports in CAD, which can lead to a currency mismatch, e.g., when relating book equity to market equity.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
 </ol>
 </section></div></main> <!-- /main -->
 <div class="custom-footer">

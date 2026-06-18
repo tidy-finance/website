@@ -31,7 +31,7 @@ prices = pl.from_pandas(
         domain="stock_prices",
         symbols="AAPL",
         start_date="2000-01-01",
-        end_date="2023-12-31"
+        end_date="2024-12-31"
     )
 ).with_columns(pl.col("date").cast(pl.Date))
 prices.head()
@@ -62,12 +62,12 @@ Creating figures becomes very intuitive with the Grammar of Graphics, as the fol
 apple_prices_figure = (
     ggplot(prices, aes(y="adjusted_close", x="date"))
     + geom_line()
-    + labs(x="", y="", title="Apple stock prices from 2000 to 2023")
+    + labs(x="", y="", title="Apple stock prices from 2000 to 2024")
 )
 apple_prices_figure.show()
 ```
 
-[![Title: Apple stock prices between beginning of 2000 and end of 2023. The figure shows that the stock price of Apple increased from about 1 USD to around 125 USD.](working-with-stock-returns_files/figure-html/fig-100-output-1.png)](working-with-stock-returns_files/figure-html/fig-100-output-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
+[![Title: Apple stock prices between beginning of 2000 and end of 2024. The figure shows that the stock price of Apple increased from about 1 USD to around 250 USD.](working-with-stock-returns_files/figure-html/fig-100-output-1.png)](working-with-stock-returns_files/figure-html/fig-100-output-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
 
 Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.
 
@@ -84,7 +84,7 @@ returns = (prices
 returns
 ```
 
-shape: (6_037, 3)
+shape: (6_288, 3)
 
 | symbol | date       | ret       |
 |--------|------------|-----------|
@@ -92,14 +92,14 @@ shape: (6_037, 3)
 | "AAPL" | 2000-01-03 | null      |
 | "AAPL" | 2000-01-04 | -0.08431  |
 | "AAPL" | 2000-01-05 | 0.014633  |
-| "AAPL" | 2000-01-06 | -0.086538 |
+| "AAPL" | 2000-01-06 | -0.086539 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
-| "AAPL" | 2023-12-22 | -0.005547 |
-| "AAPL" | 2023-12-26 | -0.002841 |
-| "AAPL" | 2023-12-27 | 0.000518  |
-| "AAPL" | 2023-12-28 | 0.002226  |
-| "AAPL" | 2023-12-29 | -0.005424 |
+| "AAPL" | 2024-12-23 | 0.003065  |
+| "AAPL" | 2024-12-24 | 0.011478  |
+| "AAPL" | 2024-12-26 | 0.003176  |
+| "AAPL" | 2024-12-27 | -0.013242 |
+| "AAPL" | 2024-12-30 | -0.013263 |
 
 The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value (`null`) because there is no previous price. Obviously, the use of `pct_change()` would be meaningless if the time series is not ordered by ascending dates. The method `sort()` provides a convenient way to order observations in the correct way for our application. In case you want to order observations by descending dates, you can use the parameter `descending=True`.
 
@@ -141,15 +141,15 @@ shape: (9, 2)
 | statistic    | ret       |
 |--------------|-----------|
 | str          | f64       |
-| "count"      | 6036.0    |
+| "count"      | 6287.0    |
 | "null_count" | 0.0       |
-| "mean"       | 0.001218  |
-| "std"        | 0.024735  |
+| "mean"       | 0.001217  |
+| "std"        | 0.024404  |
 | "min"        | -0.518692 |
-| "25%"        | -0.01007  |
-| "50%"        | 0.000897  |
-| "75%"        | 0.012939  |
-| "max"        | 0.13905   |
+| "25%"        | -0.009818 |
+| "50%"        | 0.000948  |
+| "75%"        | 0.012684  |
+| "max"        | 0.139049  |
 
 We see that the maximum *daily* return was 13.9 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
 
@@ -173,7 +173,7 @@ You can also compute these summary statistics for each year individually by grou
 )
 ```
 
-shape: (24, 9)
+shape: (25, 9)
 
 | year | count | mean   | std   | min    | q25    | median | q75   | max   |
 |------|-------|--------|-------|--------|--------|--------|-------|-------|
@@ -184,11 +184,11 @@ shape: (24, 9)
 | 2003 | 252   | 0.002  | 0.023 | -0.081 | -0.012 | 0.002  | 0.014 | 0.113 |
 | 2004 | 252   | 0.005  | 0.025 | -0.056 | -0.009 | 0.003  | 0.015 | 0.132 |
 | …    | …     | …      | …     | …      | …      | …      | …     | …     |
-| 2019 | 252   | 0.003  | 0.016 | -0.1   | -0.005 | 0.003  | 0.012 | 0.068 |
 | 2020 | 253   | 0.003  | 0.029 | -0.129 | -0.01  | 0.002  | 0.017 | 0.12  |
 | 2021 | 252   | 0.001  | 0.016 | -0.042 | -0.008 | 0.001  | 0.012 | 0.054 |
 | 2022 | 251   | -0.001 | 0.022 | -0.059 | -0.016 | -0.001 | 0.014 | 0.089 |
 | 2023 | 250   | 0.002  | 0.013 | -0.048 | -0.006 | 0.002  | 0.009 | 0.047 |
+| 2024 | 251   | 0.001  | 0.014 | -0.048 | -0.007 | 0.002  | 0.009 | 0.073 |
 
 ## Scaling Up the Analysis
 
@@ -196,7 +196,7 @@ As a next step, we generalize the previous code so that all computations can han
 
 This is where the `tidyverse` magic starts: Tidy data makes it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any number of symbols, e.g., `symbol = ["AAPL", "MMM", "BA"]`, and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once. For this example, we analyze data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average)
 
-We first download a table with DOW Jones constituents again using `tf.download_data()`, but this time with `domain="constituents"`.
+We first download a table with Dow Jones constituents again using `tf.download_data()`, but this time with `domain="constituents"`.
 
 ``` python
 symbols = pl.from_pandas(
@@ -215,12 +215,12 @@ prices_daily = pl.from_pandas(
         domain="stock_prices",
         symbols=symbols["symbol"].to_list(),
         start_date="2000-01-01",
-        end_date="2023-12-31"
+        end_date="2024-12-31"
     )
 ).with_columns(pl.col("date").cast(pl.Date))
 ```
 
-The resulting data frame contains 177,925 daily observations for 30 different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 185,455 daily observations for 30 different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ``` python
 prices_figure = (
@@ -237,7 +237,7 @@ prices_figure.show()
 
 Figure 3: Prices in USD, adjusted for dividend payments and stock splits.
 
-Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrage number of subjects quite well.
+Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrary number of subjects quite well.
 
 The same holds for stock returns. Before computing the returns, we sort by symbol and date and add `.over("symbol")` to the `pct_change()` expression, so that returns are computed within each symbol individually without bleeding across symbol boundaries. The same logic also applies to the computation of summary statistics: `group_by("symbol")` is the key to aggregating the time series into symbol-specific variables of interest.
 
@@ -271,17 +271,17 @@ shape: (30, 9)
 | symbol | count | mean  | std   | min    | q25    | median | q75   | max   |
 |--------|-------|-------|-------|--------|--------|--------|-------|-------|
 | str    | u32   | f64   | f64   | f64    | f64    | f64    | f64   | f64   |
-| "AAPL" | 6036  | 0.001 | 0.025 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
-| "AMGN" | 6036  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
-| "AMZN" | 6036  | 0.001 | 0.032 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
-| "AXP"  | 6036  | 0.001 | 0.023 | -0.176 | -0.009 | 0.0    | 0.01  | 0.219 |
-| "BA"   | 6036  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
+| "AAPL" | 6287  | 0.001 | 0.024 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
+| "AMGN" | 6287  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
+| "AMZN" | 6287  | 0.001 | 0.031 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
+| "AXP"  | 6287  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
+| "BA"   | 6287  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
 | …      | …     | …     | …     | …      | …      | …      | …     | …     |
-| "TRV"  | 6036  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
-| "UNH"  | 6036  | 0.001 | 0.02  | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
-| "V"    | 3973  | 0.001 | 0.019 | -0.136 | -0.008 | 0.001  | 0.009 | 0.15  |
-| "VZ"   | 6036  | 0.0   | 0.015 | -0.118 | -0.007 | 0.0    | 0.007 | 0.146 |
-| "WMT"  | 6036  | 0.0   | 0.015 | -0.114 | -0.007 | 0.0    | 0.007 | 0.117 |
+| "TRV"  | 6287  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
+| "UNH"  | 6287  | 0.001 | 0.019 | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
+| "V"    | 4224  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
+| "VZ"   | 6287  | 0.0   | 0.015 | -0.118 | -0.007 | 0.0    | 0.007 | 0.146 |
+| "WMT"  | 6287  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
 
 ## Different Frequencies
 
@@ -356,7 +356,7 @@ trading_volume_figure = (
 trading_volume_figure.show()
 ```
 
-[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2023, with a maximum of more than 100.](working-with-stock-returns_files/figure-html/fig-104-output-1.png)](working-with-stock-returns_files/figure-html/fig-104-output-1.png "Figure 5: Total daily trading volume in billion USD.")
+[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 90 in 2024, with a maximum of more than 200.](working-with-stock-returns_files/figure-html/fig-104-output-1.png)](working-with-stock-returns_files/figure-html/fig-104-output-1.png "Figure 5: Total daily trading volume in billion USD.")
 
 Figure 5: Total daily trading volume in billion USD.
 

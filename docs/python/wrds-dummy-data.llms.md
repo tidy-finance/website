@@ -1,6 +1,6 @@
 # WRDS Pseudo Data
 
-In this appendix chapter, we alleviate the constraints of readers who don’t have access to WRDS and hence cannot run the code that we provide. We show how to create a pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this psueod data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md).
+In this appendix chapter, we alleviate the constraints of readers who don’t have access to WRDS and hence cannot run the code that we provide. We show how to create pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this pseudo data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md).
 
 We deliberately use the pseudo label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does not contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books.
 

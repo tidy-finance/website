@@ -8,9 +8,9 @@ Financial statements and ratios are fundamental tools for understanding and eval
 
 Building on this standardized information, financial ratios transform raw accounting data into meaningful metrics that facilitate analysis across companies and over time. These ratios serve multiple purposes in both academic research and practical applications. They enable investors to benchmark companies against their peers, identify industry trends, and screen for investment opportunities. In academic finance, ratios play a crucial role in asset pricing models (e.g., the book-to-market ratio in the Fama-French three-factor model) and corporate finance (e.g., capital structure research). In many practical applications, ratios help assess a company’s financial health and performance.
 
-This chapter demonstrates how to access, process, and analyze financial statements using R. We start by reviewing the financial statements balance sheet, income statement, and cash flow statement. Then, we download publicly available statements to calculate key financial ratios, implement common screening strategies, and evaluate companies. Our analysis combines theoretical frameworks with practical implementation, providing tools for both academic research and investment practice.
+This chapter demonstrates how to access, process, and analyze financial statements using Python. We start by reviewing the financial statements balance sheet, income statement, and cash flow statement. Then, we download publicly available statements to calculate key financial ratios, implement common screening strategies, and evaluate companies. Our analysis combines theoretical frameworks with practical implementation, providing tools for both academic research and investment practice.
 
-For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the R package `fmpapi`.
+For the purpose of this chapter, we use financial statements provided by the US Securities and Exchange Commission (i.e., SEC). While the SEC provides a web interface to search filings, programmatic access to financial statements greatly facilitates systematic analyses as ours. The Financial Modeling Prep (FMP) API offers such programmatic access, which we can leverage through the Python package `fmpapi`.
 
 The FMP API’s free tier provides access to:
 
@@ -28,11 +28,16 @@ Next to `fmpapi`, we use the following packages throughout this chapter:
 ``` python
 import polars as pl
 
+from dotenv import load_dotenv
 from fmpapi import fmp_get
 from plotnine import *
 from mizani.formatters import percent_format
 from adjustText import adjust_text
+
+load_dotenv()
 ```
+
+    True
 
 > **TIP:**
 >
@@ -159,7 +164,7 @@ shape: (5, 39)
 | 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 198270000000 | 62650000000 | 135620000000 | 24512000000 | 5900000000 | 21825000000 | 27725000000 | 0 | 52237000000 | 114887000000 | 31000000 | 2094000000 | 2063000000 | 14460000000 | 100239000000 | 85779000000 | -2396000000 | 83383000000 | 333000000 | 83716000000 | 10978000000 | 72738000000 | 0 | 0 | 72738000000 | 0 | 72738000000 | 9.7 | 9.65 | 7496000000 | 7540000000 |
 | 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 168088000000 | 52232000000 | 115856000000 | 20716000000 | 5107000000 | 20117000000 | 25224000000 | 0 | 45940000000 | 98172000000 | -215000000 | 2131000000 | 2346000000 | 11686000000 | 85134000000 | 73448000000 | -3532000000 | 69916000000 | 1186000000 | 71102000000 | 9831000000 | 61271000000 | 0 | 0 | 61271000000 | 0 | 61271000000 | 8.12 | 8.05 | 7547000000 | 7608000000 |
 
-In later sections, we will use income statement items to calculate important profitability ratios and examine how they compare across companies and industries. The income statement’s focus on performance complements the balance sheet’s position snapshot, providing a more complete picture of a company’s core business operations
+In later sections, we will use income statement items to calculate important profitability ratios and examine how they compare across companies and industries. The income statement’s focus on performance complements the balance sheet’s position snapshot, providing a more complete picture of a company’s core business operations.
 
 ## Cash Flow Statements
 
@@ -247,19 +252,21 @@ Liquidity ratios assess a company’s ability to meet its short-term obligations
 
 The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:
 
-\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Total Liabilities}}\\
+\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}\\
 
 A ratio above one indicates that the company has enough current assets to cover its current liabilities, which are due within one year as discussed above.
 
 However, not all current assets are equally liquid, i.e., can be easily sold to meet a company’s obligations. This aspect is reflected in the Quick Ratio:
 
-\\\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\\ The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.
+\\\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\\
+
+The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.
 
 The most conservative liquidity measure is the Cash Ratio:
 
 \\\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}\\
 
-This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. Afterall, all that cash could also be distributed to equity or pay down costly debt.
+This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. After all, all that cash could also be distributed to equity or pay down costly debt.
 
 Next, we calculate these ratios for all stocks, focusing on three major technology companies:
 
@@ -269,7 +276,7 @@ selected_symbols = ["MSFT", "AAPL", "AMZN", "NVDA"]
 balance_sheet_statements = (balance_sheet_statements
   .with_columns(
     fiscal_year=pl.col("fiscal_year").cast(pl.Int64),
-    current_ratio=pl.col("total_current_assets") / pl.col("total_assets"),
+    current_ratio=pl.col("total_current_assets") / pl.col("total_current_liabilities"),
     quick_ratio=(pl.col("total_current_assets") - pl.col("inventory")) / pl.col("total_current_liabilities"),
     cash_ratio=pl.col("cash_and_cash_equivalents") / pl.col("total_current_liabilities"),
     label=pl.when(pl.col("symbol").is_in(selected_symbols)).then(pl.col("symbol")).otherwise(None)
@@ -309,7 +316,7 @@ liquidity_ratios_figure.show()
 
 Figure 8: Liquidity ratios are based on financial statements provided through the FMP API.
 
-While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more convervative approach by holding larger liquidity buffers in the company.
+While we are not commenting on the ratios in detail here, the liquidity ratios for Microsoft, Apple, and Amazon in 2023 reveal distinct patterns. Generally, higher liquidity ratios signal a more conservative approach by holding larger liquidity buffers in the company.
 
 ## Leverage Ratios
 
@@ -500,7 +507,7 @@ combined_statements = (combined_statements
 )
 ```
 
-We leave the visualization and interpretation of these figures as an exercise and move on the the last category of financial ratios.
+We leave the visualization and interpretation of these figures as an exercise and move on to the last category of financial ratios.
 
 ## Profitability Ratios
 
@@ -657,7 +664,7 @@ These combined rankings highlight how different business models and strategies l
 The Fama-French five-factor model aims to explain stock returns by incorporating specific financial metrics ratios. We provide more details in [Replicating Fama-French Factors](../python/replicating-fama-and-french-factors.llms.md), but here is an intuitive overview:
 
 - Size: Calculated as the logarithm of a company’s market capitalization, which is the total market value of its outstanding shares. This factor captures the tendency for smaller firms to outperform larger ones over time.
-- Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’’’ stock. This metric helps differentiate between undervalued and overvalued companies.
+- Book-to-market ratio: Determined by dividing the company’s book equity by its market capitalization. A higher ratio indicates a ‘value’ stock, while a lower ratio suggests a ‘growth’ stock. This metric helps differentiate between undervalued and overvalued companies.
 - Profitability: Measured as the ratio of operating profit to book equity, where operating profit is calculated as revenue minus cost of goods sold (COGS), selling, general, and administrative expenses (SG&A), and interest expense. This factor assesses a company’s efficiency in generating profits from its equity base.
 - Investment: Calculated as the percentage change in total assets from the previous period. This factor reflects the company’s growth strategy, indicating whether it is investing aggressively or conservatively.
 

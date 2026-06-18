@@ -2,7 +2,7 @@
 
 > **NOTE:**
 >
-> You are reading **Tidy Finance with Python**. You can find the equivalent chapter for the sibling **Tidy Finance with R**[here](../r/constrained-optimization-and-backtesting.llms.md).
+> You are reading **Tidy Finance with Python**. You can find the equivalent chapter for the sibling **Tidy Finance with R** [here](../r/constrained-optimization-and-backtesting.llms.md).
 
 In this chapter, we conduct portfolio backtesting in a realistic setting by including transaction costs and investment constraints such as no-short-selling rules. We start with standard mean-variance efficient portfolios and introduce constraints in a step-by-step manner. To do so, we rely on numerical optimization procedures in Python. We conclude the chapter by providing an out-of-sample backtesting procedure for the different strategies that we introduce in this chapter.
 
@@ -83,7 +83,7 @@ The solution to the optimal portfolio choice problem is:
 
 \\ \omega^\*\_{\gamma} = \frac{1}{\gamma}\left(\Sigma^{-1} - \frac{1}{\iota' \Sigma^{-1}\iota }\Sigma^{-1}\iota\iota' \Sigma^{-1} \right) \mu + \frac{1}{\iota' \Sigma^{-1} \iota }\Sigma^{-1} \iota. \tag{4}\\
 
-To proof this statement, we refer to the derivations in [Proofs](../python/proofs.llms.md). Empirically, this classical solution imposes many problems. In particular, the estimates of \\\mu\\ are noisy over short horizons, the (\\N \times N\\) matrix \\\Sigma\\ contains \\N(N-1)/2\\ distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are Brown ([1976](#ref-Brown1976)), Jobson and Korkie ([1980](#ref-Jobson1980)), Jorion ([1986](#ref-Jorion1986)), and Chopra and Ziemba ([1993](#ref-Chopra1993)).
+To prove this statement, we refer to the derivations in [Proofs](../python/proofs.llms.md). Empirically, this classical solution imposes many problems. In particular, the estimates of \\\mu\\ are noisy over short horizons, the (\\N \times N\\) matrix \\\Sigma\\ contains \\N(N-1)/2\\ distinct elements and thus, estimation error is huge. Seminal papers on the effect of ignoring estimation uncertainty, among others, are Brown ([1976](#ref-Brown1976)), Jobson and Korkie ([1980](#ref-Jobson1980)), Jorion ([1986](#ref-Jorion1986)), and Chopra and Ziemba ([1993](#ref-Chopra1993)).
 
 Even worse, if the asset universe contains more assets than available time periods \\(N \> T)\\, the sample covariance matrix is no longer positive definite such that the inverse \\\Sigma^{-1}\\ does not exist anymore. To address estimation issues for vast-dimensional covariance matrices, regularization techniques (see, e.g., [Ledoit and Wolf 2003](#ref-Ledoit2003), [2004](#ref-Ledoit2004), [2012](#ref-Ledoit2012); [Fan et al. 2008](#ref-Fan2008)) and the parametric approach from the previous chapter are popular tools.
 
@@ -397,7 +397,7 @@ shape: (10, 2)
 | "utils"  | 0.0          |
 | "other"  | -0.0         |
 
-[Figure 2](#fig-1702) shows the optimal allocation weights across all `python len(industry_returns.columns)` industries for the four different strategies considered so far: minimum variance, efficient portfolio with \\\gamma\\ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
+[Figure 2](#fig-1702) shows the optimal allocation weights across all 10 industries for the four different strategies considered so far: minimum variance, efficient portfolio with \\\gamma\\ = 2, efficient portfolio with short-sale constraints, and the Regulation-T constrained portfolio.
 
 ``` python
 weights = (weights_mvp

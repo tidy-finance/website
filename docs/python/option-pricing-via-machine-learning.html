@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -98,10 +98,10 @@ div.csl-indent {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../site_libs/bootstrap/bootstrap-2e93c9ea7df6fcc5d90b01baca22926b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-15df67a978eff2724f248dfecb6ea2b0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
 <link href="../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
 <link href="../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
@@ -617,8 +617,8 @@ Note
 <p>This chapter covers machine learning methods in option pricing. First, we briefly introduce regression trees, random forests, and neural networks; these methods are advocated as highly flexible <em>universal approximators</em>, capable of recovering highly non-linear structures in the data. As the focus is on implementation, we leave a thorough treatment of the statistical underpinnings to other textbooks from authors with a real comparative advantage on these issues. We show how to implement random forests and deep neural networks with tidy principles using <code>scikit-learn</code>.</p>
 <p> Machine learning (ML) is seen as a part of artificial intelligence. ML algorithms build a model based on training data in order to make predictions or decisions without being explicitly programmed to do so. While ML can be specified along a vast array of different branches, this chapter focuses on so-called supervised learning for regressions. The basic idea of supervised learning algorithms is to build a mathematical model for data that contains both the inputs and the desired outputs. In this chapter, we apply well-known methods such as random forests and neural networks to a simple application in option pricing. More specifically, we create an artificial dataset of option prices for different values based on the Black-Scholes pricing equation for call options. Then, we train different models to <em>learn</em> how to price call options without prior knowledge of the theoretical underpinnings of the famous option pricing equation by <span class="citation" data-cites="Black1976">Black and Scholes (<a href="#ref-Black1976" role="doc-biblioref">1973</a>)</span>.</p>
 <p>Throughout this chapter, we need the following Python packages.</p>
-<div id="8876b44a" class="cell" data-execution_count="2">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd </span>
+<div id="option-pricing-via-machine-learning-packages" class="cell" data-execution_count="2">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> plotnine <span class="im">import</span> <span class="op">*</span></span>
@@ -666,8 +666,8 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 \end{aligned}
 \tag{4}\]</span></span></p>
 <p>where <span class="math inline">\(C(S, T)\)</span> is the price of the option as a function of today’s stock price of the underlying, <span class="math inline">\(S\)</span>, with time to maturity <span class="math inline">\(T\)</span>, <span class="math inline">\(r_f\)</span> is the risk-free interest rate, and <span class="math inline">\(\sigma\)</span> is the volatility of the underlying stock return. <span class="math inline">\(\Phi\)</span> is the cumulative distribution function of a standard normal random variable.</p>
-<p>The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters <span class="math inline">\(S, K, r_f, T\)</span>, and <span class="math inline">\(\sigma\)</span> are specified (arguably, in a realistic context, all parameters are easy to specify except for <span class="math inline">\(\sigma\)</span> which has to be estimated). A simple R function allows computing the price as we do below.</p>
-<div id="f271de10" class="cell" data-execution_count="4">
+<p>The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters <span class="math inline">\(S, K, r_f, T\)</span>, and <span class="math inline">\(\sigma\)</span> are specified (arguably, in a realistic context, all parameters are easy to specify except for <span class="math inline">\(\sigma\)</span> which has to be estimated). A simple Python function allows computing the price as we do below.</p>
+<div id="option-pricing-via-machine-learning-black-scholes-function" class="cell" data-execution_count="4">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> black_scholes_price(S, K, r, T, sigma):</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Calculate Black Scholes option price."""</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -685,7 +685,7 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <h3 class="anchored" data-anchor-id="data-simulation">Data simulation</h3>
 <p>To that end, we start with simulated data. We compute option prices for call options for a grid of different combinations of times to maturity (<code>T</code>), risk-free rates (<code>r</code>), volatilities (<code>sigma</code>), strike prices (<code>K</code>), and current stock prices (<code>S</code>). In the code below, we add an idiosyncratic error term to each observation such that the prices considered do not exactly reflect the values implied by the Black-Scholes equation.</p>
 <p>In order to keep the analysis reproducible, we use <code>np.random.seed()</code>. A random seed specifies the start point when a computer generates a random number sequence and ensures that our simulated data is the same across different machines.</p>
-<div id="c18d97fa" class="cell" data-execution_count="5">
+<div id="option-pricing-via-machine-learning-simulate-data" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>random_state <span class="op">=</span> <span class="dv">42</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>np.random.seed(random_state)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -695,31 +695,35 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>T <span class="op">=</span> np.arange(<span class="dv">3</span> <span class="op">/</span> <span class="dv">12</span>, <span class="fl">2.01</span>, <span class="dv">1</span> <span class="op">/</span> <span class="dv">12</span>)</span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>sigma <span class="op">=</span> np.arange(<span class="fl">0.1</span>, <span class="fl">0.81</span>, <span class="fl">0.1</span>)</span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>option_prices <span class="op">=</span> pd.DataFrame(</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    product(S, K, r, T, sigma), columns<span class="op">=</span>[<span class="st">"S"</span>, <span class="st">"K"</span>, <span class="st">"r"</span>, <span class="st">"T"</span>, <span class="st">"sigma"</span>]</span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>option_prices[<span class="st">"black_scholes"</span>] <span class="op">=</span> black_scholes_price(</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    option_prices[<span class="st">"S"</span>].values,</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    option_prices[<span class="st">"K"</span>].values,</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    option_prices[<span class="st">"r"</span>].values,</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    option_prices[<span class="st">"T"</span>].values,</span>
-<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    option_prices[<span class="st">"sigma"</span>].values,</span>
-<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>option_prices <span class="op">=</span> option_prices.assign(</span>
-<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    observed_price<span class="op">=</span><span class="kw">lambda</span> x: (x[<span class="st">"black_scholes"</span>] <span class="op">+</span> np.random.normal(scale<span class="op">=</span><span class="fl">0.15</span>))</span>
-<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>option_prices <span class="op">=</span> pl.DataFrame(</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="bu">list</span>(product(S, K, r, T, sigma)),</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    schema<span class="op">=</span>[<span class="st">"S"</span>, <span class="st">"K"</span>, <span class="st">"r"</span>, <span class="st">"T"</span>, <span class="st">"sigma"</span>],</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    orient<span class="op">=</span><span class="st">"row"</span>,</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>option_prices <span class="op">=</span> option_prices.with_columns(</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    black_scholes<span class="op">=</span>black_scholes_price(</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>        option_prices[<span class="st">"S"</span>].to_numpy(),</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>        option_prices[<span class="st">"K"</span>].to_numpy(),</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>        option_prices[<span class="st">"r"</span>].to_numpy(),</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>        option_prices[<span class="st">"T"</span>].to_numpy(),</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>        option_prices[<span class="st">"sigma"</span>].to_numpy(),</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>option_prices <span class="op">=</span> option_prices.with_columns(</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    observed_price<span class="op">=</span>pl.col(<span class="st">"black_scholes"</span>) <span class="op">+</span> np.random.normal(scale<span class="op">=</span><span class="fl">0.15</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>The code above generates more than 1.5 million random parameter constellations (in the definition of the <code>option_prices</code> dataframe). For each of these values, the <em>true</em> prices reflecting the Black-Scholes model are given and a random innovation term <em>pollutes</em> the observed prices. The intuition of this application is simple: the simulated data provides many observations of option prices, by using the Black-Scholes equation we can evaluate the actual predictive performance of a ML method, which would be hard in a realistic context where the actual arbitrage-free price would be unknown.</p>
-<p>Next, we split the data into a training set (which contains 1 percent of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains <code>python len(option_prices.columns)</code> different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.</p>
-<div id="3f75275e" class="cell" data-execution_count="6">
+<p>Next, we split the data into a training set (which contains 1 percent of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.</p>
+<div id="option-pricing-via-machine-learning-train-test-split" class="cell" data-execution_count="6">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>train_data, test_data <span class="op">=</span> train_test_split(</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    option_prices, test_size<span class="op">=</span><span class="fl">0.01</span>, random_state<span class="op">=</span>random_state</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    option_prices.to_pandas(), train_size<span class="op">=</span><span class="fl">0.01</span>, random_state<span class="op">=</span>random_state</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We process the training dataset further before we fit the different ML models. We define a <code>ColumnTransformer()</code> that defines all processing steps for that purpose. For our specific case, we want to explain the observed price by the five variables that enter the Black-Scholes equation. The <em>true</em> price (stored in column <code>black_scholes</code>) should obviously not be used to fit the model. The recipe also reflects that we standardize all predictors via <code>StandardScaler()</code> to ensure that each variable exhibits a sample average of zero and a sample standard deviation of one.</p>
-<div id="dd7cc5ab" class="cell" data-execution_count="7">
+<div id="option-pricing-via-machine-learning-preprocessor" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>preprocessor <span class="op">=</span> ColumnTransformer(</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>    transformers<span class="op">=</span>[</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        (</span>
@@ -735,7 +739,7 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <section id="single-layer-networks-and-random-forests" class="level3">
 <h3 class="anchored" data-anchor-id="single-layer-networks-and-random-forests">Single layer networks and random forests</h3>
 <p>Next, we show how to fit a neural network to the data. The function <code>MLPRegressor()</code> from the package <code>scikit-learn</code> provides the functionality to initialize a single layer, feed-forward neural network. The specification below defines a single layer feed-forward neural network with ten hidden units. We set the number of training iterations to <code>max_iter=1000</code>.</p>
-<div id="8a8d7d3a" class="cell" data-execution_count="8">
+<div id="option-pricing-via-machine-learning-nnet-model" class="cell" data-execution_count="8">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>max_iter <span class="op">=</span> <span class="dv">1000</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>nnet_model <span class="op">=</span> MLPRegressor(</span>
@@ -743,7 +747,7 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>We can follow the straightforward workflow as in the chapter before: define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data.</p>
-<div id="19e5a110" class="cell" data-execution_count="9">
+<div id="option-pricing-via-machine-learning-nnet-fit" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nnet_pipeline <span class="op">=</span> Pipeline(</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    [(<span class="st">"preprocessor"</span>, preprocessor), (<span class="st">"regressor"</span>, nnet_model)]</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -755,13 +759,13 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 </div>
 <p>One word of caution regarding the training of Neural networks: For illustrative purposes we sequentially update the parameters by reiterating through the data 1,000 times (<code>max_iter=1000</code>). Typically, however, early stopping rules are advised that aim to interrupt the process of updating parameters as soon as the predictive performance on the validation test seems to deteriorate. A detailed discussion of these details in the implementation would go beyond the scope of this book.</p>
 <p>Once you are familiar with the <code>scikit-learn</code> workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node. The random forests are trained using the function <code>RandomForestRegressor()</code>.</p>
-<div id="3ec83308" class="cell" data-execution_count="10">
+<div id="option-pricing-via-machine-learning-rf-model" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>rf_model <span class="op">=</span> RandomForestRegressor(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>    n_estimators<span class="op">=</span><span class="dv">50</span>, min_samples_leaf<span class="op">=</span><span class="dv">2000</span>, random_state<span class="op">=</span>random_state</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>Fitting the model follows exactly the same convention as for the neural network before.</p>
-<div id="51da1761" class="cell" data-execution_count="11">
+<div id="option-pricing-via-machine-learning-rf-fit" class="cell" data-execution_count="11">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>rf_pipeline <span class="op">=</span> Pipeline(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    [(<span class="st">"preprocessor"</span>, preprocessor), (<span class="st">"regressor"</span>, rf_model)]</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -775,7 +779,7 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <section id="deep-neural-networks" class="level3">
 <h3 class="anchored" data-anchor-id="deep-neural-networks">Deep neural networks</h3>
 <p>A deep neural network is a neural network with multiple layers between the input and output layers. By chaining multiple layers together, more complex structures can be represented with fewer parameters than simple shallow (one-layer) networks as the one implemented above. For instance, image or text recognition are typical tasks where deep neural networks are used <span class="citation" data-cites="Jiang2022 Jensen2022">(for applications of deep neural networks in finance, see, for instance, <a href="#ref-Jiang2022" role="doc-biblioref">Jiang et al. 2023</a>; <a href="#ref-Jensen2022" role="doc-biblioref">Jensen et al. 2022</a>)</span>. The following code chunk implements a deep neural network with three hidden layers of size ten each and logistic activation functions.</p>
-<div id="00cd61e0" class="cell" data-execution_count="12">
+<div id="option-pricing-via-machine-learning-deepnnet-fit" class="cell" data-execution_count="12">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>deepnnet_model <span class="op">=</span> MLPRegressor(</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    hidden_layer_sizes<span class="op">=</span>(<span class="dv">10</span>, <span class="dv">10</span>, <span class="dv">10</span>),</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    activation<span class="op">=</span><span class="st">"logistic"</span>,</span>
@@ -797,7 +801,7 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <section id="universal-approximation" class="level3">
 <h3 class="anchored" data-anchor-id="universal-approximation">Universal approximation</h3>
 <p>Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult <a href="../python/factor-selection-via-machine-learning.html">Factor Selection via Machine Learning</a> on how to tune the model hyperparameters).</p>
-<div id="7846e614" class="cell" data-execution_count="13">
+<div id="option-pricing-via-machine-learning-lasso-fit" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>lm_pipeline <span class="op">=</span> Pipeline(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    [</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>        (</span>
@@ -821,43 +825,39 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <section id="prediction-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="prediction-evaluation">Prediction Evaluation</h2>
 <p>Finally, we collect all predictions to compare the <em>out-of-sample</em> prediction error evaluated on 10,000 new data points.</p>
-<div id="e2c5330b" class="cell" data-execution_count="14">
+<div id="option-pricing-via-machine-learning-predictions" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>test_X <span class="op">=</span> test_data.get([<span class="st">"S"</span>, <span class="st">"K"</span>, <span class="st">"r"</span>, <span class="st">"T"</span>, <span class="st">"sigma"</span>])</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>test_y <span class="op">=</span> test_data.get(<span class="st">"observed_price"</span>)</span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>predictive_performance <span class="op">=</span> (</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    pd.concat(</span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>        [</span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>            test_data.reset_index(drop<span class="op">=</span><span class="va">True</span>),</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>            pd.DataFrame(</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>                {</span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Random forest"</span>: rf_fit.predict(test_X),</span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Single layer"</span>: nnet_fit.predict(test_X),</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Deep NN"</span>: deepnnet_fit.predict(test_X),</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>                    <span class="st">"Lasso"</span>: lm_fit.predict(test_X),</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>                }</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>            ),</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>        ],</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>        axis<span class="op">=</span><span class="dv">1</span>,</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>    .melt(</span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>        id_vars<span class="op">=</span>[</span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>            <span class="st">"S"</span>,</span>
-<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>            <span class="st">"K"</span>,</span>
-<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>            <span class="st">"r"</span>,</span>
-<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>            <span class="st">"T"</span>,</span>
-<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>            <span class="st">"sigma"</span>,</span>
-<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>            <span class="st">"black_scholes"</span>,</span>
-<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>            <span class="st">"observed_price"</span>,</span>
-<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>        ],</span>
-<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>        var_name<span class="op">=</span><span class="st">"Model"</span>,</span>
-<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>        value_name<span class="op">=</span><span class="st">"Predicted"</span>,</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    pl.from_pandas(test_data)</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>        <span class="op">**</span>{</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Random forest"</span>: rf_fit.predict(test_X),</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Single layer"</span>: nnet_fit.predict(test_X),</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Deep NN"</span>: deepnnet_fit.predict(test_X),</span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>            <span class="st">"Lasso"</span>: lm_fit.predict(test_X),</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>        }</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    .unpivot(</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>        index<span class="op">=</span>[</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>            <span class="st">"S"</span>,</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>            <span class="st">"K"</span>,</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>            <span class="st">"r"</span>,</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>            <span class="st">"T"</span>,</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>            <span class="st">"sigma"</span>,</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>            <span class="st">"black_scholes"</span>,</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>            <span class="st">"observed_price"</span>,</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>        ],</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>        on<span class="op">=</span>[<span class="st">"Random forest"</span>, <span class="st">"Single layer"</span>, <span class="st">"Deep NN"</span>, <span class="st">"Lasso"</span>],</span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>        variable_name<span class="op">=</span><span class="st">"Model"</span>,</span>
+<span id="cb12-26"><a href="#cb12-26" aria-hidden="true" tabindex="-1"></a>        value_name<span class="op">=</span><span class="st">"Predicted"</span>,</span>
+<span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb12-28"><a href="#cb12-28" aria-hidden="true" tabindex="-1"></a>    .with_columns(</span>
+<span id="cb12-29"><a href="#cb12-29" aria-hidden="true" tabindex="-1"></a>        moneyness<span class="op">=</span>pl.col(<span class="st">"S"</span>) <span class="op">-</span> pl.col(<span class="st">"K"</span>),</span>
+<span id="cb12-30"><a href="#cb12-30" aria-hidden="true" tabindex="-1"></a>        pricing_error<span class="op">=</span>(pl.col(<span class="st">"Predicted"</span>) <span class="op">-</span> pl.col(<span class="st">"black_scholes"</span>)).<span class="bu">abs</span>(),</span>
 <span id="cb12-31"><a href="#cb12-31" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>    .assign(</span>
-<span id="cb12-33"><a href="#cb12-33" aria-hidden="true" tabindex="-1"></a>        moneyness<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="st">"S"</span>] <span class="op">-</span> x[<span class="st">"K"</span>],</span>
-<span id="cb12-34"><a href="#cb12-34" aria-hidden="true" tabindex="-1"></a>        pricing_error<span class="op">=</span><span class="kw">lambda</span> x: np.<span class="bu">abs</span>(x[<span class="st">"Predicted"</span>] <span class="op">-</span> x[<span class="st">"black_scholes"</span>]),</span>
-<span id="cb12-35"><a href="#cb12-35" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb12-36"><a href="#cb12-36" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-32"><a href="#cb12-32" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>In the lines above, we use each of the fitted models to generate predictions for the entire test dataset of option prices. We evaluate the absolute pricing error as one possible measure of pricing accuracy, defined as the absolute value of the difference between predicted option price and the theoretical correct option price from the Black-Scholes model. We show the results graphically in <a href="#fig-151" class="quarto-xref">Figure&nbsp;1</a>.</p>
 <div id="cell-fig-151" class="cell" data-execution_count="15">
@@ -869,20 +869,20 @@ x_k^l = f\left(\theta^k_{0} + \sum\limits_{j = 1}^{N ^l}z_j\theta_{l,j}^k\right)
 <span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> geom_point(alpha<span class="op">=</span><span class="fl">0.05</span>)</span>
 <span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> facet_wrap(<span class="st">"Model"</span>)</span>
 <span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> labs(</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Moneyness (S - K)"</span>, y<span class="op">=</span><span class="st">"Absolut prediction error (USD)"</span>,</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>        x<span class="op">=</span><span class="st">"Moneyness (S - K)"</span>, y<span class="op">=</span><span class="st">"Absolute prediction error (USD)"</span>,</span>
 <span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>        title<span class="op">=</span><span class="st">"Prediction errors of call options for different models"</span></span>
 <span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>        )</span>
 <span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    <span class="op">+</span> theme(legend_position<span class="op">=</span><span class="st">""</span>)</span>
 <span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>predictive_performance_figure.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-display">
-<div id="fig-151" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." data-fig-pos="htb">
+<div id="fig-151" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-pos="htb" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money.">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-151-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<a href="option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The figure shows absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training."><img src="option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png" data-fig-pos="htb" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." width="2100" height="1500" class="figure-img"></a>
+<a href="option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1" title="Figure&nbsp;1: The figure shows absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training."><img src="option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png" data-fig-pos="htb" alt="Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money." width="2100" height="1500" class="figure-img"></a>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-151-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;1: The figure shows absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
+Figure&nbsp;1: The figure shows absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
 </figcaption>
 </figure>
 </div>
@@ -948,105 +948,205 @@ Jiang, Jingwen, Bryan T. Kelly, and Dacheng Xiu. 2023. <span>“<span class="noc
 </div>
 </div></section></div></main> <!-- /main -->
 <div class="custom-footer">
+
   <div class="copyright">© Christoph Frey, Christoph Scheuch, Stefan Voigt &amp; Patrick Weiss</div>
+
   <a href="disclaimer.html">Disclaimer</a>
+
   <a href="#" id="open_preferences_center">Cookie Preferences</a>
-</div>
-<div id="presale-banner" hidden="">
-  <div class="presale-banner__inner">
-    <span class="presale-banner__text">
-      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
-      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
-    </span>
-    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
-  </div>
+
 </div>
 
+<div id="presale-banner" hidden="">
+
+  <div class="presale-banner__inner">
+
+    <span class="presale-banner__text">
+
+      🎓 <strong>Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.</strong>
+
+      <a href="https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science" target="_blank" rel="noopener">Apply now →</a>
+
+    </span>
+
+    <button type="button" id="presale-banner-close" class="presale-banner__close" aria-label="Dismiss banner">×</button>
+
+  </div>
+
+</div>
+
+
+
 <style>
+
   #presale-banner {
+
     background: #E1AF00;
+
     color: #fff;
+
     border-bottom: 1px solid rgba(255,255,255,0.1);
+
     font-size: 0.95rem;
+
   }
+
   #presale-banner[hidden] { display: none; }
+
   .presale-banner__inner {
+
     max-width: 1200px;
+
     margin: 0 auto;
+
     padding: 0.6rem 3rem 0.6rem 1rem;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     gap: 1rem;
+
     position: relative;
+
     text-align: center;
+
   }
+
   .presale-banner__text a {
+
     color: black;
+
     text-decoration: none;
+
     font-weight: 600;
+
     margin-left: 0.25rem;
+
   }
+
   .presale-banner__text a:hover { color: #3B9AB2; }
+
   .presale-banner__close {
+
     position: absolute;
+
     right: 0.75rem;
+
     top: 50%;
+
     transform: translateY(-50%);
+
     background: transparent;
+
     border: 0;
+
     color: #fff;
+
     font-size: 1.4rem;
+
     line-height: 1;
+
     cursor: pointer;
+
     padding: 0.25rem 0.5rem;
+
     border-radius: 4px;
+
   }
+
   .presale-banner__close:hover { background: rgba(255,255,255,0.15); }
+
   @media (max-width: 600px) {
+
     .presale-banner__inner { font-size: 0.8rem; padding: 0.5rem 2.5rem 0.5rem 0.75rem; }
+
   }
+
+
 
 </style>
 
+
+
 <script>
+
 (function () {
+
   var STORAGE_KEY = 'presale-banner-dismissed-2026-06-22';
+
   var PRESALE_END = new Date('2026-06-22T23:59:59');
 
+
+
   // Don't show if expired or previously dismissed
+
   if (new Date() > PRESALE_END) return;
+
   try {
+
     if (localStorage.getItem(STORAGE_KEY) === '1') return;
+
   } catch (e) { /* ignore */ }
 
+
+
   function init() {
+
     var banner = document.getElementById('presale-banner');
+
     if (!banner) return;
 
+
+
     // Move banner to sit directly below the navbar
+
     var navbar = document.querySelector('header.quarto-secondary-nav') 
+
               || document.querySelector('nav.navbar')
+
               || document.querySelector('header#quarto-header')
+
               || document.querySelector('header');
+
     if (navbar && navbar.parentNode) {
+
       navbar.parentNode.insertBefore(banner, navbar.nextSibling);
+
     }
+
     banner.hidden = false;
 
+
+
     document.getElementById('presale-banner-close')
+
       .addEventListener('click', function () {
+
         banner.hidden = true;
+
         try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) {}
+
       });
+
   }
 
+
+
   if (document.readyState === 'loading') {
+
     document.addEventListener('DOMContentLoaded', init);
+
   } else {
+
     init();
+
   }
+
 })();
+
 </script>
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {

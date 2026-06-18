@@ -12,7 +12,17 @@ The current chapter relies on this set of R packages.
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidyfinance)
+```
+
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 library(dbplyr)
 library(arrow)
 library(RPostgres)
@@ -53,9 +63,9 @@ The following chunk connects to the data and selects the bond sample to remove c
 7.  Exclude bonds that are payable in kind (`(pay_in_kind != 'Y' OR pay_in_kind IS NULL) AND pay_in_kind_exp_date IS NULL`).
 8.  Exclude foreign (`yankee == "N" OR is.na(yankee)`) and Canadian issuers (`canadian = 'N' OR canadian IS NULL`).
 9.  Exclude bonds denominated in foreign currency (`foreign_currency = 'N'`).
-10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and annual, semi-annual, quarterly, or monthly interest frequencies.
+10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and an interest frequency of zero (for zero-coupon bonds), annual, semi-annual, quarterly, or monthly.
 11. Exclude bonds that were issued under SEC Rule 144A (`rule_144a = 'N'`).
-12. Exlcude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
+12. Exclude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
 13. Exclude defaulted bonds (`defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL`).
 14. Exclude convertible (`convertible = 'N'`), putable (`putable = 'N' OR putable IS NULL`), exchangeable (`exchangeable = 'N' OR exchangeable IS NULL`), perpetual (`perpetual = 'N'`), or preferred bonds (`preferred_security = 'N' OR preferred_security IS NULL`).
 15. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
@@ -145,7 +155,7 @@ fisd <- fisd |>
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
 
 ``` r
-download_data("wrds_fisd")
+download_data(domain = "wrds", dataset = "fisd")
 ```
 
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
@@ -181,7 +191,8 @@ batches <- length(fisd_parts)
 
 for (j in 1:batches) {
   trace_enhanced <- download_data(
-    type = "wrds_trace_enhanced",
+    domain = "wrds",
+    dataset = "trace_enhanced",
     cusips = fisd_parts[[j]],
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
@@ -207,7 +218,8 @@ If you want to download the prepared enhanced TRACE data for selected bonds via 
 
 ``` r
 download_data(
-  "wrds_trace_enhanced",
+  domain = "wrds",
+  dataset = "trace_enhanced",
   cusips = c("00101JAH9"),
   start_date = "2019-01-01",
   end_date = "2021-12-31"
@@ -308,7 +320,7 @@ fisd |>
     2 maturity       9.48   8.99 -6.24  1.03    7.04   30.0   101.
     3 offering_amt 362.   557.    0.001 0.608 150    1250   15000 
 
-We see that the average bond in our sample period has an offering amount of over 357 million USD with a median of 200 million USD, which both cannot be considered small. The average bond has a maturity of 10 years and pays around 6 percent in coupons.
+We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 
@@ -340,7 +352,7 @@ trace_enhanced |>
     1 trade_number 25914. 5444. 439   17844. 26051  34383. 40839 
     2 trade_size   12968. 3577.  17.2  6128. 13421. 17850. 21312.
 
-On average, nearly 26 billion USD of corporate bonds are traded daily in nearly 13,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
+On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
 ## Key Takeaways
 

@@ -103,7 +103,7 @@ def roll_capm_estimation(data, look_back=60, min_obs=48):
     results = []
     dates = data["date"].unique().sort()
 
-    for i in range(look_back - 1, len(dates)):
+    for i in range(len(dates)):
         end_date = dates[i]
         start_date = end_date - relativedelta(months=look_back - 1)
 
@@ -235,16 +235,16 @@ capm_examples = (pl.concat([
 capm_examples
 ```
 
-shape: (3_018, 5)
+shape: (3_114, 5)
 
 | permno  | date       | coefficient  | estimate | t_statistic |
 |---------|------------|--------------|----------|-------------|
 | f64     | date       | str          | f64      | f64         |
-| 10107.0 | 1991-03-01 | "alpha"      | 0.042753 | 2.805863    |
-| 10107.0 | 1991-03-01 | "mkt_excess" | 1.41425  | 5.018872    |
-| 10107.0 | 1991-04-01 | "alpha"      | 0.038412 | 2.534832    |
-| 10107.0 | 1991-04-01 | "mkt_excess" | 1.434267 | 5.115538    |
-| 10107.0 | 1991-05-01 | "alpha"      | 0.039112 | 2.583179    |
+| 10107.0 | 1990-03-01 | "alpha"      | 0.041709 | 2.309559    |
+| 10107.0 | 1990-03-01 | "mkt_excess" | 1.397341 | 4.173565    |
+| 10107.0 | 1990-04-01 | "alpha"      | 0.042693 | 2.413745    |
+| 10107.0 | 1990-04-01 | "mkt_excess" | 1.385035 | 4.197367    |
+| 10107.0 | 1990-05-01 | "alpha"      | 0.044259 | 2.533768    |
 | …       | …          | …            | …        | …           |
 | 93436.0 | 2024-10-01 | "mkt_excess" | 2.380626 | 5.488947    |
 | 93436.0 | 2024-11-01 | "alpha"      | 0.038041 | 1.593754    |
@@ -252,7 +252,7 @@ shape: (3_018, 5)
 | 93436.0 | 2024-12-01 | "alpha"      | 0.039498 | 1.654254    |
 | 93436.0 | 2024-12-01 | "mkt_excess" | 2.385498 | 5.496126    |
 
-[Figure 1](#fig-601) displays the resulting beta estimates, focusing exclusively on the coefficient fo `"mkt_excess"`.
+[Figure 1](#fig-601) displays the resulting beta estimates, focusing exclusively on the coefficient for `"mkt_excess"`.
 
 ``` python
 beta_examples_sub = (capm_examples
@@ -278,15 +278,19 @@ beta_figure = (
 beta_figure.show()
 ```
 
-[![Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-output-1.png)](beta-estimation_files/figure-html/fig-601-output-1.png "Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
+[![Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across stocks but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-output-1.png)](beta-estimation_files/figure-html/fig-601-output-1.png "Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
 
 Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.
 
 ## Parallelized Rolling-Window Estimation
 
+> **TIP:**
+>
+> For a single-regressor model such as the CAPM, the rolling regressions can also be computed in closed form from precomputed cumulants, which avoids fitting millions of individual models. Our blog post [Fast, Vectorized Beta Estimation](../blog/fast-beta-estimation/index.llms.md) shows how to reproduce the results of this chapter in seconds, without parallelization.
+
 Even though we could now just apply the function to each group on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).
 
-If you have a Windows or Mac machine, it makes most sense use the default parallelization backend of `joblib`, which means that separate Python processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `joblib.parallel_config()`, you can also see other ways to resolve the parallelization in different environments. Note that we use `availableCores()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs.
+If you have a Windows or Mac machine, it makes most sense to use the default parallelization backend of `joblib`, which means that separate Python processes are running in the background on the same machine to perform the individual jobs. If you check out the documentation of `joblib.parallel_config()`, you can also see other ways to resolve the parallelization in different environments. Note that we use `cpu_count()` to determine the number of cores available for parallelization, but keep one core free for other tasks. Some machines might freeze if all cores are busy with Python jobs.
 
 ``` python
 n_cores = cpu_count() - 1
@@ -493,7 +497,7 @@ beta_daily = (capm_daily
 beta = pl.concat([beta_monthly, beta_daily])
 ```
 
-To compare the difference between daily and monthly data, we combine beta estimates to a single table. Then, we use the table to plot a comparison of beta estimates for our example stocks in [Figure 4](#fig-604).
+Then, we use the table to plot a comparison of beta estimates for our example stocks in [Figure 4](#fig-604).
 
 ``` python
 beta_comparison = beta.join(examples, how="inner", on="permno")
@@ -589,11 +593,11 @@ We also encourage everyone to always look at the distributional summary statisti
 
 shape: (2, 9)
 
-| return_type | count   | mean | std  | min   | q25  | median | q75  | max   |
-|-------------|---------|------|------|-------|------|--------|------|-------|
-| str         | u32     | f64  | f64  | f64   | f64  | f64    | f64  | f64   |
-| "daily"     | 2184539 | 0.8  | 0.49 | -3.67 | 0.42 | 0.76   | 1.12 | 4.74  |
-| "monthly"   | 2134302 | 1.1  | 0.7  | -9.01 | 0.64 | 1.04   | 1.47 | 10.35 |
+| return_type | count   | mean | std  | min    | q25  | median | q75  | max   |
+|-------------|---------|------|------|--------|------|--------|------|-------|
+| str         | u32     | f64  | f64  | f64    | f64  | f64    | f64  | f64   |
+| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.41 | 0.75   | 1.12 | 4.97  |
+| "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.64 | 1.04   | 1.48 | 11.72 |
 
 The summary statistics also look plausible for the two estimation procedures.
 

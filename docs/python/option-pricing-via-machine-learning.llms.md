@@ -11,7 +11,7 @@ Machine learning (ML) is seen as a part of artificial intelligence. ML algorithm
 Throughout this chapter, we need the following Python packages.
 
 ``` python
-import pandas as pd 
+import polars as pl
 import numpy as np
 
 from plotnine import *
@@ -59,7 +59,7 @@ To apply ML methods in a relevant field of finance, we focus on option pricing. 
 
 where \\C(S, T)\\ is the price of the option as a function of today’s stock price of the underlying, \\S\\, with time to maturity \\T\\, \\r_f\\ is the risk-free interest rate, and \\\sigma\\ is the volatility of the underlying stock return. \\\Phi\\ is the cumulative distribution function of a standard normal random variable.
 
-The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters \\S, K, r_f, T\\, and \\\sigma\\ are specified (arguably, in a realistic context, all parameters are easy to specify except for \\\sigma\\ which has to be estimated). A simple R function allows computing the price as we do below.
+The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters \\S, K, r_f, T\\, and \\\sigma\\ are specified (arguably, in a realistic context, all parameters are easy to specify except for \\\sigma\\ which has to be estimated). A simple Python function allows computing the price as we do below.
 
 ``` python
 def black_scholes_price(S, K, r, T, sigma):
@@ -92,30 +92,34 @@ r = np.arange(0, 0.051, 0.01)
 T = np.arange(3 / 12, 2.01, 1 / 12)
 sigma = np.arange(0.1, 0.81, 0.1)
 
-option_prices = pd.DataFrame(
-    product(S, K, r, T, sigma), columns=["S", "K", "r", "T", "sigma"]
+option_prices = pl.DataFrame(
+    list(product(S, K, r, T, sigma)),
+    schema=["S", "K", "r", "T", "sigma"],
+    orient="row",
 )
 
-option_prices["black_scholes"] = black_scholes_price(
-    option_prices["S"].values,
-    option_prices["K"].values,
-    option_prices["r"].values,
-    option_prices["T"].values,
-    option_prices["sigma"].values,
+option_prices = option_prices.with_columns(
+    black_scholes=black_scholes_price(
+        option_prices["S"].to_numpy(),
+        option_prices["K"].to_numpy(),
+        option_prices["r"].to_numpy(),
+        option_prices["T"].to_numpy(),
+        option_prices["sigma"].to_numpy(),
+    )
 )
 
-option_prices = option_prices.assign(
-    observed_price=lambda x: (x["black_scholes"] + np.random.normal(scale=0.15))
+option_prices = option_prices.with_columns(
+    observed_price=pl.col("black_scholes") + np.random.normal(scale=0.15)
 )
 ```
 
 The code above generates more than 1.5 million random parameter constellations (in the definition of the `option_prices` dataframe). For each of these values, the *true* prices reflecting the Black-Scholes model are given and a random innovation term *pollutes* the observed prices. The intuition of this application is simple: the simulated data provides many observations of option prices, by using the Black-Scholes equation we can evaluate the actual predictive performance of a ML method, which would be hard in a realistic context where the actual arbitrage-free price would be unknown.
 
-Next, we split the data into a training set (which contains 1 percent of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains `python len(option_prices.columns)` different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.
+Next, we split the data into a training set (which contains 1 percent of all the observed option prices) and a test set that will only be used for the final evaluation. Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 31,489 observations and is therefore relatively small.
 
 ``` python
 train_data, test_data = train_test_split(
-    option_prices, test_size=0.01, random_state=random_state
+    option_prices.to_pandas(), train_size=0.01, random_state=random_state
 )
 ```
 
@@ -238,22 +242,17 @@ test_X = test_data.get(["S", "K", "r", "T", "sigma"])
 test_y = test_data.get("observed_price")
 
 predictive_performance = (
-    pd.concat(
-        [
-            test_data.reset_index(drop=True),
-            pd.DataFrame(
-                {
-                    "Random forest": rf_fit.predict(test_X),
-                    "Single layer": nnet_fit.predict(test_X),
-                    "Deep NN": deepnnet_fit.predict(test_X),
-                    "Lasso": lm_fit.predict(test_X),
-                }
-            ),
-        ],
-        axis=1,
+    pl.from_pandas(test_data)
+    .with_columns(
+        **{
+            "Random forest": rf_fit.predict(test_X),
+            "Single layer": nnet_fit.predict(test_X),
+            "Deep NN": deepnnet_fit.predict(test_X),
+            "Lasso": lm_fit.predict(test_X),
+        }
     )
-    .melt(
-        id_vars=[
+    .unpivot(
+        index=[
             "S",
             "K",
             "r",
@@ -262,12 +261,13 @@ predictive_performance = (
             "black_scholes",
             "observed_price",
         ],
-        var_name="Model",
+        on=["Random forest", "Single layer", "Deep NN", "Lasso"],
+        variable_name="Model",
         value_name="Predicted",
     )
-    .assign(
-        moneyness=lambda x: x["S"] - x["K"],
-        pricing_error=lambda x: np.abs(x["Predicted"] - x["black_scholes"]),
+    .with_columns(
+        moneyness=pl.col("S") - pl.col("K"),
+        pricing_error=(pl.col("Predicted") - pl.col("black_scholes")).abs(),
     )
 )
 ```
@@ -283,7 +283,7 @@ predictive_performance_figure = (
     + geom_point(alpha=0.05)
     + facet_wrap("Model")
     + labs(
-        x="Moneyness (S - K)", y="Absolut prediction error (USD)",
+        x="Moneyness (S - K)", y="Absolute prediction error (USD)",
         title="Prediction errors of call options for different models"
         )
     + theme(legend_position="")
@@ -291,9 +291,9 @@ predictive_performance_figure = (
 predictive_performance_figure.show()
 ```
 
-[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money.](option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png)](option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png "Figure 1: The figure shows absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
+[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money.](option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png)](option-pricing-via-machine-learning_files/figure-html/fig-151-output-1.png "Figure 1: The figure shows absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
 
-Figure 1: The figure shows absolut prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
+Figure 1: The figure shows absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
 
 The results can be summarized as follows:
 

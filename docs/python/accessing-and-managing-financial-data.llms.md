@@ -152,7 +152,7 @@ All of these steps are doable, but none of them are really about finance - they 
 import tidyfinance as tf
 ```
 
-For example, we can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scale them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French’s finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.
+For example, we can use the `tf.download_data()` function of the package to download monthly Fama-French factors. The set *Fama/French 3 Factors* contains the return time series of the market (`mkt_excess`), size (`smb`), and value (`hml`) factors alongside the risk-free rates (`risk_free`). Note that the `tf.download_data()` function parses all the columns correctly and already scales them appropriately, as the raw Fama-French data comes in a unique data format. For precise descriptions of the variables, we suggest consulting Prof. Kenneth French’s finance data library directly. If you are on the website, check the raw data files to appreciate the time you can save thanks to the `tidyfinance` package.
 
 Because the downloaded data arrives with timestamp columns, we cast the `date` column to the polars `Date` type — calendar dates rather than timestamps — a convention we use for all tables we store in this book.
 
@@ -212,7 +212,7 @@ It is worth taking a look at all available portfolio return time series from Ken
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the Hou et al. ([2014](#ref-Hou2015)) *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q*-factors can be downloaded directly from the authors’ homepage.
 
-We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prescript using regular expressions and write all column names in lowercase. We then filter the data to select observations between the start and end dates. Finally, we apply the same transform of dividing by 100 to all four factors. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html)
+We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prescript using regular expressions and write all column names in lowercase. We then filter the data to select observations between the start and end dates. Finally, we apply the same transform of dividing by 100 to all factor returns. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html)
 
 We download the CSV with `requests` and pass the response body directly to `pl.read_csv()`:
 
@@ -226,13 +226,15 @@ factors_q_monthly = (
     .with_columns(
         date=pl.date(pl.col("year"), pl.col("month"), 1)
     )
-    .drop(["R_F", "R_MKT", "year"])
+    .drop(["year", "month"])
     .rename(lambda x: x.replace("R_", "").lower())
+    .rename({"f": "risk_free", "mkt": "mkt_excess"})
     .filter(
         (pl.col("date") >= pl.lit(start_date).str.to_date())
         & (pl.col("date") <= pl.lit(end_date).str.to_date())
     )
-    .with_columns(pl.col(["me", "ia", "roe", "eg"]) / 100)
+    .with_columns(pl.exclude("date") / 100)
+    .select(["date", "risk_free", "mkt_excess", "me", "ia", "roe", "eg"])
 )
 ```
 
@@ -247,9 +249,25 @@ tf.download_data(
 )
 ```
 
+|     | date       | risk_free | mkt_excess | me        | ia        | roe       | eg        |
+|-----|------------|-----------|------------|-----------|-----------|-----------|-----------|
+| 0   | 1967-01-01 | 0.003927  | 0.081852   | 0.068122  | -0.029263 | 0.018813  | -0.025511 |
+| 1   | 1967-02-01 | 0.003743  | 0.007557   | 0.016235  | -0.002915 | 0.035399  | 0.021792  |
+| 2   | 1967-03-01 | 0.003693  | 0.040169   | 0.019836  | -0.016772 | 0.018417  | -0.011192 |
+| 3   | 1967-04-01 | 0.003344  | 0.038786   | -0.006700 | -0.028972 | 0.010253  | -0.016371 |
+| 4   | 1967-05-01 | 0.003126  | -0.042807  | 0.027457  | 0.021864  | 0.005901  | 0.001191  |
+| ... | ...        | ...       | ...        | ...       | ...       | ...       | ...       |
+| 691 | 2024-08-01 | 0.004419  | 0.016518   | -0.040817 | 0.004687  | 0.018369  | 0.008116  |
+| 692 | 2024-09-01 | 0.004619  | 0.016806   | -0.011967 | -0.000010 | 0.007408  | -0.032810 |
+| 693 | 2024-10-01 | 0.003907  | -0.009701  | -0.011261 | -0.011676 | -0.002314 | -0.008335 |
+| 694 | 2024-11-01 | 0.003955  | 0.065002   | 0.043985  | -0.049491 | -0.015370 | -0.021420 |
+| 695 | 2024-12-01 | 0.003663  | -0.031637  | -0.051564 | -0.003684 | -0.021442 | 0.049624  |
+
+696 rows × 7 columns
+
 ## Macroeconomic Predictors
 
-Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. Welch and Goyal ([2008](#ref-Goyal2008)) comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data on [Amit Goyal’s website.](https://sites.google.com/view/agoyal145) Since the data is an XLSX-file stored on a public Google Drive location, we need additional packages to access the data directly from our Python session. Usually, you need to authenticate if you interact with Google drive directly in Python. Since the data is stored via a public link, we can proceed without any authentication.
+Our next data source is a set of macroeconomic variables often used as predictors for the equity premium. Welch and Goyal ([2008](#ref-Goyal2008)) comprehensively reexamine the performance of variables suggested by the academic literature to be good predictors of the equity premium. The authors host the data on [Amit Goyal’s website.](https://sites.google.com/view/agoyal145) Since the data is an XLSX-file stored on a public Google Drive location, we need additional packages to access the data directly from our Python session. Usually, you need to authenticate if you interact with Google Drive directly in Python. Since the data is stored via a public link, we can proceed without any authentication.
 
 ``` python
 sheet_id = "1bM7vCWd3WOt95Sf9qjLPZjoiafgF_8EG"
@@ -271,7 +289,7 @@ Next, we read in the new data and transform the columns into the variables that 
 7.  Net equity expansion (`ntis`), the ratio of 12-month moving sums of net issues by NYSE listed stocks divided by the total end-of-year market capitalization of NYSE stocks ([Campbell et al. 2008](#ref-Campbell2008)).
 8.  Treasury bills (`tbl`), the 3-Month Treasury Bill: Secondary Market Rate from the economic research database at the Federal Reserve Bank at St. Louis ([Campbell 1987](#ref-Campbell1987)).
 9.  Long-term yield (`lty`), the long-term government bond yield from Ibbotson’s Stocks, Bonds, Bills, and Inflation Yearbook ([Welch and Goyal 2008](#ref-Goyal2008)).
-10. Long-term rate of returns (`ltr`), the long-term government bond returns from Ibbotson’s Stocks, Bonds, Bills, and Inflation Yearbook ([Welch and Goyal 2008](#ref-Goyal2008)).
+10. Long-term rate of return (`ltr`), the long-term government bond returns from Ibbotson’s Stocks, Bonds, Bills, and Inflation Yearbook ([Welch and Goyal 2008](#ref-Goyal2008)).
 11. Term spread (`tms`), the difference between the long-term yield on government bonds and the Treasury bill ([Campbell 1987](#ref-Campbell1987)).
 12. Default yield spread (`dfy`), the difference between BAA and AAA-rated corporate bond yields ([Fama and French 1989](#ref-Fama1989)).
 13. Inflation (`infl`), the Consumer Price Index (All Urban Consumers) from the Bureau of Labor Statistics ([Campbell and Vuolteenaho 2004](#ref-Campbell2004)).
@@ -339,9 +357,25 @@ tf.download_data(
 )
 ```
 
+|  | date | rp_div | dp | dy | ep | de | svar | bm | ntis | tbl | lty | ltr | tms | dfy | infl |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| 1068 | 1960-01-01 | 0.006165 | -3.394191 | -3.468337 | -2.797533 | -0.596658 | 0.000919 | 0.499502 | 0.022116 | 0.0435 | 0.0441 | 0.0112 | 0.0006 | 0.0073 | -0.003401 |
+| 1069 | 1960-02-01 | -0.015793 | -3.383903 | -3.374774 | -2.806662 | -0.577241 | 0.001150 | 0.493557 | 0.024037 | 0.0396 | 0.0429 | 0.0204 | 0.0033 | 0.0078 | 0.003413 |
+| 1070 | 1960-03-01 | -0.020521 | -3.350808 | -3.364804 | -2.792666 | -0.558142 | 0.000969 | 0.549798 | 0.025593 | 0.0331 | 0.0411 | 0.0282 | 0.0080 | 0.0076 | 0.000000 |
+| 1071 | 1960-04-01 | 0.023755 | -3.331425 | -3.349108 | -2.787838 | -0.543587 | 0.000645 | 0.563404 | 0.025577 | 0.0323 | 0.0426 | -0.0170 | 0.0103 | 0.0075 | 0.003401 |
+| 1072 | 1960-05-01 | 0.016046 | -3.356176 | -3.329677 | -2.827389 | -0.528786 | 0.000424 | 0.541966 | 0.024414 | 0.0329 | 0.0417 | 0.0152 | 0.0088 | 0.0082 | 0.000000 |
+| ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... | ... |
+| 1830 | 2023-07-01 | -0.022065 | -4.198545 | -4.167881 | -3.226908 | -0.971637 | 0.000537 | 0.205917 | -0.016677 | 0.0525 | 0.0390 | -0.0035 | -0.0135 | 0.0108 | 0.001908 |
+| 1831 | 2023-08-01 | -0.053627 | -4.177780 | -4.195656 | -3.203119 | -0.974662 | 0.001337 | 0.210885 | -0.016514 | 0.0530 | 0.0417 | -0.0052 | -0.0113 | 0.0107 | 0.004367 |
+| 1832 | 2023-09-01 | -0.026090 | -4.124953 | -4.174900 | -3.147294 | -0.977660 | 0.001023 | 0.218528 | -0.017989 | 0.0532 | 0.0438 | -0.0221 | -0.0094 | 0.0103 | 0.002485 |
+| 1833 | 2023-10-01 | 0.079457 | -4.097976 | -4.120201 | -3.110379 | -0.987598 | 0.001678 | 0.221534 | -0.014711 | 0.0534 | 0.0480 | -0.0121 | -0.0054 | 0.0102 | -0.000383 |
+| 1834 | 2023-11-01 | 0.038308 | -4.178670 | -4.093246 | -3.181326 | -0.997345 | 0.001341 | 0.203676 | -0.020618 | 0.0527 | 0.0450 | 0.0347 | -0.0077 | 0.0101 | -0.002015 |
+
+767 rows × 15 columns
+
 ## Other Macroeconomic Data
 
-The Federal Reserve bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the `tidyfinance` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.
+The Federal Reserve Bank of St. Louis provides the Federal Reserve Economic Data (FRED), an extensive database for macroeconomic data. In total, there are 817,000 US and international time series from 108 different sources. As an illustration, we use the `tidyfinance` package to fetch consumer price index (CPI) data that can be found under the [CPIAUCNS](https://fred.stlouisfed.org/series/CPIAUCNS) key.
 
 ``` python
 series = "CPIAUCNS"
@@ -393,7 +427,7 @@ To download other time series, we just have to look it up on the FRED website an
 
 ## Setting Up a Database
 
-Now that we have downloaded some (freely available) data from the web into the memory of our Python session let store that information for future use. We will use the data stored throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code.
+Now that we have downloaded some (freely available) data from the web into the memory of our Python session, let us store that information for future use. We will use the data stored throughout the following chapters, but you could alternatively implement a different strategy and replace the respective code.
 
 There are many ways to set up and organize your data, depending on the use case. Storing data as Parquet files creates a universal data format that seamlessly works across different programming languages and platforms. Unlike CSV files that often lose data types when shared between R, Python, Julia, or other languages, Parquet files maintain perfect data integrity regardless of which tool reads them. A dataset saved as Parquet in Python can be opened directly in Python’s pandas, or Julia’s DataFrames.jl.[^1]
 
@@ -455,7 +489,7 @@ for key, value in data_dict.items():
 
 - Importing Fama-French factors, q-factors, macroeconomic indicators, and CPI data is simplified through API calls, CSV parsing, and web scraping techniques.
 - The `tidyfinance` Python package offers pre-processed access to financial datasets, reducing manual data cleaning and saving valuable time.
-- Creating a centralized SQLite database helps manage and organize data efficiently across projects, while maintaining reproducibility.
+- Storing data as Parquet files helps manage and organize data efficiently across projects, while maintaining reproducibility.
 - Structured database storage supports scalable data access, which is essential for long-term academic projects and collaborative work in finance.
 
 ## Exercises

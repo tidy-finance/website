@@ -20,7 +20,7 @@ It should be clear that the promised benefits of penalized regressions, i.e., re
 
 ### Ridge regression
 
-One biased estimator is known as Ridge regression. Hoerl and Kennard ([1970](#ref-Hoerl1970)) propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the \\L_2\\ norm of the parameters* \\\hat\beta\\. Formally, this means that for a penalty factor \\\lambda\geq 0\\, the minimization problem takes the form \\\min\_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c\\. Here \\c\geq 0\\ is a constant that depends on the choice of \\\lambda\\. The larger \\\lambda\\, the smaller \\c\\ (technically speaking, there is a one-to-one relationship between \\\lambda\\, which corresponds to the Lagrangian of the minimization problem above and \\c\\). Here, \\X = \left(x_1 \ldots x_T\right)'\\ and \\y = \left(y_1, \ldots, y_T\right)'\\. A closed-form solution for the resulting regression coefficient vector \\\beta^\text{ridge}\\ exists: \\\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.\\ A couple of observations are worth noting: \\\hat\beta^\text{ridge} = \hat\beta^\text{ols}\\ for \\\lambda = 0\\ and \\\hat\beta^\text{ridge} \rightarrow 0\\ for \\\lambda\rightarrow \infty\\. Also for \\\lambda \> 0\\, \\\left(X'X + \lambda I\right)\\ is non-singular even if \\X'X\\ is which means that \\\hat\beta^\text{ridge}\\ exists even if \\\hat\beta\\ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter \\\lambda\\ which controls the *amount of regularization*: a larger value of \\\lambda\\ implies *shrinkage* of the regression coefficient toward 0, a smaller value of \\\lambda\\ reduces the bias of the resulting estimator.
+One biased estimator is known as Ridge regression. Hoerl and Kennard ([1970](#ref-Hoerl1970)) propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the \\L_2\\ norm of the parameters* \\\hat\beta\\. Formally, this means that for a penalty factor \\\lambda\geq 0\\, the minimization problem takes the form \\\min\_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c\\. Here \\c\geq 0\\ is a constant that depends on the choice of \\\lambda\\. The larger \\\lambda\\, the smaller \\c\\ (technically speaking, there is a one-to-one relationship between \\\lambda\\, which corresponds to the Lagrangian of the minimization problem above and \\c\\). Here, \\X = \left(x_1 \ldots x_T\right)'\\ and \\y = \left(y_1, \ldots, y_T\right)'\\. A closed-form solution for the resulting regression coefficient vector \\\beta^\text{ridge}\\ exists: \\\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.\\ A couple of observations are worth noting: \\\hat\beta^\text{ridge} = \hat\beta^\text{ols}\\ for \\\lambda = 0\\ and \\\hat\beta^\text{ridge} \rightarrow 0\\ for \\\lambda\rightarrow \infty\\. Also for \\\lambda \> 0\\, \\\left(X'X + \lambda I\right)\\ is non-singular even if \\X'X\\ is not, which means that \\\hat\beta^\text{ridge}\\ exists even if \\\hat\beta\\ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter \\\lambda\\ which controls the *amount of regularization*: a larger value of \\\lambda\\ implies *shrinkage* of the regression coefficient toward 0, a smaller value of \\\lambda\\ reduces the bias of the resulting estimator.
 
 Note that \\X\\ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that \\y\\ is simply demeaned before computing \\\hat\beta^\text{ridge}\\.
 
@@ -41,6 +41,11 @@ To get started, we load the required R packages and data. The main focus is on t
 ``` r
 library(arrow)
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidymodels)
 library(scales)
 library(furrr)
@@ -60,17 +65,17 @@ Next, we include macroeconomic predictors which may predict the general stock ma
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets’ cross-section of returns. In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French’s homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
 
 ``` r
-factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
+factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
   rename_with(~ str_c("factor_ff_", .), -date)
 
-factors_q_monthly <- read_parquet("data-r/factors_q_monthly.parquet") |>
+factors_q_monthly <- read_parquet("data/factors_q_monthly.parquet") |>
   rename_with(~ str_c("factor_q_", .), -date)
 
-macro_predictors <- read_parquet("data-r/macro_predictors.parquet") |>
+macro_predictors <- read_parquet("data/macro_predictors.parquet") |>
   rename_with(~ str_c("macro_", .), -date) |>
   select(-macro_rp_div)
 
-industries_ff_monthly <- read_parquet("data-r/industries_ff_monthly.parquet") |>
+industries_ff_monthly <- read_parquet("data/industries_ff_monthly.parquet") |>
   pivot_longer(-date, names_to = "industry", values_to = "ret") |>
   arrange(desc(industry)) |>
   mutate(industry = as_factor(industry))
@@ -90,7 +95,7 @@ data <- industries_ff_monthly |>
   drop_na()
 ```
 
-Our data contains 26 columns of regressors with the 13 macro-variables and 12 factor returns for each month. [Figure 1](#fig-1401) provides summary statistics for the 10 monthly industry excess returns in percent.
+Our data contains 24 columns of regressors with the 13 macro-variables and 10 factor returns for each month. [Figure 1](#fig-1401) provides summary statistics for the 10 monthly industry excess returns in percent.
 
 ``` r
 data |>
@@ -170,21 +175,21 @@ data_bake <- bake(data_prep,
 data_bake
 ```
 
-    # A tibble: 137 × 182
+    # A tibble: 137 × 154
       factor_ff_mkt_excess factor_ff_smb factor_ff_hml
                      <dbl>         <dbl>         <dbl>
     1               0.0709       -0.940         -0.150
-    2               0.448         0.0895         0.295
-    3               0.489         0.0737         0.430
-    4              -0.478        -0.413          1.09 
-    5               0.0687        0.121         -0.426
+    2               0.448         0.0896         0.296
+    3               0.489         0.0738         0.430
+    4              -0.478        -0.412          1.09 
+    5               0.0688        0.121         -0.426
     # ℹ 132 more rows
-    # ℹ 179 more variables: factor_ff_risk_free <dbl>,
+    # ℹ 151 more variables: factor_ff_risk_free <dbl>,
     #   factor_q_risk_free <dbl>, factor_q_mkt_excess <dbl>,
-    #   factor_q_year <dbl>, factor_q_month <dbl>, factor_q_me <dbl>,
-    #   factor_q_ia <dbl>, factor_q_roe <dbl>, factor_q_eg <dbl>,
-    #   macro_dp <dbl>, macro_dy <dbl>, macro_ep <dbl>, macro_de <dbl>,
-    #   macro_svar <dbl>, macro_bm <dbl>, macro_ntis <dbl>, …
+    #   factor_q_me <dbl>, factor_q_ia <dbl>, factor_q_roe <dbl>,
+    #   factor_q_eg <dbl>, macro_dp <dbl>, macro_dy <dbl>,
+    #   macro_ep <dbl>, macro_de <dbl>, macro_svar <dbl>,
+    #   macro_bm <dbl>, macro_ntis <dbl>, macro_tbl <dbl>, …
 
 Note that the resulting data contains the 132 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially.
 
@@ -495,7 +500,7 @@ select_variables <- function(input) {
 }
 
 # Parallelization
-plan(multisession, workers = availableCores())
+plan(sequential)
 
 # Computation by industry
 selected_factors <- data |>
@@ -557,7 +562,7 @@ The heat map in [Figure 5](#fig-1405) conveys two main insights. First, we see 
 
 1.  Write a function that requires three inputs, namely, `y` (a \\T\\ vector), `X` (a \\(T \times K)\\ matrix), and `lambda` and then returns the Ridge estimator (a \\K\\ vector) for a given penalization parameter \\\lambda\\. Recall that the intercept should not be penalized. Therefore, your function should indicate whether \\X\\ contains a vector of ones as the first column, which should be exempt from the \\L_2\\ penalty.
 2.  Compute the \\L_2\\ norm (\\\beta'\beta\\) for the regression coefficients based on the predictive regression from the previous exercise for a range of \\\lambda\\’s and illustrate the effect of penalization in a suitable figure.
-3.  Now, write a function that requires three inputs, namely, `y` (a \\T\\ vector), `X` (a \\(T \times K)\\ matrix), and ’lambda\` and then returns the Lasso estimator (a \\K\\ vector) for a given penalization parameter \\\lambda\\. Recall that the intercept should not be penalized. Therefore, your function should indicate whether \\X\\ contains a vector of ones as the first column, which should be exempt from the \\L_1\\ penalty.
+3.  Now, write a function that requires three inputs, namely, `y` (a \\T\\ vector), `X` (a \\(T \times K)\\ matrix), and `lambda` and then returns the Lasso estimator (a \\K\\ vector) for a given penalization parameter \\\lambda\\. Recall that the intercept should not be penalized. Therefore, your function should indicate whether \\X\\ contains a vector of ones as the first column, which should be exempt from the \\L_1\\ penalty.
 4.  After you understand what Ridge and Lasso regressions are doing, familiarize yourself with the `glmnet()` package’s documentation. It is a thoroughly tested and well-established package that provides efficient code to compute the penalized regression coefficients for Ridge and Lasso and for combinations, commonly called *Elastic Nets*.
 
 ## References

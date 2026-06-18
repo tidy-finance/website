@@ -12,7 +12,17 @@ First, we load the global R packages that we use throughout this chapter. Later 
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidyfinance)
+```
+
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 library(scales)
 ```
 
@@ -59,6 +69,12 @@ request(url) |>
   ) |>
   req_perform(path = tmp_zip)
 ```
+
+    <httr2_response>
+    GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
+    Status: 200 OK
+    Content-Type: application/x-zip-compressed
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpQ5PpUY\file774440d9908.zip' (13044 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -338,6 +354,18 @@ cpi_monthly <- resp_csv |>
   ) |>
   select(date, series, value, cpi)
 ```
+
+    Warning: The `file` argument of `vroom()` must use `I()` for literal data as
+    of vroom 1.5.0.
+      
+      # Bad:
+      vroom("X,Y\n1.5,2.3\n")
+      
+      # Good:
+      vroom(I("X,Y\n1.5,2.3\n"))
+    ℹ The deprecated feature was likely used in the readr package.
+      Please report the issue at
+      <https://github.com/tidyverse/readr/issues>.
 
 The last line sets the current (latest) price level as the reference price level.
 
