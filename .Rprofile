@@ -1,2 +1,2 @@
 source("renv/activate.R")
-source("r/render-settings.R")
+source("assets/render-settings.R")

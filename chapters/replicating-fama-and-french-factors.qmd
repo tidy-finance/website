@@ -10,12 +10,12 @@ metadata:
 ```{python}
 #| label: replicating-fama-and-french-factors-setup
 #| echo: false
-exec(open("python/render-settings.py").read())
+exec(open("assets/render-settings.py").read())
 ```
 
 In this chapter, we provide a replication of the famous Fama-French factor portfolios. The Fama-French factor models are a cornerstone of empirical asset pricing [see @Fama1992 and @FamaFrench2015]. On top of the market factor represented by the traditional CAPM beta, the three-factor model includes the size and value factors to explain the cross section of returns. Its successor, the five-factor model, additionally includes profitability and investment as explanatory factors.
 
-We start with the three-factor model. We already introduced the size and value factors in [Value and Bivariate Sorts](../r/value-and-bivariate-sorts.qmd), and their definition remains the same: size is the SMB factor (small-minus-big)\index{Market capitalization}\index{Firm size} that is long small firms and short large firms. The value factor is HML (high-minus-low)\index{Book equity}\index{Book-to-market ratio} and is long in high book-to-market firms and short in low book-to-market counterparts.
+We start with the three-factor model. We already introduced the size and value factors in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd), and their definition remains the same: size is the SMB factor (small-minus-big)\index{Market capitalization}\index{Firm size} that is long small firms and short large firms. The value factor is HML (high-minus-low)\index{Book equity}\index{Book-to-market ratio} and is long in high book-to-market firms and short in low book-to-market counterparts.
 
 After the replication of the three-factor model, we move to the five factors by constructing the profitability factor RMW (robust-minus-weak) as the difference between the returns of firms with high and low operating profitability and the investment factor CMA (conservative-minus-aggressive) as the difference between firms with high versus low investment rates.
 
@@ -46,7 +46,7 @@ from regtabletotext import prettify_result
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}\index{Data!Fama-French factors} The only addition is that we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}
+We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd).^[Note that @Fama1992 claim to exclude financial firms. To a large extent this happens through using industry format "INDL", as we do in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). Neither the original paper, nor Ken French's website, or the WRDS replication contains any indication that financial companies are excluded using additional filters such as industry codes.] \index{Data!CRSP}\index{Data!Compustat}\index{Data!Fama-French factors} The only addition is that we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios [see @Fama1992 for details].\index{Book equity}
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -104,7 +104,7 @@ factors_ff5_monthly = (
 
 :::
 
-Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](../r/value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
+Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
 Second, Fama and French also have a different protocol for computing the book-to-market ratio.\index{Book-to-market ratio} They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year.\index{Book equity} Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year $t-1$.
 
@@ -183,7 +183,7 @@ sorting_variables = (size
 
 ## Portfolio Sorts
 
-Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints to independently form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30- and 70-percentiles. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](../r/value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which takes the sequence of breakpoints as an object specified in the function's call. Additionally, we perform an inner join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
+Next, we construct our portfolios with an adjusted `assign_portfolio()` function.\index{Portfolio sorts} Fama and French rely on NYSE-specific breakpoints to independently form two portfolios in the size dimension at the median and three portfolios in the dimension of book-to-market at the 30- and 70-percentiles. The sorts for book-to-market require an adjustment to the function in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd) because it would not produce the right breakpoints. Instead of `n_portfolios`, we now specify `percentiles`, which takes the sequence of breakpoints as an object specified in the function's call. Additionally, we perform an inner join with our return data to ensure that we only use traded stocks when computing the breakpoints as a first step.\index{Breakpoints}
 
 ::: {.panel-tabset group="language"}
 ### R
