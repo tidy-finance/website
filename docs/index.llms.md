@@ -1,21 +1,140 @@
-# Welcome to Tidy Finance
+★ Open-source · R & Python · Reproducible
 
-Tidy Finance is an opinionated approach to empirical research in financial economics - a fully transparent, open-source code base in multiple programming languages.
+# Empirical finance, reproducible in R and Python
 
-## Join Tidy Finance
+Tidy Finance takes an opinionated, fully transparent approach to empirical research in financial economics. One open-source code base now covers R and Python, side by side in every chapter.
 
-- Learn about empirical applications based on a fully transparent code base
-- Teach students the importance of reproducible research using tidy principles
-- Start your next finance research project one step ahead with a Tidy Finance basis
-- [Support](support.llms.md) the maintenance of our open-source project
-- [Contribute](contribute.llms.md) to mission of reproducible finance via our blog
-- Reach out with ideas, suggestions, and feedback via <contact@tidy-finance.org>
+[Start here](chapters/working-with-stock-returns.llms.md) [R & Python docs](https://package.tidy-finance.org) [Data platform](https://factors.tidy-finance.org)
 
-## Choose your language
+download & plot prices
 
-R
+## R
 
-Python
+``` r
+library(tidyfinance)
+library(ggplot2)
+
+prices <- download_data(
+  domain = "stock_prices",
+  symbols = "AAPL",
+  start_date = "2000-01-01",
+  end_date = "2024-12-31"
+)
+
+prices |>
+  ggplot(aes(date, adjusted_close)) +
+  geom_line()
+```
+
+## Python
+
+``` python
+import tidyfinance as tf
+from plotnine import ggplot, aes, geom_line
+
+prices = tf.download_data(
+  domain="stock_prices",
+  symbols="AAPL",
+  start_date="2000-01-01",
+  end_date="2024-12-31"
+)
+
+(prices
+  .pipe(ggplot, aes("date", "adjusted_close"))
+  + geom_line())
+```
+
+20+ Hands-on chapters
+
+2 Languages, one code base
+
+100% Open source & reproducible
+
+## Everything you need for reproducible finance
+
+A single, transparent code base takes you from raw data to publication-quality results, in whichever language you prefer.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTYgMTggMjIgMTIgMTYgNiI+PC9wb2x5bGluZT48cG9seWxpbmUgcG9pbnRzPSI4IDYgMiAxMiA4IDE4Ij48L3BvbHlsaW5lPjwvc3ZnPg==)
+
+### One code base, two languages
+
+Every chapter ships R and Python side by side from a single source. Switch with a tab. Your choice follows you through the book.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjMgNCAyMyAxMCAxNyAxMCI+PC9wb2x5bGluZT48cG9seWxpbmUgcG9pbnRzPSIxIDIwIDEgMTQgNyAxNCI+PC9wb2x5bGluZT48cGF0aCBkPSJNMy41MSA5YTkgOSAwIDAgMSAxNC44NS0zLjM2TDIzIDEwTTEgMTRsNC42NCA0LjM2QTkgOSAwIDAgMCAyMC40OSAxNSIgLz48L3N2Zz4=)
+
+### Fully transparent & reproducible
+
+Open code you can run end to end, from raw data to every figure and table, with no black boxes.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGxpbmUgeDE9IjE2LjUiIHkxPSI5LjQiIHgyPSI3LjUiIHkyPSI0LjIxIj48L2xpbmU+PHBhdGggZD0iTTIxIDE2VjhhMiAyIDAgMCAwLTEtMS43M2wtNy00YTIgMiAwIDAgMC0yIDBsLTcgNEEyIDIgMCAwIDAgMyA4djhhMiAyIDAgMCAwIDEgMS43M2w3IDRhMiAyIDAgMCAwIDIgMGw3LTRBMiAyIDAgMCAwIDIxIDE2eiIgLz48cG9seWxpbmUgcG9pbnRzPSIzLjI3IDYuOTYgMTIgMTIuMDEgMjAuNzMgNi45NiI+PC9wb2x5bGluZT48bGluZSB4MT0iMTIiIHkxPSIyMi4wOCIgeDI9IjEyIiB5Mj0iMTIiPjwvbGluZT48L3N2Zz4=)
+
+### Powered by `tidyfinance`
+
+A companion package for R and Python that wraps data downloads and the routines we use throughout the book.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGVsbGlwc2UgY3g9IjEyIiBjeT0iNSIgcng9IjkiIHJ5PSIzIj48L2VsbGlwc2U+PHBhdGggZD0iTTIxIDEyYzAgMS42Ni00IDMtOSAzcy05LTEuMzQtOS0zIiAvPjxwYXRoIGQ9Ik0zIDV2MTRjMCAxLjY2IDQgMyA5IDNzOS0xLjM0IDktM1Y1IiAvPjwvc3ZnPg==)
+
+### Real financial data
+
+Work with the data professionals use, like CRSP, Compustat, and TRACE, through clean, documented access patterns.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMjMgNiAxMy41IDE1LjUgOC41IDEwLjUgMSAxOCI+PC9wb2x5bGluZT48cG9seWxpbmUgcG9pbnRzPSIxNyA2IDIzIDYgMjMgMTIiPjwvcG9seWxpbmU+PC9zdmc+)
+
+### From sorts to machine learning
+
+Portfolio sorts, factor models, fixed effects, causal inference, and modern ML give you the full empirical toolkit.
+
+![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTQgMTkuNUEyLjUgMi41IDAgMCAxIDYuNSAxN0gyMCIgLz48cGF0aCBkPSJNNi41IDJIMjB2MjBINi41QTIuNSAyLjUgMCAwIDEgNCAxOS41di0xNUEyLjUgMi41IDAgMCAxIDYuNSAyeiIgLz48L3N2Zz4=)
+
+### A free, open book
+
+Read the whole book online for free, dive into the blog, or join a workshop, all in the open.
+
+## Browse the book by topic
+
+Five parts take you from your first stock return to constrained portfolio backtests.
+
+PART 01
+
+### Getting Started
+
+Stock returns, modern portfolio theory, the CAPM, and financial statement analysis.
+
+Start here →
+
+PART 02
+
+### Financial Data
+
+Access and manage WRDS, CRSP, Compustat, TRACE, and FISD with documented workflows.
+
+Explore data →
+
+PART 03
+
+### Asset Pricing
+
+Beta estimation, univariate and bivariate sorts, Fama-French factors, and Fama-MacBeth.
+
+Price assets →
+
+PART 04
+
+### Modeling & Machine Learning
+
+Fixed effects, difference-in-differences, factor selection, and option pricing via ML.
+
+Model it →
+
+PART 05
+
+### Portfolio Optimization
+
+Parametric portfolio policies and constrained optimization with realistic backtesting.
+
+Optimize →
+
+Praise
 
 ## What experts say about Tidy Finance
 
@@ -41,7 +160,7 @@ Fellow at Tinbergen Institute
 
 ![A portrait of Nikolaus Hautsch](assets/img/quotes/nikolaus_hautsch.jpeg)
 
-*A fantastic book bringing together financial theory, sound econometrics, thorough data processing and powerful programming techniques using R. An absolute must for every student and scholar in empirical finance.*
+*A fantastic book bringing together financial theory, sound econometrics, thorough data processing and powerful programming techniques. An absolute must for every student and scholar in empirical finance.*
 
 **Nikolaus Hautsch**
 
@@ -71,9 +190,11 @@ Professor of Finance at EDHEC Business School
 
 Professor of Economics at University of Cambridge
 
-## Who maintains this website
+The team
 
-![Member 2](assets/img/christoph_scheuch.jpeg)
+## Who maintains Tidy Finance
+
+![A portrait of Christoph Scheuch](assets/img/christoph_scheuch.jpeg)
 
 ### Christoph Scheuch
 
@@ -81,7 +202,7 @@ Independent Expert in Finance & Data
 
 LinkedIn →
 
-![Member 3](assets/img/stefan_voigt.jpeg)
+![A portrait of Stefan Voigt](assets/img/stefan_voigt.jpeg)
 
 ### Stefan Voigt
 
@@ -89,7 +210,7 @@ Assistant Professor of Finance at University of Copenhagen
 
 Website →
 
-![Member 4](assets/img/patrick_weiss.jpeg)
+![A portrait of Patrick Weiss](assets/img/patrick_weiss.jpeg)
 
 ### Patrick Weiss
 
@@ -97,7 +218,7 @@ Assistant Professor of Finance at Reykjavik University
 
 Website →
 
-![Member 1](assets/img/christoph_frey.jpeg)
+![A portrait of Christoph Frey](assets/img/christoph_frey.jpeg)
 
 ### Christoph Frey
 
