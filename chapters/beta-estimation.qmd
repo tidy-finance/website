@@ -25,7 +25,7 @@ We use the following packages throughout this chapter:
 #| message: false
 #| warning: false
 library(tidyverse)
-library(arrow)
+library(nanoparquet)
 library(slider)
 library(furrr)
 ```
@@ -39,7 +39,6 @@ Compared to previous chapters, we introduce `slider` [@slider] for sliding windo
 import polars as pl
 import numpy as np
 import statsmodels.formula.api as smf
-import pyarrow.dataset as ds
 import os
 
 from plotnine import *
@@ -525,11 +524,11 @@ We then create a connection to the daily CRSP data, but we don't load the whole 
 
 ```{r}
 #| label: beta-estimation-setup-daily-batches
-crsp_daily_db <- open_dataset("data/crsp_daily")
-
-permnos <- crsp_daily_db |>
-  distinct(permno) |>
-  pull(permno, as_vector = TRUE)
+permnos <- list.dirs(
+  "data/crsp_daily", full.names = FALSE, recursive = FALSE
+) |>
+  str_remove("permno=") |>
+  as.integer()
 
 batch_size <- 500
 batches <- ceiling(length(permnos) / batch_size)
@@ -540,10 +539,6 @@ min_obs <- 1000
 
 ```{python}
 #| label: beta-estimation-setup-daily-batches-py
-crsp_daily_db = ds.dataset(
-    "data/crsp_daily", format="parquet", partitioning="hive"
-)
-
 permnos = [
     int(folder.split("=")[1])
     for folder in os.listdir("data/crsp_daily")
@@ -573,10 +568,16 @@ for (j in 1:batches) {
     ((j - 1) * batch_size + 1):min(j * batch_size, length(permnos))
   ]
 
-  crsp_daily_sub <- crsp_daily_db |>
-    filter(permno %in% permno_batch) |>
-    select(permno, date, ret_excess) |>
-    collect()
+  crsp_daily_sub <- permno_batch |>
+    map(\(p) {
+      paste0("data/crsp_daily/permno=", p) |>
+        list.files(full.names = TRUE) |>
+        map(read_parquet) |>
+        list_rbind() |>
+        mutate(permno = p)
+    }) |>
+    list_rbind() |>
+    select(permno, date, ret_excess)
 
   crsp_daily_sub_nested <- crsp_daily_sub |>
     inner_join(factors_ff3_daily, join_by(date)) |>
@@ -619,16 +620,13 @@ capm_daily = []
 for j in range(1, batches + 1):
     permno_batch = permnos[((j - 1) * batch_size) : (min(j * batch_size, len(permnos)))]
 
-    crsp_daily_sub = pl.from_pandas(crsp_daily_db
-        .scanner(
-            columns=["permno", "date", "ret_excess"],
-            filter=ds.field("permno").isin(permno_batch),
-        )
-        .to_table()
-        .to_pandas()
-    ).with_columns(
+    crsp_daily_sub = (
+        pl.scan_parquet("data/crsp_daily", hive_partitioning=True)
+        .filter(pl.col("permno").is_in(permno_batch))
+        .select(["permno", "date", "ret_excess"])
+        .collect()
         # hive partition keys are read as integers; align with crsp_monthly
-        permno=pl.col("permno").cast(pl.Float64)
+        .with_columns(permno=pl.col("permno").cast(pl.Float64))
     )
 
     crsp_daily_sub_nested = (crsp_daily_sub
