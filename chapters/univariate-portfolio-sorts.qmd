@@ -42,11 +42,10 @@ Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for
 ```{python}
 #| label: univariate-portfolio-sorts-packages-py
 import polars as pl
-import statsmodels.api as sm
+import pyfixest as pf
 
 from plotnine import *
 from mizani.formatters import percent_format
-from regtabletotext import prettify_result
 ```
 
 :::
@@ -226,17 +225,16 @@ coeftest(model_fit, vcov = NeweyWest)
 
 ### Python
 
-Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so in the `fit()` function by indicating the `cov_type` as `HAC` and providing the maximum lag length through an additional keywords dictionary.
+Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so by setting `vcov` to `"NW"` (Newey-West) in `pf.feols()` and providing the maximum lag length together with the time identifier through the `vcov_kwargs` dictionary.
 
 ```{python}
 #| label: univariate-portfolio-sorts-median-newey-west-py
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 6})
+model_fit = pf.feols(
+    "long_short ~ 1",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
 :::
@@ -388,16 +386,14 @@ beta_portfolios_summary <- beta_portfolios |>
 #| label: univariate-portfolio-sorts-portfolio-summary-py
 beta_portfolios_summary = []
 for portfolio, portfolio_data in beta_portfolios.group_by("portfolio"):
-    model_fit = (sm.OLS.from_formula(
-        formula="ret ~ 1 + mkt_excess",
-        data=portfolio_data.to_pandas()
-      )
-      .fit()
+    model_fit = pf.feols(
+        "ret ~ 1 + mkt_excess",
+        data=portfolio_data
     )
     beta_portfolios_summary.append({
         "portfolio": portfolio[0],
-        "alpha": model_fit.params.iloc[0],
-        "beta": model_fit.params.iloc[1],
+        "alpha": model_fit.coef().iloc[0],
+        "beta": model_fit.coef().iloc[1],
         "ret": portfolio_data["ret"].mean()
     })
 
@@ -511,13 +507,10 @@ beta_portfolios_summary |>
 #| fig-cap: "The figure shows average portfolio excess returns and beta estimates. Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas."
 #| fig-alt: "Title: Average portfolio excess returns and beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data."
 #| fig-pos: "htb"
-sml_capm = (sm.OLS.from_formula(
-    formula="ret ~ 1 + beta",
-    data=beta_portfolios_summary.to_pandas()
-  )
-  .fit()
-  .params
-)
+sml_capm = pf.feols(
+    "ret ~ 1 + beta",
+    data=beta_portfolios_summary
+).coef()
 
 sml_figure = (
   ggplot(
@@ -606,13 +599,12 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 
 ```{python}
 #| label: univariate-portfolio-sorts-decile-newey-west-py
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
+model_fit = pf.feols(
+    "long_short ~ 1",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
 :::
@@ -634,13 +626,12 @@ coeftest(
 
 ```{python}
 #| label: univariate-portfolio-sorts-decile-capm-alpha-py
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1 + mkt_excess",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
+model_fit = pf.feols(
+    "long_short ~ 1 + mkt_excess",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
 :::
