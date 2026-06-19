@@ -99,7 +99,7 @@ from plotnine import *
 from mizani.formatters import percent_format, date_format
 from itertools import product
 from sklearn.model_selection import (
-  train_test_split, GridSearchCV, TimeSeriesSplit, cross_val_score
+  train_test_split, GridSearchCV, cross_val_score
 )
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
@@ -194,8 +194,8 @@ data <- industries_ff_monthly |>
   drop_na()
 ```
 
-Our data contains `r ncol(data)-2` columns of regressors with the `r ncol(macro_predictors) - 1` macro-variables and `r ncol(factors_ff3_monthly) + ncol(factors_q_monthly)-2` factor returns for each month.
-@fig-1401 provides summary statistics for the `r industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent.\index{Graph!Box plot}
+Our data contains `{r} ncol(data)-2` columns of regressors with the `{r} ncol(macro_predictors) - 1` macro-variables and `{r} ncol(factors_ff3_monthly) + ncol(factors_q_monthly)-2` factor returns for each month.
+@fig-1401 provides summary statistics for the `{r} industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent.\index{Graph!Box plot}
 
 ### Python
 
@@ -214,8 +214,8 @@ data = (industries_ff_monthly
 )
 ```
 
-Our data contains `{python} len(data.columns)-2` columns of regressors with the `{python} len(macro_predictors.columns) - 1` macro-variables and `{python} len(factors_ff3_monthly.columns) + len(factors_q_monthly.columns)-2` factor returns for each month.
-@fig-1401 provides summary statistics for the `{python} industries_ff_monthly["industry"].n_unique()` monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries. \index{Graph!Box plot}
+Our data contains `{r} ncol(data)-2` columns of regressors with the `{r} ncol(macro_predictors) - 1` macro-variables and `{r} ncol(factors_ff3_monthly) + ncol(factors_q_monthly)-2` factor returns for each month.
+@fig-1401 provides summary statistics for the `{r} industries_ff_monthly |> count(industry) |> nrow()` monthly industry excess returns in percent. One can see that the dispersion in the excess returns varies widely across industries. \index{Graph!Box plot}
 
 :::
 
@@ -297,7 +297,7 @@ We can call the training set with `training(split)`, while we can extract the te
 
 We employ the `scikit-learn` collection of packages for modeling and ML.
 
-To start, we restrict our analysis to just one industry: Manufacturing. We split the sample into a *training* and a *test* set, holding out the last part of the data as a test set, which is not used for any model tuning. We use this test set to evaluate the predictive accuracy in an out-of-sample scenario. We define the cutoff date directly so that observations before it form the training set.
+To start, we restrict our analysis to just one industry: Manufacturing. We split the sample into a *training* and a *test* set, holding out the last 20% of the data as a test set, which is not used for any model tuning. We use this test set to evaluate the predictive accuracy in an out-of-sample scenario.
 
 :::
 
@@ -322,7 +322,7 @@ rec <- recipe(ret_excess ~ ., data = training(split)) |>
   step_normalize(all_predictors())
 ```
 
-A table of all available recipe steps can be found [in the `tidymodels` documentation.](https://www.tidymodels.org/find/recipes/) As of `r format(Sys.Date(), "%Y")`, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input.
+A table of all available recipe steps can be found [in the `tidymodels` documentation.](https://www.tidymodels.org/find/recipes/) As of `{r} format(Sys.Date(), "%Y")`, more than 150 different processing steps are available! One important point: The definition of a recipe does not trigger any calculations yet but rather provides a *description* of the tasks to be applied. As a result, it is very easy to *reuse* recipes for different models and thus make sure that the outcomes are comparable as they are based on the same input.
 In the example above, it does not make a difference whether you use the input `data = training(split)` or `data = testing(split)`.
 All that matters at this early stage are the column names and types.
 
@@ -342,7 +342,7 @@ data_bake <- bake(data_prep,
 data_bake
 ```
 
-Note that the resulting data contains the 132 observations from the test set and 126 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially.
+Note that the resulting data contains the 137 observations from the test set and 154 columns. Why so many? Recall that the recipe states to compute every possible interaction term between the factors and predictors, which increases the dimension of the data matrix substantially.
 
 You may ask at this stage: why should I use a recipe instead of simply using the data wrangling commands such as `mutate()` or `select()`? `tidymodels` beauty is that a lot is happening under the hood. Recall, that for the simple scaling step, you actually have to compute the standard deviation of each column, then *store* this value, and apply the identical transformation to a different dataset, e.g., `testing(split)`. A prepped `recipe` stores these values and hands them on once you `bake()` a novel dataset. Easy as pie with `tidymodels`, isn't it?
 
@@ -375,7 +375,7 @@ interaction_terms = [
     for macro_column, factor_column in column_combinations
 ]
 
-data = data.with_columns(interaction_terms).to_pandas()
+data = data.with_columns(interaction_terms)
 
 preprocessor = ColumnTransformer(
   transformers=[
@@ -423,7 +423,7 @@ lm_fit
 
 ### Python
 
-In the application at hand, $X$ contains `{python} len(column_combinations)` columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
+In the application at hand, $X$ contains `{r} length(py$column_combinations)` columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $1-\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
 ```{python}
 #| label: factor-selection-via-machine-learning-build-model-py
@@ -515,20 +515,20 @@ predicted_values |>
 
 ### Python
 
-With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
+With the pipeline from above, we are ready to fit it to the data. Typically, we use training data to fit the model. The training data is pre-processed according to our pipeline steps, and the Lasso regression coefficients are computed. For illustrative purposes, we focus on the manufacturing industry for now.
 
 ```{python}
 #| label: factor-selection-via-machine-learning-fit-model-py
-data_manufacturing = data.query("industry == 'manuf'")
-training_date = "2011-12-01"
+data_manufacturing = data.filter(pl.col("industry") == "manuf").sort("date")
 
-data_manufacturing_training = (data_manufacturing
-  .query(f"date<'{training_date}'")
-)
+# Hold out the last 20% as a test set (matches R's initial_time_split(prop = 4/5)).
+n_train = int(len(data_manufacturing) * 4 / 5)
+data_manufacturing_training = data_manufacturing.head(n_train)
 
+# scikit-learn operates on pandas/numpy, so we convert at the modeling boundary.
 lm_fit = lm_pipeline.fit(
-  data_manufacturing_training,
-  data_manufacturing_training.get("ret_excess")
+  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
 
@@ -539,12 +539,13 @@ First, we focus on the in-sample predicted values $\hat{y}_t = x_t\hat\beta^\tex
 #| fig-cap: "The figure shows monthly realized and fitted manufacturing industry risk premium. The grey area corresponds to the out of sample period."
 #| fig-alt: "Title: Monthly realized and fitted manufacturing industry risk premium. The figure shows the time series of realized and predicted manufacturing industry risk premiums. The figure seems to indicate that the predictions capture most of the return dynamics."
 #| fig-pos: "htb"
-predicted_values = (pd.DataFrame({
-    "Fitted value": lm_fit.predict(data_manufacturing),
-    "Realization": data_manufacturing.get("ret_excess")
+predicted_values = (
+  pl.DataFrame({
+    "date": data_manufacturing["date"],
+    "Fitted value": lm_fit.predict(data_manufacturing.to_pandas()),
+    "Realization": data_manufacturing["ret_excess"]
   })
-  .assign(date = data_manufacturing["date"])
-  .melt(id_vars="date", var_name="Variable", value_name="return")
+  .unpivot(index="date", variable_name="Variable", value_name="return")
 )
 
 predicted_values_figure = (
@@ -639,8 +640,8 @@ We estimate the coefficients $\hat\beta^\text{Lasso}$ directly for a grid of dif
 ```{python}
 #| label: factor-selection-via-machine-learning-glmnet-fits-py
 #| warning: false
-x = preprocessor.fit_transform(data_manufacturing)
-y = data_manufacturing["ret_excess"]
+x = preprocessor.fit_transform(data_manufacturing.to_pandas())
+y = data_manufacturing["ret_excess"].to_numpy()
 
 alphas = np.logspace(-5, 5, 100)
 
@@ -649,9 +650,10 @@ for a in alphas:
     lasso = Lasso(alpha=a, fit_intercept=False)
     coefficients_lasso.append(lasso.fit(x, y).coef_)
 
-coefficients_lasso = (pd.DataFrame(coefficients_lasso)
-  .assign(alpha=alphas, model="Lasso")
-  .melt(id_vars=["alpha", "model"])
+coefficients_lasso = (
+  pl.DataFrame(np.vstack(coefficients_lasso), orient="row")
+  .with_columns(alpha=pl.Series(alphas), model=pl.lit("Lasso"))
+  .unpivot(index=["alpha", "model"])
 )
 
 coefficients_ridge = []
@@ -659,9 +661,10 @@ for a in alphas:
     ridge = Ridge(alpha=a, fit_intercept=False)
     coefficients_ridge.append(ridge.fit(x, y).coef_)
 
-coefficients_ridge = (pd.DataFrame(coefficients_ridge)
-  .assign(alpha=alphas, model="Ridge")
-  .melt(id_vars=["alpha", "model"])
+coefficients_ridge = (
+  pl.DataFrame(np.vstack(coefficients_ridge), orient="row")
+  .with_columns(alpha=pl.Series(alphas), model=pl.lit("Ridge"))
+  .unpivot(index=["alpha", "model"])
 )
 ```
 
@@ -674,7 +677,7 @@ The dataframes `coefficients_lasso` and `coefficients_ridge` contain an entire s
 #| fig-pos: "htb"
 coefficients_figure = (
   ggplot(
-    pd.concat([coefficients_lasso, coefficients_ridge]),
+    pl.concat([coefficients_lasso, coefficients_ridge]),
     aes(x="alpha", y="value", color="variable")
   )
   + geom_line()
@@ -725,22 +728,32 @@ lm_fit <- lm_fit |>
   update_model(lm_model)
 ```
 
-For our sample, we consider a time-series cross-validation sample. This means that we tune our models with 20 samples of length five years with a validation period of four years. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
+For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
 
 ```{r}
 #| label: factor-selection-via-machine-learning-cv-folds
-data_folds <- time_series_cv(
-  data        = training(split),
-  date_var    = date,
-  initial     = "5 years",
-  assess      = "48 months",
-  cumulative  = FALSE,
-  slice_limit = 20
-)
+# Shared rolling-origin folds: a five-year (60-month) training window and a
+# subsequent, non-overlapping four-year (48-month) validation window. We build
+# the folds from explicit row indices so they are identical to the Python ones.
+make_rolling_folds <- function(df, train_len = 60, assess_len = 48, step = 48) {
+  df <- arrange(df, date)
+  n <- nrow(df)
+  starts <- seq.int(0L, n - (train_len + assess_len), by = step)
+  splits <- lapply(starts, function(s) {
+    make_splits(
+      list(analysis   = seq.int(s + 1L, s + train_len),
+           assessment = seq.int(s + train_len + 1L, s + train_len + assess_len)),
+      data = df
+    )
+  })
+  manual_rset(splits, ids = paste0("Slice", seq_along(splits)))
+}
+
+data_folds <- make_rolling_folds(training(split))
 data_folds
 ```
 
-Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
+Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $20 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
 
 ```{r}
 #| label: factor-selection-via-machine-learning-tune-grid
@@ -775,24 +788,26 @@ autoplot(lm_tune) +
 
 `scikit-learn` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters.
 
-For our sample, we consider a time-series cross-validation sample. This means that we tune our models with 20 samples of length five years with a validation period of four years. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set.
+For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set.
 
-`scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a $10 \times 3$ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
+`scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a $100 \times 3$ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
 
 ```{python}
 #| label: factor-selection-via-machine-learning-tune-grid-py
 #| warning: false
-initial_years = 5
-assessment_months = 48
-n_splits = int(len(data_manufacturing)/assessment_months) - 1
-length_of_year = 12
 alphas = np.logspace(-6, 2, 100)
 
-data_folds = TimeSeriesSplit(
-  n_splits=n_splits,
-  test_size=assessment_months,
-  max_train_size=initial_years * length_of_year
-)
+# Shared rolling-origin folds: a five-year (60-month) training window and a
+# subsequent, non-overlapping four-year (48-month) validation window, built from
+# explicit row indices so they are identical to the R folds.
+def make_rolling_folds(n, train_len=60, assess_len=48, step=48):
+  return [
+    (np.arange(s, s + train_len),
+     np.arange(s + train_len, s + train_len + assess_len))
+    for s in range(0, n - (train_len + assess_len) + 1, step)
+  ]
+
+data_folds = make_rolling_folds(n_train)
 
 params = {
   "regressor__alpha": alphas,
@@ -807,7 +822,8 @@ finder = GridSearchCV(
 )
 
 finder = finder.fit(
-  data_manufacturing, data_manufacturing.get("ret_excess")
+  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
 
@@ -818,15 +834,23 @@ After the tuning process, we collect the evaluation metrics (the root mean-squar
 #| fig-cap: "The figure shows root MSPE for different penalty factors. Evaluation of manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net, and 0.0 indicates Ridge."
 #| fig-alt: "Title: Root MSPE for different penalty factors. The figure shows that more regularization does not affect the selected models in a meaningful fashion. At some point, the Elastic Net prediction error drops, which indicates the selected model. MSPE increases again for high penalization values."
 #| fig-pos: "htb"
-validation = (pd.DataFrame(finder.cv_results_)
-  .assign(
-    mspe=lambda x: -x["mean_test_score"],
-    param_regressor__alpha=lambda x: pd.to_numeric(
-      x["param_regressor__alpha"], errors="coerce"
+validation = (
+  pl.DataFrame({
+    "param_regressor__alpha": np.asarray(
+      finder.cv_results_["param_regressor__alpha"], dtype=float
     ),
-    param_regressor__l1_ratio=lambda x: x["param_regressor__l1_ratio"].astype(str)
-  )
+    "param_regressor__l1_ratio": np.asarray(
+      finder.cv_results_["param_regressor__l1_ratio"], dtype=str
+    ),
+    "mean_test_score": finder.cv_results_["mean_test_score"],
+    "rank_test_score": finder.cv_results_["rank_test_score"]
+  })
+  .with_columns(mspe=-pl.col("mean_test_score"))
 )
+
+best_model = validation.sort("rank_test_score").head(1)
+best_alpha = best_model["param_regressor__alpha"][0]
+best_rho = float(best_model["param_regressor__l1_ratio"][0])
 
 validation_figure = (
   ggplot(
@@ -850,7 +874,7 @@ validation_figure = (
 validation_figure.show()
 ```
 
-@fig-1404 shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of `{python} np.round(validation.sort_values("rank_test_score").head(1).get(["param_regressor__alpha"]).iloc[0, 0], 4)` and a mixture factor ($\rho$) of `{python} np.round(float(validation.sort_values("rank_test_score").head(1).get(["param_regressor__l1_ratio"]).iloc[0, 0]), 4)`.
+@fig-1404 shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of `{r} round(py$best_alpha, 4)` and a mixture factor ($\rho$) of `{r} round(py$best_rho, 4)`.
 
 :::
 
@@ -888,15 +912,8 @@ select_variables <- function(input) {
   # Split into training and testing data
   split <- initial_time_split(input, prop = 4 / 5)
 
-  # Data folds for cross-validation
-  data_folds <- time_series_cv(
-    data = training(split),
-    date_var = date,
-    initial = "5 years",
-    assess = "48 months",
-    cumulative = FALSE,
-    slice_limit = 20
-  )
+  # Data folds for cross-validation (same rolling-origin scheme as above)
+  data_folds <- make_rolling_folds(training(split))
 
   # Model tuning with the Lasso model
   lm_tune <- lm_fit |>
@@ -957,11 +974,15 @@ The following task can be easily parallelized to reduce computing time, but we u
 #| label: factor-selection-via-machine-learning-select-variables-py
 #| warning: false
 #| output: false
-all_industries = data["industry"].drop_duplicates()
+all_industries = data["industry"].unique(maintain_order=True)
 
 results = []
 for industry in all_industries:
   print(industry)
+  industry_training = (
+    data.filter(pl.col("industry") == industry).sort("date").head(n_train)
+  )
+
   finder = GridSearchCV(
     lm_pipeline,
     param_grid=params,
@@ -970,24 +991,20 @@ for industry in all_industries:
   )
 
   finder = finder.fit(
-    data.query("industry == @industry"),
-    data.query("industry == @industry").get("ret_excess")
+    industry_training.to_pandas(),
+    industry_training["ret_excess"].to_numpy()
   )
-  results.append(
-    pd.DataFrame(finder.best_estimator_.named_steps.regressor.coef_ != 0)
-  )
+  results.append(finder.best_estimator_.named_steps.regressor.coef_ != 0)
 
 selected_factors = (
-  pd.DataFrame(
-    lm_pipeline[:-1].get_feature_names_out(),
-    columns=["variable"]
+  pl.DataFrame({"variable": lm_pipeline[:-1].get_feature_names_out()})
+  .with_columns(
+    variable=pl.col("variable").str.replace_all("factor_|ff_|q_|macro_", "")
   )
-  .assign(variable = lambda x: (
-    x["variable"].str.replace("factor_|ff_|q_|macro_",""))
-  )
-  .assign(**dict(zip(all_industries, results)))
-  .melt(id_vars="variable", var_name ="industry")
-  .query("value == True")
+  .with_columns([pl.Series(industry, result)
+                 for industry, result in zip(all_industries, results)])
+  .unpivot(index="variable", variable_name="industry", value_name="value")
+  .filter(pl.col("value"))
 )
 ```
 
