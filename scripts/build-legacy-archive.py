@@ -67,7 +67,7 @@ BANNER = (
     'This is the original <em>pandas</em> edition of Tidy Finance with Python, '
     f'frozen as of {FREEZE_LABEL}. It is no longer updated and may not run with '
     'current package versions. The maintained edition (R and Python/polars) '
-    f'lives at <a href="{SITE}/chapters/" style="color:#fff;text-decoration:underline;">'
+    'lives at <a href="/chapters/" style="color:#fff;text-decoration:underline;">'
     'tidy-finance.org/chapters</a>.'
     "</div>"
 )
@@ -106,11 +106,14 @@ def rewrite_links(html: str) -> str:
     html = html.replace("../assets/", "assets/")
     # 3. intra-archive chapter nav: ../python/foo.html -> foo.html
     html = html.replace("../python/", "")
-    # 4a. R language toggle -> absolute (redirects to /chapters post-merge)
-    html = html.replace("../r/", f"{SITE}/r/")
-    # 4b. remaining live-site links (index/blog/contribute/...) -> absolute
-    html = re.sub(r'(href|src)="\.\./', rf'\1="{SITE}/', html)
-    # 7. og:image and any other absolute /python/ refs -> archive path
+    # 4a. R language toggle -> root-relative (redirects to /chapters post-merge).
+    #     Root-relative (not absolute) so links stay same-origin: clickable in
+    #     local preview AND correct in production.
+    html = html.replace("../r/", "/r/")
+    # 4b. remaining live-site links (index/blog/contribute/...) -> root-relative
+    html = re.sub(r'(href|src)="\.\./', r'\1="/', html)
+    # 7. og:image: keep ABSOLUTE (Open Graph requires absolute URLs); just
+    #    repoint the dead /python/ path to the archive path.
     html = html.replace(f"{SITE}/python/", f"{SITE}{ARCHIVE_PATH}/")
     return html
 
