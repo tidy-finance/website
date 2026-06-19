@@ -42,7 +42,6 @@ The last two packages are used for plotting.
 import polars as pl
 import numpy as np
 import tidyfinance as tf
-import pyarrow.parquet as pq
 
 from plotnine import *
 from mizani.formatters import comma_format, percent_format
@@ -921,7 +920,7 @@ for (j in 1:batches) {
 
 ### Python
 
-To keep track of the progress, we create ad-hoc progress updates using `print()`. Notice that we also use the method `pq.write_to_dataset()` here with the option to append the new data to an existing partitioned dataset, when we process the second and all following batches.
+To keep track of the progress, we create ad-hoc progress updates using `print()`. We write each batch to disk with polars' `write_parquet()` and `partition_by="permno"`, which stores the data in one subfolder per `permno`. Since each `permno` is processed in exactly one batch, consecutive batches extend the dataset without clobbering earlier files, and re-running the loop overwrites each partition cleanly instead of appending duplicates.
 
 ```{python}
 #| label: wrds-crsp-and-compustat-download-crsp-daily-py
@@ -986,13 +985,7 @@ for j in range(1, batches + 1):
             .select(["batch", "permno", "date", "ret_excess"])
         )
 
-        table = crsp_daily_sub.to_arrow()
-        pq.write_to_dataset(
-            table,
-            root_path="data/crsp_daily",
-            partition_cols=["permno"],
-            existing_data_behavior="overwrite_or_ignore",
-        )
+        crsp_daily_sub.write_parquet("data/crsp_daily", partition_by="permno")
 
     print(f"Batch {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
 ```

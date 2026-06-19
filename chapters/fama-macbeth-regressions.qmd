@@ -50,7 +50,7 @@ library(broom)
 ```{python}
 #| label: fama-macbeth-regressions-packages-py
 import polars as pl
-import statsmodels.formula.api as smf
+import pyfixest as pf
 ```
 
 :::
@@ -210,10 +210,10 @@ risk_premiums <- data_fama_macbeth |>
 ```{python}
 #| label: fama-macbeth-regressions-cross-sectional-py
 def estimate_cross_section(group):
-    params = smf.ols(
-        formula="ret_excess_lead ~ beta + log_mktcap + bm",
-        data=group.to_pandas()
-    ).fit().params
+    params = pf.feols(
+        "ret_excess_lead ~ beta + log_mktcap + bm",
+        data=group
+    ).coef()
     return pl.DataFrame(params.to_frame().transpose()).with_columns(
         date=group["date"].first()
     )
@@ -302,10 +302,11 @@ We compute the Newey-West $t$-statistics by fitting a constant-only model for ea
 ```{python}
 #| label: fama-macbeth-regressions-newey-west-py
 def estimate_newey_west(group):
-    fit = smf.ols(
-        "estimate ~ 1", group.to_pandas()
-    ).fit(cov_type="HAC", cov_kwds={"maxlags": 6})
-    t_statistic = group["estimate"].mean()/fit.bse["Intercept"]
+    fit = pf.feols(
+        "estimate ~ 1", data=group.sort("date"),
+        vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
+    )
+    t_statistic = group["estimate"].mean()/fit.se()["Intercept"]
     return pl.DataFrame({
         "factor": group["factor"].first(),
         "t_statistic_newey_west": t_statistic

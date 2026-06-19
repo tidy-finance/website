@@ -40,7 +40,7 @@ Compared to previous chapters, we introduce `slider` [@slider] for sliding windo
 #| label: beta-estimation-packages-py
 import polars as pl
 import numpy as np
-import statsmodels.formula.api as smf
+import pyfixest as pf
 import os
 
 from plotnine import *
@@ -50,7 +50,7 @@ from itertools import product
 from dateutil.relativedelta import relativedelta
 ```
 
-Compared to previous chapters, we introduce `statsmodels` [@seabold2010statsmodels] for regression analysis and for sliding-window regressions and `joblib` [@joblib] for parallelization.\index{Parallelization}
+Compared to previous chapters, we introduce `pyfixest` [@pyfixest] for regression analysis and for sliding-window regressions and `joblib` [@joblib] for parallelization.\index{Parallelization}
 
 :::
 
@@ -126,19 +126,19 @@ coefficients
 
 ### Python
 
-Python provides a simple solution to estimate (linear) models with the function `smf.ols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `smf.ols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.\index{Linear regression}
+Python provides a simple solution to estimate (linear) models with the function `pf.feols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `pf.feols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.\index{Linear regression}
 
 ```{python}
 #| label: beta-estimation-capm-apple-py
-model_fit = smf.ols(
-    formula="ret_excess ~ mkt_excess",
-    data=crsp_monthly.filter(pl.col("permno") == 14593).to_pandas()
-).fit()
-coefficients = model_fit.summary2().tables[1]
+model_fit = pf.feols(
+    "ret_excess ~ mkt_excess",
+    data=crsp_monthly.filter(pl.col("permno") == 14593)
+)
+coefficients = model_fit.tidy()
 coefficients
 ```
 
-`smf.ols()` returns an object of class `RegressionModel`, which contains all the information we usually care about with linear models. `summary2()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
+`pf.feols()` returns an object of class `Feols`, which contains all the information we usually care about with linear models. The `tidy()` method returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
 
 :::
 
@@ -184,16 +184,15 @@ def estimate_capm(data, min_obs=1):
     if data.shape[0] < min_obs:
         capm = pl.DataFrame()
     else:
-        fit = smf.ols(
-            formula="ret_excess ~ mkt_excess", data=data.to_pandas()
-        ).fit()
-        coefficients = fit.summary2().tables[1]
+        coefficients = pf.feols(
+            "ret_excess ~ mkt_excess", data=data
+        ).tidy()
 
         capm = pl.DataFrame(
             {
                 "coefficient": coefficients.index.tolist(),
-                "estimate": coefficients["Coef."].to_numpy(),
-                "t_statistic": coefficients["t"].to_numpy(),
+                "estimate": coefficients["Estimate"].to_numpy(),
+                "t_statistic": coefficients["t value"].to_numpy(),
             }
         ).with_columns(
             coefficient=pl.when(pl.col("coefficient") == "Intercept")
