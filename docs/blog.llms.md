@@ -2,6 +2,18 @@
 
 Experimental and external contributions based on *Tidy Finance with R*. [Contribute](contribute.llms.md) your ideas!
 
+![Cover of Tidy Finance with Python, marked as an archived edition.](./blog/legacy-python-pandas/thumbnail.jpg)
+
+##### The legacy pandas edition of Tidy Finance with Python (unmaintained archive)
+
+2 min
+
+We migrated Tidy Finance with Python from pandas to polars and merged the R and Python editions into unified chapters. For reference, this post archives the complete…
+
+Christoph Scheuch, Stefan Voigt, Patrick Weiss
+
+Jun 19, 2026
+
 ![A monochrome Japanese sumi-e ink wash painting of a school of koi fish swimming swiftly in parallel in the same direction, one fish breaking ahead of the group, with trailing ink splatter evoking speed and motion against a clean white background.](./blog/fast-beta-estimation/thumbnail.png)
 
 ##### Fast, Vectorized Beta Estimation
@@ -205,8 +217,6 @@ An op-ed about the motives behind Tidy Finance with R
 Christoph Scheuch, Stefan Voigt, Patrick Weiss
 
 Jan 16, 2023
-
-![](./blog/workshops-for-ukraine/thumbnail.png)
 
 ##### Tidy Finance at Workshops for Ukraine
 
