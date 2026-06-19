@@ -1,0 +1,107 @@
+# Setting Up Your Environment
+
+We aim to lower the bar for starting empirical research in financial economics. We want to make using Python easy for you. However, given that Tidy Finance is a platform that supports multiple programming languages, we also consider the possibility that you are unfamiliar with Python. Maybe you are transitioning from R to Python, i.e., following the journey of Tidy Finance, which started in R. Hence, we provide you with a simple guide to get started with Python. If you have not used Python before, you will be able to use it after reading this chapter.
+
+## Python Environment
+
+A Python environment is a self-contained directory or folder containing a specific version of the Python installation with a set of packages and dependencies. In order to isolate and manage the specific dependencies of the Tidy Finance with Python project, a so-called *virtual environment* is a reliable way to ensure that it will work consistently and reliably on different systems and over time.
+
+There are many ways to install a Python version and environments on your system. We present the way that we found most convenient to write this book and maintain our website: Installation via `uv`.
+
+## Installation via uv
+
+We use `uv`, a modern Python package and project manager. Unlike traditional approaches that use separate files for different purposes, `uv` uses a single `pyproject.toml` file to define your project’s dependencies and a `uv.lock` file to ensure reproducible installations across different systems. Additionally, `uv` handles Python version management automatically, meaning you don’t need to install Python separately before setting up your environment. You can install `uv` with a single command:
+
+**On macOS and Linux:**
+
+``` bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**On Windows:**
+
+``` powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+You can find detailed installation instructions on the [official uv documentation.](https://docs.astral.sh/uv/getting-started/installation/) After the installation, you can verify that `uv` is installed correctly by running `uv --version`. If the command returns a version number, the installation was successful. Otherwise, try to restart your terminal to ensure that the system recognizes the new command.
+
+Second, we now describe how to set up a Python virtual environment specific to Tidy Finance on your local system. This book uses Python version 3.10 to set up the environment for both Windows and Mac. As we write this book, it is not the latest version of Python. The reason for this is that we wanted (i) a stable code base and (ii) the content of the book to be usable for all kinds of users, especially for those who might rely on corporate version controls and are not able to install new Python distributions.
+
+Additionally, you need the packages defined in the provided [`pyproject.toml`-file](https://github.com/tidy-finance/website/blob/main/pyproject.toml). This file is the modern Python standard for declaring project metadata and dependencies. It contains a `[project]` section that lists all required packages (like `pandas`, `numpy`, `plotnine`, etc.) along with their minimum versions. You can find the detailed list of packages in the [Colophon](../python/colophon.llms.md).
+
+``` toml
+[project]
+name = "TFWP"
+version = "0.1.0"
+description = "Dependencies for the chapters of Tidy Finance with Python"
+requires-python = ">=3.10"
+dependencies = [
+    "adjusttext>=1.3.0",
+    "fmpapi>=1.0.0",
+    "joblib>=1.5.3",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "plotnine>=0.15.1",
+    "tidyfinance>=0.2.5",
+]
+```
+
+We recommend you start with the package installation right away. Create a new folder for your Tidy Finance project, add the `pyproject.toml` file (either download it from the [repository](https://github.com/tidy-finance/website/blob/main/pyproject.toml) or copy the content shown above into a new file), and set up your environment with the following commands:
+
+1.  `mkdir tidy-finance`
+2.  `cd tidy-finance`
+3.  Create or download `pyproject.toml` in this folder
+4.  `uv sync --python 3.10.11`
+
+That’s it! The `uv sync` command creates a virtual environment in the `.venv` folder, installs Python 3.10.11 if needed, and installs all required packages along with their dependencies as specified in `pyproject.toml`. The command also generates a `uv.lock` file that records the exact versions of all packages and their dependencies, ensuring everyone gets identical package versions for reproducibility. When you or your collaborators run `uv sync` in the future, `uv` will read both `pyproject.toml` (for the list of required packages) and `uv.lock` (for exact versions) to recreate the environment precisely.
+
+> **NOTE:**
+>
+> If you prefer using Anaconda (install it first from the [Anaconda website](https://www.anaconda.com/products/individual)), you can create a conda environment with `conda create -n tidy_finance python=3.10` and install packages using `pip install` from the dependencies listed in `pyproject.toml`. However, we recommend `uv` for its speed and simplicity.
+
+Now, you are basically ready to go. However, you will now need a Python integrated development environment (IDE) to make your coding experience pleasant.
+
+## Python IDE
+
+If you are new to coding, you will not have an IDE for Python. We recommend using Positron, a new IDE from Posit (the creators of RStudio) specifically designed for data science with Python and R. Positron provides an excellent environment for working with the Tidy Finance materials, especially if you’re interested in using both Python and R. It supports notebooks and includes interactive data viewers, and integrated plots. You can download Positron from the [official website.](https://positron.posit.co/) After installation, follow these steps to set up Positron with your Tidy Finance environment:
+
+1.  Open Positron and use `File > Open Folder` to open your `tidy-finance` project folder.
+2.  Click on the Python interpreter indicator in the top-right corner (or press `Ctrl+Shift+P` / `Cmd+Shift+P` and search for “Python: Select Interpreter”).
+3.  Select the interpreter from your `.venv` folder inside the tidy-finance folder (`.venv/bin/python` on Mac/Linux or `.venv\Scripts\python.exe` on Windows).
+
+Positron will now use this environment for running Python code in the editor. For the integrated terminal, you need to activate the environment first with `source .venv/bin/activate` (Mac/Linux) or `.venv\Scripts\activate` (Windows) before running standard Python or pip commands. Alternatively, you can use `uv` commands (like `uv pip list` or `uv run python script.py`) which automatically work with your project’s environment by detecting the `pyproject.toml` file, without needing manual activation.
+
+Alternatively, you can use Spyder, which you can install with `uv pip install spyder` and then run with `uv run spyder`, or Visual Studio Code (VS Code), which you can download from the [official website.](https://code.visualstudio.com/) There are many more ways to set up a Python IDE, so we refer to [this page](https://wiki.python.org/moin/IntegratedDevelopmentEnvironments) in the Python wiki for more inspiration.
+
+## Creating Environment Variables
+
+If you plan to share your own code with collaborators or the public, you may encounter the situation that your projects require sensitive information, such as login credentials, that you don’t want to publish. Environment variables are widely used in software development projects because they provide a flexible and secure way to configure applications and store secrets. In later chapters, we use such environment variables to store private login data for a remote database.
+
+You can use `.env`-files to store environment variables. Upon startup, Python projects often use libraries like `python-dotenv` to load these environment variables from a `.env`-file. `.env`-files can be placed at the project level and are not meant to be committed to version control, ensuring that sensitive information remains private.
+
+First, you need to install the `python-dotenv` library if you haven’t already:
+
+``` python
+uv pip install python-dotenv
+```
+
+Then, create a `.env`-file in your project directory. You can add variables to this file. For the purpose of this book, we create and save the following variables (where `user` and `password` are our private login credentials):
+
+    WRDS_USER=user
+    WRDS_PASSWORD=password
+
+To access these environment variables in your Python code, load the environment variables at the start of your Python script using `python-dotenv`:
+
+``` python
+from dotenv import load_dotenv
+import os
+load_dotenv()
+
+wrds_user = os.getenv("WRDS_USER")
+wrds_password = os.getenv("WRDS_PASSWORD")
+```
+
+Note that you can also store other login credentials, API keys, or file paths in the same environment file.
+
+If you use version control, make sure that the `.env`-file is included in your `.gitignore` to avoid committing sensitive information to your repository.
