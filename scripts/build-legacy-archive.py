@@ -75,13 +75,28 @@ BANNER = (
 NOINDEX = '<meta name="robots" content="noindex, nofollow">'
 
 
-def assert_real_content(html: str, name: str) -> None:
-    """Guard: real chapters are large; redirect stubs are ~18 lines / <1 KB."""
-    if len(html) < 5000 or "window.location.replace" in html and "<main" not in html:
+SENTINEL = "beta-estimation.html"  # a known large content page
+
+
+def is_redirect_stub(html: str) -> bool:
+    """A Quarto redirect stub: tiny and built around window.location.replace."""
+    return len(html) < 2000 and "window.location.replace" in html
+
+
+def assert_correct_tree(archive: Path) -> None:
+    """Guard against running on the wrong/post-merge tree.
+
+    Pre-merge, beta-estimation.html is a full ~138 KB chapter; post-merge it is
+    an 18-line redirect stub to ../chapters/. A couple of legitimate pre-merge
+    stubs (e.g. introduction-to-tidy-finance -> working-with-stock-returns) are
+    expected and handled per file; the sentinel just confirms real content was
+    captured.
+    """
+    sentinel = archive / SENTINEL
+    if not sentinel.is_file() or is_redirect_stub(sentinel.read_text(encoding="utf-8")):
         sys.exit(
-            f"ABORT: {name} looks like a redirect stub, not real content. "
-            "Re-capture from the 'legacy-pandas-snapshot' tag (main), not the "
-            "post-merge tree."
+            f"ABORT: {SENTINEL} is missing or a redirect stub. Re-capture from "
+            "the 'legacy-pandas-snapshot' tag (main), not the post-merge tree."
         )
 
 
@@ -148,7 +163,12 @@ def strip_search(html: str) -> str:
 
 def process_file(path: Path, dry_run: bool) -> None:
     html = path.read_text(encoding="utf-8")
-    assert_real_content(html, path.name)
+    if is_redirect_stub(html):
+        # Legitimate pre-merge alias (e.g. a renamed chapter). Its redirect
+        # target is already a sibling .html, so it works inside the archive
+        # as-is; nothing to rewrite, banner, or strip.
+        print(f"  skipped (redirect stub): {path.name}")
+        return
     out = html
     out = rewrite_links(out)
     out = strip_tracking(out)
@@ -172,6 +192,7 @@ def main() -> None:
     if not html_files:
         sys.exit("ABORT: no .html files in archive folder.")
 
+    assert_correct_tree(ARCHIVE)
     print(f"Processing {len(html_files)} HTML files in {ARCHIVE} ...")
     for f in html_files:
         process_file(f, args.dry_run)
