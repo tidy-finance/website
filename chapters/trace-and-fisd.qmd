@@ -46,9 +46,6 @@ import polars as pl
 import numpy as np
 import tidyfinance as tf
 import httpimport
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
 import time
 
 from datetime import date
@@ -506,14 +503,8 @@ for j in range(1, batches + 1):
         raise RuntimeError(f"Batch {j} failed after repeated connection errors.")
 
     if not trace_enhanced_sub.is_empty():
-            table = (trace_enhanced_sub.to_arrow()
-                .append_column("batch", pa.array([j] * len(trace_enhanced_sub)))
-            )
-            pq.write_to_dataset(
-                table,
-                root_path="data/trace_enhanced",
-                partition_cols=["batch"],
-                existing_data_behavior="overwrite_or_ignore"
+            trace_enhanced_sub.with_columns(batch=pl.lit(j)).write_parquet(
+                "data/trace_enhanced", partition_by="batch"
             )
 
     print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
@@ -638,9 +629,9 @@ Notice that we load the complete TRACE data from our dataset, as we only have a 
 
 ```{python}
 #| label: trace-and-fisd-bonds-traded-py
-trace_enhanced = pl.from_arrow(
-    ds.dataset("data/trace_enhanced", format="parquet").to_table()
-)
+trace_enhanced = pl.read_parquet(
+    "data/trace_enhanced", hive_partitioning=True
+).drop("batch")
 
 bonds_traded = (trace_enhanced
     .with_columns(
