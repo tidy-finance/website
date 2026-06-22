@@ -533,10 +533,17 @@ def evaluate_portfolio(weights_data,
             pl.col("weight").min().alias("Min. weight"),
             pl.col("weight").filter(pl.col("weight") < 0).sum()
               .mul(-1).alias("Avg. sum of neg. weights"),
-            (pl.col("weight") < 0).mean().alias("Avg. share of neg. weights")
+            (pl.col("weight") < 0).mean().alias("Avg. share of neg. weights"),
+            pl.len().alias("n")
           ])
+          # average across dates weighting each by its number of stocks (N_t),
+          # matching the R aggregation
           .group_by("model")
-          .agg(pl.col(pl.Float64).mean()*100)
+          .agg([
+            ((pl.col(c) * pl.col("n")).sum() / pl.col("n").sum() * 100).alias(c)
+            for c in ["Mean abs. weight", "Max. weight", "Min. weight",
+                      "Avg. sum of neg. weights", "Avg. share of neg. weights"]
+          ])
           .with_columns(model=pl.col("model").str.replace("weight_", ""))
           .to_pandas()
         )
