@@ -12,7 +12,17 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
+```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
+
+``` r
 library(fixest)
 library(broom)
 ```
@@ -23,7 +33,6 @@ library(broom)
 import polars as pl
 import datetime as dt
 import pyfixest as pf
-import pyarrow.dataset as ds
 
 from plotnine import *
 from scipy.stats import norm
@@ -60,10 +69,9 @@ fisd = (pl.read_parquet("data/fisd.parquet")
     .drop_nulls()
 )
 
-trace_enhanced = (pl.from_arrow(
-        ds.dataset("data/trace_enhanced")
-        .to_table(columns=["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
-    )
+trace_enhanced = (pl.scan_parquet("data/trace_enhanced", hive_partitioning=True)
+    .select(["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
+    .collect()
     .drop_nulls()
 )
 ```
@@ -590,7 +598,7 @@ model_with_fe_time_coefs |>
   )
 ```
 
-[![Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again.](difference-in-differences_files/figure-html/fig-1402-3.png)](difference-in-differences_files/figure-html/fig-1402-3.png "Figure 2: The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).")
+[![Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again.](difference-in-differences_files/figure-html/fig-1302-3.png)](difference-in-differences_files/figure-html/fig-1302-3.png "Figure 2: The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).")
 
 Figure 2: The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).
 
@@ -651,7 +659,7 @@ model_with_fe_time = pf.feols(
 )
 ```
 
-We then collect the regression results into a dataframe that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies.
+We then collect the regression results into a data frame that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies.
 
 ``` python
 lag0_row = pl.DataFrame({
@@ -685,7 +693,7 @@ model_with_fe_time_coefs = pl.concat(
 )
 ```
 
-[Figure 2](#fig-1402) shows the resulting coefficient estimates.
+[Figure 2](#fig-1302) shows the resulting coefficient estimates.
 
 ``` python
 model_with_fe_time_figure = (
@@ -707,11 +715,11 @@ model_with_fe_time_figure = (
 model_with_fe_time_figure.show()
 ```
 
-[![Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again.](difference-in-differences_files/figure-html/difference-in-differences-fig-1402-py-1.png)](difference-in-differences_files/figure-html/difference-in-differences-fig-1402-py-1.png "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).")
+[![Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again.](difference-in-differences_files/figure-html/difference-in-differences-fig-1302-py-1.png)](difference-in-differences_files/figure-html/difference-in-differences-fig-1302-py-1.png "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).")
 
 The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015).
 
-The resulting graph shown in [Figure 2](#fig-1402) confirms the main conclusion of the previous image: polluters’ yield patterns show a considerable anticipation effect starting toward the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
+The resulting graph shown in [Figure 2](#fig-1302) confirms the main conclusion of the previous image: polluters’ yield patterns show a considerable anticipation effect starting toward the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
 
 Notice that during the year after the PA was signed, Donald Trump, the 45th president of the United States, was elected on November 8, 2016. During his campaign there were some indications of intentions to withdraw the US from the PA, which ultimately happened on November 4, 2020. Hence, reversal effects are potentially driven by these actions.
 

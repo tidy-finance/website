@@ -19,7 +19,7 @@ library(ggrepel)
 import polars as pl
 import numpy as np
 import tidyfinance as tf
-import statsmodels.formula.api as smf
+import pyfixest as pf
 
 from plotnine import *
 from mizani.formatters import percent_format
@@ -431,7 +431,7 @@ factors <- download_data(
 factors = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
-        dataset="F-F_Research_Data_5_Factors_2x3",
+        dataset="Fama/French 5 Factors (2x3)",
         start_date="2000-01-01",
         end_date="2024-09-30",
     )
@@ -490,7 +490,7 @@ returns_excess_monthly |>
 
 ## Python
 
-The `estimate_capm()` function then implements the regression equation we previously discussed. We partition the data by symbol and run these regressions for all assets, looping over the symbol-specific sub-frames. Because `statsmodels` expects a `pandas` data frame, we convert each sub-frame at the boundary with `to_pandas()`. Collecting the coefficients gives us a clean data frame of assets and their corresponding betas.
+The `estimate_capm()` function then implements the regression equation we previously discussed. We partition the data by symbol and run these regressions for all assets, looping over the symbol-specific sub-frames. Because `pyfixest` accepts `polars` data frames directly, we pass each sub-frame without any conversion. Collecting the coefficients gives us a clean data frame of assets and their corresponding betas.
 
 ``` python
 returns_excess_monthly = (returns_monthly
@@ -500,12 +500,12 @@ returns_excess_monthly = (returns_monthly
 )
 
 def estimate_capm(data):
-    model = smf.ols("ret_excess ~ mkt_excess", data=data.to_pandas()).fit()
+    model = pf.feols("ret_excess ~ mkt_excess", data=data)
     result = pl.DataFrame({
         "symbol": data["symbol"][0],
         "coefficient": ["alpha", "beta"],
-        "estimate": model.params.values,
-        "t_statistic": model.tvalues.values
+        "estimate": model.coef().values,
+        "t_statistic": model.tstat().values
     })
     return result
 

@@ -20,7 +20,17 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
+```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
+
+``` r
 library(sandwich)
 library(broom)
 ```
@@ -29,7 +39,7 @@ library(broom)
 
 ``` python
 import polars as pl
-import statsmodels.formula.api as smf
+import pyfixest as pf
 ```
 
 ## Data Preparation
@@ -168,10 +178,10 @@ risk_premiums <- data_fama_macbeth |>
 
 ``` python
 def estimate_cross_section(group):
-    params = smf.ols(
-        formula="ret_excess_lead ~ beta + log_mktcap + bm",
-        data=group.to_pandas()
-    ).fit().params
+    params = pf.feols(
+        "ret_excess_lead ~ beta + log_mktcap + bm",
+        data=group
+    ).coef()
     return pl.DataFrame(params.to_frame().transpose()).with_columns(
         date=group["date"].first()
     )
@@ -258,10 +268,11 @@ We compute the Newey-West \\t\\-statistics by fitting a constant-only model for 
 
 ``` python
 def estimate_newey_west(group):
-    fit = smf.ols(
-        "estimate ~ 1", group.to_pandas()
-    ).fit(cov_type="HAC", cov_kwds={"maxlags": 6})
-    t_statistic = group["estimate"].mean()/fit.bse["Intercept"]
+    fit = pf.feols(
+        "estimate ~ 1", data=group.sort("date"),
+        vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
+    )
+    t_statistic = group["estimate"].mean()/fit.se()["Intercept"]
     return pl.DataFrame({
         "factor": group["factor"].first(),
         "t_statistic_newey_west": t_statistic
@@ -286,10 +297,10 @@ shape: (4, 4)
 | factor       | risk_premium | t_statistic | t_statistic_newey_west |
 |--------------|--------------|-------------|------------------------|
 | str          | f64          | f64         | f64                    |
-| "Intercept"  | 0.011        | 4.625       | 4.015                  |
+| "Intercept"  | 0.011        | 4.625       | 4.012                  |
 | "beta"       | -0.0         | -0.011      | -0.011                 |
-| "log_mktcap" | -0.001       | -2.738      | -2.559                 |
-| "bm"         | 0.002        | 3.521       | 3.078                  |
+| "log_mktcap" | -0.001       | -2.738      | -2.557                 |
+| "bm"         | 0.002        | 3.521       | 3.076                  |
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
@@ -310,7 +321,11 @@ You can mirror the manual Newey-West specification above by passing the correspo
 
 ``` r
 library(tidyfinance)
+```
 
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 estimate_fama_macbeth(
   data_fama_macbeth,
   "ret_excess_lead ~ beta + bm + log_mktcap",

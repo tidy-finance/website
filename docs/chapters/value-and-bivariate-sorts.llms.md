@@ -10,8 +10,15 @@ The current chapter relies on this set of packages.
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
 ```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ## Python
 
@@ -355,7 +362,7 @@ value_premium = (value_portfolios
 )
 ```
 
-The resulting monthly value premium is `{python} round(value_premium * 100, 2)` percent with an annualized return of `{python} round(((1 + value_premium)**12 - 1) * 100, 1)` percent.
+The resulting monthly value premium is 0.41 percent with an annualized return of 5 percent.
 
 ## Dependent Sorts
 
@@ -457,7 +464,7 @@ value_premium = (
 )
 ```
 
-The monthly value premium from dependent sorts is `{python} round(value_premium*100, 2)` percent, which translates to an annualized premium of `{python} round(((1 + value_premium)**12 - 1) * 100, 1)` percent per year.
+The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.3 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](../chapters/size-sorts-and-p-hacking.llms.md), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

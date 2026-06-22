@@ -14,7 +14,17 @@ You typically have to install a package once before you can load it into your ac
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidyfinance)
+```
+
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 library(scales)
 ```
 
@@ -107,7 +117,7 @@ prices |>
   )
 ```
 
-[![Title: Apple stock prices between beginning of 2000 and end of 2023. The figure shows that the stock price of Apple increased from about 1 USD to around 125 USD.](working-with-stock-returns_files/figure-html/fig-100-1.png)](working-with-stock-returns_files/figure-html/fig-100-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
+[![Title: Apple stock prices between beginning of 2000 and end of 2024. The figure shows that the stock price of Apple increased from about 1 USD to around 250 USD.](working-with-stock-returns_files/figure-html/fig-100-1.png)](working-with-stock-returns_files/figure-html/fig-100-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
 
 Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.
 
@@ -125,7 +135,7 @@ Creating figures becomes very intuitive with the Grammar of Graphics, as the fol
 apple_prices_figure = (
     ggplot(prices, aes(y="adjusted_close", x="date"))
     + geom_line()
-    + labs(x="", y="", title="Apple stock prices from 2000 to 2024")
+    + labs(x="", y="", title="Apple stock prices between beginning of 2000 and end of 2024")
 )
 apple_prices_figure.show()
 ```
@@ -420,7 +430,7 @@ symbols
     2 CAT    CATERPILLAR INC         Vereinigte Staaten New Yor… USD     
     3 UNH    UNITEDHEALTH GROUP INC  Vereinigte Staaten New Yor… USD     
     4 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
-    5 AMGN   AMGEN INC               Vereinigte Staaten NASDAQ   USD     
+    5 AXP    AMERICAN EXPRESS        Vereinigte Staaten New Yor… USD     
     # ℹ 25 more rows
 
 ## Python
@@ -460,7 +470,7 @@ prices_daily = pl.from_pandas(
 ).with_columns(pl.col("date").cast(pl.Date))
 ```
 
-The resulting data frame contains 185455 daily observations for GS, CAT, UNH, MSFT, AMGN, AXP, JPM, V, HD, SHW, TRV, AAPL, MCD, IBM, AMZN, JNJ, HON, BA, NVDA, CVX, MMM, CRM, PG, WMT, CSCO, MRK, DIS, KO, VZ, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 185455 daily observations for GS, CAT, UNH, MSFT, AXP, AMGN, HD, V, JPM, SHW, TRV, AAPL, MCD, IBM, AMZN, HON, JNJ, BA, NVDA, CVX, MMM, CRM, PG, CSCO, WMT, MRK, DIS, KO, VZ, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -492,7 +502,7 @@ prices_figure = (
     ggplot(prices_daily, aes(y="adjusted_close", x="date", color="symbol"))
     + geom_line()
     + scale_x_date(date_breaks="5 years", date_labels="%Y")
-    + labs(x="", y="", color="", title="Stock prices of DOW index constituents")
+    + labs(x="", y="", color="", title="Stock prices of Dow Jones index constituents")
     + theme(legend_position="none")
 )
 prices_figure.show()
@@ -725,12 +735,12 @@ trading_volume |>
   geom_line() +
   labs(
     x = NULL, y = NULL,
-    title = "Aggregate daily trading volume of Dow Jones index constitutens"
+    title = "Aggregate daily trading volume of Dow Jones index constituents"
   ) +
   scale_y_continuous(labels = unit_format(unit = "B", scale = 1e-9))
 ```
 
-[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from 15 in 2000 to 20.5 in 2023, with a maximum of more than 100.](working-with-stock-returns_files/figure-html/fig-104-3.png)](working-with-stock-returns_files/figure-html/fig-104-3.png "Figure 5: Total daily trading volume in billion USD.")
+[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 90 in 2024, with a maximum of more than 200.](working-with-stock-returns_files/figure-html/fig-104-3.png)](working-with-stock-returns_files/figure-html/fig-104-3.png "Figure 5: Total daily trading volume in billion USD.")
 
 Figure 5: Total daily trading volume in billion USD.
 
@@ -751,7 +761,7 @@ trading_volume_figure = (
     + scale_x_date(date_breaks="5 years", date_labels="%Y")
     + labs(
         x="", y="",
-        title="Aggregate daily trading volume of DOW index constituents in billion USD"
+        title="Aggregate daily trading volume of Dow Jones index constituents"
         )
 )
 trading_volume_figure.show()
@@ -800,7 +810,7 @@ persistence_figure = (
     + labs(
         x="Previous day aggregate trading volume",
         y="Aggregate trading volume",
-        title="Persistence in daily trading volume of DOW constituents in billion USD"
+        title="Persistence in daily trading volume of Dow Jones index constituents"
         )
 )
 persistence_figure.show()
