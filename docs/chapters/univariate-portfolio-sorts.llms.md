@@ -10,7 +10,17 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
+```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
+
+``` r
 library(scales)
 library(lmtest)
 library(broom)
@@ -23,11 +33,10 @@ Compared to previous chapters, we introduce `lmtest` ([Zeileis and Hothorn 2002]
 
 ``` python
 import polars as pl
-import statsmodels.api as sm
+import pyfixest as pf
 
 from plotnine import *
 from mizani.formatters import percent_format
-from regtabletotext import prettify_result
 ```
 
 ## Data Preparation
@@ -183,29 +192,29 @@ coeftest(model_fit, vcov = NeweyWest)
 
 ## Python
 
-Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so in the `fit()` function by indicating the `cov_type` as `HAC` and providing the maximum lag length through an additional keywords dictionary.
+Researchers often default to choosing a pre-specified lag length of six months (which is not a data-driven approach). We do so by setting `vcov` to `"NW"` (Newey-West) in `pf.feols()` and providing the maximum lag length together with the time identifier through the `vcov_kwargs` dictionary.
 
 ``` python
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 6})
+model_fit = pf.feols(
+    "long_short ~ 1",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
-    OLS Model:
-    long_short ~ 1
+    ###
 
-    Coefficients:
-               Estimate  Std. Error  t-Statistic  p-Value
-    Intercept       0.0       0.001        0.316    0.752
+    Estimation:  OLS
+    Dep. var.: long_short, Fixed effects: 0
+    Inference:  NW
+    Observations:  731
 
-    Summary statistics:
-    - Number of observations: 731
-    - R-squared: 0.000, Adjusted R-squared: 0.000
-    - F-statistic not available
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept     |      0.000 |        0.001 |     0.316 |      0.752 | -0.002 |   0.003 |
+    ---
+    RMSE: 0.032 R2: 0.0 
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high-beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high-beta stocks by shorting low-beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
 
@@ -341,16 +350,14 @@ beta_portfolios_summary <- beta_portfolios |>
 ``` python
 beta_portfolios_summary = []
 for portfolio, portfolio_data in beta_portfolios.group_by("portfolio"):
-    model_fit = (sm.OLS.from_formula(
-        formula="ret ~ 1 + mkt_excess",
-        data=portfolio_data.to_pandas()
-      )
-      .fit()
+    model_fit = pf.feols(
+        "ret ~ 1 + mkt_excess",
+        data=portfolio_data
     )
     beta_portfolios_summary.append({
         "portfolio": portfolio[0],
-        "alpha": model_fit.params.iloc[0],
-        "beta": model_fit.params.iloc[1],
+        "alpha": model_fit.coef().iloc[0],
+        "beta": model_fit.coef().iloc[1],
         "ret": portfolio_data["ret"].mean()
     })
 
@@ -378,9 +385,9 @@ beta_portfolios_summary |>
   theme(legend.position = "None")
 ```
 
-[![Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low beta portfolios are positive, while high beta portfolios show negative alphas.](univariate-portfolio-sorts_files/figure-html/fig-701-1.png)](univariate-portfolio-sorts_files/figure-html/fig-701-1.png "Figure 1: Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period.")
+[![Title: CAPM alphas of beta-sorted portfolios. The figure shows bar charts of alphas of beta-sorted portfolios with the decile portfolio on the horizontal axis and the corresponding CAPM alpha on the vertical axis. Alphas for low-beta portfolios are positive, while high-beta portfolios show negative alphas.](univariate-portfolio-sorts_files/figure-html/fig-701-1.png)](univariate-portfolio-sorts_files/figure-html/fig-701-1.png "Figure 1: The figure shows CAPM alphas of beta-sorted portfolios. Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period.")
 
-Figure 1: Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period.
+Figure 1: The figure shows CAPM alphas of beta-sorted portfolios. Portfolios are sorted into deciles each month based on their estimated CAPM beta. The bar charts indicate the CAPM alpha of the resulting portfolio returns during the entire CRSP period.
 
 ## Python
 
@@ -445,24 +452,21 @@ beta_portfolios_summary |>
     x = "Beta",
     y = "Excess return",
     color = "Portfolio",
-    title = "Average portfolio excess returns and average beta estimates"
+    title = "Average portfolio excess returns and beta estimates"
   )
 ```
 
-[![Title: Average portfolio excess returns and average beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data.](univariate-portfolio-sorts_files/figure-html/fig-702-3.png)](univariate-portfolio-sorts_files/figure-html/fig-702-3.png "Figure 2: Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.")
+[![Title: Average portfolio excess returns and beta estimates. The figure shows a scatter plot of the average excess returns per beta portfolio with average beta estimates per portfolio on the horizontal axis and average excess returns on the vertical axis. An increasing solid line indicates the security market line. A dashed increasing line with lower slope than the security market line indicates that the CAPM prediction is not valid for CRSP data.](univariate-portfolio-sorts_files/figure-html/fig-702-3.png)](univariate-portfolio-sorts_files/figure-html/fig-702-3.png "Figure 2: The figure shows average portfolio excess returns and beta estimates. Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.")
 
-Figure 2: Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.
+Figure 2: The figure shows average portfolio excess returns and beta estimates. Excess returns are computed as CAPM alphas of the beta-sorted portfolios. The horizontal axis indicates the CAPM beta of the resulting beta-sorted portfolio return time series. The dashed line indicates the slope coefficient of a linear regression of excess returns on portfolio betas.
 
 ## Python
 
 ``` python
-sml_capm = (sm.OLS.from_formula(
-    formula="ret ~ 1 + beta",
-    data=beta_portfolios_summary.to_pandas()
-  )
-  .fit()
-  .params
-)
+sml_capm = pf.feols(
+    "ret ~ 1 + beta",
+    data=beta_portfolios_summary
+).coef()
 
 sml_figure = (
   ggplot(
@@ -551,26 +555,26 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 ## Python
 
 ``` python
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
+model_fit = pf.feols(
+    "long_short ~ 1",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
-    OLS Model:
-    long_short ~ 1
+    ###
 
-    Coefficients:
-               Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     0.002       0.003        0.809    0.419
+    Estimation:  OLS
+    Dep. var.: long_short, Fixed effects: 0
+    Inference:  NW
+    Observations:  731
 
-    Summary statistics:
-    - Number of observations: 731
-    - R-squared: 0.000, Adjusted R-squared: 0.000
-    - F-statistic not available
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept     |      0.003 |        0.003 |     0.808 |      0.419 | -0.004 |   0.009 |
+    ---
+    RMSE: 0.08 R2: 0.0 
 
 However, controlling for the effect of beta, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting-against-beta factor ([Frazzini and Pedersen 2014](#ref-Frazzini2014)). Betting-against-beta corresponds to a strategy that shorts high-beta stocks and takes a (levered) long position in low-beta stocks. If borrowing constraints prevent investors from taking positions on the security market line they are instead incentivized to buy high-beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high-beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital-constrained investors with lower risk aversion.
 
@@ -595,27 +599,27 @@ coeftest(
 ## Python
 
 ``` python
-model_fit = (sm.OLS.from_formula(
-    formula="long_short ~ 1 + mkt_excess",
-    data=beta_longshort.to_pandas()
-  )
-  .fit(cov_type="HAC", cov_kwds={"maxlags": 1})
+model_fit = pf.feols(
+    "long_short ~ 1 + mkt_excess",
+    data=beta_longshort,
+    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
 )
-prettify_result(model_fit)
+model_fit.summary()
 ```
 
-    OLS Model:
-    long_short ~ 1 + mkt_excess
+    ###
 
-    Coefficients:
-                Estimate  Std. Error  t-Statistic  p-Value
-    Intercept     -0.004       0.002       -1.870    0.061
-    mkt_excess     1.163       0.070       16.646    0.000
+    Estimation:  OLS
+    Dep. var.: long_short, Fixed effects: 0
+    Inference:  NW
+    Observations:  731
 
-    Summary statistics:
-    - Number of observations: 731
-    - R-squared: 0.427, Adjusted R-squared: 0.426
-    - F-statistic: 277.088 on 1 and 729 DF, p-value: 0.000
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept     |     -0.004 |        0.002 |    -1.868 |      0.062 | -0.009 |   0.000 |
+    | mkt_excess    |      1.163 |        0.070 |    16.623 |      0.000 |  1.026 |   1.301 |
+    ---
+    RMSE: 0.061 R2: 0.427 
 
 [Figure 3](#fig-703) shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years; each portfolio exhibits periods with positive and negative annual returns.
 
@@ -642,9 +646,9 @@ beta_longshort |>
   )
 ```
 
-[![Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods.](univariate-portfolio-sorts_files/figure-html/fig-703-1.png)](univariate-portfolio-sorts_files/figure-html/fig-703-1.png "Figure 3: We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.")
+[![Title: Annual returns of beta portfolios. The figure shows bar charts of annual returns of long, short, and long-short beta portfolios with years on the horizontal axis and returns on the vertical axis. Each portfolio is plotted in its own facet. The long-short portfolio strategy delivers very high losses during some periods.](univariate-portfolio-sorts_files/figure-html/fig-703-1.png)](univariate-portfolio-sorts_files/figure-html/fig-703-1.png "Figure 3: The figure shows annual returns of beta portfolios. We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.")
 
-Figure 3: We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.
+Figure 3: The figure shows annual returns of beta portfolios. We construct portfolios by sorting stocks into high and low based on their estimated CAPM beta. Long short indicates a strategy that goes long into high beta stocks and short low beta stocks.
 
 ## Python
 

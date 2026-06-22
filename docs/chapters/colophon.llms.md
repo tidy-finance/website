@@ -4,53 +4,50 @@ In this appendix chapter, we provide details on the package versions used in thi
 
 ## R
 
-This version of the book was built with R ([R Core Team 2022](#ref-R-base)) version 4.5.3 (2026-03-11, Reassured Reassurer) and the following packages. We generated all R plots using `ggplot2` and its classic dark-on-light theme (`theme_bw()`).
+This version of the book was built with R ([R Core Team 2022](#ref-R-base)) version 4.5.2 (2025-10-31, \[Not\] Part in a Rumble) and the following packages. We generated all R plots using `ggplot2` and its classic dark-on-light theme (`theme_bw()`).
 
-| Package     | Version  |
-|:------------|:---------|
-| RPostgres   | 1.4.9    |
-| RSQLite     | 2.4.3    |
-| arrow       | 21.0.0.1 |
-| broom       | 1.0.10   |
-| brulee      | 0.6.0    |
-| dbplyr      | 2.5.1    |
-| dplyr       | 1.2.1    |
-| fixest      | 0.14.1   |
-| fmpapi      | 1.0.1    |
-| forcats     | 1.0.0    |
-| furrr       | 0.3.1    |
-| ggplot2     | 4.0.3    |
-| ggrepel     | 0.9.6    |
-| glmnet      | 4.1-10   |
-| hardhat     | 1.4.2    |
-| httr2       | 1.2.2    |
-| jsonlite    | 2.0.0    |
-| kableExtra  | 1.4.0    |
-| lmtest      | 0.9-40   |
-| lubridate   | 1.9.4    |
-| nanoparquet | 0.5.1    |
-| nloptr      | 2.2.1    |
-| purrr       | 1.1.0    |
-| ranger      | 0.18.0   |
-| readr       | 2.1.6    |
-| readxl      | 1.4.5    |
-| renv        | 1.2.3    |
-| rlang       | 1.2.0    |
-| rmarkdown   | 2.29     |
-| rsample     | 1.3.1    |
-| sandwich    | 3.1-1    |
-| scales      | 1.4.0    |
-| slider      | 0.3.2    |
-| stringr     | 1.5.2    |
-| svglite     | 2.2.2    |
-| tibble      | 3.3.0    |
-| tidyfinance | 0.6.0    |
-| tidymodels  | 1.4.1    |
-| tidyr       | 1.3.1    |
-| tidyverse   | 2.0.0    |
-| timetk      | 2.9.1    |
-| torch       | 0.17.0   |
-| wesanderson | 0.3.7    |
+| Package     | Version |
+|:------------|:--------|
+| RPostgres   | 1.4.9   |
+| RSQLite     | 2.4.3   |
+| broom       | 1.0.10  |
+| brulee      | 0.6.0   |
+| dbplyr      | 2.5.1   |
+| dplyr       | 1.2.1   |
+| fixest      | 0.14.1  |
+| fmpapi      | 1.0.1   |
+| forcats     | 1.0.0   |
+| furrr       | 0.3.1   |
+| ggplot2     | 4.0.3   |
+| ggrepel     | 0.9.6   |
+| glmnet      | 4.1-10  |
+| hardhat     | 1.4.2   |
+| httr2       | 1.2.2   |
+| jsonlite    | 2.0.0   |
+| kableExtra  | 1.4.0   |
+| lmtest      | 0.9-40  |
+| nanoparquet | 0.5.1   |
+| nloptr      | 2.2.1   |
+| purrr       | 1.1.0   |
+| ranger      | 0.18.0  |
+| readr       | 2.1.6   |
+| readxl      | 1.4.5   |
+| renv        | 1.2.3   |
+| rlang       | 1.2.0   |
+| rmarkdown   | 2.29    |
+| sandwich    | 3.1-1   |
+| scales      | 1.4.0   |
+| slider      | 0.3.2   |
+| stringr     | 1.5.2   |
+| svglite     | 2.2.2   |
+| tibble      | 3.3.0   |
+| tidyfinance | 0.6.0   |
+| tidymodels  | 1.4.1   |
+| tidyr       | 1.3.1   |
+| tidyverse   | 2.0.0   |
+| timetk      | 2.9.1   |
+| torch       | 0.17.0  |
+| wesanderson | 0.3.7   |
 
 ## Python
 
@@ -180,7 +177,6 @@ The book was built with Python ([Python Software Foundation 2023](#ref-python)) 
 | pyyaml                    | 6.0.3       |
 | pyzmq                     | 27.1.0      |
 | referencing               | 0.37.0      |
-| regtabletotext            | 0.0.12      |
 | requests                  | 2.32.5      |
 | rfc3339-validator         | 0.1.4       |
 | rfc3986-validator         | 0.1.1       |

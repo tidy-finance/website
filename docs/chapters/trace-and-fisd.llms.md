@@ -12,9 +12,24 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidyfinance)
+```
+
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 library(dbplyr)
 library(nanoparquet)
+```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
+
+``` r
 library(RPostgres)
 ```
 
@@ -27,9 +42,6 @@ import polars as pl
 import numpy as np
 import tidyfinance as tf
 import httpimport
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
 import time
 
 from datetime import date
@@ -417,14 +429,8 @@ for j in range(1, batches + 1):
         raise RuntimeError(f"Batch {j} failed after repeated connection errors.")
 
     if not trace_enhanced_sub.is_empty():
-            table = (trace_enhanced_sub.to_arrow()
-                .append_column("batch", pa.array([j] * len(trace_enhanced_sub)))
-            )
-            pq.write_to_dataset(
-                table,
-                root_path="data/trace_enhanced",
-                partition_cols=["batch"],
-                existing_data_behavior="overwrite_or_ignore"
+            trace_enhanced_sub.with_columns(batch=pl.lit(j)).write_parquet(
+                "data/trace_enhanced", partition_by="batch"
             )
 
     print(f"Batch {j} out of {batches} done ({(j/batches)*100:.2f}%)\n")
@@ -530,9 +536,9 @@ bonds_traded <- trace_enhanced |>
 Notice that we load the complete TRACE data from our dataset, as we only have a single part of it in the environment from the download loop above.
 
 ``` python
-trace_enhanced = pl.from_arrow(
-    ds.dataset("data/trace_enhanced", format="parquet").to_table()
-)
+trace_enhanced = pl.read_parquet(
+    "data/trace_enhanced", hive_partitioning=True
+).drop("batch")
 
 bonds_traded = (trace_enhanced
     .with_columns(
@@ -571,9 +577,9 @@ bonds_outstanding |>
   )
 ```
 
-[![Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016.](trace-and-fisd_files/figure-html/fig-401-1.png)](trace-and-fisd_files/figure-html/fig-401-1.png "Figure 1: The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.")
+[![Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016.](trace-and-fisd_files/figure-html/fig-401-1.png)](trace-and-fisd_files/figure-html/fig-401-1.png "Figure 1: Number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.")
 
-Figure 1: The number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.
+Figure 1: Number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.
 
 ## Python
 
@@ -667,9 +673,9 @@ shape: (3, 8)
 | measure        | mean  | std    | min   | q05  | median | q95   | max     |
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
+| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 
 We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
 
@@ -700,10 +706,10 @@ trace_enhanced |>
 ```
 
     # A tibble: 2 × 8
-      measure        mean    sd   min    q05    q50    q95    max
-      <chr>         <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
-    1 trade_number 25914. 5444. 439   17844. 26051  34383. 40839 
-    2 trade_size   12968. 3577.  17.2  6128. 13421. 17850. 21312.
+      measure        mean     sd   min    q05    q50    q95    max
+      <chr>         <dbl>  <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
+    1 trade_number 51828. 10888. 878   35689. 52102  68765. 81678 
+    2 trade_size   25937.  7154.  34.4 12257. 26842. 35700. 42625.
 
 ## Python
 
@@ -735,11 +741,11 @@ average_trade_size.with_columns(pl.col(pl.Float64).round(0))
 
 shape: (2, 8)
 
-| measure        | mean    | std    | min   | q05     | median  | q95     | max     |
-|----------------|---------|--------|-------|---------|---------|---------|---------|
-| str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
-| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6136.0  | 13421.0 | 17845.0 | 21312.0 |
-| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17845.0 | 26051.0 | 34379.0 | 40839.0 |
+| measure        | mean    | std     | min   | q05     | median  | q95     | max     |
+|----------------|---------|---------|-------|---------|---------|---------|---------|
+| str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
+| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35690.0 | 52102.0 | 68758.0 | 81678.0 |
+| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12272.0 | 26842.0 | 35690.0 | 42625.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

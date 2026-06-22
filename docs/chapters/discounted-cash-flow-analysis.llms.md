@@ -34,7 +34,7 @@ library(fmpapi)
 ``` python
 import polars as pl
 import numpy as np
-import statsmodels.formula.api as smf
+import pyfixest as pf
 
 from dotenv import load_dotenv
 from fmpapi import fmp_get
@@ -202,7 +202,7 @@ dcf_data |>
   )
 ```
 
-[![Title: Key forecast ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-500-1.png)](discounted-cash-flow-analysis_files/figure-html/fig-500-1.png "Figure 1: Ratios are based on financial statements provided through the FMP API.")
+[![Title: Key financial ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-500-1.png)](discounted-cash-flow-analysis_files/figure-html/fig-500-1.png "Figure 1: Ratios are based on financial statements provided through the FMP API.")
 
 Figure 1: Ratios are based on financial statements provided through the FMP API.
 
@@ -247,7 +247,7 @@ ratios_figure = (
 ratios_figure.show()
 ```
 
-[![Title: Key forecast ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/dcf-fig-500-py-1.png)](discounted-cash-flow-analysis_files/figure-html/dcf-fig-500-py-1.png "Ratios are based on financial statements provided through the FMP API.")
+[![Title: Key financial ratios of Microsoft between 2021 and 2025. The figure shows a line chart with years on the horizontal axis and financial ratios on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/dcf-fig-500-py-1.png)](discounted-cash-flow-analysis_files/figure-html/dcf-fig-500-py-1.png "Ratios are based on financial statements provided through the FMP API.")
 
 Ratios are based on financial statements provided through the FMP API.
 
@@ -293,7 +293,7 @@ dcf_data |>
   theme(legend.position = "right")
 ```
 
-[![Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-501-3.png)](discounted-cash-flow-analysis_files/figure-html/fig-501-3.png "Figure 2: Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.")
+[![Title: Key financial ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/fig-501-3.png)](discounted-cash-flow-analysis_files/figure-html/fig-501-3.png "Figure 2: Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.")
 
 Figure 2: Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.
 
@@ -346,7 +346,7 @@ ratios_forecast_figure = (
 ratios_forecast_figure.show()
 ```
 
-[![Title: Key forecast ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/dcf-fig-501-py-1.png)](discounted-cash-flow-analysis_files/figure-html/dcf-fig-501-py-1.png "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.")
+[![Title: Key financial ratios and ad-hoc forecasts of Microsoft between 2021 and 2030. The figure shows a line chart with years on the horizontal axis and financial ratios and their projections on the vertical axis.](discounted-cash-flow-analysis_files/figure-html/dcf-fig-501-py-1.png)](discounted-cash-flow-analysis_files/figure-html/dcf-fig-501-py-1.png "Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.")
 
 Historical ratios are based on financial statements provided through the FMP API, while forecasts are manually defined.
 
@@ -417,9 +417,9 @@ dcf_data <- dcf_data |>
 ## Python
 
 ``` python
-revenue_growth_model = smf.ols(
-  "revenue_growth ~ gdp_growth", data=dcf_data.to_pandas()
-).fit().params
+revenue_growth_model = pf.feols(
+  "revenue_growth ~ gdp_growth", data=dcf_data
+).coef()
 
 dcf_data = (dcf_data
   .with_columns(

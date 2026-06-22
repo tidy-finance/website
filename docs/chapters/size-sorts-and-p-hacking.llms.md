@@ -10,13 +10,25 @@ The chapter relies on the following set of packages:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
+```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
+
+``` r
 library(scales)
 library(sandwich)
 library(lmtest)
 library(furrr)
 library(rlang)
 ```
+
+    Warning: package 'rlang' was built under R version 4.5.3
 
 Compared to previous chapters, we introduce the `rlang` package ([Henry and Wickham 2022](#ref-rlang)) for more advanced parsing of functional expressions.
 
@@ -110,9 +122,9 @@ crsp_monthly |>
   )
 ```
 
-[![Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent.](size-sorts-and-p-hacking_files/figure-html/fig-801-1.png)](size-sorts-and-p-hacking_files/figure-html/fig-801-1.png "Figure 1: We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.")
+[![Title: Percentage of total market capitalization in largest stocks. The figure shows a line chart with four different lines that are relatively stable during the entire CRSP sample period. The largest 1 percent of all stocks on average comprise around 40 percent of the entire market capitalization. For the largest 25 percent, the share is around 90 percent.](size-sorts-and-p-hacking_files/figure-html/fig-801-1.png)](size-sorts-and-p-hacking_files/figure-html/fig-801-1.png "Figure 1: The figure shows the percentage of total market capitalization in largest stocks. We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.")
 
-Figure 1: We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.
+Figure 1: The figure shows the percentage of total market capitalization in largest stocks. We report the aggregate market capitalization of all stocks that belong to the 1, 5, 10, and 25 percent quantile of the largest firms in the monthly cross-section relative to the market capitalization of all stocks during the month.
 
 ## Python
 
@@ -195,9 +207,9 @@ crsp_monthly |>
   )
 ```
 
-[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png)](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png "Figure 2: Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
+[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png)](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png "Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
 
-Figure 2: Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
+Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
 
 ## Python
 
@@ -551,7 +563,7 @@ shape: (2, 2)
 | "NYSE, NASDAQ & AMEX" | 0.04    |
 | "NYSE"                | 0.13    |
 
-The table shows that the size premium is more than 60 percent larger if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
+The table shows that the size premium is more than three times as large if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
 
 ## P-Hacking and Non-Standard Errors
 
@@ -625,7 +637,17 @@ p_hacking_setup <- p_hacking_setup |>
       )
     )
   )
+```
 
+    Warning: There were 14 warnings in `mutate()`.
+    The first warning was:
+    ℹ In argument: `size_premium = future_pmap(...)`.
+    Caused by warning:
+    ! package 'rlang' was built under R version 4.5.3
+    ℹ Run `dplyr::last_dplyr_warnings()` to see the 13 remaining
+      warnings.
+
+``` r
 p_hacking_results <- p_hacking_setup |>
   mutate(data = map_chr(data, deparse)) |>
   unnest(size_premium) |>
@@ -669,7 +691,7 @@ p_hacking_results |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Distribution of size premiums for different sorting choices"
+    title = "Distribution of size premiums for various sorting choices"
   ) +
   geom_vline(
     aes(xintercept = mean(factors_ff3_monthly$smb)),
@@ -678,9 +700,9 @@ p_hacking_results |>
   scale_x_continuous(labels = percent)
 ```
 
-[![Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge, but the estimated coefficients are positive for all choices.](size-sorts-and-p-hacking_files/figure-html/fig-803-1.png)](size-sorts-and-p-hacking_files/figure-html/fig-803-1.png "Figure 3: The dashed vertical line indicates the average Fama-French SMB premium.")
+[![Title: Distribution of size premiums for different sorting choices. The figure shows a histogram of size premiums based on different sorting choices. The variation is huge, but the estimated coefficients are positive for all choices.](size-sorts-and-p-hacking_files/figure-html/fig-803-1.png)](size-sorts-and-p-hacking_files/figure-html/fig-803-1.png "Figure 3: The figure shows the distribution of size premiums for various sorting choices. The dashed vertical line indicates the average Fama-French SMB premium.")
 
-Figure 3: The dashed vertical line indicates the average Fama-French SMB premium.
+Figure 3: The figure shows the distribution of size premiums for various sorting choices. The dashed vertical line indicates the average Fama-French SMB premium.
 
 ## Python
 

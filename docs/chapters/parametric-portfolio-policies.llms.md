@@ -8,8 +8,15 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
 ```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ## Python
 
@@ -17,7 +24,7 @@ library(nanoparquet)
 import polars as pl
 import pandas as pd
 import numpy as np
-import statsmodels.formula.api as smf
+import pyfixest as pf
 
 from itertools import product, starmap
 from scipy.optimize import minimize
@@ -41,7 +48,7 @@ crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .drop_nulls()
+    .select(["permno", "date", "ret_excess", "mktcap", "mktcap_lag"])
 )
 ```
 
@@ -460,10 +467,10 @@ def evaluate_portfolio(weights_data,
             .to_pandas()
             .groupby("model")
             .apply(lambda x:
-              smf.ols(formula="portfolio_return ~ 1 + mkt_excess", data=x)
-              .fit().params
+              pf.feols("portfolio_return ~ 1 + mkt_excess", data=x)
+              .coef()
             )
-            .rename(columns={"const": "CAPM alpha",
+            .rename(columns={"Intercept": "CAPM alpha",
                              "mkt_excess": "Market beta"})
             )
         evaluation_stats = (evaluation_stats
@@ -532,18 +539,18 @@ evaluate_portfolio(weights_crsp) |>
 evaluate_portfolio(weights_crsp).round(2)
 ```
 
-                                benchmark   tilt
-    Expected utility                -0.25  -0.26
-    Average return                   7.04   0.83
-    SD return                       15.41  21.15
-    Sharpe ratio                     0.46   0.04
-    Intercept                        0.00  -0.00
-    Market beta                      0.99   0.95
-    Mean abs. weight                 0.03   0.08
-    Max. weight                      4.12   4.29
-    Min. weight                      0.00  -0.17
-    Avg. sum of neg. weights         0.00  77.97
-    Avg. share of neg. weights       0.00  49.05
+                                 tilt  benchmark
+    Expected utility            -0.26      -0.25
+    Average return               0.83       7.04
+    SD return                   21.15      15.41
+    Sharpe ratio                 0.04       0.46
+    CAPM alpha                  -0.00       0.00
+    Market beta                  0.95       0.99
+    Mean abs. weight             0.08       0.03
+    Max. weight                  4.29       4.12
+    Min. weight                 -0.17       0.00
+    Avg. sum of neg. weights    77.97       0.00
+    Avg. share of neg. weights  49.05       0.00
 
 The value-weighted portfolio delivers an annualized return of more than six percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically one for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
 
@@ -827,7 +834,7 @@ performance_table.get(["EW", "VW"])
     Average return               9.959   9.959   7.041   7.041
     SD return                   20.431  20.431  15.413  15.413
     Sharpe ratio                 0.487   0.487   0.457   0.457
-    Intercept                    0.002   0.002   0.000   0.000
+    CAPM alpha                   0.002   0.002   0.000   0.000
     Market beta                  1.130   1.130   0.994   0.994
     Mean abs. weight             0.030   0.030   0.030   0.030
     Max. weight                  0.030   0.030   4.125   4.125
@@ -844,7 +851,7 @@ performance_table.get(["EW Optimal", "VW Optimal"])
     Average return                  11.060      12.743
     SD return                       21.466      19.246
     Sharpe ratio                     0.515       0.662
-    Intercept                        0.003       0.005
+    CAPM alpha                       0.003       0.005
     Market beta                      1.130       1.006
     Mean abs. weight                 0.030       0.040
     Max. weight                      0.140       3.945
@@ -861,7 +868,7 @@ performance_table.get(["EW Optimal (no s.)", "VW Optimal (no s.)"])
     Average return                          16.568              11.852
     SD return                               25.524              18.536
     Sharpe ratio                             0.649               0.639
-    Intercept                                0.007               0.004
+    CAPM alpha                               0.007               0.004
     Market beta                              1.103               1.028
     Mean abs. weight                         0.030               0.030
     Max. weight                              0.199               3.497
