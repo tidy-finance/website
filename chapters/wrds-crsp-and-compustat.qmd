@@ -116,7 +116,6 @@ To establish a connection, you use the function `dbConnect()` with arguments tha
 
 ```{r}
 #| label: wrds-crsp-and-compustat-connect
-#| eval: false
 wrds <- dbConnect(
   Postgres(),
   host = "wrds-pgdata.wharton.upenn.edu",
@@ -195,7 +194,6 @@ The `tbl()` function creates a lazy table in our R session based on the remote W
 
 ```{r}
 #| label: wrds-crsp-and-compustat-msf-db
-#| eval: false
 msf_db <- tbl(wrds, I("crsp.msf_v2"))
 ```
 
@@ -203,7 +201,6 @@ and the identifying information,
 
 ```{r}
 #| label: wrds-crsp-and-compustat-stksecurityinfohist-db
-#| eval: false
 stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 ```
 
@@ -218,7 +215,6 @@ We use the two remote tables to fetch the data we want to put into our local fol
 
 ```{r}
 #| label: wrds-crsp-and-compustat-download-crsp-monthly
-#| eval: false
 crsp_monthly <- msf_db |>
   filter(mthcaldt >= start_date & mthcaldt <= end_date) |>
   select(-c(siccd, primaryexch, conditionaltype, tradingstatusflg)) |>
@@ -301,7 +297,6 @@ The first additional variable we create is market capitalization (`mktcap`), whi
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-mktcap
-#| eval: false
 crsp_monthly <- crsp_monthly |>
   mutate(
     mktcap = shrout * prc / 10^6,
@@ -332,7 +327,6 @@ The next variable we frequently use is the one-month *lagged* market capitalizat
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-mktcap-lag
-#| eval: false
 mktcap_lag <- crsp_monthly |>
   mutate(date = date %m+% months(1)) |>
   select(permno, date, mktcap_lag = mktcap)
@@ -369,7 +363,6 @@ Next, we transform primary listing exchange codes to explicit exchange names.\in
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-exchange
-#| eval: false
 crsp_monthly <- crsp_monthly |>
   mutate(
     exchange = case_when(
@@ -402,7 +395,6 @@ Similarly, we transform industry codes to industry descriptions following @BaliE
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-industry
-#| eval: false
 crsp_monthly <- crsp_monthly |>
   mutate(
     industry = case_when(
@@ -451,7 +443,6 @@ Next, we compute excess returns by subtracting the monthly risk-free rate provid
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-excess-returns
-#| eval: false
 factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
   select(date, risk_free)
 
@@ -518,7 +509,6 @@ Since excess returns and market capitalization are crucial for all our analyses,
 
 ```{r}
 #| label: wrds-crsp-and-compustat-drop-missing
-#| eval: false
 crsp_monthly <- crsp_monthly |>
   drop_na(ret_excess, mktcap, mktcap_lag)
 ```
@@ -1040,7 +1030,6 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 
 ```{r}
 #| label: wrds-crsp-and-compustat-funda-db
-#| eval: false
 funda_db <- tbl(wrds, I("comp.funda"))
 
 compustat_annual <- funda_db |>
@@ -1108,7 +1097,6 @@ Next, we calculate the book value of preferred stock and equity `be` and the ope
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-be-op
-#| eval: false
 compustat_annual <- compustat_annual |>
   mutate(
     be = coalesce(seq, ceq + pstk, at - lt) +
@@ -1153,7 +1141,6 @@ We keep only the last available information for each firm-year group. Note that 
 
 ```{r}
 #| label: wrds-crsp-and-compustat-keep-last-firm-year
-#| eval: false
 compustat_annual <- compustat_annual |>
   mutate(year = year(datadate)) |>
   group_by(gvkey, year) |>
@@ -1182,7 +1169,6 @@ We also compute the investment ratio `inv` according to Ken French's variable de
 
 ```{r}
 #| label: wrds-crsp-and-compustat-add-investment
-#| eval: false
 compustat_annual <- compustat_annual |>
   left_join(
     compustat_annual |>
@@ -1290,7 +1276,6 @@ Unfortunately, CRSP and Compustat use different keys to identify stocks and firm
 
 ```{r}
 #| label: wrds-crsp-and-compustat-download-ccm-linking-table
-#| eval: false
 ccm_linking_table_db <- tbl(wrds, I("crsp.ccmxpf_lnkhist"))
 
 ccm_linking_table <- ccm_linking_table_db |>
@@ -1351,7 +1336,6 @@ We use these links to create a new table with a mapping between stock identifier
 
 ```{r}
 #| label: wrds-crsp-and-compustat-create-ccm-links
-#| eval: false
 ccm_links <- crsp_monthly |>
   inner_join(
     ccm_linking_table,
