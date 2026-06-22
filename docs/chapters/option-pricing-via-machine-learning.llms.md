@@ -10,8 +10,18 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidymodels)
 library(torch)
+```
+
+    Warning: package 'torch' was built under R version 4.5.3
+
+``` r
 library(brulee)
 library(hardhat)
 library(ranger)
@@ -73,7 +83,7 @@ Despite these computational challenges, implementation in R is not tedious at al
 
 ## Python
 
-Despite these computational challenges, implementation in Python is not tedious at all because we can use the API to `TensorFlow`.
+Despite these computational challenges, implementation in Python is not tedious at all because we can use the API to `scikit-learn`.
 
 ## Option Pricing
 
@@ -180,7 +190,7 @@ Next, we split the data into a training set (which contains 1 percent of all the
 
 ## R
 
-Note that the entire grid of possible combinations contains 1574496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 1.574^{4} observations and is therefore relatively small.
+Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,745 observations and is therefore relatively small.
 
 ``` r
 split <- initial_split(option_prices, prop = 1 / 100)
@@ -198,7 +208,7 @@ rec <- recipe(observed_price ~ .,
 
 ## Python
 
-Note that the entire grid of possible combinations contains `{python} f'{option_prices.shape[0]:,}'` different specifications. Thus, the sample to learn the Black-Scholes price contains only `{python} f'{round(option_prices.shape[0] / 100):,}'` observations and is therefore relatively small.
+Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,745 observations and is therefore relatively small.
 
 ``` python
 train_data, test_data = train_test_split(

@@ -20,7 +20,7 @@ Compared to previous chapters, we introduce `slider` ([Vaughan 2021](#ref-slider
 ``` python
 import polars as pl
 import numpy as np
-import statsmodels.formula.api as smf
+import pyfixest as pf
 import os
 
 from plotnine import *
@@ -30,7 +30,7 @@ from itertools import product
 from dateutil.relativedelta import relativedelta
 ```
 
-Compared to previous chapters, we introduce `statsmodels` ([Seabold and Perktold 2010](#ref-seabold2010statsmodels)) for regression analysis and for sliding-window regressions and `joblib` ([Team 2023](#ref-joblib)) for parallelization.
+Compared to previous chapters, we introduce `pyfixest` ([Fischer 2024](#ref-pyfixest)) for regression analysis and for sliding-window regressions and `joblib` ([Team 2023](#ref-joblib)) for parallelization.
 
 ## Estimating Beta Using Monthly Returns
 
@@ -93,22 +93,23 @@ coefficients
 
 ## Python
 
-Python provides a simple solution to estimate (linear) models with the function `smf.ols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `smf.ols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute \\\hat\alpha_i\\ as well as \\\hat\beta_i\\.
+Python provides a simple solution to estimate (linear) models with the function `pf.feols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `pf.feols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute \\\hat\alpha_i\\ as well as \\\hat\beta_i\\.
 
 ``` python
-model_fit = smf.ols(
-    formula="ret_excess ~ mkt_excess",
-    data=crsp_monthly.filter(pl.col("permno") == 14593).to_pandas()
-).fit()
-coefficients = model_fit.summary2().tables[1]
+model_fit = pf.feols(
+    "ret_excess ~ mkt_excess",
+    data=crsp_monthly.filter(pl.col("permno") == 14593)
+)
+coefficients = model_fit.tidy()
 coefficients
 ```
 
-                   Coef.  Std.Err.          t         P>|t|    [0.025    0.975]
-    Intercept   0.009919  0.004884   2.031102  4.274695e-02  0.000325  0.019513
-    mkt_excess  1.375598  0.107606  12.783617  8.893401e-33  1.164207  1.586989
+                 Estimate  Std. Error    t value  Pr(>|t|)      2.5%     97.5%
+    Coefficient                                                               
+    Intercept    0.009919    0.004884   2.031102  0.042747  0.000325  0.019513
+    mkt_excess   1.375598    0.107606  12.783617  0.000000  1.164207  1.586989
 
-`smf.ols()` returns an object of class `RegressionModel`, which contains all the information we usually care about with linear models. `summary2()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated \\\hat\beta_i\\ is above one (\\\hat\beta_i \approx 1.4\\).
+`pf.feols()` returns an object of class `Feols`, which contains all the information we usually care about with linear models. The `tidy()` method returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated \\\hat\beta_i\\ is above one (\\\hat\beta_i \approx 1.4\\).
 
 ## Rolling-Window Estimation
 
@@ -149,16 +150,15 @@ def estimate_capm(data, min_obs=1):
     if data.shape[0] < min_obs:
         capm = pl.DataFrame()
     else:
-        fit = smf.ols(
-            formula="ret_excess ~ mkt_excess", data=data.to_pandas()
-        ).fit()
-        coefficients = fit.summary2().tables[1]
+        coefficients = pf.feols(
+            "ret_excess ~ mkt_excess", data=data
+        ).tidy()
 
         capm = pl.DataFrame(
             {
                 "coefficient": coefficients.index.tolist(),
-                "estimate": coefficients["Coef."].to_numpy(),
-                "t_statistic": coefficients["t"].to_numpy(),
+                "estimate": coefficients["Estimate"].to_numpy(),
+                "t_statistic": coefficients["t value"].to_numpy(),
             }
         ).with_columns(
             coefficient=pl.when(pl.col("coefficient") == "Intercept")
@@ -429,9 +429,9 @@ beta_examples |>
   )
 ```
 
-[![Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across stocks but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-1.png)](beta-estimation_files/figure-html/fig-601-1.png "Figure 1: The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
+[![Title: Monthly beta estimates for example stocks using five years of data. The figure shows a time series of beta estimates based on five years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across stocks but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-1.png)](beta-estimation_files/figure-html/fig-601-1.png "Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
 
-Figure 1: The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.
+Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.
 
 ## Python
 
@@ -792,9 +792,9 @@ beta_monthly |>
   )
 ```
 
-[![Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top 10 percent quantile on average is around 2 but varies substantially over time. The lowest 10 percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly.](beta-estimation_files/figure-html/fig-603-3.png)](beta-estimation_files/figure-html/fig-603-3.png "Figure 3: Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.")
+[![Title: Monthly deciles of estimated betas. The figure shows time series of deciles of estimated betas to illustrate the distribution of betas over time. The top ten percent quantile on average is around two but varies substantially over time. The lowest ten percent quantile is around 0.4 on average but is highly correlated with the top quantile such that in general CAPM market betas seem to go up and down jointly.](beta-estimation_files/figure-html/fig-603-3.png)](beta-estimation_files/figure-html/fig-603-3.png "Figure 3: The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.")
 
-Figure 3: Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.
+Figure 3: The figure shows monthly deciles of estimated betas. Each line corresponds to the monthly cross-sectional quantile of the estimated CAPM beta.
 
 ## Python
 
@@ -887,9 +887,9 @@ beta |>
   )
 ```
 
-[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using 5 years of monthly versus daily return data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency.](beta-estimation_files/figure-html/fig-604-1.png)](beta-estimation_files/figure-html/fig-604-1.png "Figure 4: CAPM betas are computed using 5 years of monthly or daily return data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.")
+[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency.](beta-estimation_files/figure-html/fig-604-1.png)](beta-estimation_files/figure-html/fig-604-1.png "Figure 4: The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.")
 
-Figure 4: CAPM betas are computed using 5 years of monthly or daily return data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.
+Figure 4: The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.
 
 ## Python
 
@@ -916,9 +916,9 @@ beta_comparison_figure = (
 beta_comparison_figure.show()
 ```
 
-[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus three years of daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on longer periods of monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency.](beta-estimation_files/figure-html/beta-estimation-fig-604-py-1.png)](beta-estimation_files/figure-html/beta-estimation-fig-604-py-1.png "The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or three months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.")
+[![Title: Comparison of beta estimates using monthly and daily data. The figure shows a time series of beta estimates using five years of monthly versus daily data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimates based on monthly data are smooth relative to the estimates based on daily data. However, the general trend and level is similar, irrespective of the choice of frequency.](beta-estimation_files/figure-html/beta-estimation-fig-604-py-1.png)](beta-estimation_files/figure-html/beta-estimation-fig-604-py-1.png "The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.")
 
-The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or three months of daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.
+The figure shows the comparison of beta estimates using monthly and daily data. CAPM betas are computed using five years of monthly or daily data. The two lines show the monthly estimates based on a rolling window for few exemplary stocks.
 
 The estimates in [Figure 4](#fig-604) look as expected. As you can see, it really depends on the data frequency how your beta estimates turn out because the estimates based on daily data are much smoother due to the higher number of observations in each regression.
 
@@ -965,9 +965,9 @@ beta_coverage |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using 5 years of monthly or daily return data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta.](beta-estimation_files/figure-html/fig-605-1.png)](beta-estimation_files/figure-html/fig-605-1.png "Figure 5: The two lines show the share of securities with beta estimates using 5 years of monthly or daily return data.")
+[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using five years of monthly or daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta.](beta-estimation_files/figure-html/fig-605-1.png)](beta-estimation_files/figure-html/fig-605-1.png "Figure 5: The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or daily data.")
 
-Figure 5: The two lines show the share of securities with beta estimates using 5 years of monthly or daily return data.
+Figure 5: The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or daily data.
 
 ## Python
 
@@ -1000,9 +1000,9 @@ beta_coverage_figure = (
 beta_coverage_figure.show()
 ```
 
-[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using five years of monthly or three months of daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta.](beta-estimation_files/figure-html/beta-estimation-fig-605-py-1.png)](beta-estimation_files/figure-html/beta-estimation-fig-605-py-1.png "The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or three months of daily data.")
+[![Title: End-of-month share of securities with beta estimates. The figure shows two time series with end-of-year shares of securities with beta estimates using five years of monthly or daily data. There is almost no missing data for the estimates based on daily data. For the beta estimates based on monthly data, around 75 percent of all stock-month combinations provide sufficient long historical periods to estimate the beta.](beta-estimation_files/figure-html/beta-estimation-fig-605-py-1.png)](beta-estimation_files/figure-html/beta-estimation-fig-605-py-1.png "The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or daily data.")
 
-The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or three months of daily data.
+The figure shows end-of-month share of securities with beta estimates. The two lines show the share of securities with beta estimates using five years of monthly or daily data.
 
 [Figure 5](#fig-605) shows no issues, as the two coverage lines track each other closely, so we can proceed to the next check.
 
@@ -1110,11 +1110,11 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 
 ## References
 
+Fischer, Alexander. 2024. *PyFixest: Fast High-Dimensional Fixed Effects Regression in Python*. [Https://pypi.org/project/pyfixest/](https://pypi.org/project/pyfixest/).
+
 Lintner, John. 1965. “Security prices, risk, and maximal gains from diversification.” *The Journal of Finance* 20 (4): 587–615. <https://doi.org/10.1111/j.1540-6261.1965.tb02930.x>.
 
 Mossin, Jan. 1966. “Equilibrium in a capital asset market.” *Econometrica* 34 (4): 768–83. <https://doi.org/10.2307/1910098>.
-
-Seabold, Skipper, and Josef Perktold. 2010. “Statsmodels: Econometric and Statistical Modeling with Python.” *9th Python in Science Conference*.
 
 Sharpe, William F. 1964. “Capital asset prices: A theory of market equilibrium under conditions of risk .” *The Journal of Finance* 19 (3): 425–42. <https://doi.org/10.1111/j.1540-6261.1964.tb02865.x>.
 

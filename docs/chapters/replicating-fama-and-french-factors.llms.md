@@ -12,17 +12,22 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(nanoparquet)
 ```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ## Python
 
 ``` python
 import polars as pl
 import numpy as np
-import statsmodels.formula.api as smf
-
-from regtabletotext import prettify_result
+import pyfixest as pf
 ```
 
 ## Data Preparation
@@ -340,7 +345,7 @@ test <- factors_ff3_monthly |>
 
 ## Python
 
-We run the regressions using `smf.ols()`.
+We run the regressions using `pf.feols()`.
 
 ``` python
 test = (factors_replicated
@@ -382,29 +387,28 @@ The results for the SMB factor are really convincing, as all three criteria outl
 ## Python
 
 ``` python
-model_smb = (smf.ols(
-        formula="smb ~ smb_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_smb = pf.feols(
+    fml="smb ~ smb_replicated",
+    data=test
 )
-prettify_result(model_smb)
+model_smb.summary()
 ```
 
-    OLS Model:
-    smb ~ smb_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept         -0.000       0.000       -1.338    0.181
-    smb_replicated     0.979       0.004      238.383    0.000
+    Estimation:  OLS
+    Dep. var.: smb, Fixed effects: 0
+    Inference:  iid
+    Observations:  762
 
-    Summary statistics:
-    - Number of observations: 762
-    - R-squared: 0.987, Adjusted R-squared: 0.987
-    - F-statistic: 56,826.570 on 1 and 760 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |     -0.000 |        0.000 |    -1.338 |      0.181 | -0.000 |   0.000 |
+    | smb_replicated |      0.979 |        0.004 |   238.383 |      0.000 |  0.971 |   0.987 |
+    ---
+    RMSE: 0.003 R2: 0.987 
 
-The results for the SMB factor are really convincing, as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)` percent.
+The results for the SMB factor are really convincing, as all three criteria outlined above are met and the coefficient is 0.98 and the R-squared is at 99 percent.
 
 ## R
 
@@ -437,29 +441,28 @@ The replication of the HML factor is also a success, although at a slightly lowe
 ## Python
 
 ``` python
-model_hml = (smf.ols(
-        formula="hml ~ hml_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_hml = pf.feols(
+    fml="hml ~ hml_replicated",
+    data=test
 )
-prettify_result(model_hml)
+model_hml.summary()
 ```
 
-    OLS Model:
-    hml ~ hml_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        1.926    0.055
-    hml_replicated     0.955       0.007      138.117    0.000
+    Estimation:  OLS
+    Dep. var.: hml, Fixed effects: 0
+    Inference:  iid
+    Observations:  762
 
-    Summary statistics:
-    - Number of observations: 762
-    - R-squared: 0.962, Adjusted R-squared: 0.962
-    - F-statistic: 19,076.252 on 1 and 760 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |      0.000 |        0.000 |     1.926 |      0.055 | -0.000 |   0.001 |
+    | hml_replicated |      0.955 |        0.007 |   138.117 |      0.000 |  0.942 |   0.969 |
+    ---
+    RMSE: 0.006 R2: 0.962 
 
-The replication of the HML factor is also a success, although at a slightly lower coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `{python} int(np.round(model_hml.rsquared_adj, 2) * 100)` percent.
+The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.96 and an R-squared around 96 percent.
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French size and value premiums, although we do not know their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.
 
@@ -728,7 +731,7 @@ factors_size = (
 )
 ```
 
-We then join all factors together into one dataframe and construct again a suitable table to run tests for evaluating our replication.
+We then join all factors together into one data frame and construct again a suitable table to run tests for evaluating our replication.
 
 ## R
 
@@ -796,29 +799,28 @@ The results for the SMB factor are quite convincing as all three criteria outlin
 ## Python
 
 ``` python
-model_smb = (smf.ols(
-        formula="smb ~ smb_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_smb = pf.feols(
+    fml="smb ~ smb_replicated",
+    data=test
 )
-prettify_result(model_smb)
+model_smb.summary()
 ```
 
-    OLS Model:
-    smb ~ smb_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept         -0.000       0.000       -1.768    0.077
-    smb_replicated     0.959       0.004      233.729    0.000
+    Estimation:  OLS
+    Dep. var.: smb, Fixed effects: 0
+    Inference:  iid
+    Observations:  738
 
-    Summary statistics:
-    - Number of observations: 738
-    - R-squared: 0.987, Adjusted R-squared: 0.987
-    - F-statistic: 54,629.054 on 1 and 736 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |     -0.000 |        0.000 |    -1.768 |      0.077 | -0.000 |   0.000 |
+    | smb_replicated |      0.959 |        0.004 |   233.729 |      0.000 |  0.951 |   0.967 |
+    ---
+    RMSE: 0.003 R2: 0.987 
 
-The results for the SMB factor are quite convincing, as all three criteria outlined above are met and the coefficient is `{python} np.round(model_smb.params["smb_replicated"], 2)` and the R-squared is at `{python} int(np.round(model_smb.rsquared_adj, 2) * 100)` percent.
+The results for the SMB factor are quite convincing, as all three criteria outlined above are met and the coefficient is 0.96 and the R-squared is at 99 percent.
 
 ## R
 
@@ -851,29 +853,28 @@ The replication of the HML factor is also a success, although at a slightly high
 ## Python
 
 ``` python
-model_hml = (smf.ols(
-        formula="hml ~ hml_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_hml = pf.feols(
+    fml="hml ~ hml_replicated",
+    data=test
 )
-prettify_result(model_hml)
+model_hml.summary()
 ```
 
-    OLS Model:
-    hml ~ hml_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.001        0.00        2.095    0.036
-    hml_replicated     0.980        0.01       99.940    0.000
+    Estimation:  OLS
+    Dep. var.: hml, Fixed effects: 0
+    Inference:  iid
+    Observations:  738
 
-    Summary statistics:
-    - Number of observations: 738
-    - R-squared: 0.931, Adjusted R-squared: 0.931
-    - F-statistic: 9,987.967 on 1 and 736 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |      0.001 |        0.000 |     2.095 |      0.036 |  0.000 |   0.001 |
+    | hml_replicated |      0.980 |        0.010 |    99.940 |      0.000 |  0.960 |   0.999 |
+    ---
+    RMSE: 0.008 R2: 0.931 
 
-The replication of the HML factor is also a success, although at a slightly higher coefficient of `{python} np.round(model_hml.params["hml_replicated"], 2)` and an R-squared around `{python} int(np.round(model_hml.rsquared_adj, 2) * 100)` percent.
+The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.98 and an R-squared around 93 percent.
 
 ## R
 
@@ -906,29 +907,28 @@ We are also able to replicate the RMW factor quite well with a coefficient of 0.
 ## Python
 
 ``` python
-model_rmw = (smf.ols(
-        formula="rmw ~ rmw_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_rmw = pf.feols(
+    fml="rmw ~ rmw_replicated",
+    data=test
 )
-prettify_result(model_rmw)
+model_rmw.summary()
 ```
 
-    OLS Model:
-    rmw ~ rmw_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        0.142    0.887
-    rmw_replicated     0.949       0.009      108.793    0.000
+    Estimation:  OLS
+    Dep. var.: rmw, Fixed effects: 0
+    Inference:  iid
+    Observations:  738
 
-    Summary statistics:
-    - Number of observations: 738
-    - R-squared: 0.941, Adjusted R-squared: 0.941
-    - F-statistic: 11,835.836 on 1 and 736 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |      0.000 |        0.000 |     0.142 |      0.887 | -0.000 |   0.000 |
+    | rmw_replicated |      0.949 |        0.009 |   108.793 |      0.000 |  0.932 |   0.966 |
+    ---
+    RMSE: 0.005 R2: 0.941 
 
-We are also able to replicate the RMW factor quite well with a coefficient of `{python} np.round(model_rmw.params["rmw_replicated"], 2)` and an R-squared around `{python} int(np.round(model_rmw.rsquared_adj, 2) * 100)` percent.
+We are also able to replicate the RMW factor quite well with a coefficient of 0.95 and an R-squared around 94 percent.
 
 ## R
 
@@ -961,29 +961,28 @@ Finally, the CMA factor also replicates well with a coefficient of 0.95 and an R
 ## Python
 
 ``` python
-model_cma = (smf.ols(
-        formula="cma ~ cma_replicated",
-        data=test.to_pandas()
-    )
-    .fit()
+model_cma = pf.feols(
+    fml="cma ~ cma_replicated",
+    data=test
 )
-prettify_result(model_cma)
+model_cma.summary()
 ```
 
-    OLS Model:
-    cma ~ cma_replicated
+    ###
 
-    Coefficients:
-                    Estimate  Std. Error  t-Statistic  p-Value
-    Intercept          0.000       0.000        3.013    0.003
-    cma_replicated     0.954       0.008      116.871    0.000
+    Estimation:  OLS
+    Dep. var.: cma, Fixed effects: 0
+    Inference:  iid
+    Observations:  738
 
-    Summary statistics:
-    - Number of observations: 738
-    - R-squared: 0.949, Adjusted R-squared: 0.949
-    - F-statistic: 13,658.832 on 1 and 736 DF, p-value: 0.000
+    | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept      |      0.001 |        0.000 |     3.013 |      0.003 |  0.000 |   0.001 |
+    | cma_replicated |      0.954 |        0.008 |   116.871 |      0.000 |  0.938 |   0.970 |
+    ---
+    RMSE: 0.005 R2: 0.949 
 
-Finally, the CMA factor also replicates well with a coefficient of `{python} np.round(model_cma.params["cma_replicated"], 2)` and an R-squared around `{python} int(np.round(model_cma.rsquared_adj, 2) * 100)` percent.
+Finally, the CMA factor also replicates well with a coefficient of 0.95 and an R-squared around 95 percent.
 
 Overall, our approach seems to replicate the Fama-French five-factor model just as well as the three factors.
 

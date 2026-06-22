@@ -10,7 +10,17 @@ We use the following packages throughout this chapter. Later on, we load more pa
 
 ``` r
 library(tidyverse)
+```
+
+    Warning: package 'dplyr' was built under R version 4.5.3
+
+``` r
 library(tidyfinance)
+```
+
+    Warning: package 'tidyfinance' was built under R version 4.5.3
+
+``` r
 library(scales)
 ```
 
@@ -84,7 +94,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpGiPByx\file52bc2b7e6c2d.zip' (13044 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpiAW7BK\file70ac5117797e.zip' (13044 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -285,7 +295,7 @@ Because the downloaded data arrives with timestamp columns, we cast the `date` c
 factors_ff3_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
-        dataset="F-F_Research_Data_Factors",
+        dataset="Fama/French 3 Factors",
         start_date=start_date,
         end_date=end_date,
     )
@@ -311,7 +321,7 @@ factors_ff5_monthly <- download_data(
 factors_ff5_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
-        dataset="F-F_Research_Data_5_Factors_2x3",
+        dataset="Fama/French 5 Factors (2x3)",
         start_date=start_date,
         end_date=end_date,
     )
@@ -337,7 +347,7 @@ factors_ff3_daily <- download_data(
 factors_ff3_daily = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
-        dataset="F-F_Research_Data_Factors_daily",
+        dataset="Fama/French 3 Factors [Daily]",
         start_date=start_date,
         end_date=end_date,
     )
@@ -363,7 +373,7 @@ industries_ff_monthly <- download_data(
 industries_ff_monthly = pl.from_pandas(
     tf.download_data(
         domain="famafrench",
-        dataset="10_Industry_Portfolios",
+        dataset="10 Industry Portfolios",
         start_date=start_date,
         end_date=end_date,
     )
@@ -764,11 +774,22 @@ pl.from_pandas(
 )
 ```
 
-shape: (0, 3)
+shape: (780, 3)
 
-| date | value | series |
-|------|-------|--------|
-| str  | str   | str    |
+| date                | series     | value   |
+|---------------------|------------|---------|
+| datetime\[ns\]      | str        | f64     |
+| 1960-01-01 00:00:00 | "CPIAUCNS" | 29.3    |
+| 1960-02-01 00:00:00 | "CPIAUCNS" | 29.4    |
+| 1960-03-01 00:00:00 | "CPIAUCNS" | 29.4    |
+| 1960-04-01 00:00:00 | "CPIAUCNS" | 29.5    |
+| 1960-05-01 00:00:00 | "CPIAUCNS" | 29.5    |
+| …                   | …          | …       |
+| 2024-08-01 00:00:00 | "CPIAUCNS" | 314.796 |
+| 2024-09-01 00:00:00 | "CPIAUCNS" | 315.301 |
+| 2024-10-01 00:00:00 | "CPIAUCNS" | 315.664 |
+| 2024-11-01 00:00:00 | "CPIAUCNS" | 315.493 |
+| 2024-12-01 00:00:00 | "CPIAUCNS" | 315.605 |
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key.
 
@@ -793,6 +814,8 @@ Parquet files are easily created - the code below is really all there is. You do
 ``` r
 library(nanoparquet)
 ```
+
+    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ``` r
 if (!dir.exists("data")) {
