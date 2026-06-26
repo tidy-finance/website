@@ -317,9 +317,9 @@ bonds_panel_summary = (bonds_panel
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
         median=pl.col("value").median(),
-        q95=pl.col("value").quantile(0.95),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
     .sort("measure")
@@ -453,7 +453,7 @@ model_without_fe_coefs |>
 #| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
 #| fig-pos: "htb"
 model_without_fe_time = pf.feols(
-    "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
+    "avg_yield ~ C(polluter)/C(date) + time_to_maturity + log_offering_amt",
     vcov = "iid",
     data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
 )
@@ -465,8 +465,8 @@ model_without_fe_coefs = (pl.DataFrame({
     })
     .filter(pl.col("term").str.contains("date"))
     .with_columns(
-        treatment=pl.col("term").str.contains(":polluter"),
-        date=pl.col("term").str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})"),
+        treatment=pl.col("term").str.contains("True", literal=True),
+        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})\]"),
         ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
@@ -601,10 +601,9 @@ We first compute, for each observation, the number of months relative to the tre
 bonds_panel_alt = (bonds_panel
     .with_columns(
         diff_to_treatment=(
-            ((pl.col("date")-treatment_month).dt.total_days()/365*12)
-            .round(0)
-            .cast(pl.Int64)
-        )
+            (pl.col("date").dt.year() - treatment_month.year) * 12
+            + (pl.col("date").dt.month() - treatment_month.month)
+        ).cast(pl.Int64)
     )
 )
 

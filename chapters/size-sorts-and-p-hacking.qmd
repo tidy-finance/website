@@ -157,7 +157,7 @@ crsp_monthly |>
 #| fig-pos: "htb"
 def top_share(quantile):
     total = pl.col("mktcap").sum().over("date")
-    threshold = pl.col("mktcap").quantile(quantile).over("date")
+    threshold = pl.col("mktcap").quantile(quantile, interpolation="linear").over("date")
     return (
         pl.when(pl.col("mktcap") >= threshold)
         .then(pl.col("mktcap"))
@@ -320,7 +320,7 @@ def summary_statistics(variable, percentiles):
         pl.col(variable).min().alias("min"),
     ]
     stats += [
-        pl.col(variable).quantile(p).alias(f"{int(p*100)}%") for p in percentiles
+        pl.col(variable).quantile(p, interpolation="linear").alias(f"{int(p*100)}%") for p in percentiles
     ]
     stats += [pl.col(variable).max().alias("max")]
     return stats
@@ -410,6 +410,10 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
         for q in quantiles
     ]
     breakpoints = sorted(set(breakpoints))
+    if len(breakpoints) < 2:
+        # Degenerate group (e.g., a single stock): no interior breakpoints,
+        # so all observations end up in a single portfolio
+        breakpoints = [-np.inf, np.inf]
     breakpoints[0], breakpoints[-1] = -np.inf, np.inf
 
     assigned_portfolios = (data

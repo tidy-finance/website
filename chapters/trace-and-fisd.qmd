@@ -579,8 +579,8 @@ bonds_outstanding <- expand_grid(
 #| label: trace-and-fisd-bonds-outstanding-py
 dates = pl.DataFrame(
     {"date": pl.date_range(
-        date(2014, 3, 1), date(2016, 11, 30), interval="3mo", eager=True
-    ).dt.month_end()}
+        date(2014, 1, 1), date(2016, 11, 30), interval="3mo", eager=True
+    )}
 )
 
 bonds_outstanding = (dates
@@ -631,13 +631,7 @@ trace_enhanced = pl.read_parquet(
 ).drop("batch")
 
 bonds_traded = (trace_enhanced
-    .with_columns(
-        date=pl.when(pl.col("trd_exctn_dt").dt.day() == 1)
-            .then(pl.col("trd_exctn_dt").dt.offset_by("-1mo"))
-            .otherwise(pl.col("trd_exctn_dt").dt.truncate("1mo"))
-            .dt.truncate("1q")
-            .cast(pl.Date)
-    )
+    .with_columns(date=pl.col("trd_exctn_dt").dt.truncate("1q"))
     .group_by("date")
     .agg(count=pl.col("cusip_id").n_unique())
     .with_columns(type=pl.lit("Traded"))
@@ -753,9 +747,9 @@ average_characteristics = (fisd
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
-        median=pl.col("value").quantile(0.50),
-        q95=pl.col("value").quantile(0.95),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").quantile(0.50, interpolation="linear"),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
 )
@@ -814,9 +808,9 @@ average_trade_size = (trace_enhanced
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
-        median=pl.col("value").quantile(0.50),
-        q95=pl.col("value").quantile(0.95),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").quantile(0.50, interpolation="linear"),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
 )
