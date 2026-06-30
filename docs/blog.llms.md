@@ -26,6 +26,16 @@ Stefan Voigt
 
 Jun 12, 2026
 
+##### High-Frequency Market Data: lobsteR and 20 Years of SPY on Hugging Face
+
+8 min
+
+Announcing lobsteR, an R package for LOBSTER high-frequency data, and seamless access to 20 years of 5-second SPY trading data via tidyfinance.
+
+Stefan Voigt
+
+Mar 15, 2026
+
 ![Illustration showing a data conversion workflow: a database icon with a blue feather on the left, a glowing arrow in the center, and a Parquet file icon labeled ‘.parquet’ on the right, set against a split digital background with cool green-blue tones on the left and warm orange tones on the right.](./blog/sql-legacy-version/thumbnail.png)
 
 ##### Tidy Finance migrates from SQLite to Parquet
@@ -49,6 +59,18 @@ Code for preparing ISS Voting Analytics data for further analysis on shareholder
 Alexander Pasler, Moritz Rodenkirchen
 
 Jun 13, 2025
+
+![Logo of the lobsteR R package for downloading and cleaning LOBSTER high-frequency order book data](./blog/hf-and-lobster/logo.png)
+
+##### lobsteR package and high-frequency data
+
+12 min
+
+Introducing the lobsteR package and tidy cleaning procedures in R for LOBSTER high-frequency data
+
+Stefan Voigt
+
+Mar 15, 2025
 
 ![Abstract illustration of a data flow pipeline with arrows and lines moving from financial icons like stock charts, currency symbols, and graphs towards a central tidy data frame. The background features a gradient of deep blues and greens, symbolizing finance and technology. The text ‘tidyfinance 0.4.0’ and a small CRAN logo are prominently displayed, with additional subtle financial icons integrated into the design. Created with DALL-E.](./blog/r-tidyfinance-0-4-0-new-data-downloads/thumbnail.png)
 
@@ -194,8 +216,6 @@ Patrick Weiss
 
 May 10, 2023
 
-![A 3D computer-rendered image of a historical stock exchange building. Created with DALL-E 3.](./blog/historical-sp-500-total-return/thumbnail.png)
-
 ##### Construction of a Historical S&P 500 Total Return Index
 
 8 min
@@ -205,8 +225,6 @@ An approximation of total returns using Robert Shiller’s stock market data
 Christoph Scheuch
 
 Feb 15, 2023
-
-![](./blog/op-ed-tidy-finance/thumbnail.png)
 
 ##### What is Tidy Finance?
 
