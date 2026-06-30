@@ -10,23 +10,8 @@ We use the following packages throughout this chapter. Later on, we load more pa
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidyfinance)
-```
-
-    Warning: package 'tidyfinance' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(dbplyr)
 ```
 
@@ -778,7 +763,7 @@ for (j in 1:batches) {
       mutate(
         ret_excess = ret - risk_free
       ) |>
-      select(permno, date, ret, ret_excess)
+      select(permno, date, ret_excess)
 
     crsp_daily_sub |>
       group_by(permno) |>
@@ -860,10 +845,9 @@ for j in range(1, batches + 1):
                 factors_ff3_daily.select(["date", "risk_free"]), on="date", how="left"
             )
             .with_columns(
-                ret_excess=pl.col("ret") - pl.col("risk_free"),
-                batch=pl.lit(j)
+                ret_excess=pl.col("ret") - pl.col("risk_free")
             )
-            .select(["batch", "permno", "date", "ret_excess"])
+            .select(["permno", "date", "ret_excess"])
         )
 
         crsp_daily_sub.write_parquet("data/crsp_daily", partition_by="permno")

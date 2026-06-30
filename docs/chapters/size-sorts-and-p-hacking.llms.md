@@ -10,25 +10,13 @@ The chapter relies on the following set of packages:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(scales)
 library(sandwich)
 library(lmtest)
 library(furrr)
 library(rlang)
 ```
-
-    Warning: package 'rlang' was built under R version 4.5.3
 
 Compared to previous chapters, we introduce the `rlang` package ([Henry and Wickham 2022](#ref-rlang)) for more advanced parsing of functional expressions.
 
@@ -131,7 +119,7 @@ Figure 1: The figure shows the percentage of total market capitalization in lar
 ``` python
 def top_share(quantile):
     total = pl.col("mktcap").sum().over("date")
-    threshold = pl.col("mktcap").quantile(quantile).over("date")
+    threshold = pl.col("mktcap").quantile(quantile, interpolation="linear").over("date")
     return (
         pl.when(pl.col("mktcap") >= threshold)
         .then(pl.col("mktcap"))
@@ -295,7 +283,7 @@ def summary_statistics(variable, percentiles):
         pl.col(variable).min().alias("min"),
     ]
     stats += [
-        pl.col(variable).quantile(p).alias(f"{int(p*100)}%") for p in percentiles
+        pl.col(variable).quantile(p, interpolation="linear").alias(f"{int(p*100)}%") for p in percentiles
     ]
     stats += [pl.col(variable).max().alias("max")]
     return stats
@@ -333,10 +321,10 @@ shape: (4, 9)
 | exchange  | count | mean    | std      | min  | 5%    | 50%    | 95%     | max      |
 |-----------|-------|---------|----------|------|-------|--------|---------|----------|
 | str       | u32   | f64     | f64      | f64  | f64   | f64    | f64     | f64      |
-| "AMEX"    | 154   | 195.0   | 512.0    | 2.0  | 4.0   | 47.0   | 849.0   | 3921.0   |
-| "NASDAQ"  | 2379  | 12558.0 | 141814.0 | 0.0  | 6.0   | 318.0  | 20087.0 | 3.7665e6 |
-| "NYSE"    | 1256  | 21862.0 | 63583.0  | 15.0 | 179.0 | 4049.0 | 90093.0 | 732872.0 |
-| "Overall" | 3789  | 15139.0 | 118291.0 | 0.0  | 8.0   | 730.0  | 47189.0 | 3.7665e6 |
+| "AMEX"    | 154   | 195.0   | 512.0    | 2.0  | 4.0   | 46.0   | 870.0   | 3921.0   |
+| "NASDAQ"  | 2379  | 12558.0 | 141814.0 | 0.0  | 6.0   | 318.0  | 20095.0 | 3.7665e6 |
+| "NYSE"    | 1256  | 21862.0 | 63583.0  | 15.0 | 179.0 | 4048.0 | 90119.0 | 732872.0 |
+| "Overall" | 3789  | 15139.0 | 118291.0 | 0.0  | 8.0   | 730.0  | 47134.0 | 3.7665e6 |
 
 ## Univariate Size Portfolios with Flexible Breakpoints
 
@@ -390,6 +378,10 @@ def assign_portfolio(data, exchanges, sorting_variable, n_portfolios):
         for q in quantiles
     ]
     breakpoints = sorted(set(breakpoints))
+    if len(breakpoints) < 2:
+        # Degenerate group (e.g., a single stock): no interior breakpoints,
+        # so all observations end up in a single portfolio
+        breakpoints = [-np.inf, np.inf]
     breakpoints[0], breakpoints[-1] = -np.inf, np.inf
 
     assigned_portfolios = (data
@@ -637,17 +629,7 @@ p_hacking_setup <- p_hacking_setup |>
       )
     )
   )
-```
 
-    Warning: There were 14 warnings in `mutate()`.
-    The first warning was:
-    ℹ In argument: `size_premium = future_pmap(...)`.
-    Caused by warning:
-    ! package 'rlang' was built under R version 4.5.3
-    ℹ Run `dplyr::last_dplyr_warnings()` to see the 13 remaining
-      warnings.
-
-``` r
 p_hacking_results <- p_hacking_setup |>
   mutate(data = map_chr(data, deparse)) |>
   unnest(size_premium) |>

@@ -805,7 +805,7 @@ beta_quantiles = (
     beta_monthly
     .group_by("date")
     .agg([
-        pl.col("beta").quantile(q).alias(str(int(round(q * 100))))
+        pl.col("beta").quantile(q, interpolation="linear").alias(str(int(round(q * 100))))
         for q in quantiles
     ])
     .unpivot(index="date", variable_name="quantile", value_name="beta")
@@ -1041,9 +1041,9 @@ beta |>
         mean=pl.col("beta").mean(),
         std=pl.col("beta").std(),
         min=pl.col("beta").min(),
-        q25=pl.col("beta").quantile(0.25),
-        median=pl.col("beta").median(),
-        q75=pl.col("beta").quantile(0.75),
+        q05=pl.col("beta").quantile(0.05, interpolation="linear"),
+        q50=pl.col("beta").quantile(0.50, interpolation="linear"),
+        q95=pl.col("beta").quantile(0.95, interpolation="linear"),
         max=pl.col("beta").max(),
     )
     .sort("return_type")
@@ -1053,11 +1053,11 @@ beta |>
 
 shape: (2, 9)
 
-| return_type | count   | mean | std  | min    | q25  | median | q75  | max   |
-|-------------|---------|------|------|--------|------|--------|------|-------|
-| str         | u32     | f64  | f64  | f64    | f64  | f64    | f64  | f64   |
-| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.41 | 0.75   | 1.12 | 4.97  |
-| "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.64 | 1.04   | 1.48 | 11.72 |
+| return_type | count   | mean | std  | min    | q05  | q50  | q95  | max   |
+|-------------|---------|------|------|--------|------|------|------|-------|
+| str         | u32     | f64  | f64  | f64    | f64  | f64  | f64  | f64   |
+| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.09 | 0.75 | 1.66 | 4.97  |
+| "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.13 | 1.04 | 2.33 | 11.72 |
 
 The summary statistics indicate that estimates based on daily returns are, on average, lower and less variable than those derived from monthly returns.
 

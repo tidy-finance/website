@@ -12,15 +12,8 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
 ```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ## Python
 
@@ -153,7 +146,7 @@ book_to_market = (compustat_annual
 sorting_variables = (size
     .join(book_to_market, how="inner", on=["permno", "sorting_date"])
     .drop_nulls()
-    .unique(subset=["permno", "sorting_date"])
+    .unique(subset=["permno", "sorting_date"], keep="first")
  )
 ```
 
@@ -350,7 +343,7 @@ We run the regressions using `pf.feols()`.
 ``` python
 test = (factors_replicated
     .join(factors_ff3_monthly, how="inner", on="date")
-    .with_columns(pl.col(pl.Float64).round(4))
+    .with_columns(pl.col("^.*_replicated$").round(4))
 )
 ```
 
@@ -504,7 +497,7 @@ other_sorting_variables = (compustat_annual
 sorting_variables = (size
     .join(other_sorting_variables, how="inner", on=["permno", "sorting_date"])
     .drop_nulls()
-    .unique(subset=["permno", "sorting_date"])
+    .unique(subset=["permno", "sorting_date"], keep="first")
  )
 ```
 
@@ -762,7 +755,7 @@ factors_replicated = (factors_size
 
 test = (factors_replicated
     .join(factors_ff5_monthly, how="inner", on="date")
-    .with_columns(pl.col(pl.Float64).round(4))
+    .with_columns(pl.col("^.*_replicated$").round(4))
 )
 ```
 

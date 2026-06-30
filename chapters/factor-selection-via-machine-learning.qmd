@@ -154,17 +154,17 @@ industries_ff_monthly <- read_parquet("data/industries_ff_monthly.parquet") |>
 #| label: factor-selection-via-machine-learning-load-data-py
 factors_ff3_monthly = (
     pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .rename(lambda c: f"factor_ff_{c}")
+    .rename(lambda c: c if c == "date" else f"factor_ff_{c}")
 )
 
 factors_q_monthly = (
     pl.read_parquet("data/factors_q_monthly.parquet")
-    .rename(lambda c: f"factor_q_{c}")
+    .rename(lambda c: c if c == "date" else f"factor_q_{c}")
 )
 
 macro_predictors = (
     pl.read_parquet("data/macro_predictors.parquet")
-    .rename(lambda c: f"macro_{c}")
+    .rename(lambda c: c if c == "date" else f"macro_{c}")
     .drop("macro_rp_div")
 )
 
@@ -202,12 +202,9 @@ Our data contains `{r} ncol(data)-2` columns of regressors with the `{r} ncol(ma
 ```{python}
 #| label: factor-selection-via-machine-learning-combine-data-py
 data = (industries_ff_monthly
-  .join(factors_ff3_monthly,
-        how="left", left_on="date", right_on="factor_ff_date")
-  .join(factors_q_monthly,
-        how="left", left_on="date", right_on="factor_q_date")
-  .join(macro_predictors,
-        how="left", left_on="date", right_on="macro_date")
+  .join(factors_ff3_monthly, how="left", on="date")
+  .join(factors_q_monthly, how="left", on="date")
+  .join(macro_predictors, how="left", on="date")
   .with_columns(ret_excess=pl.col("ret") - pl.col("factor_ff_risk_free"))
   .drop("ret")
   .drop_nulls()

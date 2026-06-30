@@ -12,17 +12,7 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(fixest)
 library(broom)
 ```
@@ -261,9 +251,9 @@ bonds_panel |>
     # A tibble: 3 × 9
       measure           mean    sd    min   q05   q50   q95   max      n
       <chr>            <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl>  <int>
-    1 avg_yield         4.08 4.21  0.0595  1.27  3.38  8.10 128.  127530
-    2 log_offering_amt 13.3  0.823 4.64   12.2  13.2  14.5   16.5 127530
-    3 time_to_maturity  8.55 8.41  1.01    1.50  5.81 27.4  101.  127530
+    1 avg_yield         4.03 3.99  0.0595  1.30  3.46  7.72 128.  159892
+    2 log_offering_amt 13.1  0.924 4.64   11.9  13.1  14.5   16.5 159892
+    3 time_to_maturity  9.26 9.27  1.01    1.51  6.10 27.7  101.  159892
 
 ## Python
 
@@ -279,9 +269,9 @@ bonds_panel_summary = (bonds_panel
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
         median=pl.col("value").median(),
-        q95=pl.col("value").quantile(0.95),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
     .sort("measure")
@@ -295,9 +285,9 @@ shape: (3, 9)
 | measure            | count  | mean  | std  | min  | q05   | median | q95   | max    |
 |--------------------|--------|-------|------|------|-------|--------|-------|--------|
 | str                | u32    | f64   | f64  | f64  | f64   | f64    | f64   | f64    |
-| "avg_yield"        | 127530 | 4.08  | 4.21 | 0.06 | 1.27  | 3.38   | 8.1   | 127.97 |
-| "log_offering_amt" | 127530 | 13.27 | 0.82 | 4.64 | 12.21 | 13.22  | 14.51 | 16.52  |
-| "time_to_maturity" | 127530 | 8.55  | 8.41 | 1.01 | 1.5   | 5.81   | 27.41 | 100.7  |
+| "avg_yield"        | 159892 | 4.03  | 3.99 | 0.06 | 1.3   | 3.46   | 7.72  | 127.97 |
+| "log_offering_amt" | 159892 | 13.13 | 0.92 | 4.64 | 11.92 | 13.12  | 14.51 | 16.52  |
+| "time_to_maturity" | 159892 | 9.26  | 9.27 | 1.01 | 1.51  | 6.1    | 27.74 | 100.7  |
 
 ## Panel Regressions
 
@@ -325,7 +315,7 @@ model_with_fe <- feols(
 )
 ```
 
-    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
+    NOTE: 205/0 fixed-effect singletons were removed (205 observations).
 
 ``` r
 etable(
@@ -340,20 +330,20 @@ etable(
                       model_without_fe   model_with_fe
     Dependent Var.:          avg_yield       avg_yield
                                                       
-    Constant            10.7*** (57.0)                
-    treatedTRUE        0.462*** (9.31) 0.983*** (29.5)
-    post_periodTRUE  -0.174*** (-5.92)                
-    polluterTRUE       0.481*** (15.3)                
-    log_offering_amt -0.551*** (-39.0)                
-    time_to_maturity   0.058*** (41.6)                
+    Constant            7.92*** (56.2)                
+    treatedTRUE        0.437*** (10.4) 0.823*** (29.7)
+    post_periodTRUE  -0.134*** (-5.28)                
+    polluterTRUE       0.364*** (13.9)                
+    log_offering_amt -0.342*** (-32.0)                
+    time_to_maturity   0.049*** (46.1)                
     Fixed-Effects:   ----------------- ---------------
     cusip_id                        No             Yes
     date                            No             Yes
     ________________ _________________ _______________
     VCOV type                      IID             IID
-    Observations               127,530         127,179
-    R2                           0.032           0.647
-    Within R2                       --           0.007
+    Observations               159,892         159,687
+    R2                           0.025           0.642
+    Within R2                       --           0.006
     ---
     Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -379,20 +369,20 @@ pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 |----|----|----|
 |  | \(1\) | \(2\) |
 | coef |  |  |
-| treated | 0.462\*\*\* (9.308) | 0.983\*\*\* (29.534) |
-| post_period | -0.174\*\*\* (-5.923) |  |
-| polluter | 0.481\*\*\* (15.280) |  |
-| log_offering_amt | -0.551\*\*\* (-38.976) |  |
-| time_to_maturity | 0.058\*\*\* (41.556) |  |
-| Intercept | 10.734\*\*\* (57.015) |  |
+| treated | 0.437\*\*\* (10.412) | 0.823\*\*\* (29.662) |
+| post_period | -0.134\*\*\* (-5.284) |  |
+| polluter | 0.364\*\*\* (13.859) |  |
+| log_offering_amt | -0.342\*\*\* (-32.010) |  |
+| time_to_maturity | 0.049\*\*\* (46.077) |  |
+| Intercept | 7.923\*\*\* (56.171) |  |
 | fe |  |  |
 | date | \- | x |
 | cusip_id | \- | x |
 | stats |  |  |
-| Observations | 127530 | 127179 |
+| Observations | 159892 | 159687 |
 | S.E. type | iid | iid |
-| R² | 0.032 | 0.647 |
-| R² Within | \- | 0.007 |
+| R² | 0.025 | 0.642 |
+| R² Within | \- | 0.006 |
 | Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models.
@@ -457,7 +447,7 @@ Figure 1: The figure shows the coefficient estimates and 95 percent confidence 
 
 ``` python
 model_without_fe_time = pf.feols(
-    "avg_yield ~ polluter + date*polluter + time_to_maturity + log_offering_amt",
+    "avg_yield ~ C(polluter)/C(date) + time_to_maturity + log_offering_amt",
     vcov = "iid",
     data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
 )
@@ -469,8 +459,8 @@ model_without_fe_coefs = (pl.DataFrame({
     })
     .filter(pl.col("term").str.contains("date"))
     .with_columns(
-        treatment=pl.col("term").str.contains(":polluter"),
-        date=pl.col("term").str.extract(r"date\[T\.(\d{4}-\d{2}-\d{2})"),
+        treatment=pl.col("term").str.contains("True", literal=True),
+        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})\]"),
         ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
@@ -555,7 +545,7 @@ model_with_fe_time <- feols(
 )
 ```
 
-    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
+    NOTE: 205/0 fixed-effect singletons were removed (205 observations).
 
 ``` r
 model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
@@ -610,10 +600,9 @@ We first compute, for each observation, the number of months relative to the tre
 bonds_panel_alt = (bonds_panel
     .with_columns(
         diff_to_treatment=(
-            ((pl.col("date")-treatment_month).dt.total_days()/365*12)
-            .round(0)
-            .cast(pl.Int64)
-        )
+            (pl.col("date").dt.year() - treatment_month.year) * 12
+            + (pl.col("date").dt.month() - treatment_month.month)
+        ).cast(pl.Int64)
     )
 )
 

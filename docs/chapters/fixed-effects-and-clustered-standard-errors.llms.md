@@ -171,8 +171,8 @@ def winsorize(col, cut):
     """Winsorize a column at cut level."""
 
     x = pl.col(col)
-    upper_quantile = x.quantile(1 - cut)
-    lower_quantile = x.quantile(cut)
+    upper_quantile = x.quantile(1 - cut, interpolation="linear")
+    lower_quantile = x.quantile(cut, interpolation="linear")
     return (
         pl.when(x > upper_quantile).then(upper_quantile)
         .when(x < lower_quantile).then(lower_quantile)
@@ -233,9 +233,9 @@ data_investment_summary = (data_investment
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
         median=pl.col("value").median(),
-        q95=pl.col("value").quantile(0.95),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
     .sort("measure")
@@ -309,9 +309,9 @@ model_ols.summary()
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.043 |        0.000 |   137.513 |      0.000 |  0.042 |   0.043 |
-    | cash_flows    |      0.045 |        0.001 |    63.163 |      0.000 |  0.043 |   0.046 |
-    | tobins_q      |      0.007 |        0.000 |    57.540 |      0.000 |  0.006 |   0.007 |
+    | Intercept     |      0.043 |        0.000 |   137.514 |      0.000 |  0.042 |   0.043 |
+    | cash_flows    |      0.045 |        0.001 |    63.162 |      0.000 |  0.043 |   0.046 |
+    | tobins_q      |      0.007 |        0.000 |    57.539 |      0.000 |  0.006 |   0.007 |
     ---
     RMSE: 0.075 R2: 0.04 
 
@@ -373,7 +373,7 @@ model_fe_firm.summary()
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.011 |        0.001 |    13.729 |      0.000 |  0.010 |   0.013 |
+    | cash_flows    |      0.011 |        0.001 |    13.730 |      0.000 |  0.010 |   0.013 |
     | tobins_q      |      0.010 |        0.000 |    81.822 |      0.000 |  0.009 |   0.010 |
     ---
     RMSE: 0.05 R2: 0.563 R2 Within: 0.051 
@@ -489,12 +489,12 @@ pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.045\*\*\* (63.163) | 0.011\*\*\* (13.729) | 0.014\*\*\* (17.498) |
-| tobins_q | 0.007\*\*\* (57.540) | 0.010\*\*\* (81.822) | 0.009\*\*\* (75.943) |
-| Intercept | 0.043\*\*\* (137.513) |  |  |
+| cash_flows | 0.045\*\*\* (63.162) | 0.011\*\*\* (13.730) | 0.014\*\*\* (17.498) |
+| tobins_q | 0.007\*\*\* (57.539) | 0.010\*\*\* (81.822) | 0.009\*\*\* (75.943) |
+| Intercept | 0.043\*\*\* (137.514) |  |  |
 | fe |  |  |  |
-| gvkey | \- | x | x |
 | year | \- | \- | x |
+| gvkey | \- | x | x |
 | stats |  |  |  |
 | Observations | 139861 | 138205 | 138205 |
 | S.E. type | iid | iid | iid |
@@ -589,11 +589,11 @@ pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.014\*\*\* (17.498) | 0.014\*\*\* (10.122) | 0.014\*\*\* (8.298) |
+| cash_flows | 0.014\*\*\* (17.498) | 0.014\*\*\* (10.122) | 0.014\*\*\* (8.297) |
 | tobins_q | 0.009\*\*\* (75.943) | 0.009\*\*\* (35.632) | 0.009\*\*\* (14.303) |
 | fe |  |  |  |
-| gvkey | x | x | x |
 | year | x | x | x |
+| gvkey | x | x | x |
 | stats |  |  |  |
 | Observations | 138205 | 138205 | 138205 |
 | S.E. type | iid | by: gvkey | by: gvkey+year |
