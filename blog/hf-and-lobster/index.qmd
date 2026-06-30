@@ -1,0 +1,427 @@
+---
+title: "lobsteR package and high-frequency data"
+author: Stefan Voigt
+date: 2025-03-15
+description: Introducing the lobsteR package and tidy cleaning procedures in R for LOBSTER high-frequency data
+categories: 
+  - R
+  - Data
+  - Market microstructure
+image: logo.png
+image-alt: "Logo of the lobsteR R package for downloading and cleaning LOBSTER high-frequency order book data"
+execute: 
+  warning: false
+---
+
+
+Recently, [Nikolaus Hautsch](https://homepage.univie.ac.at/nikolaus.hautsch/), [Albert J. Menkveld](https://albertjmenkveld.com/) and I released a new working paper [Market responses to a VIX shock](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6298780) for which we analysed more than 30 billion order book events and trades in the S&P 500 index tracking ETF SPY. The paper is based on high-frequency data from [LOBSTER](https://lobsterdata.com/), which provides detailed information on the limit order book for all assets traded on NASDAQ.
+
+As part of our research, we developed a novel R package, [lobsteR](https://voigtstefan.github.io/lobsteR/), to request, download, and clean LOBSTER data. The package is now available on CRAN and GitHub. We also made cleaned 5-second trading and liquidity information on SPY available for everyone to use.
+
+This is part one of two blog posts in which we announce and explain these two major updates to the Tidy Finance ecosystem.
+
+1. `lobsteR` is a novel R package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package. 
+2. Seamless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+
+To connect the dots between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [LOBSTER](https://lobsterdata.com/). 
+
+## The `lobsteR` package
+
+The goal of [lobsteR](https://voigtstefan.github.io/lobsteR/) is to provide a tidy framework to request data from [LOBSTER](https://lobsterdata.com/), to download, unzip, and clean the data. The package focuses on the core functionalities required to get LOBSTER data ready fast.
+
+You can install `lobsteR` from CRAN with:
+```{r}
+#| eval: false
+install.packages("lobsteR")
+```
+
+Or install the development version from GitHub with:
+
+```{r}
+#| eval: false
+# install.packages("pak")
+pak::pak("voigtstefan/lobsteR")
+```
+```{r}
+library(lobsteR)
+```
+
+[LOBSTER](https://lobsterdata.com/) reconstructs the complete history of limit order book snapshots from NASDAQ exchange data for all assets traded on the exchange, starting from June 27, 2006. For each trading day, [LOBSTER](https://lobsterdata.com/) delivers two files: a message file with nanosecond-timestamped records of every order book event, and an order book snapshot file capturing the state of the book after each event. This level of granularity offers unprecedented insights into the inner workings of some of the world's most actively traded assets.
+
+With `lobsteR` you can connect to [LOBSTER](https://lobsterdata.com/) using your own credentials.
+
+```{r}
+#| eval: false
+lobster_login <- account_login(
+  login = Sys.getenv("user"), # replace with your username
+  pwd   = Sys.getenv("pwd")   # replace with your password
+)
+```
+
+I recommend storing your credentials in the `.Renviron` file (e.g., via `usethis::edit_r_environ()`) to avoid hardcoding them in your scripts. 
+
+Next, we request data from LOBSTER — for example, order book data for *SPY*, a large ETF tracking the S&P 500 index, on May 6, 2010: the day of the famous [2010 flash crash](https://en.wikipedia.org/wiki/2010_flash_crash). `level` corresponds to the requested number of order book levels (bid and ask sides each).
+
+```{r}
+#| eval: false
+data_request <- request_query(
+  symbol = "SPY",
+  start_date = "2010-05-06",
+  end_date = "2010-05-06",
+  level = 20
+)
+```
+
+Next, we submit the requests to the interface of data provider LOBSTER. The processing of the request is done in the background on the servers of Lobster, so you can close the session after submitting the request. Once done, the requested data will be available in your account archive, ready to download.
+
+```{r}
+#| eval: false
+request_submit(
+  account_login = lobster_login,
+  request = data_request
+)
+```
+
+After submitting the request, LOBSTER will work on providing the order book snapshots. Depending on the number of messages to process,
+this may take some time. Once done, the requested data is available in your account archive - ready to download!
+
+```{r}
+#| eval: false
+lobster_archive <- account_archive(account_login = lobster_login)
+```
+
+When downloading, the data is unzipped automatically (this can be omitted using `unzip = FALSE`)
+
+```{r}
+#| eval: false
+data_download(
+  requested_data = lobster_archive,
+  account_login = lobster_login
+)
+```
+
+## Clean and organize `lobsteR` data
+
+LOBSTER always delivers two files per day, following the naming convention `{ticker}_{date}_{start}_{end}_{type}_{level}.csv`. Here `{type}` is either `message` (nanosecond-timestamped records of every order book event) or `orderbook` (the corresponding book snapshot after each event). The integers `{start}` and `{end}` mark the trading session boundaries in milliseconds since midnight.
+
+For many tasks related to measuring liquidity, the order book snapshots are particularly interesting. The code below parses the file names and extracts the relevant metadata; it is structured so it can loop over all downloaded files.
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+```{r}
+#| eval: false
+available_files <- tibble(path = list.files(path = "blog/hf-and-lobster", pattern = ".csv", full.names = TRUE)) |>
+    extract(
+      col = path,
+      into = c("ticker", "date", NA, NA, "filetype", "level"),
+      regex = ".*/.*/([A-Z]+)_([0-9]{4}-[0-9]{2}-[0-9]{2})_(\\d+)_(\\d+)_([a-z]+)_([0-9]+)\\.csv$",
+      remove = FALSE
+    ) |>
+    pivot_wider(
+      names_from = filetype,
+      values_from = path,
+      names_glue = "{filetype}_file"
+    ) 
+
+available_files
+
+ticker <- available_files |> head(1) |> pull(ticker)
+orderbook_file <- available_files |> head(1) |> pull(orderbook_file)
+message_file <- available_files |> head(1) |> pull(message_file)
+level <- available_files |> head(1) |> pull(level)
+date <-  available_files |> head(1) |> pull(date)
+```
+
+I read the `.csv` files with `data.table::fread` rather than a tidyverse reader because `fread` is substantially faster for the large files LOBSTER produces. Two data issues need to be resolved upfront:
+
+1. LOBSTER reports all prices as integer Dollar price times 10,000.
+2. Unoccupied price levels (when the requested depth exceeds the actual order book depth) are filled with sentinel values and should be set to `NA`.
+
+```{r}
+#| eval: false
+library(data.table)
+
+orderbook_raw <- fread(
+      orderbook_file,
+      col.names = paste(
+        rep(c("ask_price", "ask_size", "bid_price", "bid_size"), level),
+        rep(1:level, each = 4),
+        sep = "_"
+      )
+    )
+
+# Apply transformations in-place
+price_cols <- grep("price", names(orderbook_raw), value = TRUE)
+bid_price_cols <- grep("bid_price", names(orderbook_raw), value = TRUE)
+ask_price_cols <- grep("ask_price", names(orderbook_raw), value = TRUE)
+
+# Scale all price columns
+orderbook_raw[,
+  (price_cols) := lapply(.SD, function(x) x / 10000),
+  .SDcols = price_cols
+]
+
+# Replace negative bid prices with NA
+orderbook_raw[,
+  (bid_price_cols) := lapply(.SD, function(x) fifelse(x < 0, NA_real_, x)),
+  .SDcols = bid_price_cols
+]
+# Replace extreme ask prices with NA
+orderbook_raw[,
+  (ask_price_cols) := lapply(.SD, function(x) {
+    fifelse(x >= 999999, NA_real_, x)
+  }),
+  .SDcols = ask_price_cols
+]
+orderbook_raw[, midquote := (ask_price_1 / 2 + bid_price_1 / 2)]
+```
+
+A natural question is: *how many shares can I buy (or sell) with a market order before the marginal execution price is x basis points away from the current best price?* The `compute_depth` helper below answers this for any side and basis-point threshold.
+
+```{r}
+#| eval: false
+compute_depth <- function(df, side = "bid", bp = 0) {
+  mat <- as.matrix(df)
+
+  if (side == "bid") {
+    value_bid <- (1 - bp / 10000) * mat[, "bid_price_1"]
+    price_cols <- grep("^bid_price_", colnames(mat))
+    size_cols <- grep("^bid_size_", colnames(mat))
+
+    index <- sweep(mat[, price_cols], 1, value_bid, `>=`)
+    sum_vector <- rowSums(mat[, size_cols] * index, na.rm = TRUE)
+  } else {
+    value_ask <- (1 + bp / 10000) * mat[, "ask_price_1"]
+    price_cols <- grep("^ask_price_", colnames(mat))
+    size_cols <- grep("^ask_size_", colnames(mat))
+
+    index <- sweep(mat[, price_cols], 1, value_ask, `<=`)
+    sum_vector <- rowSums(mat[, size_cols] * index, na.rm = TRUE)
+  }
+
+  return(sum_vector)
+}
+
+depth5_ask <- compute_depth(orderbook_raw, side = "ask", bp = 5)
+depth5_bid <- compute_depth(orderbook_raw, side = "bid", bp = 5)
+
+orderbook_aggregated <- orderbook_raw[, .(
+      midquote,
+      crossed_quotes = ask_price_1 < bid_price_1,
+      spread = 10000 * (ask_price_1 - bid_price_1) / midquote,
+      depth0_bid = bid_size_1,
+      depth0_ask = ask_size_1,
+      depth5_ask,
+      depth5_bid    
+    )]
+```
+
+Next, we read the message file, which records every change to the order book. NASDAQ's regular trading session runs from 9:30am to 4pm, corresponding to 34,200 to 57,600 seconds after midnight.
+
+```{r}
+#| eval: false
+messages_raw <- fread(
+  message_file,
+  select = 1:6,
+  col.names = c("ts", "type", "order_id", "m_size", "m_price", "direction")
+)
+
+messages_raw[, m_price := m_price / 10000]
+```
+
+```{r}
+#| eval: false
+orderbook <- cbind(messages_raw, orderbook_aggregated)
+
+market_open = 34200
+market_close = 57600
+
+orderbook <- orderbook[ts >= market_open & ts <= market_close & !crossed_quotes]
+orderbook[, crossed_quotes := NULL]
+```
+
+Cleaning LOBSTER data requires a few targeted steps. First, we remove observations that fall within trading halt periods — type-7 messages signal the start and end of each halt, and any events between them should be excluded.
+
+```{r}
+#| eval: false
+# Step 1: Detect trading halt timestamps
+halt_ts <- orderbook[
+  type == 7 & direction == -1 & m_price %in% c(-1 / 10000, 1 / 10000),
+  ts
+]
+
+if (length(halt_ts) >= 2) {
+  # Create intervals to exclude
+  halt_intervals <- data.table(
+    start = halt_ts[seq(1, length(halt_ts) - 1, by = 2)],
+    end = halt_ts[seq(2, length(halt_ts), by = 2)]
+  )
+
+  # Keep rows outside all halt intervals
+  for (i in seq_len(nrow(halt_intervals))) {
+    orderbook <- orderbook[
+      ts < halt_intervals$start[i] | ts > halt_intervals$end[i]
+    ]
+  }
+}
+```
+
+Opening and closing auction messages (type 6) can overlap with regular trading hours and appear in the NASDAQ message feed. The next filter trims observations to the continuous trading window and drops type-6 and type-7 messages entirely.
+
+```{r}
+#| eval: false
+# Step 2: Identify auction boundaries
+opening_auction <- orderbook[type == 6 & order_id == -1, ts]
+closing_auction <- orderbook[type == 6 & order_id == -2, ts]
+
+if (length(opening_auction) != 1) {
+  opening_auction <- orderbook[1, ts] - 0.1
+}
+if (length(closing_auction) != 1) {
+  closing_auction <- orderbook[.N, ts] + 0.1
+}
+
+# Step 3: Filter by auction window and remove types 6 and 7
+orderbook <- orderbook[ts > opening_auction & ts < closing_auction]
+orderbook <- orderbook[!(type %in% c(6, 7))]
+```
+
+Large trades that sweep multiple order book levels are recorded as several messages sharing an identical timestamp. We aggregate these into single trade records and infer trade direction by comparing the execution price to the lagged midquote.
+
+```{r}
+#| eval: false
+# Step 4: Extract trades
+trades <- orderbook[type %in% c(4, 5), .SD, .SDcols = ts:midquote]
+
+# Step 5: Create midquote and lag_midquote
+quotes <- orderbook[, .SD[1], by = ts][, .(
+  ts,
+  lag_midquote = shift(midquote)
+)]
+
+# Step 6: Merge trades with quotes
+trades <- merge(trades, quotes, by = "ts", all.x = TRUE)
+
+# Step 7: Recalculate direction
+trades[,
+  direction := fcase(
+    type == 5 & m_price < lag_midquote ,                    1 ,
+    type == 5 & m_price > lag_midquote ,                   -1 ,
+    type == 4                          , as.double(direction) ,
+    default = NA_real_
+  )
+]
+```
+
+Finally, I aggregate the trades and merge with the last snapshot of each group.
+
+```{r}
+#| eval: false
+# Step 8: Aggregate trades
+trade_aggregated <- trades[,
+  .(
+    type = last(type),
+    m_price = sum(m_price * m_size) / sum(m_size),
+    m_size = sum(m_size),
+    direction = last(direction)
+  ),
+  by = ts
+]
+
+# Step 9: Merge with last snapshot of orderbook
+exclude_cols <- which(
+  names(orderbook) %in%
+    c("ts", "type", "order_id", "m_size", "m_price", "direction")
+)
+keep_cols <- setdiff(seq_along(orderbook), exclude_cols)
+
+snapshots <- orderbook[, .SD[.N], by = ts, .SDcols = keep_cols]
+trade_aggregated <- merge(trade_aggregated, snapshots, by = "ts")
+
+# Step 10: Final assembly
+orderbook <- orderbook[!(type %in% c(4, 5))][, order_id := NULL]
+orderbook <- rbind(orderbook, trade_aggregated)
+setorder(orderbook, ts)
+
+orderbook[, `:=`(
+  direction = fifelse(type %in% c(4, 5), direction, NA_real_),
+  signed_volume = fifelse(type %in% c(4, 5), -direction * m_size, 0),
+  trading_volume = fifelse(type %in% c(4, 5), m_price * m_size, NA_real_)
+)]
+```
+
+After cleaning, more than 11 million observations remain for this single trading day. To visualize the flash crash, I aggregate to a 1-second grid: each message is assigned to a `ts_interval` and summary statistics — midquote, spread, depth, and volume — are computed per interval, time-weighted by the duration each state persisted (`ts_latency`).
+
+```{r}
+#| eval: false
+library(lubridate)
+library(arrow)
+aggregation_frequency <- "1 second"
+ 
+orderbook[, `:=`(
+  ts_latency = fifelse(
+    !is.na(shift(ts, type = "lead")),
+    as.numeric(shift(ts, type = "lead")) - as.numeric(ts),
+    0
+  ),
+  ts_interval = ceiling_date(
+    as.POSIXct(ts, origin = date, tz = "UTC"),
+    aggregation_frequency
+  ) # messages from 10:30:00 - 10:34:59.xx belong into 10:35:00
+)]
+
+orderbook_aggregated <- orderbook[,
+  .(
+    midquote = last(midquote),
+    signed_volume = sum(signed_volume),
+    n_trades = sum(!is.na(trading_volume)),
+    n_messages = .N,
+    trading_volume = sum(trading_volume, na.rm = TRUE),
+    depth0_bid = weighted.mean(depth0_bid, ts_latency, na.rm = TRUE),
+    depth0_ask = weighted.mean(depth0_ask, ts_latency, na.rm = TRUE),
+    depth5_bid = weighted.mean(depth5_bid, ts_latency, na.rm = TRUE),
+    depth5_ask = weighted.mean(depth5_ask, ts_latency, na.rm = TRUE),
+    spread = weighted.mean(spread, ts_latency, na.rm = TRUE)
+  ),
+  by = ts_interval
+]
+
+file_name <- glue::glue("processed_{ticker}_{date}.parquet")
+orderbook_aggregated |> write_parquet(file_name)
+```
+
+```{r}
+#| echo: false
+library(arrow)
+
+orderbook_aggregated <- read_parquet(
+  "blog/hf-and-lobster/processed_SPY_2010-05-06.parquet"
+)
+date <- as.Date("2010-05-06")
+```
+
+So, what happened on May 6th, 2010? In a matter of minutes, stock indices including the S&P 500, Dow Jones Industrial Average, and Nasdaq Composite collapsed and rebounded. The chart below shows how quoted depth within 5 basis points of the midquote suddenly vanished (in millions of USD at the opening price), spreads skyrocketed, and the SPY midquote plummeted by roughly 9%. Prices recovered quickly, but depth remained alarmingly thin.
+
+```{r}
+opening_price <- orderbook_aggregated |> head(1) |> pull(midquote)
+
+orderbook_aggregated |>
+  filter(ts_minute>=as.POSIXct(glue::glue("{date} 14:35:00"), tz = "UTC"),
+ts_minute<=as.POSIXct(glue::glue("{date} 15:00:00"), tz = "UTC")) |>
+  as_tibble() |>
+  mutate(across(contains("depth5"), ~.x * opening_price / 1000000)) |>
+  select(ts = ts_minute, `Midquote (USD)` = midquote, `Spread (bp)` = spread, `Depth bid (mUSD)` = depth5_bid, `Depth ask (mUSD)` = depth5_ask) |>
+  pivot_longer(-ts) |>
+  ggplot(aes(x = ts, y = value)) +
+  geom_line() +
+  facet_wrap(name~., ncol = 1, scales ="free_y") +
+  theme_minimal() +
+  labs(x = NULL, y = NULL, title = "SPY trading and order book activity on May 6th, 2010")
+```
+
+The cleaning pipeline above transforms raw LOBSTER files into a compact, analysis-ready dataset. In the [companion blog post](../hf-and-hugging-face/index.qmd), we describe how we applied this pipeline to the full 2007--2025 LOBSTER history and made the resulting 5-second aggregated data for SPY freely available via `tidyfinance::download_data("hf")`.
+
