@@ -3,7 +3,7 @@ Implementing standard tasks like portfolio sorts in R can be approached in vario
 We’ll dive into the following sorting approaches:
 
 - Use the built-in `base` functions that ship with every R installation.
-- Leverage the popular `dplyr` package and workhorse of [Tidy Finance with R](../../r/index.llms.md).
+- Leverage the popular `dplyr` package and workhorse of [Tidy Finance with R](../../r/index.qmd).
 - Explore the powerful `data.table` package using on-the-fly column creation.
 - Compare to the `data.table` variant with in-place mutations.
 - Combine the `dplyr` syntax with `data.table`’s performance through `dtplyr`.
@@ -22,7 +22,7 @@ library(ggplot2)
 
 ## Data preparation
 
-First, I start by loading the monthly CRSP data from our database (see [WRDS, CRSP, and Compustat](../../r/wrds-crsp-and-compustat.llms.md) for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a `tibble` for `dplyr`, a `data.frame` for `base`, two `data.table`s for the two `data.table` approaches, and a ‘lazy’ data table for `dtplyr` because I want to avoid any conversion issues in the portfolio assignments.
+First, I start by loading the monthly CRSP data from our database (see [WRDS, CRSP, and Compustat](../../r/wrds-crsp-and-compustat.qmd) for details). The dataset has about 3 million rows and contains monthly returns between 1960 and 2023 for about 26,000 stocks. I also make sure that the data comes as a `tibble` for `dplyr`, a `data.frame` for `base`, two `data.table`s for the two `data.table` approaches, and a ‘lazy’ data table for `dtplyr` because I want to avoid any conversion issues in the portfolio assignments.
 
 ``` r
 tidy_finance <- dbConnect(

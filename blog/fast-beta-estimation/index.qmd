@@ -18,7 +18,7 @@ categories:
   - tidyverse
 ---
 
-In Beta Estimation ([R](../../r/beta-estimation.qmd) / [Python](../../python/beta-estimation.qmd)), we estimate rolling CAPM betas for the entire CRSP universe by calling a regression routine for every stock and every monthly estimation window. That design is easy to read and easy to generalize, but it requires over two million individual regression fits — even parallelized across all cores, the estimation takes hours.
+In Beta Estimation ([R](../../chapters/beta-estimation.qmd) / [Python](../../chapters/beta-estimation.qmd)), we estimate rolling CAPM betas for the entire CRSP universe by calling a regression routine for every stock and every monthly estimation window. That design is easy to read and easy to generalize, but it requires over two million individual regression fits — even parallelized across all cores, the estimation takes hours.
 
 This post shows that the *identical* estimates can be produced in a few seconds, in both languages, without a single explicit regression and without any parallelization machinery. The trick is that, for a single-regressor model, the OLS coefficients and their $t$-statistics are simple functions of precomputed cumulants: the observation count $n$ and the sums $\sum x_t$, $\sum y_t$, $\sum x_t^2$, $\sum y_t^2$, and $\sum x_t y_t$. Because sums are additive, we can compute them once per stock-month and aggregate them over rolling calendar windows in a single vectorized pass — `polars` does this in Python, `dplyr` together with `slider` in R. We then reproduce every output of the book chapter with this approach.
 
@@ -68,17 +68,17 @@ We rely on `slider` [@slider] for its fast, index-aware rolling-sum function, bu
 
 ## Data
 
-As in the chapter, we combine monthly CRSP returns with the market excess returns from the Fama-French data library, both stored in the Parquet files introduced in WRDS, CRSP, and Compustat ([R](../../r/wrds-crsp-and-compustat.qmd) / [Python](../../python/wrds-crsp-and-compustat.qmd)).
+As in the chapter, we combine monthly CRSP returns with the market excess returns from the Fama-French data library, both stored in the Parquet files introduced in WRDS, CRSP, and Compustat ([R](../../chapters/wrds-crsp-and-compustat.qmd) / [Python](../../chapters/wrds-crsp-and-compustat.qmd)).
 
 ::: {.panel-tabset group="language"}
 ### Python
 
 ```{python}
-crsp_monthly = (pl.read_parquet("data-python/crsp_monthly.parquet")
+crsp_monthly = (pl.read_parquet("data/crsp_monthly.parquet")
     .select(["permno", "date", "industry", "ret_excess"])
     .drop_nulls()
     .join(
-        pl.read_parquet("data-python/factors_ff3_monthly.parquet")
+        pl.read_parquet("data/factors_ff3_monthly.parquet")
             .select(["date", "mkt_excess"]),
         how="left", on="date"
     )
@@ -89,11 +89,11 @@ crsp_monthly = (pl.read_parquet("data-python/crsp_monthly.parquet")
 
 ```{r}
 #| eval: false
-crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
   select(permno, date, industry, ret_excess) |>
   drop_na() |>
   left_join(
-    read_parquet("data-r/factors_ff3_monthly.parquet") |>
+    read_parquet("data/factors_ff3_monthly.parquet") |>
       select(date, mkt_excess),
     join_by(date)
   )
@@ -270,7 +270,7 @@ cat(sprintf(
 The estimates are numerically identical to the regression-based approach of the chapter — closed-form OLS is still OLS. We verify this claim for one stock and window: the latest five-year window of Apple's returns, estimated via the standard regression routine.
 
 ```{python}
-import statsmodels.formula.api as smf
+import pyfixest as pf
 
 apple_window = (crsp_monthly
     .filter(pl.col("permno") == 14593)
@@ -278,7 +278,7 @@ apple_window = (crsp_monthly
     .tail(60)
 )
 
-fit = smf.ols("ret_excess ~ mkt_excess", data=apple_window.to_pandas()).fit()
+fit = pf.feols("ret_excess ~ mkt_excess", data=apple_window)
 
 apple_vectorized = (capm_monthly
     .filter(
@@ -288,10 +288,10 @@ apple_vectorized = (capm_monthly
     )
 )
 
-print(f"statsmodels beta: {fit.params['mkt_excess']:.12f}")
-print(f"vectorized beta:  {apple_vectorized['estimate'][0]:.12f}")
-print(f"statsmodels t:    {fit.tvalues['mkt_excess']:.12f}")
-print(f"vectorized t:     {apple_vectorized['t_statistic'][0]:.12f}")
+print(f"pyfixest beta:   {fit.coef()['mkt_excess']:.12f}")
+print(f"vectorized beta: {apple_vectorized['estimate'][0]:.12f}")
+print(f"pyfixest t:      {fit.tstat()['mkt_excess']:.12f}")
+print(f"vectorized t:    {apple_vectorized['t_statistic'][0]:.12f}")
 ```
 
 ## Daily Betas Without Batching
@@ -302,13 +302,13 @@ The chapter splits the daily CRSP data into batches of stocks to keep memory in 
 ### Python
 
 ```{python}
-factors_ff3_daily = (pl.read_parquet("data-python/factors_ff3_daily.parquet")
+factors_ff3_daily = (pl.read_parquet("data/factors_ff3_daily.parquet")
     .select(["date", "mkt_excess"])
 )
 
 tic = time.perf_counter()
 crsp_daily = (pl.scan_parquet(
-        "data-python/crsp_daily/**/*.parquet",
+        "data/crsp_daily/**/*.parquet",
         hive_partitioning=True, extra_columns="ignore"
     )
     .select(["permno", "date", "ret_excess"])
@@ -331,11 +331,11 @@ print(f"Daily estimation: {capm_daily.shape[0]:,} rows in {toc - tic:.1f} second
 
 ```{r}
 #| eval: false
-factors_ff3_daily <- read_parquet("data-r/factors_ff3_daily.parquet") |>
+factors_ff3_daily <- read_parquet("data/factors_ff3_daily.parquet") |>
   select(date, mkt_excess)
 
 tic <- Sys.time()
-crsp_daily <- open_dataset("data-r/crsp_daily") |>
+crsp_daily <- open_dataset("data/crsp_daily") |>
   select(permno, date, ret_excess) |>
   collect()
 
@@ -707,6 +707,12 @@ beta |>
   round(2)
 ```
 :::
+
+```{python}
+#| echo: false
+#| output: false
+beta.write_parquet("data/beta.parquet")
+```
 
 ## Takeaways
 

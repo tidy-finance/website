@@ -30,7 +30,7 @@ How to consistently and efficiently maintain projects
 
 ## About the Instructors
 
-The workshop is conducted by members of the Tidy Finance project team, which promotes a transparent, open-source approach to financial economics research. Alongside authoring the books [Tidy Finance with R](../r/index.llms.md) and [Tidy Finance with Python](../python/index.llms.md) (both Chapman & Hall/CRC), they have published in leading academic journals, including the Journal of Finance, Journal of Financial Economics, Review of Finance, and Journal of Econometrics.
+The workshop is conducted by members of the Tidy Finance project team, which promotes a transparent, open-source approach to financial economics research. Alongside authoring the books [Tidy Finance with R](../index.llms.md) and [Tidy Finance with Python](../index.llms.md) (both Chapman & Hall/CRC), they have published in leading academic journals, including the Journal of Finance, Journal of Financial Economics, Review of Finance, and Journal of Econometrics.
 
 ![A portrait of Christoph Scheuch](../assets/img/christoph_scheuch.jpeg)
 

@@ -61,7 +61,7 @@ binary_rating_matrix
 
     6544 x 5069 rating matrix of class 'binaryRatingMatrix' with 149916 ratings.
 
-As in our book chapter on [Factor Selection via Machine Learning](../../r/factor-selection-via-machine-learning.llms.md), I perform cross-validation and split the data into training and test data. The training sample constitute 80% of the data and I perform 5-fold cross validation. Testing is performed by withholding items from the test portfolios (parameter `given`) and checking how well the algorithm predicts the withheld items. The value `given=-1` means that an algorithm sees all but 1 withheld stock for the test portfolios and needs to predict the missing stock. I refer to Breese et al. (1998)[^3] for a discussion of other withholding strategies.
+As in our book chapter on [Factor Selection via Machine Learning](../../r/factor-selection-via-machine-learning.qmd), I perform cross-validation and split the data into training and test data. The training sample constitute 80% of the data and I perform 5-fold cross validation. Testing is performed by withholding items from the test portfolios (parameter `given`) and checking how well the algorithm predicts the withheld items. The value `given=-1` means that an algorithm sees all but 1 withheld stock for the test portfolios and needs to predict the missing stock. I refer to Breese et al. (1998)[^3] for a discussion of other withholding strategies.
 
 ``` r
 scheme <- binary_rating_matrix |>

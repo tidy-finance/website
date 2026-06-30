@@ -1,6 +1,6 @@
 In this short note, I show how one can use DuckDB with WRDS data stored in the PostgreSQL database provided by WRDS. I then use some simple benchmarks to show how DuckDB offers a powerful, fast analytical engine for researchers in accounting and finance.
 
-To make the analysis concrete, I focus on data used in the excellent recent book [“Tidy Finance with R”](../../r/index.llms.md). Essentially, I combine data from CRSP’s daily stock return file (`crsp.dsf`) with data on factor returns from Ken French’s website and then run an aggregate query.
+To make the analysis concrete, I focus on data used in the excellent recent book [“Tidy Finance with R”](../../r/index.qmd). Essentially, I combine data from CRSP’s daily stock return file (`crsp.dsf`) with data on factor returns from Ken French’s website and then run an aggregate query.
 
 # Summary of findings
 
@@ -12,9 +12,9 @@ This note illustrates the power of the core Tidy Finance approach. With a few tw
 
 # Databases and tidy data
 
-A popular way to manage and store data is with SQL databases. [Tidy Finance with R](../../r/index.llms.md) uses SQLite, which “implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine.” In this note, I use DuckDB, which has been [described](https://medium.com/short-bits/duckdb-sqlite-for-analytics-1273f7267298) as offering “SQLite for Analytics”. DuckDB is like SQLite in not requiring a server process, but like server-based databases such as PostgreSQL in terms of support for advanced SQL features and data types.
+A popular way to manage and store data is with SQL databases. [Tidy Finance with R](../../r/index.qmd) uses SQLite, which “implements a small, fast, self-contained, high-reliability, full-featured, SQL database engine.” In this note, I use DuckDB, which has been [described](https://medium.com/short-bits/duckdb-sqlite-for-analytics-1273f7267298) as offering “SQLite for Analytics”. DuckDB is like SQLite in not requiring a server process, but like server-based databases such as PostgreSQL in terms of support for advanced SQL features and data types.
 
-While storing data in a DuckDB database offers some benefits of SQLite (e.g., data compression), the real benefits of using DuckDB come from using the database engine for data analytics. For the most part, [Tidy Finance with R](../../r/index.llms.md) uses SQLite for storage and uses `dplyr` and in-memory data frames for analysis. For example, in the [chapter on beta estimation](../../r/beta-estimation.llms.md), the data are read into memory immediately using `collect()` before any analysis is conducted. However, the `dbplyr` package allows many analytical tasks to be performed in the database. In this note, I demonstrate how using DuckDB and `dbplyr` can lead to significant performance gains.
+While storing data in a DuckDB database offers some benefits of SQLite (e.g., data compression), the real benefits of using DuckDB come from using the database engine for data analytics. For the most part, [Tidy Finance with R](../../r/index.qmd) uses SQLite for storage and uses `dplyr` and in-memory data frames for analysis. For example, in the [chapter on beta estimation](../../r/beta-estimation.qmd), the data are read into memory immediately using `collect()` before any analysis is conducted. However, the `dbplyr` package allows many analytical tasks to be performed in the database. In this note, I demonstrate how using DuckDB and `dbplyr` can lead to significant performance gains.
 
 # Getting data
 
@@ -43,7 +43,7 @@ tidy_finance <- dbConnect(
 
 ## Fama-French factor returns
 
-We use the same `start_date` and `end_date` values used in [“Tidy Finance with R”](../../r/index.llms.md) and the code below also is adapted from that book. However, we use the `copy_to()` function from `dplyr` to save the table to our database.
+We use the same `start_date` and `end_date` values used in [“Tidy Finance with R”](../../r/index.qmd) and the code below also is adapted from that book. However, we use the `copy_to()` function from `dplyr` to save the table to our database.
 
 ``` r
 start_date <- ymd("1960-01-01")
@@ -122,7 +122,7 @@ system_time <- function(x) {
 }
 ```
 
-The following code is adapted from the Tidy Finance code [here](../../r/wrds-crsp-and-compustat.llms.md#daily-crsp-data). But the original code is much more complicated and takes slightly longer to run.[^3]
+The following code is adapted from the Tidy Finance code [here](../../r/wrds-crsp-and-compustat.qmd#daily-crsp-data). But the original code is much more complicated and takes slightly longer to run.[^3]
 
 ``` r
 rs <- dbExecute(tidy_finance, "DROP TABLE IF EXISTS crsp_daily")

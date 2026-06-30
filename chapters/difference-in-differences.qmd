@@ -1,0 +1,732 @@
+---
+title: Difference in Differences
+aliases:
+  - ../difference-in-differences.html
+  - ../r/difference-in-differences.html
+  - ../python/difference-in-differences.html
+metadata:
+  pagetitle: Difference in Differences
+  description-meta: Perform difference-in-difference estimation and analyze parallel trends using the programming languages R and Python.
+---
+
+```{python}
+#| label: difference-in-differences-setup
+#| echo: false
+exec(open("assets/render-settings.py").read())
+```
+
+In this chapter, we illustrate the concept of *difference in differences* (DiD) estimators by evaluating the effects of climate change regulation on the pricing of bonds across firms. DiD estimators are typically used to recover the treatment effects of natural or quasi-natural experiments that trigger sharp changes in the environment of a specific group. Instead of looking at differences in just one group (e.g., the effect in the treated group), DiD investigates the treatment effects by looking at the difference between differences in two groups. Such experiments are usually exploited to address endogeneity concerns [e.g., @RobertsWhited2013]. The identifying assumption is that the outcome variable would change equally in both groups without the treatment. This assumption is also often referred to as the assumption of parallel trends. Moreover, we would ideally also want a random assignment to the treatment and control groups. Due to lobbying or other activities, this randomness is often violated in (financial) economics.\index{Difference in differences}
+
+In the context of our setting, we investigate the impact of the Paris Agreement (PA), signed on December 12, 2015, on the bond yields of polluting firms. We first estimate the treatment effect of the agreement using panel regression techniques that we discuss in [Fixed Effects and Clustered Standard Errors](fixed-effects-and-clustered-standard-errors.qmd). We then present two methods to illustrate the treatment effect over time graphically. Although we demonstrate that the treatment effect of the agreement is anticipated by bond market participants well in advance, the techniques we present below can also be applied to many other settings.\index{Paris (Climate) Agreement}
+
+The approach we use here replicates the results of @Seltzer2022 partly. Specifically, we borrow their industry definitions for grouping firms into green and brown types. Overall, the literature on environmental, social, and governance (ESG) effects in corporate bond markets is already large but continues to grow (for recent examples, see, e.g., @Halling2021, @Handler2022, @Huynh2021, among many others).
+
+We use the following packages throughout this chapter:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-packages
+#| message: false
+library(tidyverse)
+library(nanoparquet)
+library(fixest)
+library(broom)
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-packages-py
+import polars as pl
+import datetime as dt
+import pyfixest as pf
+
+from plotnine import *
+from scipy.stats import norm
+```
+
+Compared to previous chapters, we introduce the `scipy.stats` module from `scipy` [@scipy] for simple retrieval of quantiles of the standard normal distribution.
+
+:::
+
+```{python}
+#| label: difference-in-differences-render-plotnine
+#| echo: false
+exec(open("assets/render-plotnine-custom.py").read())
+```
+
+## Data Preparation
+
+We use TRACE and Mergent FISD as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [TRACE and FISD](trace-and-fisd.qmd). \index{Data!TRACE}\index{Data!FISD}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-read-data
+fisd <- read_parquet("data/fisd.parquet") |>
+  select(complete_cusip, maturity, offering_amt, sic_code) |>
+  drop_na()
+
+trace_enhanced <- list.files(
+    "data/trace_enhanced", pattern = "\\.parquet$",
+    recursive = TRUE, full.names = TRUE
+  ) |>
+  map(read_parquet) |>
+  list_rbind() |>
+  select(cusip_id, trd_exctn_dt, rptd_pr, entrd_vol_qt, yld_pt) |>
+  drop_na()
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-read-data-py
+fisd = (pl.read_parquet("data/fisd.parquet")
+    .select(["complete_cusip", "maturity", "offering_amt", "sic_code"])
+    .drop_nulls()
+)
+
+trace_enhanced = (pl.scan_parquet("data/trace_enhanced", hive_partitioning=True)
+    .select(["cusip_id", "trd_exctn_dt", "rptd_pr", "entrd_vol_qt", "yld_pt"])
+    .collect()
+    .drop_nulls()
+)
+```
+
+:::
+
+We start our analysis by preparing the sample of bonds. We only consider bonds with a time to maturity of more than one year to the signing of the PA, so that we have sufficient data to analyze the yield behavior after the treatment date. This restriction also excludes all bonds issued after the agreement. We also consider only the first two digits of the SIC industry code to identify the polluting industries [in line with @Seltzer2022].\index{Time to maturity}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-prepare-bonds
+treatment_date <- ymd("2015-12-12")
+
+polluting_industries <- c(
+  49,
+  13,
+  45,
+  29,
+  28,
+  33,
+  40,
+  20,
+  26,
+  42,
+  10,
+  53,
+  32,
+  99,
+  37
+)
+
+bonds <- fisd |>
+  filter(offering_amt > 0) |>
+  mutate(
+    time_to_maturity = as.numeric(maturity - treatment_date) / 365,
+    sic_code = as.integer(substr(sic_code, 1, 2)),
+    log_offering_amt = log(offering_amt)
+  ) |>
+  filter(time_to_maturity >= 1) |>
+  select(
+    cusip_id = complete_cusip,
+    time_to_maturity,
+    log_offering_amt,
+    sic_code
+  ) |>
+  mutate(polluter = sic_code %in% polluting_industries)
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-prepare-bonds-py
+treatment_date = dt.datetime(2015, 12, 12)
+treatment_month = dt.datetime(2015, 12, 1)
+polluting_industries = [
+    49, 13, 45, 29, 28, 33, 40, 20, 26, 42, 10, 53, 32, 99, 37
+]
+
+bonds = (fisd
+    .filter(pl.col("offering_amt") > 0)
+    .with_columns(
+        time_to_maturity=(pl.col("maturity") - treatment_date).dt.total_days() / 365,
+        sic_code=pl.col("sic_code").cast(pl.Utf8).str.slice(0, 2).cast(pl.Int64),
+        log_offering_amt=pl.col("offering_amt").log()
+    )
+    .filter(pl.col("time_to_maturity") >= 1)
+    .rename({"complete_cusip": "cusip_id"})
+    .select(["cusip_id", "time_to_maturity", "log_offering_amt", "sic_code"])
+    .with_columns(polluter=pl.col("sic_code").is_in(polluting_industries))
+)
+```
+
+:::
+
+Next, we aggregate the individual transactions as reported in TRACE to a monthly panel of bond yields. We consider bond yields for a bond's last trading day in a month. Therefore, we first aggregate bond data to daily frequency and apply common restrictions from the literature [see, e.g., @Bessembinder2008]. We weigh each transaction by volume to reflect a trade's relative importance and avoid emphasizing small trades. Moreover, we only consider transactions with reported prices `rptd_pr` larger than 25 (to exclude bonds that are close to default) and only bond-day observations with more than five trades on a corresponding day (to exclude prices based on too few, potentially non-representative transactions).\index{Yield aggregation} \index{Returns!Bonds}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-aggregate-trace
+trace_aggregated <- trace_enhanced |>
+  filter(rptd_pr > 25) |>
+  group_by(cusip_id, trd_exctn_dt) |>
+  summarize(
+    avg_yield = weighted.mean(yld_pt, entrd_vol_qt * rptd_pr),
+    trades = n(),
+    .groups = "drop"
+  ) |>
+  drop_na(avg_yield) |>
+  filter(trades >= 5) |>
+  mutate(date = floor_date(trd_exctn_dt, "month")) |>
+  group_by(cusip_id, date) |>
+  slice_max(trd_exctn_dt) |>
+  ungroup() |>
+  select(cusip_id, date, avg_yield)
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-aggregate-trace-py
+trace_enhanced = (trace_enhanced
+    .filter(pl.col("rptd_pr") > 25)
+    .with_columns(weight=pl.col("entrd_vol_qt")*pl.col("rptd_pr"))
+    .with_columns(weighted_yield=pl.col("weight")*pl.col("yld_pt"))
+)
+
+trace_aggregated = (trace_enhanced
+    .group_by(["cusip_id", "trd_exctn_dt"])
+    .agg(
+        weighted_yield_sum=pl.col("weighted_yield").sum(),
+        weight_sum=pl.col("weight").sum(),
+        trades=pl.col("rptd_pr").count()
+    )
+    .with_columns(avg_yield=pl.col("weighted_yield_sum")/pl.col("weight_sum"))
+    .drop_nulls("avg_yield")
+    .filter(pl.col("trades") >= 5)
+    .with_columns(trd_exctn_dt=pl.col("trd_exctn_dt").cast(pl.Datetime))
+    .with_columns(date=pl.col("trd_exctn_dt").dt.truncate("1mo"))
+)
+
+trace_aggregated = (trace_aggregated
+    .sort("trd_exctn_dt")
+    .group_by(["cusip_id", "date"])
+    .last()
+    .select(["cusip_id", "date", "avg_yield"])
+)
+```
+
+:::
+
+By combining the bond-specific information from Mergent FISD for our bond sample with the aggregated TRACE data, we arrive at the main sample for our analysis.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-build-panel
+bonds_panel <- bonds |>
+  inner_join(trace_aggregated, join_by(cusip_id), multiple = "all") |>
+  drop_na()
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-build-panel-py
+bonds_panel = (bonds
+    .join(trace_aggregated, how="inner", on="cusip_id")
+    .drop_nulls()
+)
+```
+
+:::
+
+Before we can run the first regression, we need to define the `treated` indicator,^[Note that by using a generic name here, everybody can replace ours with their sample data and run the code to produce standard regression tables and illustrations.] which is the product of the `post_period` (i.e., all months after the signing of the PA) and the `polluter` indicator defined above.\index{Regression!Fixed effects}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-treated-indicator
+bonds_panel <- bonds_panel |>
+  mutate(post_period = date >= floor_date(treatment_date, "months")) |>
+  mutate(treated = polluter & post_period)
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-treated-indicator-py
+bonds_panel = (bonds_panel
+    .with_columns(
+        post_period=(pl.col("date") >= treatment_month)
+    )
+    .with_columns(treated=pl.col("polluter") & pl.col("post_period"))
+)
+```
+
+:::
+
+As usual, we tabulate summary statistics of the variables that enter the regression to check the validity of our variable definitions.\index{Summary statistics}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-summary-stats
+bonds_panel |>
+  pivot_longer(
+    cols = c(avg_yield, time_to_maturity, log_offering_amt),
+    names_to = "measure"
+  ) |>
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q50 = quantile(value, 0.50),
+    q95 = quantile(value, 0.95),
+    max = max(value),
+    n = n(),
+    .groups = "drop"
+  )
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-summary-stats-py
+bonds_panel_summary = (bonds_panel
+    .unpivot(
+        on=["avg_yield", "time_to_maturity", "log_offering_amt"],
+        variable_name="measure"
+    )
+    .group_by("measure")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").median(),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
+        max=pl.col("value").max(),
+    )
+    .sort("measure")
+    .with_columns(pl.col(pl.Float64).round(2))
+)
+bonds_panel_summary
+```
+
+:::
+
+## Panel Regressions
+
+The PA is a legally binding international treaty on climate change. It was adopted by 196 parties at COP 21 in Paris on December 12, 2015 and entered into force on November 4, 2016. The PA obliges developed countries to support efforts to build clean, climate-resilient futures. One may thus hypothesize that adopting climate-related policies may affect financial markets. To measure the magnitude of this effect, we first run an ordinary least square (OLS) regression without fixed effects where we include the `treated`, `post_period`, and `polluter` dummies, as well as the bond-specific characteristics `log_offering_amt` and `time_to_maturity`. This simple model assumes that there are essentially two periods (before and after the PA) and two groups (polluters and non-polluters). Nonetheless, it should indicate whether polluters have higher yields following the PA compared to non-polluters.\index{Regression!Yields}\index{Regression!Panel}
+
+The second model follows the typical DiD regression approach by including individual (`cusip_id`) and time (`date`) fixed effects. In this model, we do not include any other variables from the simple model because the fixed effects subsume them, and we observe the coefficient of our main variable of interest: `treated`.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: difference-in-differences-did-regressions
+model_without_fe <- feols(
+  avg_yield ~ treated +
+    post_period +
+    polluter +
+    log_offering_amt +
+    time_to_maturity,
+  vcov = "iid",
+  data = bonds_panel
+)
+
+model_with_fe <- feols(
+  avg_yield ~ treated | cusip_id + date,
+  vcov = "iid",
+  data = bonds_panel
+)
+
+etable(
+  model_without_fe,
+  model_with_fe,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
+)
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-did-regressions-py
+model_without_fe = pf.feols(
+    "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
+    vcov = "iid",
+    data = bonds_panel.to_pandas()
+)
+
+model_with_fe = pf.feols(
+    "avg_yield ~ treated | cusip_id + date",
+    vcov = "iid",
+    data = bonds_panel.to_pandas()
+)
+
+pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
+```
+
+:::
+
+Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models.
+
+## Visualizing Parallel Trends
+
+Even though the regressions above indicate that there is an impact of the PA on bond yields of polluters, the tables do not tell us anything about the dynamics of the treatment effect. In particular, the models provide no indication about whether the crucial *parallel trends* assumption is valid. This assumption requires that in the absence of treatment, the difference between the two groups is constant over time. Although there is no well-defined statistical test for this assumption, visual inspection typically provides a good indication.\index{Parallel trends assumption}
+
+To provide such visual evidence, we revisit the simple OLS model and replace the `treated` and `post_period` indicators with month dummies for each group. This approach estimates the average yield change of both groups for each period and provides corresponding confidence intervals. Plotting the coefficient estimates for both groups around the treatment date shows us the dynamics of our panel data.\index{Graph!Diff-in-diff graph}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-1301
+#| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
+#| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
+model_without_fe_time <- feols(
+  avg_yield ~ polluter + date:polluter + time_to_maturity + log_offering_amt,
+  vcov = "iid",
+  data = bonds_panel |>
+    mutate(date = factor(date))
+)
+
+model_without_fe_coefs <- tidy(model_without_fe_time) |>
+  filter(str_detect(term, "date")) |>
+  mutate(
+    date = ymd(substr(term, nchar(term) - 9, nchar(term))),
+    treatment = str_detect(term, "TRUE"),
+    ci_up = estimate + qnorm(0.975) * std.error,
+    ci_low = estimate + qnorm(0.025) * std.error
+  )
+
+model_without_fe_coefs |>
+  ggplot(
+    aes(date, color = treatment, linetype = treatment, shape = treatment)
+  ) +
+  geom_vline(
+    aes(xintercept = floor_date(treatment_date, "month")),
+    linetype = "dashed"
+  ) +
+  geom_hline(
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  geom_errorbar(
+    aes(ymin = ci_low, ymax = ci_up),
+    alpha = 0.5
+  ) +
+  guides(linetype = "none") +
+  geom_point(aes(y = estimate)) +
+  labs(
+    x = NULL,
+    y = "Yield",
+    shape = "Polluter?",
+    color = "Polluter?",
+    title = "Polluters respond stronger to Paris Agreement than green firms"
+  )
+```
+
+### Python
+
+```{python}
+#| label: difference-in-differences-fig-1301-py
+#| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters and non-polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
+#| fig-alt: "Title: Polluters respond stronger to Paris Agreement than green firms. The figure shows a sequence of monthly dots for two groups. Before the agreement, the dots mainly overlap. Ahead of the agreement, yields start to increase. Then, after the agreement, there is a strong divergence in yields. Polluters have significantly higher yields than non-polluters in the months before and after the signing of the Paris Agreement. However, this yield difference vanishes again towards the end of 2016."
+#| fig-pos: "htb"
+model_without_fe_time = pf.feols(
+    "avg_yield ~ C(polluter)/C(date) + time_to_maturity + log_offering_amt",
+    vcov = "iid",
+    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
+)
+
+model_without_fe_coefs = (pl.DataFrame({
+        "term": model_without_fe_time.coef().index.to_list(),
+        "estimate": model_without_fe_time.coef().to_numpy(),
+        "std_error": model_without_fe_time.se().to_numpy()
+    })
+    .filter(pl.col("term").str.contains("date"))
+    .with_columns(
+        treatment=pl.col("term").str.contains("True", literal=True),
+        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
+        ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
+    )
+    .with_columns(date=pl.col("date").str.to_datetime("%Y-%m-%d"))
+)
+
+model_without_fe_figure = (
+    ggplot(
+        model_without_fe_coefs,
+        aes(x="date", y="estimate", color="treatment",
+            linetype="treatment", shape="treatment")
+    )
+    + geom_vline(xintercept=treatment_month, linetype="dashed")
+    + geom_hline(yintercept=0, linetype="dashed")
+    + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
+    + geom_point()
+    + guides(linetype="none")
+    + labs(
+        x="", y="Yield", shape="Polluter?", color="Polluter?",
+        title="Polluters respond stronger to Paris Agreement than green firms"
+        )
+    + scale_linetype_manual(values=["solid", "dashed"])
+    + scale_x_date(date_breaks="1 year", date_labels="%Y")
+)
+model_without_fe_figure.show()
+```
+
+:::
+
+@fig-1301 shows that throughout most of 2014, the yields of the two groups changed in unison. However, starting at the end of 2014, the yields start to diverge, reaching the highest difference around the signing of the PA. Afterward, the yields for both groups fall again, and the polluters arrive at the same level as at the beginning of 2014. The non-polluters, on the other hand, even experience significantly lower yields than polluters after the signing of the agreement.
+
+Instead of plotting both groups using the simple model approach, we can also use the fixed-effects model and focus on the polluter's yield response to the signing relative to the non-polluters. To perform this estimation, we need to replace the `treated` indicator with separate time dummies for the polluters, each marking a one-month period relative to the treatment date. We then regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects.\index{Graph!Diff-in-diff graph}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-1302
+#| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
+#| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
+bonds_panel_alt <- bonds_panel |>
+  mutate(
+    diff_to_treatment = interval(
+      floor_date(treatment_date, "month"),
+      date
+    ) %/%
+      months(1)
+  )
+
+variables <- bonds_panel_alt |>
+  distinct(diff_to_treatment, date) |>
+  arrange(date) |>
+  mutate(variable_name = as.character(NA))
+
+formula <- "avg_yield ~ "
+
+for (j in 1:nrow(variables)) {
+  if (variables$diff_to_treatment[j] != 0) {
+    old_names <- names(bonds_panel_alt)
+    bonds_panel_alt <- bonds_panel_alt |>
+      mutate(
+        new_var = diff_to_treatment == variables$diff_to_treatment[j] &
+          polluter
+      )
+    new_var_name <- ifelse(
+      variables$diff_to_treatment[j] < 0,
+      str_c("lag", abs(variables$diff_to_treatment[j])),
+      str_c("lead", variables$diff_to_treatment[j])
+    )
+    variables$variable_name[j] <- new_var_name
+    names(bonds_panel_alt) <- c(old_names, new_var_name)
+    formula <- str_c(
+      formula,
+      ifelse(j == 1, new_var_name, str_c("+", new_var_name))
+    )
+  }
+}
+formula <- str_c(formula, "| cusip_id + date")
+
+model_with_fe_time <- feols(
+  as.formula(formula),
+  vcov = "iid",
+  data = bonds_panel_alt
+)
+
+model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
+  mutate(
+    term = str_remove(term, "TRUE"),
+    ci_up = estimate + qnorm(0.975) * std.error,
+    ci_low = estimate + qnorm(0.025) * std.error
+  ) |>
+  left_join(
+    variables,
+    join_by(term == variable_name)
+  ) |>
+  bind_rows(tibble(
+    term = "lag0",
+    estimate = 0,
+    ci_up = 0,
+    ci_low = 0,
+    date = floor_date(treatment_date, "month")
+  ))
+
+model_with_fe_time_coefs |>
+  ggplot(aes(x = date, y = estimate)) +
+  geom_vline(
+    aes(xintercept = floor_date(treatment_date, "month")),
+    linetype = "dashed"
+  ) +
+  geom_hline(
+    aes(yintercept = 0),
+    linetype = "dashed"
+  ) +
+  geom_errorbar(
+    aes(ymin = ci_low, ymax = ci_up),
+    alpha = 0.5
+  ) +
+  geom_point(aes(y = estimate)) +
+  labs(
+    x = NULL,
+    y = "Yield",
+    title = "Polluters' yield patterns around Paris Agreement signing"
+  )
+```
+
+### Python
+
+We first compute, for each observation, the number of months relative to the treatment date and collect the distinct period markers.
+
+```{python}
+#| label: difference-in-differences-prepare-time-dummies-py
+bonds_panel_alt = (bonds_panel
+    .with_columns(
+        diff_to_treatment=(
+            (pl.col("date").dt.year() - treatment_month.year) * 12
+            + (pl.col("date").dt.month() - treatment_month.month)
+        ).cast(pl.Int64)
+    )
+)
+
+variables = (bonds_panel_alt
+    .select(["diff_to_treatment", "date"])
+    .unique()
+    .sort("date")
+    .with_columns(variable_name=pl.lit(None, dtype=pl.Utf8))
+)
+```
+
+In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects.
+
+```{python}
+#| label: difference-in-differences-fe-time-regression-py
+bonds_panel_alt = bonds_panel_alt.to_pandas()
+variables = variables.to_pandas()
+
+formula = "avg_yield ~ 1 + "
+
+for j in range(variables.shape[0]):
+    if variables["diff_to_treatment"].iloc[j] != 0:
+        old_names=list(bonds_panel_alt.columns)
+
+        bonds_panel_alt["new_var"] = (
+          bonds_panel_alt["diff_to_treatment"] ==
+            variables["diff_to_treatment"].iloc[j]
+        ) & bonds_panel_alt["polluter"]
+
+        diff_to_treatment_value=variables["diff_to_treatment"].iloc[j]
+        direction="lag" if diff_to_treatment_value < 0 else "lead"
+        abs_diff_to_treatment=int(abs(diff_to_treatment_value))
+        new_var_name=f"{direction}{abs_diff_to_treatment}"
+        variables.at[j, "variable_name"]=new_var_name
+        bonds_panel_alt[new_var_name]=bonds_panel_alt["new_var"]
+        formula += (f" + {new_var_name}" if j > 0 else new_var_name)
+
+formula = formula + " | cusip_id + date "
+
+model_with_fe_time = pf.feols(
+    formula,
+    vcov = "iid",
+    data = bonds_panel_alt
+)
+```
+
+We then collect the regression results into a data frame that contains the estimates and corresponding 95 percent confidence intervals. Note that we also add a row with zeros for the (omitted) reference point of the time dummies.
+
+```{python}
+#| label: difference-in-differences-collect-coefficients-py
+lag0_row = pl.DataFrame({
+    "term": ["lag0"],
+    "estimate": [0.0],
+    "std_error": [0.0],
+    "ci_up": [0.0],
+    "ci_low": [0.0],
+    "diff_to_treatment": [0],
+    "date": [treatment_month]
+})
+
+model_with_fe_time_coefs = (pl.DataFrame({
+        "term": model_with_fe_time.coef().index.to_list(),
+        "estimate": model_with_fe_time.coef().to_numpy(),
+        "std_error": model_with_fe_time.se().to_numpy()
+    })
+    .with_columns(
+        ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
+        ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
+    )
+    .join(
+        pl.from_pandas(variables),
+        how="left", left_on="term", right_on="variable_name"
+    )
+)
+
+model_with_fe_time_coefs = pl.concat(
+    [model_with_fe_time_coefs, lag0_row],
+    how="diagonal"
+)
+```
+
+@fig-1302 shows the resulting coefficient estimates.
+
+```{python}
+#| label: difference-in-differences-fig-1302-py
+#| fig-cap: "The figure shows the coefficient estimates and 95 percent confidence intervals for OLS regressions estimating the treatment effect of the Paris Agreement on bond yields (in percent) for polluters. The horizontal line represents the benchmark yield of polluters before the Paris Agreement. The vertical line indicates the date of the agreement (December 12, 2015)."
+#| fig-alt: "Title: Polluters' yield patterns around Paris Agreement signing. The figure shows a sequence of monthly dots for the treated group. Ahead of the agreement, yields of polluters start to increase. Then, after the agreement, there is a small reversal and yields drop again."
+#| fig-pos: "htb"
+model_with_fe_time_figure = (
+    ggplot(
+        model_with_fe_time_coefs,
+        aes(x="date", y="estimate")
+    )
+    + geom_vline(aes(xintercept=treatment_month),
+                    linetype="dashed")
+    + geom_hline(aes(yintercept=0), linetype="dashed")
+    + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
+    + geom_point(aes(y="estimate"))
+    + labs(
+        x="", y="Yield",
+        title="Polluters' yield patterns around Paris Agreement signing"
+        )
+    + scale_x_date(date_breaks="1 year", date_labels="%Y")
+)
+model_with_fe_time_figure.show()
+```
+
+:::
+
+\index{Robustness tests}
+The resulting graph shown in @fig-1302 confirms the main conclusion of the previous image: polluters' yield patterns show a considerable anticipation effect starting toward the end of 2014. Yields only marginally increase after the signing of the agreement. However, as opposed to the simple model, we do not see a complete reversal back to the pre-agreement level. Yields of polluters stay at a significantly higher level even one year after the signing.
+
+Notice that during the year after the PA was signed, Donald Trump, the 45th president of the United States, was elected on November 8, 2016. During his campaign there were some indications of intentions to withdraw the US from the PA, which ultimately happened on November 4, 2020. Hence, reversal effects are potentially driven by these actions.
+
+## Key Takeaways
+
+- Difference-in-differences is a powerful tool for estimating causal effects in financial settings, especially when analyzing the impact of policy changes or shocks.
+- It is important to assess the parallel trends assumption using graphical methods.
+- The `fixest` (R) and `pyfixest` (Python) packages allow you to implement difference-in-differences regressions and visualize parallel trends.
+- By combining panel data from TRACE and Mergent FISD with fixed effects regressions, you can evaluate how the Paris Agreement influenced corporate bond yields.
+- The application shows that polluting firms experienced significantly higher yields leading up to and after the agreement, invalidating the parallel trends assumption.
+
+## Exercises
+
+1. The 46th President of the US, Joe Biden, rejoined the Paris Agreement on February 19, 2021. Repeat the difference in differences analysis for the day of his election victory. Note that you will also have to download new TRACE data. How did polluters' yields react to this action?
+2. Based on the exercise on ratings in [TRACE and FISD](trace-and-fisd.qmd), include ratings as a control variable in the analysis above. Do the results change?
