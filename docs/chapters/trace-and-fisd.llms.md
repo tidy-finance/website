@@ -12,24 +12,9 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidyfinance)
-```
-
-    Warning: package 'tidyfinance' was built under R version 4.5.3
-
-``` r
 library(dbplyr)
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(RPostgres)
 ```
 
@@ -494,8 +479,8 @@ bonds_outstanding <- expand_grid(
 ``` python
 dates = pl.DataFrame(
     {"date": pl.date_range(
-        date(2014, 3, 1), date(2016, 11, 30), interval="3mo", eager=True
-    ).dt.month_end()}
+        date(2014, 1, 1), date(2016, 11, 30), interval="3mo", eager=True
+    )}
 )
 
 bonds_outstanding = (dates
@@ -541,13 +526,7 @@ trace_enhanced = pl.read_parquet(
 ).drop("batch")
 
 bonds_traded = (trace_enhanced
-    .with_columns(
-        date=pl.when(pl.col("trd_exctn_dt").dt.day() == 1)
-            .then(pl.col("trd_exctn_dt").dt.offset_by("-1mo"))
-            .otherwise(pl.col("trd_exctn_dt").dt.truncate("1mo"))
-            .dt.truncate("1q")
-            .cast(pl.Date)
-    )
+    .with_columns(date=pl.col("trd_exctn_dt").dt.truncate("1q"))
     .group_by("date")
     .agg(count=pl.col("cusip_id").n_unique())
     .with_columns(type=pl.lit("Traded"))
@@ -659,9 +638,9 @@ average_characteristics = (fisd
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
-        median=pl.col("value").quantile(0.50),
-        q95=pl.col("value").quantile(0.95),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").quantile(0.50, interpolation="linear"),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
 )
@@ -730,9 +709,9 @@ average_trade_size = (trace_enhanced
         mean=pl.col("value").mean(),
         std=pl.col("value").std(),
         min=pl.col("value").min(),
-        q05=pl.col("value").quantile(0.05),
-        median=pl.col("value").quantile(0.50),
-        q95=pl.col("value").quantile(0.95),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").quantile(0.50, interpolation="linear"),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
         max=pl.col("value").max(),
     )
 )
@@ -744,8 +723,8 @@ shape: (2, 8)
 | measure        | mean    | std     | min   | q05     | median  | q95     | max     |
 |----------------|---------|---------|-------|---------|---------|---------|---------|
 | str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
-| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35690.0 | 52102.0 | 68758.0 | 81678.0 |
-| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12272.0 | 26842.0 | 35690.0 | 42625.0 |
+| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35689.0 | 52102.0 | 68765.0 | 81678.0 |
+| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12257.0 | 26842.0 | 35700.0 | 42625.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

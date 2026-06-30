@@ -283,16 +283,13 @@ def clean_enhanced_trace(cusips,
     .select(["cusip_id", "msg_seq_nb", "entrd_vol_qt",
              "rptd_pr", "rpt_side_cd", "cntra_mp_id",
              "trd_exctn_dt", "trd_exctn_tm"])
-    .with_columns(drop=pl.lit(True))
   )
 
   ## Cleaning corrected and cancelled trades
   trace_post_TR = (trace_post_TR
     .join(trace_post_XC, on=["cusip_id", "msg_seq_nb", "entrd_vol_qt",
                              "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-                             "trd_exctn_dt", "trd_exctn_tm"], how="left")
-    .filter(pl.col("drop").is_null())
-    .drop("drop")
+                             "trd_exctn_dt", "trd_exctn_tm"], how="anti")
   )
 
   # Reversals (trc_st = Y)
@@ -302,7 +299,6 @@ def clean_enhanced_trace(cusips,
     .select(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
              "rptd_pr", "rpt_side_cd", "cntra_mp_id",
              "trd_exctn_dt", "trd_exctn_tm"])
-    .with_columns(drop=pl.lit(True))
     .rename({"orig_msg_seq_nb": "msg_seq_nb"})
   )
 
@@ -311,14 +307,13 @@ def clean_enhanced_trace(cusips,
   trace_post = (trace_post_TR
     .join(trace_post_Y, on=["cusip_id", "msg_seq_nb", "entrd_vol_qt",
                             "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-                            "trd_exctn_dt", "trd_exctn_tm"], how="left")
-    .filter(pl.col("drop").is_null())
-    .drop("drop")
+                            "trd_exctn_dt", "trd_exctn_tm"], how="anti")
   )
 
   # Pre 2012-02-06
   ## Trades (trc_st = T)
   trace_pre_T = (trace_all
+    .filter(pl.col("trc_st") == "T")
     .filter(pl.col("trd_rpt_dt") < pl.lit("2012-02-06").str.to_date())
   )
 
@@ -329,7 +324,6 @@ def clean_enhanced_trace(cusips,
     .select(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
              "rptd_pr", "rpt_side_cd", "cntra_mp_id",
              "trd_exctn_dt", "trd_exctn_tm"])
-    .with_columns(drop=pl.lit(True))
     .rename({"orig_msg_seq_nb": "msg_seq_nb"})
   )
 
@@ -338,9 +332,7 @@ def clean_enhanced_trace(cusips,
   trace_pre_T = (trace_pre_T
     .join(trace_pre_C, on=["cusip_id", "msg_seq_nb", "entrd_vol_qt",
                            "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-                           "trd_exctn_dt", "trd_exctn_tm"], how="left")
-    .filter(pl.col("drop").is_null())
-    .drop("drop")
+                           "trd_exctn_dt", "trd_exctn_tm"], how="anti")
   )
 
   # Corrections (trc_st = W)
@@ -361,23 +353,18 @@ def clean_enhanced_trace(cusips,
     placeholder_trace_pre_T = (trace_pre_T
       .select(["cusip_id", "trd_exctn_dt", "msg_seq_nb"])
       .rename({"msg_seq_nb": "orig_msg_seq_nb"})
-      .with_columns(matched_T=pl.lit(True))
     )
 
     # Corrections that correct some msg
     trace_pre_W_correcting = (trace_pre_W
       .join(placeholder_trace_pre_T,
-            on=["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"], how="left")
-      .filter(pl.col("matched_T") == True)
-      .drop("matched_T")
+            on=["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"], how="semi")
     )
 
     # Corrections that do not correct some msg
     trace_pre_W = (trace_pre_W
       .join(placeholder_trace_pre_T,
-            on=["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"], how="left")
-      .filter(pl.col("matched_T").is_null())
-      .drop("matched_T")
+            on=["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"], how="anti")
     )
 
     # Create placeholder
@@ -385,15 +372,12 @@ def clean_enhanced_trace(cusips,
     placeholder_trace_pre_W_correcting = (trace_pre_W_correcting
       .select(["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"])
       .rename({"orig_msg_seq_nb": "msg_seq_nb"})
-      .with_columns(corrected=pl.lit(True))
     )
 
     # Delete msgs that are corrected
     trace_pre_T = (trace_pre_T
       .join(placeholder_trace_pre_W_correcting,
-            on=["cusip_id", "trd_exctn_dt", "msg_seq_nb"], how="left")
-      .filter(pl.col("corrected").is_null())
-      .drop("corrected")
+            on=["cusip_id", "trd_exctn_dt", "msg_seq_nb"], how="anti")
     )
 
     # Add correction msgs

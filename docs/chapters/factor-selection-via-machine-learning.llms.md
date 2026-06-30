@@ -42,17 +42,7 @@ The main focus is on the workflow behind the `tidymodels` package collection ([K
 
 ``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidymodels)
 library(scales)
 library(furrr)
@@ -116,17 +106,17 @@ industries_ff_monthly <- read_parquet("data/industries_ff_monthly.parquet") |>
 ``` python
 factors_ff3_monthly = (
     pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .rename(lambda c: f"factor_ff_{c}")
+    .rename(lambda c: c if c == "date" else f"factor_ff_{c}")
 )
 
 factors_q_monthly = (
     pl.read_parquet("data/factors_q_monthly.parquet")
-    .rename(lambda c: f"factor_q_{c}")
+    .rename(lambda c: c if c == "date" else f"factor_q_{c}")
 )
 
 macro_predictors = (
     pl.read_parquet("data/macro_predictors.parquet")
-    .rename(lambda c: f"macro_{c}")
+    .rename(lambda c: c if c == "date" else f"macro_{c}")
     .drop("macro_rp_div")
 )
 
@@ -158,12 +148,9 @@ Our data contains 24 columns of regressors with the 13 macro-variables and 10 fa
 
 ``` python
 data = (industries_ff_monthly
-  .join(factors_ff3_monthly,
-        how="left", left_on="date", right_on="factor_ff_date")
-  .join(factors_q_monthly,
-        how="left", left_on="date", right_on="factor_q_date")
-  .join(macro_predictors,
-        how="left", left_on="date", right_on="macro_date")
+  .join(factors_ff3_monthly, how="left", on="date")
+  .join(factors_q_monthly, how="left", on="date")
+  .join(macro_predictors, how="left", on="date")
   .with_columns(ret_excess=pl.col("ret") - pl.col("factor_ff_risk_free"))
   .drop("ret")
   .drop_nulls()
