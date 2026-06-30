@@ -21,7 +21,7 @@ As part of our research, we developed a novel R package, [lobsteR](https://voigt
 This is part one of two blog posts in which we announce and explain these two major updates to the Tidy Finance ecosystem.
 
 1. `lobsteR` is a novel R package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package. 
-2. Seamless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+2. Seamless access to a massive, 5 second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("tidyfinance", "high_frequency_sp500", "2025-01-01", "2025-01-10")`
 
 To connect the dots between `lobsteR` and the new dataset, this blog post provides detailed code on how to clean and organize the granular data from [LOBSTER](https://lobsterdata.com/). 
 
@@ -354,7 +354,7 @@ orderbook[, `:=`(
 )]
 ```
 
-After cleaning, more than 11 million observations remain for this single trading day. To visualize the flash crash, I aggregate to a 1-second grid: each message is assigned to a `ts_interval` and summary statistics — midquote, spread, depth, and volume — are computed per interval, time-weighted by the duration each state persisted (`ts_latency`).
+After cleaning, more than 11 million observations remain for this single trading day. To visualize the flash crash, I aggregate to a 1-second grid: each message is assigned to a `ts_minute` and summary statistics — midquote, spread, depth, and volume — are computed per interval, time-weighted by the duration each state persisted (`ts_latency`).
 
 ```{r}
 #| eval: false
@@ -368,10 +368,10 @@ orderbook[, `:=`(
     as.numeric(shift(ts, type = "lead")) - as.numeric(ts),
     0
   ),
-  ts_interval = ceiling_date(
+  ts_minute = ceiling_date(
     as.POSIXct(ts, origin = date, tz = "UTC"),
     aggregation_frequency
-  ) # messages from 10:30:00 - 10:34:59.xx belong into 10:35:00
+  )
 )]
 
 orderbook_aggregated <- orderbook[,
@@ -387,7 +387,7 @@ orderbook_aggregated <- orderbook[,
     depth5_ask = weighted.mean(depth5_ask, ts_latency, na.rm = TRUE),
     spread = weighted.mean(spread, ts_latency, na.rm = TRUE)
   ),
-  by = ts_interval
+  by = ts_minute
 ]
 
 file_name <- glue::glue("processed_{ticker}_{date}.parquet")
@@ -423,5 +423,5 @@ ts_minute<=as.POSIXct(glue::glue("{date} 15:00:00"), tz = "UTC")) |>
   labs(x = NULL, y = NULL, title = "SPY trading and order book activity on May 6th, 2010")
 ```
 
-The cleaning pipeline above transforms raw LOBSTER files into a compact, analysis-ready dataset. In the [companion blog post](../hf-and-hugging-face/index.qmd), we describe how we applied this pipeline to the full 2007--2025 LOBSTER history and made the resulting 5-second aggregated data for SPY freely available via `tidyfinance::download_data("hf")`.
+The cleaning pipeline above transforms raw LOBSTER files into a compact, analysis-ready dataset. In the [companion blog post](../hf-and-hugging-face/index.qmd), we describe how we applied this pipeline to the full 2007--2025 LOBSTER history and made the resulting 5-second aggregated data for SPY freely available via `tidyfinance::download_data("tidyfinance", "high_frequency_sp500")`.
 

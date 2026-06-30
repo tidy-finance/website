@@ -14,7 +14,7 @@ In a [companion blog post](../hf-and-lobster/index.qmd), we introduced [lobsteR]
 This is part two of two blog posts in which we announce and explain two major updates to the [tidy-finance.org](https://tidy-finance.org) ecosystem:
 
 1. `lobsteR` is a novel R package to request and download high-frequency orderbook snapshot data from [LOBSTER](https://lobsterdata.com/). We provide a short vignette on how to use the package in the [first post](../hf-and-lobster/index.qmd).
-2. Seamless access to a massive, 5-second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("hf", "2025-01-01", "2025-01-10")`
+2. Seamless access to a massive, 5-second level dataset on S&P 500 index tracking ETF SPY via `tidyfinance::download_data("tidyfinance", "high_frequency_sp500", "2025-01-01", "2025-01-10")`
 
 ## 20 years of HF data
 
@@ -45,10 +45,11 @@ library(tidyfinance)
 library(tidyverse)
 
 download_data(
-  domain = "hf",
+  domain = "tidyfinance",
   dataset = "high_frequency_sp500",
- start_date = "2020-01-01", 
- end_date = "2020-01-15")
+  start_date = "2020-01-01",
+  end_date = "2020-01-15"
+)
 ```
 
 ## A simple case study
@@ -72,13 +73,39 @@ central_bank_events <- read_csv(
     end_ts = start + minutes(window_size)
   )
 
+# Looping over many dates issues many requests to the Hugging Face API in
+# quick succession, which can trigger rate limiting (HTTP 429). We retry with
+# exponential backoff so that the download completes reliably within the limits.
+download_hf_day <- function(date, max_tries = 8) {
+  for (attempt in seq_len(max_tries)) {
+    result <- tryCatch(
+      download_data(
+        "tidyfinance",
+        "high_frequency_sp500",
+        start_date = date,
+        end_date = date
+      ),
+      error = function(e) e
+    )
+    if (!inherits(result, "error")) {
+      return(result)
+    }
+    Sys.sleep(min(2^attempt, 45))
+  }
+  stop("Failed to download ", date, " after ", max_tries, " attempts: ",
+       conditionMessage(result))
+}
+
 set.seed(2026)
 data <- central_bank_events |>
   mutate(date = as.Date(time)) |>
   filter(date > "2006-07-27") |>
   slice_sample(n = 50) |>
   mutate(
-    data = map(date, \(x) download_data("hf", "high_frequency_sp500", start_date = x, end_date = x))
+    data = map(date, \(x) {
+      Sys.sleep(2)
+      download_hf_day(x)
+    })
   )
 ```
 
@@ -142,4 +169,4 @@ hf_data |>
   scale_x_continuous(breaks = seq(-window_size, window_size, by = 5))
 ```
 
-The chart illustrates a pronounced spike in bid-ask spreads and trading volume right at the FOMC announcement, alongside a temporary dip in quoted depth. These patterns are consistent with market makers widening quotes and pulling liquidity ahead of the news release. The full dataset, covering July 2007 through October 2025, is available on [Hugging Face](https://huggingface.co/datasets/voigtstefan/sp500) and can be accessed directly via `tidyfinance::download_data("hf")`.
+The chart illustrates a pronounced spike in bid-ask spreads and trading volume right at the FOMC announcement, alongside a temporary dip in quoted depth. These patterns are consistent with market makers widening quotes and pulling liquidity ahead of the news release. The full dataset, covering July 2007 through October 2025, is available on [Hugging Face](https://huggingface.co/datasets/voigtstefan/sp500) and can be accessed directly via `tidyfinance::download_data("tidyfinance", "high_frequency_sp500")`.
