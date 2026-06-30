@@ -229,7 +229,3 @@ Website →
 © Christoph Frey, Christoph Scheuch, Stefan Voigt & Patrick Weiss
 
 [Disclaimer](disclaimer.llms.md) [Cookie Preferences](#)
-
-🎓 **Applications open: Summer School "Foundations for Reproducible Research" — closes June 22.** [Apply now →](https://bse.eu/summer-school/data-science-finance/tidy-finance-reproducible-research-in-data-science)
-
-×
