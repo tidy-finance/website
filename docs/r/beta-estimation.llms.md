@@ -50,7 +50,7 @@ coefficients
 
                 Estimate Std. Error t value Pr(>|t|)
     (Intercept)  0.00992    0.00488    2.03 4.27e-02
-    mkt_excess   1.37566    0.10761   12.78 8.89e-33
+    mkt_excess   1.37560    0.10761   12.78 8.89e-33
 
 `lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated \\\hat\beta_i\\ is above one (\\\hat\beta_i \approx 1.4\\).
 
@@ -151,7 +151,7 @@ capm_examples
     5  10107 1990-05-01 alpha         0.0443        2.53
     # ℹ 3,109 more rows
 
-[Figure 1](#fig-601) displays the resulting beta estimates, focusing exclusively on the coefficient fo `"mkt_excess"`.
+[Figure 1](#fig-601) displays the resulting beta estimates, focusing exclusively on the coefficient of `"mkt_excess"`.
 
 ``` r
 beta_examples <- capm_examples |>
@@ -170,11 +170,15 @@ beta_examples |>
   )
 ```
 
-[![Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across varies but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-1.png)](beta-estimation_files/figure-html/fig-601-1.png "Figure 1: The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
+[![Title: Monthly beta estimates for example stocks using 5 years of data. The figure shows a time series of beta estimates based on 5 years of monthly data for Apple, Berkshire Hathaway, Microsoft, and Tesla. The estimated betas vary over time and across stocks but are always positive for each stock.](beta-estimation_files/figure-html/fig-601-1.png)](beta-estimation_files/figure-html/fig-601-1.png "Figure 1: The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.")
 
 Figure 1: The CAPM betas are estimated with monthly data and a rolling window of length 5 years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.
 
 ## Parallelized Rolling-Window Estimation
+
+> **TIP:**
+>
+> For a single-regressor model such as the CAPM, the rolling regressions can also be computed in closed form from precomputed cumulants, which avoids fitting millions of individual models. Our blog post [Fast, Vectorized Beta Estimation](../blog/fast-beta-estimation/index.llms.md) shows how to reproduce the results of this chapter in seconds, without parallelization.
 
 Even though we could now just apply the function using the approach from above on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).
 
@@ -205,6 +209,19 @@ capm_monthly
     4  10001 1990-02-01 mkt_excess    0.0976       0.678
     5  10001 1990-03-01 alpha         0.0105       1.35 
     # ℹ 4,665,565 more rows
+
+Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task and supports parallelization via the `use_furrr` argument:
+
+``` r
+library(tidyfinance)
+
+estimate_betas(
+  crsp_monthly,
+  "ret_excess ~ mkt_excess",
+  lookback = months(60),
+  min_obs = 48
+)
+```
 
 ## Estimating Beta Using Daily Returns
 

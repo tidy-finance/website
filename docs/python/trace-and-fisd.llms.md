@@ -35,15 +35,20 @@ Both bond databases we need are available on [WRDS](https://wrds-www.wharton.upe
 ``` python
 import os
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, URL
+
 load_dotenv()
 
-connection_string = (
-    "postgresql+psycopg2://"
-    f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
-    "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
+connection_url = URL.create(
+    drivername="postgresql+psycopg2",
+    username=os.getenv("WRDS_USER"),
+    password=os.getenv("WRDS_PASSWORD"),
+    host="wrds-pgdata.wharton.upenn.edu",
+    port=9737,
+    database="wrds",
 )
 
-wrds = create_engine(connection_string, pool_pre_ping=True)
+wrds = create_engine(connection_url, pool_pre_ping=True)
 ```
 
 ## Mergent FISD

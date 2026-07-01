@@ -2,11 +2,11 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.9.37">
+<meta name="generator" content="quarto-1.9.38">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="description" content="Scale variations in choices of sample preparation to compute non-standard errors using the programming language Python.">
+<meta name="description" content="Scale variations in choices of sample preparation to compute non-standard errors using the programming language R.">
 
 <title>Size Sorts and p-Hacking with R – Tidy Finance</title>
 <style>
@@ -98,7 +98,7 @@ div.csl-indent {
 <script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="../site_libs/quarto-html/anchor.min.js"></script>
 <link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
 <link href="../site_libs/bootstrap/bootstrap-2e93c9ea7df6fcc5d90b01baca22926b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
@@ -798,14 +798,14 @@ Figure&nbsp;2: Years are on the horizontal axis and the corresponding share of t
 <span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  assigned_portfolios</span>
 <span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Note that the <code>tidyfinance</code> package also provides an <code>assing_portfolio()</code> function, albeit with more flexibility. For the sake of simplicity, we continue to use the function that we just defined.</p>
+<p>Note that the <code>tidyfinance</code> package also provides an <code>assign_portfolio()</code> function, albeit with more flexibility. For the sake of simplicity, we continue to use the function that we just defined.</p>
 </section>
 <section id="weighting-schemes-for-portfolios" class="level2">
 <h2 class="anchored" data-anchor-id="weighting-schemes-for-portfolios">Weighting Schemes for Portfolios</h2>
 <p>Apart from computing breakpoints on different samples, researchers often use different portfolio weighting schemes. So far, we weighted each portfolio constituent by its relative market equity of the previous period. This protocol is called <em>value-weighting</em>. The alternative protocol is <em>equal-weighting</em>, which assigns each stock’s return the same weight, i.e., a simple average of the constituents’ returns. Notice that equal-weighting is difficult in practice as the portfolio manager needs to rebalance the portfolio monthly while value-weighting is a truly passive investment.</p>
-<p>We implement the two weighting schemes in the function <code>compute_portfolio_returns()</code> that takes a logical argument to weight the returns by firm value. The statement <code>if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))</code> generates value-weighted returns if <code>value_weighted = TRUE</code>. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in <a href="../r/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>.</p>
+<p>We implement the two weighting schemes in the function <code>compute_size_premium()</code> that takes a logical argument to weight the returns by firm value. We deliberately avoid the name <code>compute_portfolio_returns()</code> here, as the <code>tidyfinance</code> package exports a function of that name with a different signature that returns a full panel of portfolio returns rather than a single size premium. The statement <code>if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))</code> generates value-weighted returns if <code>value_weighted = TRUE</code>. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in <a href="../r/univariate-portfolio-sorts.html">Univariate Portfolio Sorts</a>.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>compute_portfolio_returns <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>compute_size_premium <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_portfolios =</span> <span class="dv">10</span>,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">exchanges =</span> <span class="fu">c</span>(<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>),</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">value_weighted =</span> <span class="cn">TRUE</span>,</span>
@@ -838,16 +838,16 @@ Figure&nbsp;2: Years are on the horizontal axis and the corresponding share of t
 <span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>  portfolio_returns</span>
 <span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>To see how the function <code>compute_portfolio_returns()</code> works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.</p>
+<p>To see how the function <code>compute_size_premium()</code> works, we consider a simple median breakpoint example with value-weighted returns. We are interested in the effect of restricting listing exchanges on the estimation of the size premium. In the first function call, we compute returns based on breakpoints from all listing exchanges. Then, we computed returns based on breakpoints from NYSE-listed stocks.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ret_all <span class="ot">&lt;-</span> <span class="fu">compute_portfolio_returns</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ret_all <span class="ot">&lt;-</span> <span class="fu">compute_size_premium</span>(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_portfolios =</span> <span class="dv">2</span>,</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">exchanges =</span> <span class="fu">c</span>(<span class="st">"NYSE"</span>, <span class="st">"NASDAQ"</span>, <span class="st">"AMEX"</span>),</span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">value_weighted =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> crsp_monthly</span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>ret_nyse <span class="ot">&lt;-</span> <span class="fu">compute_portfolio_returns</span>(</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>ret_nyse <span class="ot">&lt;-</span> <span class="fu">compute_size_premium</span>(</span>
 <span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_portfolios =</span> <span class="dv">2</span>,</span>
 <span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">exchanges =</span> <span class="st">"NYSE"</span>,</span>
 <span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">value_weighted =</span> <span class="cn">TRUE</span>,</span>
@@ -902,7 +902,7 @@ Figure&nbsp;2: Years are on the horizontal axis and the corresponding share of t
 <span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>        value_weighted,</span>
 <span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>        data</span>
 <span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>      ),</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">.f =</span> <span class="sc">~</span> <span class="fu">compute_portfolio_returns</span>(</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">.f =</span> <span class="sc">~</span> <span class="fu">compute_size_premium</span>(</span>
 <span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>        <span class="at">n_portfolios =</span> ..<span class="dv">1</span>,</span>
 <span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>        <span class="at">exchanges =</span> ..<span class="dv">2</span>,</span>
 <span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>        <span class="at">value_weighted =</span> ..<span class="dv">3</span>,</span>
@@ -974,7 +974,7 @@ Figure&nbsp;3: The dashed vertical line indicates the average Fama-French SMB pr
 <ol type="1">
 <li>We gained several insights on the size distribution above. However, we did not analyze the average size across listing exchanges and industries. Which listing exchanges/industries have the largest firms? Plot the average firm size for the three listing exchanges over time. What do you conclude?</li>
 <li>We compute breakpoints but do not take a look at them in the exposition above. This might cover potential data errors. Plot the breakpoints for ten size portfolios over time. Then, take the difference between the two extreme portfolios and plot it. Describe your results.</li>
-<li>The returns that we analyze above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function <code>compute_portfolio_returns()</code> to output the CAPM alpha or beta instead of the average excess return.</li>
+<li>The returns that we analyze above do not account for differences in the exposure to market risk, i.e., the CAPM beta. Change the function <code>compute_size_premium()</code> to output the CAPM alpha or beta instead of the average excess return.</li>
 <li>While you saw the spread in returns from the p-hacking exercise, we did not show which choices led to the largest effects. Find a way to investigate which choice variable has the largest impact on the estimated size premium.</li>
 <li>We computed several size premiums, but they do not follow the definition of <span class="citation" data-cites="Fama1993">Fama and French (<a href="#ref-Fama1993" role="doc-biblioref">1993</a>)</span>. Which of our approaches comes closest to their SMB premium?</li>
 </ol>

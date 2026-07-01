@@ -141,6 +141,30 @@ weights_crsp <- compute_portfolio_weights(
 )
 ```
 
+    Warning: There was 1 warning in `mutate()`.
+    ℹ In argument: `weight_benchmark = case_when(...)`.
+    ℹ In group 1: `date = 1961-03-01`.
+    Caused by warning:
+    ! Calling `case_when()` with size 1 LHS inputs and size >1 RHS
+      inputs was deprecated in dplyr 1.2.0.
+    ℹ This `case_when()` statement can result in subtle silent bugs and is very inefficient.
+
+      Please use a series of if statements instead:
+
+      ```
+      # Previously
+      case_when(scalar_lhs1 ~ rhs1, scalar_lhs2 ~ rhs2, .default = default)
+
+      # Now
+      if (scalar_lhs1) {
+        rhs1
+      } else if (scalar_lhs2) {
+        rhs2
+      } else {
+        default
+      }
+      ```
+
 ## Portfolio Performance
 
 Are the computed weights optimal in any way? Most likely not, as we picked \\\theta_0\\ arbitrarily. To evaluate the performance of an allocation strategy, one can think of many different approaches. In their original paper, Brandt et al. ([2009](#ref-Brandt2009)) focus on a simple evaluation of the hypothetical utility of an agent equipped with a power utility function \\u\_\gamma(r) = \frac{(1 + r)^{(1-\gamma)}}{1-\gamma}\\, where \\\gamma\\ is the risk aversion factor.
@@ -241,7 +265,7 @@ evaluate_portfolio(weights_crsp) |>
      2 Average return                     7.04       0.837  
      3 SD return                         15.4       21.2    
      4 Sharpe ratio                       0.457      0.0396 
-     5 CAPM alpha                         0.000105  -0.00479
+     5 CAPM alpha                         0.000104  -0.00479
      6 Market beta                        0.994      0.947  
      7 Absolute weight                    0.0249     0.0638 
      8 Max. weight                        3.67       3.80   
@@ -314,9 +338,9 @@ evaluate_optimal_performance <- function(data,
     par = theta,
     fn = compute_objective_function,
     data = data,
-    objective_measure = "Expected utility",
-    value_weighting = TRUE,
-    allow_short_selling = TRUE,
+    objective_measure = objective_measure,
+    value_weighting = value_weighting,
+    allow_short_selling = allow_short_selling,
     method = "Nelder-Mead"
   )
 
@@ -393,14 +417,14 @@ performance_table |>
     # A tibble: 11 × 7
        measure     `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Optimal `
        <chr>          <dbl>    <dbl>          <dbl>                 <dbl>
-     1 Expected u… -0.251   -2.49e-1       -0.247                -0.248  
-     2 Average re…  9.96     7.04e+0       12.7                  12.0    
-     3 SD return   20.4      1.54e+1       19.2                  18.8    
+     1 Expected u… -0.251   -2.49e-1       -0.247                -0.247  
+     2 Average re…  9.96     7.04e+0       12.7                  11.8    
+     3 SD return   20.4      1.54e+1       19.2                  18.5    
      4 Sharpe rat…  0.487    4.57e-1        0.662                 0.639  
-     5 CAPM alpha   0.00175  1.05e-4        0.00478               0.00403
+     5 CAPM alpha   0.00175  1.04e-4        0.00478               0.00391
      6 Market beta  1.13     9.94e-1        1.01                  1.03   
      7 Absolute w…  0.0249   2.49e-2        0.0340                0.0249 
-     8 Max. weight  0.0249   3.67e+0        3.52                  2.97   
+     8 Max. weight  0.0249   3.67e+0        3.52                  3.09   
      9 Min. weight  0.0249   2.66e-5       -0.0262                0      
     10 Avg. sum o…  0        0             19.0                   0      
     11 Avg. fract…  0        0             36.5                   0      

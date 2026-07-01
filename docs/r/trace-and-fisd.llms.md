@@ -55,7 +55,7 @@ The following chunk connects to the data and selects the bond sample to remove c
 9.  Exclude bonds denominated in foreign currency (`foreign_currency = 'N'`).
 10. Keep only fixed (`F`) and zero (`Z`) coupon bonds with additional requirements of `fix_frequency IS NULL`, `coupon_change_indicator = 'N'` and annual, semi-annual, quarterly, or monthly interest frequencies.
 11. Exclude bonds that were issued under SEC Rule 144A (`rule_144a = 'N'`).
-12. Exlcude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
+12. Exclude privately placed bonds (`private_placement = 'N' OR private_placement IS NULL`).
 13. Exclude defaulted bonds (`defaulted = 'N' AND filing_date IS NULL AND settlement IS NULL`).
 14. Exclude convertible (`convertible = 'N'`), putable (`putable = 'N' OR putable IS NULL`), exchangeable (`exchangeable = 'N' OR exchangeable IS NULL`), perpetual (`perpetual = 'N'`), or preferred bonds (`preferred_security = 'N' OR preferred_security IS NULL`).
 15. Exclude unit deal bonds (`(unit_deal = 'N' OR unit_deal IS NULL)`).
@@ -145,7 +145,7 @@ fisd <- fisd |>
 To download the FISD data with the above filters and processing steps, you can use the `tidyfinance` package. Note that you might have to set the login credentials for WRDS first using `set_wrds_credentials()`.
 
 ``` r
-download_data("wrds_fisd")
+download_data(domain = "wrds", dataset = "fisd")
 ```
 
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
@@ -181,7 +181,8 @@ batches <- length(fisd_parts)
 
 for (j in 1:batches) {
   trace_enhanced <- download_data(
-    type = "wrds_trace_enhanced",
+    domain = "wrds",
+    dataset = "trace_enhanced",
     cusips = fisd_parts[[j]],
     start_date = ymd("2014-01-01"),
     end_date = ymd("2016-11-30")
@@ -207,7 +208,8 @@ If you want to download the prepared enhanced TRACE data for selected bonds via 
 
 ``` r
 download_data(
-  "wrds_trace_enhanced",
+  domain = "wrds",
+  dataset = "trace_enhanced",
   cusips = c("00101JAH9"),
   start_date = "2019-01-01",
   end_date = "2021-12-31"

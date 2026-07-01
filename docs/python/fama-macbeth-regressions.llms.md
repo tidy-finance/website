@@ -28,7 +28,7 @@ import statsmodels.formula.api as smf
 
 ## Data Preparation
 
-We illustrate Fama and MacBeth ([1973](#ref-Fama1973)) with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: Market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md).
+We illustrate Fama and MacBeth ([1973](#ref-Fama1973)) with the monthly CRSP sample and use three characteristics to explain the cross-section of returns: Market capitalization, the book-to-market ratio, and the CAPM beta (i.e., the covariance of the excess stock returns with the market excess returns). We collect the data from our Parquet files introduced in [Accessing and Managing Financial Data](../python/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../python/wrds-crsp-and-compustat.llms.md). As in the previous chapters, we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
 
 ``` python
 crsp_monthly = (
@@ -39,6 +39,7 @@ crsp_monthly = (
 compustat_annual = (
     pd.read_parquet("data-python/compustat_annual.parquet")
     .get(["datadate", "gvkey", "be"])
+    .query("be > 0")
 )
 
 beta = (
@@ -151,10 +152,10 @@ price_of_risk_newey_west = (risk_premiums
 
 |     | factor     | risk_premium | t_statistic | t_statistic_newey_west |
 |-----|------------|--------------|-------------|------------------------|
-| 0   | Intercept  | 0.012        | 4.660       | 4.067                  |
-| 1   | beta       | 0.000        | 0.006       | 0.005                  |
-| 2   | bm         | 0.002        | 3.016       | 2.833                  |
-| 3   | log_mktcap | -0.001       | -2.812      | -2.639                 |
+| 0   | Intercept  | 0.011        | 4.514       | 3.939                  |
+| 1   | beta       | 0.000        | 0.071       | 0.066                  |
+| 2   | bm         | 0.002        | 3.420       | 3.234                  |
+| 3   | log_mktcap | -0.001       | -2.703      | -2.538                 |
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
@@ -186,6 +187,8 @@ tf.estimate_fama_macbeth(
 Campbell, John Y., Andrew W. Lo, A. Craig MacKinlay, and Robert F. Whitelaw. 1998. “The Econometrics of Financial Markets.” *Macroeconomic Dynamics* 2 (4): 559–62. <https://doi.org/10.1017/S1365100598009092>.
 
 Chen, Hong-Yi, Alice C Lee, and Cheng-Few Lee. 2015. “Alternative errors-in-variables models and their applications in finance research.” *The Quarterly Review of Economics and Finance* 58: 213–27. <https://doi.org/10.1016/j.qref.2014.12.002>.
+
+Fama, Eugene F., and Kenneth R. French. 1992. “The cross-section of expected stock returns.” *The Journal of Finance* 47 (2): 427–65. <https://doi.org/2329112>.
 
 Fama, Eugene F., and Kenneth R. French. 1993. “Common risk factors in the returns on stocks and bonds.” *Journal of Financial Economics* 33 (1): 3–56. <https://doi.org/10.1016/0304-405X(93)90023-5>.
 

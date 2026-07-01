@@ -19,7 +19,7 @@ library(arrow)
 
 ## Data Preparation
 
-We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, there is nothing new below, and we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md).[^1]
+We use CRSP and Compustat as data sources, as we need the same variables to compute the factors in the way Fama and French do it. Hence, we only load data from our Parquet files introduced in [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../r/wrds-crsp-and-compustat.llms.md).[^1] The only addition is that we keep only firms with positive book equity, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
 
 ``` r
 crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
@@ -34,7 +34,8 @@ crsp_monthly <- read_parquet("data-r/crsp_monthly.parquet") |>
   )
 
 compustat_annual <- read_parquet("data-r/compustat_annual.parquet") |>
-  select(gvkey, datadate, be, op, inv)
+  select(gvkey, datadate, be, op, inv) |>
+  filter(be > 0)
 
 factors_ff3_monthly <- read_parquet("data-r/factors_ff3_monthly.parquet") |>
   select(date, smb, hml)
@@ -57,7 +58,7 @@ size <- crsp_monthly |>
 
 market_equity <- crsp_monthly |>
   filter(month(date) == 12) |>
-  mutate(sorting_date = ymd(str_c(year(date) + 1, "0701)"))) |>
+  mutate(sorting_date = ymd(str_c(year(date) + 1, "0701"))) |>
   select(permno, gvkey, sorting_date, me = mktcap)
 
 book_to_market <- compustat_annual |>
@@ -187,18 +188,18 @@ summary(model_smb)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.020203 -0.001374  0.000019  0.001461  0.015537 
+    -0.020204 -0.001374  0.000018  0.001445  0.015535 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    -0.000165   0.000125   -1.32     0.19    
-    smb_replicated  0.979116   0.004110  238.21   <2e-16 ***
+    (Intercept)    -0.000164   0.000125   -1.31     0.19    
+    smb_replicated  0.979099   0.004109  238.25   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00346 on 760 degrees of freedom
+    Residual standard error: 0.00345 on 760 degrees of freedom
     Multiple R-squared:  0.987, Adjusted R-squared:  0.987 
-    F-statistic: 5.67e+04 on 1 and 760 DF,  p-value: <2e-16
+    F-statistic: 5.68e+04 on 1 and 760 DF,  p-value: <2e-16
 
 The results for the SMB factor are really convincing, as all three criteria outlined above are met and the coefficient is 0.98 and the R-squared is at 99 percent.
 
@@ -212,19 +213,19 @@ summary(model_hml)
     lm(formula = hml ~ hml_replicated, data = test)
 
     Residuals:
-         Min       1Q   Median       3Q      Max 
-    -0.02360 -0.00247 -0.00018  0.00202  0.03114 
+          Min        1Q    Median        3Q       Max 
+    -0.023593 -0.002528 -0.000183  0.002024  0.031134 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000407   0.000209    1.95    0.052 .  
-    hml_replicated 0.955236   0.006893  138.58   <2e-16 ***
+    (Intercept)    0.000406   0.000209    1.94    0.053 .  
+    hml_replicated 0.955207   0.006907  138.31   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00574 on 760 degrees of freedom
+    Residual standard error: 0.00575 on 760 degrees of freedom
     Multiple R-squared:  0.962, Adjusted R-squared:  0.962 
-    F-statistic: 1.92e+04 on 1 and 760 DF,  p-value: <2e-16
+    F-statistic: 1.91e+04 on 1 and 760 DF,  p-value: <2e-16
 
 The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.96 and an R-squared around 96 percent.
 
@@ -395,12 +396,12 @@ summary(model_smb)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.019394 -0.001875  0.000166  0.001942  0.013436 
+    -0.019395 -0.001874  0.000153  0.001941  0.013437 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
     (Intercept)    -0.000221   0.000129   -1.72    0.086 .  
-    smb_replicated  0.959342   0.004084  234.88   <2e-16 ***
+    smb_replicated  0.959317   0.004083  234.94   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -421,17 +422,17 @@ summary(model_hml)
 
     Residuals:
          Min       1Q   Median       3Q      Max 
-    -0.04341 -0.00409 -0.00030  0.00384  0.03453 
+    -0.04341 -0.00408 -0.00035  0.00387  0.03453 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000609   0.000287    2.12    0.034 *  
-    hml_replicated 0.980389   0.009798  100.06   <2e-16 ***
+    (Intercept)    0.000607   0.000287    2.11    0.035 *  
+    hml_replicated 0.980382   0.009806   99.98   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00778 on 736 degrees of freedom
-    Multiple R-squared:  0.932, Adjusted R-squared:  0.931 
+    Residual standard error: 0.00779 on 736 degrees of freedom
+    Multiple R-squared:  0.931, Adjusted R-squared:  0.931 
     F-statistic: 1e+04 on 1 and 736 DF,  p-value: <2e-16
 
 The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.98 and an R-squared around 93 percent.
@@ -447,18 +448,18 @@ summary(model_rmw)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.018489 -0.003047 -0.000012  0.003281  0.019066 
+    -0.018495 -0.003069 -0.000012  0.003276  0.019064 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    2.83e-05   1.99e-04    0.14     0.89    
-    rmw_replicated 9.49e-01   8.71e-03  108.99   <2e-16 ***
+    (Intercept)    2.67e-05   1.99e-04    0.13     0.89    
+    rmw_replicated 9.49e-01   8.72e-03  108.84   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00536 on 736 degrees of freedom
-    Multiple R-squared:  0.942, Adjusted R-squared:  0.942 
-    F-statistic: 1.19e+04 on 1 and 736 DF,  p-value: <2e-16
+    Residual standard error: 0.00537 on 736 degrees of freedom
+    Multiple R-squared:  0.942, Adjusted R-squared:  0.941 
+    F-statistic: 1.18e+04 on 1 and 736 DF,  p-value: <2e-16
 
 We are also able to replicate the RMW factor quite well with a coefficient of 0.95 and an R-squared around 94 percent.
 
@@ -473,12 +474,12 @@ summary(model_cma)
 
     Residuals:
          Min       1Q   Median       3Q      Max 
-    -0.02876 -0.00274  0.00004  0.00260  0.02121 
+    -0.02866 -0.00273  0.00004  0.00259  0.02121 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000523   0.000172    3.05   0.0024 ** 
-    cma_replicated 0.955140   0.008140  117.33   <2e-16 ***
+    (Intercept)    0.000522   0.000171    3.04   0.0024 ** 
+    cma_replicated 0.955118   0.008137  117.38   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 

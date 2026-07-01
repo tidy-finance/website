@@ -223,7 +223,7 @@ model_without_fe_figure = (
     + geom_hline(yintercept=0, linetype="dashed")
     + geom_errorbar(aes(ymin="ci_low", ymax="ci_up"), alpha=0.5)
     + geom_point()
-    + guides(linetype=None)
+    + guides(linetype="none")
     + labs(
         x="", y="Yield", shape="Polluter?", color="Polluter?",
         title="Polluters respond stronger than green firms"

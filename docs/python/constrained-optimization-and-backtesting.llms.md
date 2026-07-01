@@ -201,7 +201,7 @@ rebalancing_figure = (
         ),
     )
     + geom_line()
-    + guides(linetype=None)
+    + guides(linetype="none")
     + labs(
         x="Transaction cost parameter",
         y="Distance from MVP",
@@ -575,7 +575,7 @@ performance_table.round(3)
 |     | strategy | mean   | sd     | sharpe_ratio | turnover |
 |-----|----------|--------|--------|--------------|----------|
 | 0   | MV       | -1.041 | 12.556 | NaN          | 210.015  |
-| 1   | MV (TC)  | 12.068 | 15.129 | 0.798        | 0.019    |
+| 1   | MV (TC)  | 12.069 | 15.129 | 0.798        | 0.020    |
 | 2   | Naive    | 12.052 | 15.132 | 0.796        | 0.236    |
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters \\\hat\mu_t\\ and \\\hat\Sigma_t\\ indicate that the current allocation is too far away from the optimal theoretical portfolio.

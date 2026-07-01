@@ -137,7 +137,7 @@ capm_examples_nested = (crsp_monthly
 capm_examples_nested
 ```
 
-    <pandas.core.groupby.generic.DataFrameGroupBy object at 0x107562b00>
+    <pandas.core.groupby.generic.DataFrameGroupBy object at 0x12c26e6e0>
 
 Next, we want to apply the `roll_capm_estimation()` function to each stock. This situation is an ideal use case for `apply()`, which takes a list or vector as input and returns an object of the same length as the input. In our case, `apply()` returns a single data frame with a time series of beta estimates for each stock. Therefore, we use `reset_index()` to transform the list of outputs to a tidy data frame.
 
@@ -196,6 +196,10 @@ beta_figure.show()
 Figure 1: The figure shows monthly beta estimates for example stocks using five years of data. The CAPM betas are estimated with monthly data and a rolling window of length five years based on adjusted excess returns from CRSP. We use market excess returns from Kenneth French data library.
 
 ## Parallelized Rolling-Window Estimation
+
+> **TIP:**
+>
+> For a single-regressor model such as the CAPM, the rolling regressions can also be computed in closed form from precomputed cumulants, which avoids fitting millions of individual models. Our blog post [Fast, Vectorized Beta Estimation](../blog/fast-beta-estimation/index.llms.md) shows how to reproduce the results of this chapter in seconds, without parallelization.
 
 Even though we could now just apply the function using `.groubby()` on the whole CRSP sample, we advise against doing it as it is computationally quite expensive. Remember that we have to perform rolling-window estimations across all stocks and time periods. However, this estimation problem is an ideal scenario to employ the power of parallelization. Parallelization means that we split the tasks which perform rolling-window estimations across different workers (or cores on your local machine).
 

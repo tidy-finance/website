@@ -45,16 +45,20 @@ Additionally, you have to use two-factor authentication since May 2023 when esta
 ``` python
 import os
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, URL
 
 load_dotenv()
 
-connection_string = (
-    "postgresql+psycopg2://"
-    f"{os.getenv('WRDS_USER')}:{os.getenv('WRDS_PASSWORD')}"
-    "@wrds-pgdata.wharton.upenn.edu:9737/wrds"
+connection_url = URL.create(
+    drivername="postgresql+psycopg2",
+    username=os.getenv("WRDS_USER"),
+    password=os.getenv("WRDS_PASSWORD"),
+    host="wrds-pgdata.wharton.upenn.edu",
+    port=9737,
+    database="wrds",
 )
 
-wrds = create_engine(connection_string, pool_pre_ping=True)
+wrds = create_engine(connection_url, pool_pre_ping=True)
 ```
 
 You can also use the `tidyfinance` package to set the login credentials and create a connection.
@@ -481,7 +485,7 @@ compustat_annual = pd.read_sql_query(
 )
 ```
 
-Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html) Note that we set negative or zero equity to missing, which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
+Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Kenneth French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html)
 
 ``` python
 compustat_annual = (compustat_annual
@@ -494,10 +498,7 @@ compustat_annual = (compustat_annual
         .combine_first(x["pstk"]).fillna(0))
     )
     .assign(
-        be=lambda x: x["be"].apply(lambda y: np.nan if y <= 0 else y)
-    )
-    .assign(
-        op=lambda x: 
+        op=lambda x:
         ((x["sale"]-x["cogs"].fillna(0)- 
             x["xsga"].fillna(0)-x["xint"].fillna(0))/x["be"])
     )
@@ -665,8 +666,6 @@ The difference arises from the distinct coverage of the two databases. CRSP focu
 Bali, Turan G, Robert F Engle, and Scott Murray. 2016. *Empirical asset pricing: The cross section of stock returns*. John Wiley & Sons. <https://doi.org/10.1002/9781118445112.stat07954>.
 
 Bayer, Michael. 2012. “SQLAlchemy.” In *The Architecture of Open Source Applications Volume II: Structure, Scale, and a Few More Fearless Hacks*, edited by Amy Brown and Greg Wilson. Aosabook.org. <http://aosabook.org/en/sqlalchemy.html>.
-
-Fama, Eugene F., and Kenneth R. French. 1992. “The cross-section of expected stock returns.” *The Journal of Finance* 47 (2): 427–65. <https://doi.org/2329112>.
 
 Fama, Eugene F., and Kenneth R. French. 1997. “Industry Costs of Equity.” *Journal of Financial Economics* 43 (2): 153–93. <https://doi.org/10.1016/s0304-405x(96)00896-3>.
 

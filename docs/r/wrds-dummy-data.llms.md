@@ -1,6 +1,6 @@
 # WRDS Pseudo Data
 
-In this appendix chapter, we alleviate the constraints of readers who do not have access to WRDS and hence cannot run the code that we provide. We show how to create a pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this pseudo data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md).
+In this appendix chapter, we alleviate the constraints of readers who do not have access to WRDS and hence cannot run the code that we provide. We show how to create pseudo data that contains the WRDS tables and corresponding columns such that all code chunks in this book can be executed with this pseudo data. We do not create pseudo data for tables of open-source data sources because they can be freely downloaded from the original sources; check out [Accessing and Managing Financial Data](../r/accessing-and-managing-financial-data.llms.md).
 
 We deliberately use the pseudo label because the data is not meaningful in the sense that it allows readers to actually replicate the results of the book. For legal reasons, the data does not contain any samples of the original data. We merely generate random numbers for all columns of the tables that we use throughout the books.
 
@@ -268,7 +268,7 @@ write_parquet(fisd_pseudo, "data-r/fisd.parquet")
 
 ### Pseudo `trace_enhanced` data
 
-Finally, we create a pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book.
+Finally, we create pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book.
 
 ``` r
 start_date <- as.Date("2014-01-01")

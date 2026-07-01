@@ -6,7 +6,7 @@
 
 This chapter shows how to connect to [Wharton Research Data Services (WRDS)](https://wrds-www.wharton.upenn.edu/), a popular provider of financial and economic data for research applications. We use this connection to download the most commonly used data for stock and firm characteristics, CRSP and Compustat. Unfortunately, this data is not freely available, but most students and researchers typically have access to WRDS through their university libraries. Assuming that you have access to WRDS, we show you how to prepare and merge the datasets and store them as Parquet-files introduced in the previous chapter. We conclude this chapter by providing some tips for working with the WRDS database.
 
-If you don’t have access to WRDS but still want to run the code in this book, we refer to [WRDS Pseudo Data](../r/wrds-dummy-data.llms.md), where we show how to create a pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.
+If you don’t have access to WRDS but still want to run the code in this book, we refer to [WRDS Pseudo Data](../r/wrds-dummy-data.llms.md), where we show how to create pseudo versions of the WRDS tables and corresponding columns. With this pseudo data at hand, all code chunks in this book can be executed.
 
 First, we load the R packages that we use throughout this chapter. Later on, we load more packages in the sections where we need them.
 
@@ -189,7 +189,8 @@ The `tidyfinance` package provides a shortcut to implement all these processing 
 
 ``` r
 crsp_monthly <- download_data(
-  type = "wrds_crsp_monthly",
+  domain = "wrds",
+  dataset = "crsp_monthly",
   start_date = start_date,
   end_date = end_date
 )
@@ -418,13 +419,14 @@ To download the daily CRSP data via the `tidyfinance` package, you can call:
 
 ``` r
 crsp_daily <- download_data(
-  type = "wrds_crsp_daily",
+  domain = "wrds",
+  dataset = "crsp_daily",
   start_date = start_date,
   end_date = end_date
 )
 ```
 
-Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend to use loop the function over different date periods and store the results.
+Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend looping the function over different date periods and storing the results.
 
 ## Preparing Compustat Data
 
@@ -471,7 +473,7 @@ compustat_annual <- funda_db |>
   collect()
 ```
 
-Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Ken French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html) Note that we set negative or zero equity to missing which is a common practice when working with book-to-market ratios (see [Fama and French 1992](#ref-Fama1992) for details).
+Next, we calculate the book value of preferred stock and equity `be` and the operating profitability `op` inspired by the [variable definitions in Ken French’s data library.](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/variable_definitions.html)
 
 ``` r
 compustat_annual <- compustat_annual |>
@@ -479,7 +481,6 @@ compustat_annual <- compustat_annual |>
     be = coalesce(seq, ceq + pstk, at - lt) +
       coalesce(txditc, txdb + itcb, 0) -
       coalesce(pstkrv, pstkl, pstk, 0),
-    be = if_else(be <= 0, NA, be),
     op = (sale - coalesce(cogs, 0) - coalesce(xsga, 0) - coalesce(xint, 0)) /
       be,
   )
@@ -521,7 +522,8 @@ The `tidyfinance` package provides a shortcut for these processing steps as well
 
 ``` r
 compustat_annual <- download_data(
-  type = "wrds_compustat_annual",
+  domain = "wrds",
+  dataset = "compustat_annual",
   start_date = start_date,
   end_date = end_date
 )
@@ -566,7 +568,7 @@ ccm_links <- crsp_monthly |>
 To fetch these links via `tidyfinance`, you can call:
 
 ``` r
-ccm_links <- download_data(type = "wrds_ccm_links")
+ccm_links <- download_data(domain = "wrds", dataset = "ccm_links")
 ```
 
 As the last step, we update the previously prepared monthly CRSP file with the linking information in our local folder.
@@ -617,7 +619,7 @@ The difference arises from the distinct coverage of the two data sources. CRSP f
 
 ## Some Tricks for PostgreSQL Databases
 
-As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documetation.](https://www.postgresql.org/docs/9.1/ddl-schemas.html) For instance, if you want to find all tables that live in the `crsp` schema, you run
+As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documentation.](https://www.postgresql.org/docs/9.1/ddl-schemas.html) For instance, if you want to find all tables that live in the `crsp` schema, you run
 
 ``` r
 dbListObjects(wrds, Id(schema = "crsp"))
@@ -645,7 +647,7 @@ dbListObjects(wrds)
 ## Exercises
 
 1.  Check out the structure of the WRDS database by sending queries in the spirit of [“Querying WRDS Data using R”](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/) and verify the output with `dbListObjects()`. How many tables are associated with CRSP? Can you identify what is stored within `msp500`?
-2.  Compute `mkt_cap_lag` using `lag(mktcap)` rather than using joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are the two measures they different?
+2.  Compute `mkt_cap_lag` using `lag(mktcap)` rather than using joins as above. Filter out all the rows where the lag-based market capitalization measure is different from the one we computed above. Why are the two measures different?
 3.  Plot the average market capitalization of firms for each exchange and industry, respectively, over time. What do you find?
 4.  In the `compustat_annual` table, `datadate` refers to the date to which the fiscal year of a corresponding firm refers. Count the number of observations in Compustat by `month` of this date variable. What do you find? What does the finding suggest about pooling observations with the same fiscal year?
 5.  Go back to the original Compustat data in `funda_db` and extract rows where the same firm has multiple rows for the same fiscal year. What is the reason for these observations?
@@ -656,8 +658,6 @@ dbListObjects(wrds)
 ## References
 
 Bali, Turan G, Robert F Engle, and Scott Murray. 2016. *Empirical asset pricing: The cross section of stock returns*. John Wiley & Sons. <https://doi.org/10.1002/9781118445112.stat07954>.
-
-Fama, Eugene F., and Kenneth R. French. 1992. “The cross-section of expected stock returns.” *The Journal of Finance* 47 (2): 427–65. <https://doi.org/2329112>.
 
 Fama, Eugene F., and Kenneth R. French. 1997. “Industry Costs of Equity.” *Journal of Financial Economics* 43 (2): 153–93. <https://doi.org/10.1016/s0304-405x(96)00896-3>.
 
@@ -675,4 +675,4 @@ Wickham, Hadley, Jeroen Ooms, and Kirill Müller. 2022. *RPostgres: Rcpp interfa
 
 [^3]: Companies that operate in the banking, insurance, or utilities sector typically report in different industry formats that reflect their specific regulatory requirements.
 
-[^4]: Compustat also contains reports in CAD, which can lead a currency mismatch, e.g., when relating book equity to market equity.
+[^4]: Compustat also contains reports in CAD, which can lead to a currency mismatch, e.g., when relating book equity to market equity.

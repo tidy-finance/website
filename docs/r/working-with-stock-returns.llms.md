@@ -24,7 +24,7 @@ In the following code, we request daily data from the beginning of 2000 to the e
 
 ``` r
 prices <- download_data(
-  type = "stock_prices",
+  domain = "stock_prices",
   symbols = "AAPL",
   start_date = "2000-01-01",
   end_date = "2024-12-31"
@@ -35,14 +35,14 @@ prices
     # A tibble: 6,288 × 8
       symbol date          volume  open   low  high close adjusted_close
       <chr>  <date>         <dbl> <dbl> <dbl> <dbl> <dbl>          <dbl>
-    1 AAPL   2000-01-03 535796800 0.936 0.908 1.00  0.999          0.839
-    2 AAPL   2000-01-04 512377600 0.967 0.903 0.988 0.915          0.769
-    3 AAPL   2000-01-05 778321600 0.926 0.920 0.987 0.929          0.780
-    4 AAPL   2000-01-06 767972800 0.948 0.848 0.955 0.848          0.712
-    5 AAPL   2000-01-07 460734400 0.862 0.853 0.902 0.888          0.746
+    1 AAPL   2000-01-03 535796800 0.936 0.908 1.00  0.999          0.838
+    2 AAPL   2000-01-04 512377600 0.967 0.903 0.988 0.915          0.767
+    3 AAPL   2000-01-05 778321600 0.926 0.920 0.987 0.929          0.778
+    4 AAPL   2000-01-06 767972800 0.948 0.848 0.955 0.848          0.711
+    5 AAPL   2000-01-07 460734400 0.862 0.853 0.902 0.888          0.745
     # ℹ 6,283 more rows
 
-`download_data(type = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `high`, `low`, `close`, and the `adjusted` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
+`download_data(domain = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
 
 Next, we use the `ggplot2` package ([Wickham 2016](#ref-ggplot2)) to visualize the time series of adjusted prices in [Figure 1](#fig-100). This package takes care of visualization tasks based on the principles of the grammar of graphics ([Wilkinson 2012](#ref-Wilkinson2012)).
 
@@ -193,34 +193,34 @@ This is where the `tidyverse` magic starts: Tidy data makes it extremely easy to
 
 ``` r
 symbols <- download_data(
-  type = "constituents", 
+  domain = "constituents",
   index = "Dow Jones Industrial Average"
-) 
+)
 symbols
 ```
 
-    # A tibble: 30 × 5
+    # A tibble: 32 × 5
       symbol name                    location           exchange currency
       <chr>  <chr>                   <chr>              <chr>    <chr>   
     1 GS     GOLDMAN SACHS GROUP INC Vereinigte Staaten New Yor… USD     
     2 CAT    CATERPILLAR INC         Vereinigte Staaten New Yor… USD     
-    3 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
-    4 HD     HOME DEPOT INC          Vereinigte Staaten New Yor… USD     
-    5 AXP    AMERICAN EXPRESS        Vereinigte Staaten New Yor… USD     
-    # ℹ 25 more rows
+    3 UNH    UNITEDHEALTH GROUP INC  Vereinigte Staaten New Yor… USD     
+    4 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
+    5 AMGN   AMGEN INC               Vereinigte Staaten NASDAQ   USD     
+    # ℹ 27 more rows
 
 Conveniently, `tidyfinance` provides the functionality to get all stock prices from an index for a specific point in time with a single call.
 
 ``` r
 prices_daily <- download_data(
-  type = "stock_prices",
+  domain = "stock_prices",
   symbols = symbols$symbol,
   start_date = "2000-01-01",
   end_date = "2023-12-31"
 )
 ```
 
-The resulting data frame contains 177925 daily observations for GS, CAT, MSFT, HD, AXP, SHW, AMGN, V, MCD, IBM, JPM, UNH, TRV, AAPL, AMZN, BA, JNJ, HON, CRM, NVDA, CVX, MMM, PG, WMT, DIS, MRK, CSCO, KO, NKE, VZ different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 182800 daily observations for GS, CAT, UNH, MSFT, AMGN, HD, SHW, AXP, GOOGL, V, JPM, TRV, AAPL, IBM, MCD, JNJ, AMZN, BA, NVDA, CVX, MMM, CRM, PG, MRK, WMT, CSCO, DIS, KO, NKE, HON, VZ different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ``` r
 prices_daily |>
@@ -243,7 +243,7 @@ prices_daily |>
 
 Figure 3: Prices in USD, adjusted for dividend payments and stock splits.
 
-Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrage number of subjects quite well.
+Do you notice the small differences relative to the code we used before? All we needed to do to illustrate all stock symbols simultaneously is to include `color = symbol` in the `ggplot` aesthetics. In this way, we generate a separate line for each symbol. Of course, there are simply too many lines on this graph to identify the individual stocks properly, but it illustrates our point of how to generalize a specific analysis to an arbitrary number of subjects quite well.
 
 The same holds for stock returns. Before computing the returns, we use `group_by(symbol)` such that the `mutate()` command is performed for each symbol individually. The same logic also applies to the computation of summary statistics: `group_by(symbol)` is the key to aggregating the time series into symbol-specific variables of interest.
 
@@ -269,7 +269,7 @@ returns_daily |>
   print(n = Inf)
 ```
 
-    # A tibble: 30 × 5
+    # A tibble: 31 × 5
        symbol daily_mean daily_sd daily_min daily_max
        <chr>       <dbl>    <dbl>     <dbl>     <dbl>
      1 AAPL     0.00122    0.0247    -0.519     0.139
@@ -282,28 +282,29 @@ returns_daily |>
      8 CSCO     0.000322   0.0234    -0.162     0.244
      9 CVX      0.000511   0.0175    -0.221     0.227
     10 DIS      0.000414   0.0194    -0.184     0.160
-    11 GS       0.000557   0.0229    -0.190     0.265
-    12 HD       0.000544   0.0192    -0.287     0.141
-    13 HON      0.000497   0.0191    -0.174     0.282
-    14 IBM      0.000297   0.0163    -0.155     0.120
-    15 JNJ      0.000379   0.0121    -0.158     0.122
-    16 JPM      0.000606   0.0238    -0.207     0.251
-    17 KO       0.000318   0.0131    -0.101     0.139
-    18 MCD      0.000536   0.0145    -0.159     0.181
-    19 MMM      0.000363   0.0151    -0.129     0.126
-    20 MRK      0.000371   0.0166    -0.268     0.130
-    21 MSFT     0.000573   0.0193    -0.156     0.196
-    22 NKE      0.000708   0.0193    -0.198     0.155
-    23 NVDA     0.00175    0.0376    -0.352     0.424
-    24 PG       0.000362   0.0133    -0.302     0.120
-    25 SHW      0.000860   0.0180    -0.208     0.153
-    26 TRV      0.000555   0.0181    -0.208     0.256
-    27 UNH      0.000948   0.0196    -0.186     0.348
-    28 V        0.000933   0.0185    -0.136     0.150
-    29 VZ       0.000238   0.0151    -0.118     0.146
-    30 WMT      0.000323   0.0148    -0.114     0.117
+    11 GOOGL    0.00101    0.0193    -0.116     0.200
+    12 GS       0.000557   0.0229    -0.190     0.265
+    13 HD       0.000544   0.0192    -0.287     0.141
+    14 HON      0.000501   0.0191    -0.174     0.282
+    15 IBM      0.000297   0.0163    -0.155     0.120
+    16 JNJ      0.000379   0.0121    -0.158     0.122
+    17 JPM      0.000606   0.0238    -0.207     0.251
+    18 KO       0.000318   0.0131    -0.101     0.139
+    19 MCD      0.000536   0.0145    -0.159     0.181
+    20 MMM      0.000363   0.0151    -0.129     0.126
+    21 MRK      0.000371   0.0166    -0.268     0.130
+    22 MSFT     0.000573   0.0193    -0.156     0.196
+    23 NKE      0.000708   0.0193    -0.198     0.155
+    24 NVDA     0.00175    0.0376    -0.352     0.424
+    25 PG       0.000362   0.0133    -0.302     0.120
+    26 SHW      0.000860   0.0180    -0.208     0.153
+    27 TRV      0.000555   0.0181    -0.208     0.256
+    28 UNH      0.000948   0.0196    -0.186     0.348
+    29 V        0.000933   0.0185    -0.136     0.150
+    30 VZ       0.000238   0.0151    -0.118     0.146
+    31 WMT      0.000323   0.0148    -0.114     0.117
 
-Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- download_data(type = "constituents", index = "S&P 500")`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
+Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just use `symbol <- download_data(domain = "constituents", index = "S&P 500")`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
 ## Different Frequencies
 
