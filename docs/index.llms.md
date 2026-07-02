@@ -4,7 +4,7 @@
 
 Tidy Finance takes an opinionated, fully transparent approach to empirical research in financial economics. One open-source code base now covers R and Python, side by side in every chapter.
 
-[Start here](chapters/working-with-stock-returns.llms.md) [R & Python docs](https://package.tidy-finance.org) [Data platform](https://factors.tidy-finance.org)
+[Start here](chapters/working-with-stock-returns.llms.md) [Factor Library](https://factors.tidy-finance.org) [Python Library](https://python.tidy-finance.org) [R Package](https://r.tidy-finance.org)
 
 download & plot prices
 
@@ -50,9 +50,9 @@ prices = tf.download_data(
 
 100% Open source & reproducible
 
-## Everything you need for reproducible finance
+## Everything you need for reproducible reserach in finance
 
-A single, transparent code base takes you from raw data to publication-quality results, in whichever language you prefer.
+A single, transparent code base takes you from raw data to publication-quality results, in R and Python.
 
 ![](data:image/svg+xml;base64,PHN2ZyB2aWV3Ym94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBvbHlsaW5lIHBvaW50cz0iMTYgMTggMjIgMTIgMTYgNiI+PC9wb2x5bGluZT48cG9seWxpbmUgcG9pbnRzPSI4IDYgMiAxMiA4IDE4Ij48L3BvbHlsaW5lPjwvc3ZnPg==)
 
@@ -198,7 +198,7 @@ The team
 
 ### Christoph Scheuch
 
-Independent Expert in Finance & Data
+Associate Researcher at HU Berlin
 
 LinkedIn →
 
