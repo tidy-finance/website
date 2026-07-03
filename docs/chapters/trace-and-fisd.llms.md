@@ -583,8 +583,12 @@ bonds_figure = (
     + scale_x_date(date_breaks="1 year", date_labels="%Y")
     + scale_y_continuous(labels=comma_format())
 )
-bonds_figure.draw()
+bonds_figure.show()
 ```
+
+[![Title: Number of bonds outstanding and traded each quarter. The figure shows a time series of outstanding bonds and bonds traded. The amount outstanding increases monotonically between 2014 and 2016. The number of bonds traded represents only a fraction of roughly 60 percent, which peaks around the third quarter of 2016.](trace-and-fisd_files/figure-html/trace-and-fisd-fig-401-py-1.png)](trace-and-fisd_files/figure-html/trace-and-fisd-fig-401-py-1.png "Number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.")
+
+Number of corporate bonds outstanding each quarter as reported by Mergent FISD and the number of traded bonds from enhanced TRACE between 2014 and end of 2016.
 
 We see that the number of bonds outstanding increases steadily between 2014 and 2016. During our sample period of trade data, we see that the fraction of bonds trading each quarter is roughly 60 percent. The relatively small number of traded bonds means that many bonds do not trade through an entire quarter. This lack of trading activity illustrates the generally low level of liquidity in the corporate bond market, where it can be hard to trade specific bonds. Does this lack of liquidity mean that corporate bond markets are irrelevant in terms of their size? With over 7,500 traded bonds each quarter, it is hard to say that the market is small. However, let us also investigate the characteristics of issued corporate bonds. In particular, we consider maturity (in years), coupon, and offering amount (in million USD).
 
@@ -652,9 +656,9 @@ shape: (3, 8)
 | measure        | mean  | std    | min   | q05  | median | q95   | max     |
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 | "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
+| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 
 We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
 
@@ -723,8 +727,8 @@ shape: (2, 8)
 | measure        | mean    | std     | min   | q05     | median  | q95     | max     |
 |----------------|---------|---------|-------|---------|---------|---------|---------|
 | str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
-| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35689.0 | 52102.0 | 68765.0 | 81678.0 |
 | "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12257.0 | 26842.0 | 35700.0 | 42625.0 |
+| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35689.0 | 52102.0 | 68765.0 | 81678.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

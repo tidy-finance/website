@@ -221,8 +221,12 @@ plot_market_cap_share = (
            title="Share of total market capitalization per listing exchange")
     + theme(legend_title=element_blank())
 )
-plot_market_cap_share.draw()
+plot_market_cap_share.show()
 ```
+
+[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png)](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png "The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
+
+The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. We apply the summary computation to the most current month of our CRSP data on each listing exchange and add a row with the overall summary statistics.
 

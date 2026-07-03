@@ -51,8 +51,8 @@ At a high level, the package groups its functionality into a few families:
 
 For the precise signatures and the latest changes, consult the [package changelog](../chapters/changelog.llms.md) and the function reference on the [package website](https://tidy-finance.github.io/r-tidyfinance/). The following blog posts walk through earlier releases and the design of the data-download interface:
 
-- [Version 0.1.0](../blog/r-tidyfinance-0-1-0/index.llms.md)
-- [Version 0.4.0](../blog/r-tidyfinance-0-4-0-new-data-downloads/index.llms.md)
+- [Version 0.1.0](https://blog.tidy-finance.org/posts/r-tidyfinance-0-1-0/)
+- [Version 0.4.0](https://blog.tidy-finance.org/posts/r-tidyfinance-0-4-0-new-data-downloads/)
 
 ## Python
 
