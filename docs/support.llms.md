@@ -24,10 +24,9 @@ You can read Tidy Finance for free online, but physical copies come with their o
 
 Tidy Finance grows with the attention it receives from the community, so telling others is a great way to help. You could:
 
-- Cite [Tidy Finance with R](index.llms.md) or [Tidy Finance with Python](index.llms.md) in your work
+- Cite [Tidy Finance with R](chapters/index.llms.md) or [Tidy Finance with Python](chapters/index.llms.md) in your work
 - Use Tidy Finance as a teaching resource and let us know
 - Connect with us and share posts about Tidy Finance on social media
-- Grab some [Tidy Finance Swag](https://www.etsy.com/shop/tidyswag/?etsrc=sdt&utm_source=tidy-finance.org)
 
 ## Buy us a coffee
 
