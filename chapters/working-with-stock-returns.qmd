@@ -37,6 +37,8 @@ You typically have to install a package once before you can load it into your ac
 library(tidyverse)
 library(tidyfinance)
 library(scales)
+
+theme_set(theme_minimal())
 ```
 
 ### Python
@@ -49,17 +51,13 @@ You typically have to install a package once before you can load it into your ac
 #| label: working-with-stock-returns-packages-py
 import polars as pl
 import tidyfinance as tf
+
+tf.set_backend("polars")
 ```
 
-Note that `import polars as pl` implies that we can call all polars functions later with a simple `pl.function()`. Instead, utilizing `from polars import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `polars` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pl` abbreviation is a very convenient way to prevent this.\index{polars}
+Note that `import polars as pl` implies that we can call all polars functions later with a simple `pl.function()`. Instead, utilizing `from polars import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `polars` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pl` abbreviation is a very convenient way to prevent this.\index{polars} With `tf.set_backend("polars")`, all `tidyfinance` download functions return `polars` data frames directly.\index{tidyfinance}
 
 :::
-
-```{python}
-#| label: working-with-stock-returns-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## Downloading Data
 
@@ -85,17 +83,15 @@ prices
 
 ### Python
 
-Because `tf.download_data()` returns a `pandas` data frame, we wrap the call in `pl.from_pandas()` to obtain a `polars` data frame that we work with for the rest of the chapter. Since `pandas` represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
+Because we set the `polars` backend above, `tf.download_data()` returns a `polars` data frame that we work with for the rest of the chapter. Since the download represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
 
 ```{python}
 #| label: working-with-stock-returns-download-apple-prices-py
-prices = pl.from_pandas(
-    tf.download_data(
-        domain="stock_prices",
-        symbols="AAPL",
-        start_date="2000-01-01",
-        end_date="2024-12-31"
-    )
+prices = tf.download_data(
+    domain="stock_prices",
+    symbols="AAPL",
+    start_date="2000-01-01",
+    end_date="2024-12-31"
 ).with_columns(pl.col("date").cast(pl.Date))
 prices.head()
 ```
@@ -132,6 +128,8 @@ We use the `plotnine` package [@plotnine] to visualize the time series. Note tha
 ```{python}
 #| label: working-with-stock-returns-import-plotnine
 from plotnine import *
+
+theme_set(theme_minimal())
 ```
 
 Creating figures becomes very intuitive with the Grammar of Graphics, as the following code chunk demonstrates.
@@ -367,11 +365,9 @@ symbols
 
 ```{python}
 #| label: working-with-stock-returns-download-dow-constituents-py
-symbols = pl.from_pandas(
-    tf.download_data(
-        domain="constituents",
-        index="Dow Jones Industrial Average"
-    )
+symbols = tf.download_data(
+    domain="constituents",
+    index="Dow Jones Industrial Average"
 )
 ```
 
@@ -397,13 +393,11 @@ prices_daily <- download_data(
 
 ```{python}
 #| label: working-with-stock-returns-download-dow-prices-py
-prices_daily = pl.from_pandas(
-    tf.download_data(
-        domain="stock_prices",
-        symbols=symbols["symbol"].to_list(),
-        start_date="2000-01-01",
-        end_date="2024-12-31"
-    )
+prices_daily = tf.download_data(
+    domain="stock_prices",
+    symbols=symbols["symbol"].to_list(),
+    start_date="2000-01-01",
+    end_date="2024-12-31"
 ).with_columns(pl.col("date").cast(pl.Date))
 ```
 

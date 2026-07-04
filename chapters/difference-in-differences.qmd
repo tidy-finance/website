@@ -33,6 +33,8 @@ library(tidyverse)
 library(nanoparquet)
 library(fixest)
 library(broom)
+
+theme_set(theme_minimal())
 ```
 
 ### Python
@@ -45,17 +47,13 @@ import pyfixest as pf
 
 from plotnine import *
 from scipy.stats import norm
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce the `scipy.stats` module from `scipy` [@scipy] for simple retrieval of quantiles of the standard normal distribution.
 
 :::
-
-```{python}
-#| label: difference-in-differences-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## Data Preparation
 
@@ -466,7 +464,7 @@ model_without_fe_coefs = (pl.DataFrame({
     .filter(pl.col("term").str.contains("date"))
     .with_columns(
         treatment=pl.col("term").str.contains("True", literal=True),
-        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})"),
         ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
@@ -611,7 +609,16 @@ variables = (bonds_panel_alt
     .select(["diff_to_treatment", "date"])
     .unique()
     .sort("date")
-    .with_columns(variable_name=pl.lit(None, dtype=pl.Utf8))
+    .with_columns(
+        variable_name=pl.when(pl.col("diff_to_treatment") == 0)
+        .then(pl.lit(None, dtype=pl.Utf8))
+        .otherwise(
+            pl.when(pl.col("diff_to_treatment") < 0)
+            .then(pl.lit("lag"))
+            .otherwise(pl.lit("lead"))
+            + pl.col("diff_to_treatment").abs().cast(pl.Utf8)
+        )
+    )
 )
 ```
 
@@ -620,24 +627,20 @@ In the next code chunk, we assemble the model formula and regress the monthly yi
 ```{python}
 #| label: difference-in-differences-fe-time-regression-py
 bonds_panel_alt = bonds_panel_alt.to_pandas()
-variables = variables.to_pandas()
+variables_pd = variables.to_pandas()
 
 formula = "avg_yield ~ 1 + "
 
-for j in range(variables.shape[0]):
-    if variables["diff_to_treatment"].iloc[j] != 0:
+for j in range(variables_pd.shape[0]):
+    if variables_pd["diff_to_treatment"].iloc[j] != 0:
         old_names=list(bonds_panel_alt.columns)
 
         bonds_panel_alt["new_var"] = (
           bonds_panel_alt["diff_to_treatment"] ==
-            variables["diff_to_treatment"].iloc[j]
+            variables_pd["diff_to_treatment"].iloc[j]
         ) & bonds_panel_alt["polluter"]
 
-        diff_to_treatment_value=variables["diff_to_treatment"].iloc[j]
-        direction="lag" if diff_to_treatment_value < 0 else "lead"
-        abs_diff_to_treatment=int(abs(diff_to_treatment_value))
-        new_var_name=f"{direction}{abs_diff_to_treatment}"
-        variables.at[j, "variable_name"]=new_var_name
+        new_var_name=variables_pd["variable_name"].iloc[j]
         bonds_panel_alt[new_var_name]=bonds_panel_alt["new_var"]
         formula += (f" + {new_var_name}" if j > 0 else new_var_name)
 
@@ -674,7 +677,7 @@ model_with_fe_time_coefs = (pl.DataFrame({
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
     .join(
-        pl.from_pandas(variables),
+        variables,
         how="left", left_on="term", right_on="variable_name"
     )
 )

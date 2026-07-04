@@ -48,6 +48,8 @@ library(tidyfinance)
 library(scales)
 library(ggrepel)
 library(fmpapi)
+
+theme_set(theme_minimal())
 ```
 
 ### Python
@@ -63,17 +65,12 @@ from mizani.formatters import percent_format
 from adjustText import adjust_text
 
 load_dotenv()
+theme_set(theme_minimal())
 ```
 
-Because `fmp_get()` returns a `pandas` data frame when called with `to_pandas=True`, which we then convert to `polars` via `pl.from_pandas()`, we recommend installing `fmpapi` with the corresponding dependencies: `pip install fmpapi[pandas]`.
+By default, `fmp_get()` returns a `polars` data frame, so we can work with the results directly.
 
 :::
-
-```{python}
-#| label: financial-statement-analysis-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## Balance Sheet Statements
 
@@ -134,13 +131,10 @@ fmp_get(
 
 ```{python}
 #| label: financial-statement-analysis-msft-balance-sheet
-pl.from_pandas(
-  fmp_get(
-    resource="balance-sheet-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="balance-sheet-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -186,13 +180,10 @@ fmp_get(
 
 ```{python}
 #| label: financial-statement-analysis-msft-income-statement
-pl.from_pandas(
-  fmp_get(
-    resource="income-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="income-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -234,13 +225,10 @@ fmp_get(
 
 ```{python}
 #| label: financial-statement-analysis-msft-cash-flow
-pl.from_pandas(
-  fmp_get(
-    resource="cash-flow-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="cash-flow-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -318,21 +306,21 @@ sample = [
 params = {"period": "annual", "limit": 5}
 
 balance_sheet_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="balance-sheet-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="balance-sheet-statement", symbol=x, params=params
+    ) for x in sample]
 )
 
 income_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="income-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="income-statement", symbol=x, params=params
+    ) for x in sample]
 )
 
 cash_flow_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="cash-flow-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="cash-flow-statement", symbol=x, params=params
+    ) for x in sample]
 )
 ```
 
@@ -576,17 +564,13 @@ The evolution of debt-to-asset ratios among these major technology companies rev
 #| label: fig-411
 #| fig-cap: "Debt-to-asset ratios are based on financial statements provided through the FMP API."
 #| fig-alt: "Title: Debt-to-asset ratios of selected stocks in 2023. The figure shows a bar chart with debt-to-asset ratios on the horizontal and corresponding symbols on the vertical axis."
-selected_colors <- c("#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey")
-
 balance_sheet_statements |>
   filter(fiscal_year == 2023) |>
   ggplot(
     aes(x = debt_to_asset, y = fct_reorder(symbol, debt_to_asset), fill = label)
   ) +
   geom_col() +
-  scale_x_continuous(labels = percent) +
-  scale_fill_manual(values = selected_colors) +
-  labs(
+  scale_x_continuous(labels = percent) +  labs(
     x = NULL,
     y = NULL,
     color = NULL,
@@ -601,8 +585,6 @@ balance_sheet_statements |>
 #| label: fsa-fig-411-py
 #| fig-cap: "Debt-to-asset ratios are based on financial statements provided through the FMP API."
 #| fig-alt: "Title: Debt-to-asset ratios of selected stocks in 2023. The figure shows a bar chart with debt-to-asset ratios on the horizontal and corresponding symbols on the vertical axis."
-selected_colors = ["#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey"]
-
 debt_to_asset_comparison = (balance_sheet_statements
   .filter(pl.col("fiscal_year") == 2023)
 )
@@ -622,9 +604,7 @@ debt_to_asset_comparison_figure = (
   )
   + geom_col()
   + coord_flip()
-  + scale_y_continuous(labels=percent_format())
-  + scale_fill_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="", y="", fill="",
       title="Debt-to-asset ratios of selected stocks in 2023"
     )
@@ -656,9 +636,7 @@ income_statements |>
   geom_point(size = 2) +
   geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
   scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  scale_y_continuous(labels = percent) +  labs(
     x = "Debt-to-Asset",
     y = "Interest Coverage",
     title = "Debt-to-asset ratios and interest coverages for selected stocks"
@@ -686,9 +664,7 @@ interest_coverage_figure = (
   + geom_point(size=2)
   + geom_label(aes(label="label"), adjust_text={"arrowprops": {"arrowstyle": "-"}})
   + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="Debt-to-Asset", y="Interest Coverage",
       title="Debt-to-asset ratios and interest coverages for selected stocks"
     )
@@ -929,9 +905,7 @@ combined_statements |>
   geom_point(size = 2) +
   geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
   scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  scale_y_continuous(labels = percent) +  labs(
     x = "Gross margin",
     y = "Profit margin",
     title = "Gross and profit margins for selected stocks in 2023"
@@ -960,9 +934,7 @@ profit_margins_figure = (
       adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
   + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="Gross margin", y="Profit margin",
       title="Gross and profit margins for selected stocks in 2023"
     )
@@ -1022,9 +994,7 @@ financial_ratios |>
   summarize(rank = mean(rank), .groups = "drop") |>
   filter(symbol %in% selected_symbols) |>
   ggplot(aes(x = rank, y = type, color = symbol)) +
-  geom_point(shape = 17, size = 4) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  geom_point(shape = 17, size = 4) +  labs(
     x = "Average rank",
     y = NULL,
     color = NULL,
@@ -1076,9 +1046,7 @@ final_ranks_figure = (
     final_ranks,
     aes(x="rank", y="type", color="symbol")
   )
-  + geom_point(shape="^", size=4)
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + geom_point(shape="^", size=4)  + labs(
       x="Average rank", y="", color="",
       title="Average rank among selected stocks"
   )
@@ -1144,9 +1112,9 @@ combined_statements_ff <- combined_statements |>
 ```{python}
 #| label: financial-statement-analysis-fama-french-factors-py
 market_cap = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="historical-market-capitalization", symbol=x, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="historical-market-capitalization", symbol=x
+    ) for x in sample]
 )
 
 min_date = market_cap["date"].min()
@@ -1201,9 +1169,7 @@ combined_statements_ff |>
   ungroup() |>
   filter(symbol %in% selected_symbols) |>
   ggplot(aes(x = rank, y = name, color = symbol)) +
-  geom_point(shape = 17, size = 4) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  geom_point(shape = 17, size = 4) +  labs(
     x = "Rank",
     y = NULL,
     color = NULL,
@@ -1238,9 +1204,7 @@ factors_ranks_figure = (
     factors_ranks,
     aes(x="rank", y="name", color="symbol")
   )
-  + geom_point(shape="^", size=4)
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + geom_point(shape="^", size=4)  + labs(
       x="Rank", y="", color="",
       title="Rank in Fama-French variables for selected stocks"
   )

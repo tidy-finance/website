@@ -83,6 +83,8 @@ library(scales)
 library(furrr)
 library(glmnet)
 library(timetk)
+
+theme_set(theme_minimal())
 ```
 
 ### Python
@@ -105,15 +107,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNet, Lasso, Ridge
+
+theme_set(theme_minimal())
 ```
 
 :::
-
-```{python}
-#| label: factor-selection-via-machine-learning-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 In this analysis, we use four different data sources that we load from our Parquet files introduced in [Accessing and Managing Financial Data](accessing-and-managing-financial-data.qmd) and [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications.
 
@@ -935,7 +933,14 @@ select_variables <- function(input) {
 
   return(estimated_coefficients)
 }
+```
 
+With the `select_variables()` function in place, we apply it to each industry. We nest the data by industry and map the function across the resulting list with `future_map()`, which uses `furrr` to distribute the industries across workers. The option `seed = TRUE` makes the cross-validation process reproducible.\index{Parallelization}
+
+```{r}
+#| label: factor-selection-via-machine-learning-run-select-variables
+#| message: false
+#| warning: false
 # Parallelization
 plan(sequential)
 
@@ -948,8 +953,7 @@ selected_factors <- data |>
   ))
 ```
 
-What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible.
-Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in @fig-1405.\index{Graph!Heat map}
+What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten. Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in @fig-1405.\index{Graph!Heat map}
 
 ### Python
 
