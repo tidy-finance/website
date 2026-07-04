@@ -10,21 +10,13 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(scales)
 library(lmtest)
 library(broom)
 library(sandwich)
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce `lmtest` ([Zeileis and Hothorn 2002](#ref-lmtest)) for inference for estimated coefficients, `broom` package ([Robinson et al. 2022](#ref-broom)) to tidy the estimation output of many estimated linear models, and `sandwich` ([Zeileis 2006](#ref-sandwich)) for different covariance matrix estimators
@@ -37,6 +29,8 @@ import pyfixest as pf
 
 from plotnine import *
 from mizani.formatters import percent_format
+
+theme_set(theme_minimal())
 ```
 
 ## Data Preparation
@@ -177,18 +171,18 @@ We compute the average return and the corresponding standard error to test wheth
 
 ## R
 
-While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by Newey and West ([1994](#ref-Newey1994)) and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`.
+Researchers often default to a pre-specified lag length of six months. A data-driven alternative advocated by Newey and West ([1994](#ref-Newey1994)) is available in the `sandwich` package via `NeweyWest()`, but we use the common six-lag setting here to keep the R and Python results comparable. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function, passing the arguments `lag = 6, prewhite = FALSE` on to `NeweyWest()`.
 
 ``` r
 model_fit <- lm(long_short ~ 1, data = beta_longshort)
-coeftest(model_fit, vcov = NeweyWest)
+coeftest(model_fit, vcov = NeweyWest, lag = 6, prewhite = FALSE)
 ```
 
 
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept) 0.000395   0.001258    0.31     0.75
+    (Intercept) 0.000395   0.001250    0.32     0.75
 
 ## Python
 
@@ -206,7 +200,8 @@ model_fit.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: long_short, Fixed effects: 0
+    Dep. var.: long_short
+    sample: None = all
     Inference:  NW
     Observations:  731
 
@@ -543,14 +538,17 @@ Again, the resulting long-short strategy does not exhibit statistically signific
 ## R
 
 ``` r
-coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
+coeftest(
+  lm(long_short ~ 1, data = beta_longshort),
+  vcov = NeweyWest, lag = 6, prewhite = FALSE
+)
 ```
 
 
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept)  0.00251    0.00320    0.78     0.43
+    (Intercept)  0.00251    0.00313     0.8     0.42
 
 ## Python
 
@@ -558,7 +556,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 model_fit = pf.feols(
     "long_short ~ 1",
     data=beta_longshort,
-    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
 model_fit.summary()
 ```
@@ -566,13 +564,14 @@ model_fit.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: long_short, Fixed effects: 0
+    Dep. var.: long_short
+    sample: None = all
     Inference:  NW
     Observations:  731
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.003 |        0.003 |     0.808 |      0.419 | -0.004 |   0.009 |
+    | Intercept     |      0.003 |        0.003 |     0.798 |      0.425 | -0.004 |   0.009 |
     ---
     RMSE: 0.08 R2: 0.0 
 
@@ -583,7 +582,7 @@ However, controlling for the effect of beta, the long-short portfolio yields a s
 ``` r
 coeftest(
   lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
-  vcov = NeweyWest
+  vcov = NeweyWest, lag = 6, prewhite = FALSE
 )
 ```
 
@@ -591,8 +590,8 @@ coeftest(
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)    
-    (Intercept) -0.00424    0.00249    -1.7    0.089 .  
-    mkt_excess   1.16353    0.08697    13.4   <2e-16 ***
+    (Intercept) -0.00424    0.00244   -1.74    0.083 .  
+    mkt_excess   1.16353    0.08323   13.98   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -602,7 +601,7 @@ coeftest(
 model_fit = pf.feols(
     "long_short ~ 1 + mkt_excess",
     data=beta_longshort,
-    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
 model_fit.summary()
 ```
@@ -610,14 +609,15 @@ model_fit.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: long_short, Fixed effects: 0
+    Dep. var.: long_short
+    sample: None = all
     Inference:  NW
     Observations:  731
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |     -0.004 |        0.002 |    -1.868 |      0.062 | -0.009 |   0.000 |
-    | mkt_excess    |      1.163 |        0.070 |    16.623 |      0.000 |  1.026 |   1.301 |
+    | Intercept     |     -0.004 |        0.002 |    -1.739 |      0.082 | -0.009 |   0.001 |
+    | mkt_excess    |      1.163 |        0.083 |    13.960 |      0.000 |  1.000 |   1.327 |
     ---
     RMSE: 0.061 R2: 0.427 
 
