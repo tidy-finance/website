@@ -86,7 +86,7 @@ $${#eq-decision-tree-split}
 
 As in [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd) in the context of penalized regressions, the first relevant question is: what are the hyperparameter decisions? Instead of a regularization parameter, trees are fully determined by the number of branches used to generate a partition (sometimes one specifies the minimum number of observations in each final branch instead of the maximum number of branches).
 
-Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build $B$ decision trees $T_1, \ldots, T_B$ using the training sample. For that purpose, we randomly select features to be included in the building of each tree. For each observation in the test set, we then form a prediction $\hat{y} = \frac{1}{B}\sum\limits_{i=1}^B\hat{y}_{T_i}$.
+Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build $B$ decision trees $T_1, \ldots, T_B$ using the training sample. In addition, only a random subset of the features is considered as split candidates at each node of each tree. For each observation in the test set, we then form a prediction $\hat{y} = \frac{1}{B}\sum\limits_{i=1}^B\hat{y}_{T_i}$.
 
 ## Neural Networks
 
@@ -286,7 +286,7 @@ preprocessor = ColumnTransformer(
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. The specification below defines a single layer feed-forward neural network with ten hidden units.
+Next, we show how to fit a neural network to the data. The specification below defines a single layer feed-forward neural network with ten hidden units. Note that we fix the hyperparameters of all models in this chapter at sensible values to focus on the implementation workflow. In a real application, they should be tuned via cross-validation, as we illustrate in [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd).
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -352,7 +352,7 @@ nnet_fit = nnet_pipeline.fit(
 
 One word of caution regarding the training of neural networks: For illustrative purposes, we sequentially update the parameters by reiterating through the training data many times. Typically, however, early stopping rules are advised that aim to interrupt the process of updating parameters as soon as the predictive performance on a validation set seems to deteriorate. A detailed discussion of these implementation details would go beyond the scope of this book.
 
-Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where a node must contain at least 2,000 observations to be split further.
+Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where a node must contain at least 100 observations to be split further and three of the five predictors are randomly selected as split candidates at each node.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -362,8 +362,9 @@ The random forests are trained using the package `ranger`, which is required to 
 ```{r}
 #| label: option-pricing-via-machine-learning-rf-model
 rf_model <- rand_forest(
+  mtry = 3,
   trees = 50,
-  min_n = 2000
+  min_n = 100
 ) |>
   set_engine("ranger") |>
   set_mode("regression")
@@ -381,12 +382,15 @@ rf_fit <- workflow() |>
 
 ### Python
 
-The random forests are trained using the function `RandomForestRegressor()`, where the argument `min_samples_split` corresponds to `min_n` in the R implementation.
+The random forests are trained using the function `RandomForestRegressor()`, where the arguments `min_samples_split` and `max_features` correspond to `min_n` and `mtry` in the R implementation.
 
 ```{python}
 #| label: option-pricing-via-machine-learning-rf-model-py
 rf_model = RandomForestRegressor(
-    n_estimators=50, min_samples_split=2000, random_state=random_state
+    n_estimators=50,
+    min_samples_split=100,
+    max_features=3,
+    random_state=random_state,
 )
 ```
 
@@ -600,7 +604,7 @@ In the lines above, we use each of the fitted models to generate predictions for
 ```{r}
 #| label: fig-431
 #| fig-cap: "Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training."
-#| fig-alt: "Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money."
+#| fig-alt: "Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness."
 predictive_performance |>
   ggplot(aes(
     x = moneyness,
@@ -624,7 +628,7 @@ predictive_performance |>
 ```{python}
 #| label: option-pricing-via-machine-learning-fig-431-py
 #| fig-cap: "Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training."
-#| fig-alt: "Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money."
+#| fig-alt: "Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness."
 #| fig-pos: "htb"
 predictive_performance_figure = (
     ggplot(
@@ -677,3 +681,4 @@ The results can be summarized as follows.
 1. Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
 1. Use `brulee` (R) or `scikit-learn` (Python) to initialize a neural network that takes the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. How many parameters does the neural network you aim to fit have?
 1. Fit the network from the previous exercise. Pay special attention to the loss function used for training. Illustrate the difference in predictive accuracy for different architecture choices, e.g., regarding the depth of the network or the number of hidden units.
+1. The test data in this chapter is sampled from the same parameter grid as the training data, so the models only have to *interpolate*. Design an experiment that evaluates *extrapolation* instead: For instance, train the models only on options with volatilities $\sigma \leq 0.5$ and evaluate the pricing errors for options with $\sigma > 0.5$. Which of the methods deteriorates most, and why are regression trees particularly ill-suited for extrapolation?
