@@ -29,6 +29,8 @@ library(tidyfinance)
 library(scales)
 library(ggrepel)
 library(fmpapi)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -47,7 +49,11 @@ load_dotenv()
 
     True
 
-Because `fmp_get()` returns a `pandas` data frame when called with `to_pandas=True`, which we then convert to `polars` via `pl.from_pandas()`, we recommend installing `fmpapi` with the corresponding dependencies: `pip install fmpapi[pandas]`.
+``` python
+theme_set(theme_minimal())
+```
+
+By default, `fmp_get()` returns a `polars` data frame, so we can work with the results directly.
 
 ## Balance Sheet Statements
 
@@ -127,13 +133,10 @@ fmp_get(
 ## Python
 
 ``` python
-pl.from_pandas(
-  fmp_get(
-    resource="balance-sheet-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="balance-sheet-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -141,12 +144,12 @@ shape: (5, 61)
 
 | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | cash_and_cash_equivalents | short_term_investments | cash_and_short_term_investments | net_receivables | accounts_receivables | other_receivables | inventory | prepaids | other_current_assets | total_current_assets | property_plant_equipment_net | goodwill | intangible_assets | goodwill_and_intangible_assets | long_term_investments | tax_assets | other_non_current_assets | total_non_current_assets | other_assets | total_assets | total_payables | account_payables | other_payables | accrued_expenses | short_term_debt | capital_lease_obligations_current | tax_payables | deferred_revenue | other_current_liabilities | total_current_liabilities | long_term_debt | capital_lease_obligations_non_current | deferred_revenue_non_current | deferred_tax_liabilities_non_current | other_non_current_liabilities | total_non_current_liabilities | other_liabilities | capital_lease_obligations | total_liabilities | treasury_stock | preferred_stock | common_stock | retained_earnings | additional_paid_in_capital | accumulated_other_comprehensive_income_loss | other_total_stockholders_equity | total_stockholders_equity | total_equity | minority_interest | total_liabilities_and_total_equity | total_investments | total_debt | net_debt |
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
-| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 30242000000 | 64313000000 | 94555000000 | 69905000000 | 69905000000 | 0 | 938000000 | 0 | 25733000000 | 191131000000 | 229789000000 | 119509000000 | 22604000000 | 142113000000 | 15133000000 | 0 | 40837000000 | 427872000000 | 0 | 619003000000 | 34935000000 | 27724000000 | 7211000000 | 0 | 2999000000 | 8596000000 | 0 | 64555000000 | 30133000000 | 141218000000 | 40152000000 | 60437000000 | 2710000000 | 2835000000 | 28172000000 | 134306000000 | 0 | 69033000000 | 275524000000 | 0 | 0 | 109095000000 | 237731000000 | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 112184000000 | 81942000000 |
-| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 18315000000 | 57216000000 | 75531000000 | 56924000000 | 56924000000 | 0 | 1246000000 | 0 | 26033000000 | 159734000000 | 154552000000 | 119220000000 | 27597000000 | 146817000000 | 14600000000 | 0 | 36460000000 | 352429000000 | 0 | 512163000000 | 27013000000 | 21996000000 | 5017000000 | 0 | 8942000000 | 5929000000 | 5017000000 | 57582000000 | 25820000000 | 125286000000 | 42688000000 | 40293000000 | 2602000000 | 2618000000 | 30199000000 | 118400000000 | 0 | 46222000000 | 243686000000 | 0 | 0 | 100923000000 | 173144000000 | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 97852000000 | 79537000000 |
-| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 34704000000 | 76552000000 | 111256000000 | 48688000000 | 48688000000 | 0 | 2500000000 | 0 | 21813000000 | 184257000000 | 109987000000 | 67886000000 | 9366000000 | 77252000000 | 9879000000 | 0 | 30601000000 | 227719000000 | 0 | 411976000000 | 22247000000 | 18095000000 | 4152000000 | 0 | 5247000000 | 3606000000 | 4152000000 | 50901000000 | 22148000000 | 104149000000 | 41990000000 | 28598000000 | 2912000000 | 433000000 | 27671000000 | 101604000000 | 0 | 32204000000 | 205753000000 | 0 | 0 | 93718000000 | 118848000000 | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 79441000000 | 44737000000 |
-| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 13931000000 | 90818000000 | 104749000000 | 44261000000 | 44261000000 | 0 | 3742000000 | 0 | 16932000000 | 169684000000 | 87546000000 | 67524000000 | 11298000000 | 78822000000 | 6891000000 | 0 | 21897000000 | 195156000000 | 0 | 364840000000 | 23067000000 | 19000000000 | 4067000000 | 0 | 2749000000 | 3288000000 | 4067000000 | 45538000000 | 20440000000 | 95082000000 | 47032000000 | 25331000000 | 2870000000 | 230000000 | 27753000000 | 103216000000 | 0 | 28619000000 | 198298000000 | 0 | 0 | 86939000000 | 84281000000 | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 78400000000 | 64469000000 |
-| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 14224000000 | 116032000000 | 130256000000 | 38043000000 | 38043000000 | 0 | 2636000000 | 0 | 13471000000 | 184406000000 | 70803000000 | 49711000000 | 7800000000 | 57511000000 | 5984000000 | 0 | 15075000000 | 149373000000 | 0 | 333779000000 | 17337000000 | 15163000000 | 2174000000 | 0 | 8072000000 | 2753000000 | 2174000000 | 41525000000 | 18970000000 | 88657000000 | 50074000000 | 21379000000 | 2616000000 | 198000000 | 28867000000 | 103134000000 | 0 | 24132000000 | 191791000000 | 0 | 0 | 83111000000 | 57055000000 | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 82278000000 | 68054000000 |
+| date | str | str | str | date | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
+| 2025-06-30 | "MSFT" | "USD" | "0000789019" | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | "FY" | 30242000000 | 64313000000 | 94555000000 | 69905000000 | 69905000000 | 0 | 938000000 | 0 | 25733000000 | 191131000000 | 229789000000 | 119509000000 | 22604000000 | 142113000000 | 15133000000 | 0 | 40837000000 | 427872000000 | 0 | 619003000000 | 34935000000 | 27724000000 | 7211000000 | 0 | 2999000000 | 8596000000 | 0 | 64555000000 | 30133000000 | 141218000000 | 40152000000 | 60437000000 | 2710000000 | 2835000000 | 28172000000 | 134306000000 | 0 | 69033000000 | 275524000000 | 0 | 0 | 109095000000 | 237731000000 | 0 | -3347000000 | 0 | 343479000000 | 343479000000 | 0 | 619003000000 | 79446000000 | 112184000000 | 81942000000 |
+| 2024-06-30 | "MSFT" | "USD" | "0000789019" | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | "FY" | 18315000000 | 57216000000 | 75531000000 | 56924000000 | 56924000000 | 0 | 1246000000 | 0 | 26033000000 | 159734000000 | 154552000000 | 119220000000 | 27597000000 | 146817000000 | 14600000000 | 0 | 36460000000 | 352429000000 | 0 | 512163000000 | 27013000000 | 21996000000 | 5017000000 | 0 | 8942000000 | 5929000000 | 5017000000 | 57582000000 | 25820000000 | 125286000000 | 42688000000 | 40293000000 | 2602000000 | 2618000000 | 30199000000 | 118400000000 | 0 | 46222000000 | 243686000000 | 0 | 0 | 100923000000 | 173144000000 | 0 | -5590000000 | 0 | 268477000000 | 268477000000 | 0 | 512163000000 | 71816000000 | 97852000000 | 79537000000 |
+| 2023-06-30 | "MSFT" | "USD" | "0000789019" | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | "FY" | 34704000000 | 76552000000 | 111256000000 | 48688000000 | 48688000000 | 0 | 2500000000 | 0 | 21813000000 | 184257000000 | 109987000000 | 67886000000 | 9366000000 | 77252000000 | 9879000000 | 0 | 30601000000 | 227719000000 | 0 | 411976000000 | 22247000000 | 18095000000 | 4152000000 | 0 | 5247000000 | 3606000000 | 4152000000 | 50901000000 | 22148000000 | 104149000000 | 41990000000 | 28598000000 | 2912000000 | 433000000 | 27671000000 | 101604000000 | 0 | 32204000000 | 205753000000 | 0 | 0 | 93718000000 | 118848000000 | 0 | -6343000000 | 0 | 206223000000 | 206223000000 | 0 | 411976000000 | 86431000000 | 79441000000 | 44737000000 |
+| 2022-06-30 | "MSFT" | "USD" | "0000789019" | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | "FY" | 13931000000 | 90818000000 | 104749000000 | 44261000000 | 44261000000 | 0 | 3742000000 | 0 | 16932000000 | 169684000000 | 87546000000 | 67524000000 | 11298000000 | 78822000000 | 6891000000 | 0 | 21897000000 | 195156000000 | 0 | 364840000000 | 23067000000 | 19000000000 | 4067000000 | 0 | 2749000000 | 3288000000 | 4067000000 | 45538000000 | 20440000000 | 95082000000 | 47032000000 | 25331000000 | 2870000000 | 230000000 | 27753000000 | 103216000000 | 0 | 28619000000 | 198298000000 | 0 | 0 | 86939000000 | 84281000000 | 0 | -4678000000 | 0 | 166542000000 | 166542000000 | 0 | 364840000000 | 97709000000 | 78400000000 | 64469000000 |
+| 2021-06-30 | "MSFT" | "USD" | "0000789019" | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | "FY" | 14224000000 | 116032000000 | 130256000000 | 38043000000 | 38043000000 | 0 | 2636000000 | 0 | 13471000000 | 184406000000 | 70803000000 | 49711000000 | 7800000000 | 57511000000 | 5984000000 | 0 | 15075000000 | 149373000000 | 0 | 333779000000 | 17337000000 | 15163000000 | 2174000000 | 0 | 8072000000 | 2753000000 | 2174000000 | 41525000000 | 18970000000 | 88657000000 | 50074000000 | 21379000000 | 2616000000 | 198000000 | 28867000000 | 103134000000 | 0 | 24132000000 | 191791000000 | 0 | 0 | 83111000000 | 57055000000 | 0 | 1822000000 | 0 | 141988000000 | 141988000000 | 0 | 333779000000 | 122016000000 | 82278000000 | 68054000000 |
 
 The function returns a data frame containing detailed balance sheet information, with each row representing a different reporting period. This structured format makes it easy to analyze trends over time and calculate financial ratios. We can see how the data aligns with the balance sheet components we discussed earlier, from current assets like cash and receivables to long-term assets and various forms of liabilities and equity.
 
@@ -205,13 +208,10 @@ fmp_get(
 ## Python
 
 ``` python
-pl.from_pandas(
-  fmp_get(
-    resource="income-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="income-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -219,12 +219,12 @@ shape: (5, 39)
 
 | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | revenue | cost_of_revenue | gross_profit | research_and_development_expenses | general_and_administrative_expenses | selling_and_marketing_expenses | selling_general_and_administrative_expenses | other_expenses | operating_expenses | cost_and_expenses | net_interest_income | interest_income | interest_expense | depreciation_and_amortization | ebitda | ebit | non_operating_income_excluding_interest | operating_income | total_other_income_expenses_net | income_before_tax | income_tax_expense | net_income_from_continuing_operations | net_income_from_discontinued_operations | other_adjustments_to_net_income | net_income | net_income_deductions | bottom_line_net_income | eps | eps_diluted | weighted_average_shs_out | weighted_average_shs_out_dil |
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | f64 | f64 | i64 | i64 |
-| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 281724000000 | 87831000000 | 193893000000 | 32488000000 | 7223000000 | 25654000000 | 32877000000 | 0 | 65365000000 | 153196000000 | 262000000 | 2647000000 | 2385000000 | 34153000000 | 160165000000 | 126012000000 | 2516000000 | 128528000000 | -4901000000 | 123627000000 | 21795000000 | 101832000000 | 0 | 0 | 101832000000 | 0 | 101832000000 | 13.7 | 13.64 | 7433000000 | 7465000000 |
-| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 245122000000 | 74114000000 | 171008000000 | 29510000000 | 7609000000 | 24456000000 | 32065000000 | 0 | 61575000000 | 135689000000 | 222000000 | 3157000000 | 2935000000 | 22287000000 | 133009000000 | 110722000000 | -1289000000 | 109433000000 | -1646000000 | 107787000000 | 19651000000 | 88136000000 | 0 | 0 | 88136000000 | 0 | 88136000000 | 11.86 | 11.8 | 7431000000 | 7469000000 |
-| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 211915000000 | 65863000000 | 146052000000 | 27195000000 | 7575000000 | 22759000000 | 30334000000 | 0 | 57529000000 | 123392000000 | 1026000000 | 2994000000 | 1968000000 | 13861000000 | 105140000000 | 91279000000 | -2756000000 | 88523000000 | 788000000 | 89311000000 | 16950000000 | 72361000000 | 0 | 0 | 72361000000 | 0 | 72361000000 | 9.72 | 9.68 | 7446000000 | 7472000000 |
-| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 198270000000 | 62650000000 | 135620000000 | 24512000000 | 5900000000 | 21825000000 | 27725000000 | 0 | 52237000000 | 114887000000 | 31000000 | 2094000000 | 2063000000 | 14460000000 | 100239000000 | 85779000000 | -2396000000 | 83383000000 | 333000000 | 83716000000 | 10978000000 | 72738000000 | 0 | 0 | 72738000000 | 0 | 72738000000 | 9.7 | 9.65 | 7496000000 | 7540000000 |
-| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 168088000000 | 52232000000 | 115856000000 | 20716000000 | 5107000000 | 20117000000 | 25224000000 | 0 | 45940000000 | 98172000000 | -215000000 | 2131000000 | 2346000000 | 11686000000 | 85134000000 | 73448000000 | -3532000000 | 69916000000 | 1186000000 | 71102000000 | 9831000000 | 61271000000 | 0 | 0 | 61271000000 | 0 | 61271000000 | 8.12 | 8.05 | 7547000000 | 7608000000 |
+| date | str | str | str | date | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | f64 | f64 | i64 | i64 |
+| 2025-06-30 | "MSFT" | "USD" | "0000789019" | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | "FY" | 281724000000 | 87831000000 | 193893000000 | 32488000000 | 7223000000 | 25654000000 | 32877000000 | 0 | 65365000000 | 153196000000 | 262000000 | 2647000000 | 2385000000 | 34153000000 | 160165000000 | 126012000000 | 2516000000 | 128528000000 | -4901000000 | 123627000000 | 21795000000 | 101832000000 | 0 | 0 | 101832000000 | 0 | 101832000000 | 13.7 | 13.64 | 7433000000 | 7465000000 |
+| 2024-06-30 | "MSFT" | "USD" | "0000789019" | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | "FY" | 245122000000 | 74114000000 | 171008000000 | 29510000000 | 7609000000 | 24456000000 | 32065000000 | 0 | 61575000000 | 135689000000 | 222000000 | 3157000000 | 2935000000 | 22287000000 | 133009000000 | 110722000000 | -1289000000 | 109433000000 | -1646000000 | 107787000000 | 19651000000 | 88136000000 | 0 | 0 | 88136000000 | 0 | 88136000000 | 11.86 | 11.8 | 7431000000 | 7469000000 |
+| 2023-06-30 | "MSFT" | "USD" | "0000789019" | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | "FY" | 211915000000 | 65863000000 | 146052000000 | 27195000000 | 7575000000 | 22759000000 | 30334000000 | 0 | 57529000000 | 123392000000 | 1026000000 | 2994000000 | 1968000000 | 13861000000 | 105140000000 | 91279000000 | -2756000000 | 88523000000 | 788000000 | 89311000000 | 16950000000 | 72361000000 | 0 | 0 | 72361000000 | 0 | 72361000000 | 9.72 | 9.68 | 7446000000 | 7472000000 |
+| 2022-06-30 | "MSFT" | "USD" | "0000789019" | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | "FY" | 198270000000 | 62650000000 | 135620000000 | 24512000000 | 5900000000 | 21825000000 | 27725000000 | 0 | 52237000000 | 114887000000 | 31000000 | 2094000000 | 2063000000 | 14460000000 | 100239000000 | 85779000000 | -2396000000 | 83383000000 | 333000000 | 83716000000 | 10978000000 | 72738000000 | 0 | 0 | 72738000000 | 0 | 72738000000 | 9.7 | 9.65 | 7496000000 | 7540000000 |
+| 2021-06-30 | "MSFT" | "USD" | "0000789019" | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | "FY" | 168088000000 | 52232000000 | 115856000000 | 20716000000 | 5107000000 | 20117000000 | 25224000000 | 0 | 45940000000 | 98172000000 | -215000000 | 2131000000 | 2346000000 | 11686000000 | 85134000000 | 73448000000 | -3532000000 | 69916000000 | 1186000000 | 71102000000 | 9831000000 | 61271000000 | 0 | 0 | 61271000000 | 0 | 61271000000 | 8.12 | 8.05 | 7547000000 | 7608000000 |
 
 In later sections, we will use income statement items to calculate important profitability ratios and examine how they compare across companies and industries. The income statement’s focus on performance complements the balance sheet’s position snapshot, providing a more complete picture of a company’s core business operations.
 
@@ -279,13 +279,10 @@ fmp_get(
 ## Python
 
 ``` python
-pl.from_pandas(
-  fmp_get(
-    resource="cash-flow-statement",
-    symbol="MSFT",
-    params={"period": "annual", "limit": 5},
-    to_pandas=True
-  )
+fmp_get(
+  resource="cash-flow-statement",
+  symbol="MSFT",
+  params={"period": "annual", "limit": 5}
 )
 ```
 
@@ -293,12 +290,12 @@ shape: (5, 47)
 
 | date | symbol | reported_currency | cik | filing_date | accepted_date | fiscal_year | period | net_income | depreciation_and_amortization | deferred_income_tax | stock_based_compensation | change_in_working_capital | accounts_receivables | inventory | accounts_payables | other_working_capital | other_non_cash_items | net_cash_provided_by_operating_activities | investments_in_property_plant_and_equipment | acquisitions_net | purchases_of_investments | sales_maturities_of_investments | other_investing_activities | net_cash_provided_by_investing_activities | net_debt_issuance | long_term_net_debt_issuance | short_term_net_debt_issuance | net_stock_issuance | net_common_stock_issuance | common_stock_issuance | common_stock_repurchased | net_preferred_stock_issuance | net_dividends_paid | common_dividends_paid | preferred_dividends_paid | other_financing_activities | net_cash_provided_by_financing_activities | effect_of_forex_changes_on_cash | net_change_in_cash | cash_at_end_of_period | cash_at_beginning_of_period | operating_cash_flow | capital_expenditure | free_cash_flow | income_taxes_paid | interest_paid |
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
-| datetime\[ms\] | str | str | str | datetime\[ms\] | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
-| 2025-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2025-07-30 00:00:00 | 2025-07-30 16:11:40 | 2025 | "FY" | 101832000000 | 34153000000 | -7056000000 | 11974000000 | -5350000000 | -10581000000 | 309000000 | 569000000 | 4353000000 | 609000000 | 136162000000 | -64551000000 | -5978000000 | -29775000000 | 25388000000 | 2317000000 | -72599000000 | -8962000000 | -3216000000 | -5746000000 | -16364000000 | -16364000000 | 2056000000 | -18420000000 | 0 | -24082000000 | -24082000000 | 0 | -2291000000 | -51699000000 | 63000000 | 11927000000 | 30242000000 | 18315000000 | 136162000000 | -64551000000 | 71611000000 | 0 | 0 |
-| 2024-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2024-07-30 00:00:00 | 2024-07-30 16:06:22 | 2024 | "FY" | 88136000000 | 22287000000 | -4738000000 | 10734000000 | 1824000000 | -7191000000 | 1284000000 | 3545000000 | 4186000000 | 305000000 | 118548000000 | -44477000000 | -69132000000 | -17732000000 | 35669000000 | -1298000000 | -96970000000 | 575000000 | -4675000000 | 5250000000 | -15252000000 | -15252000000 | 2002000000 | -17254000000 | 0 | -21771000000 | -21771000000 | 0 | -1309000000 | -37757000000 | -210000000 | -16389000000 | 18315000000 | 34704000000 | 118548000000 | -44477000000 | 74071000000 | 0 | 0 |
-| 2023-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2023-07-27 00:00:00 | 2023-07-27 16:01:56 | 2023 | "FY" | 72361000000 | 13861000000 | -6059000000 | 9611000000 | -2388000000 | -4087000000 | 1242000000 | -2721000000 | 3178000000 | 196000000 | 87582000000 | -28107000000 | -1670000000 | -37651000000 | 47864000000 | -3116000000 | -22680000000 | -2750000000 | -2750000000 | 0 | -20379000000 | -20379000000 | 1866000000 | -22245000000 | 0 | -19800000000 | -19800000000 | 0 | -1006000000 | -43935000000 | -194000000 | 20773000000 | 34704000000 | 13931000000 | 87582000000 | -28107000000 | 59475000000 | 0 | 0 |
-| 2022-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2022-07-28 00:00:00 | 2022-07-28 16:06:19 | 2022 | "FY" | 72738000000 | 14460000000 | -5702000000 | 7502000000 | 446000000 | -6834000000 | -1123000000 | 2943000000 | 5460000000 | -409000000 | 89035000000 | -23886000000 | -22038000000 | -26456000000 | 44894000000 | -2825000000 | -30311000000 | -9023000000 | -9023000000 | 0 | -30855000000 | -30855000000 | 1841000000 | -32696000000 | 0 | -18135000000 | -18135000000 | 0 | -863000000 | -58876000000 | -141000000 | -293000000 | 13931000000 | 14224000000 | 89035000000 | -23886000000 | 65149000000 | 0 | 0 |
-| 2021-06-30 00:00:00 | "MSFT" | "USD" | "0000789019" | 2021-07-29 00:00:00 | 2021-07-29 16:21:55 | 2021 | "FY" | 61271000000 | 11686000000 | -150000000 | 6118000000 | -936000000 | -6481000000 | -737000000 | 2798000000 | 3484000000 | -1249000000 | 76740000000 | -20622000000 | -8909000000 | -62924000000 | 65800000000 | -922000000 | -27577000000 | -3750000000 | -3750000000 | 0 | -25692000000 | -25692000000 | 1693000000 | -27385000000 | 0 | -16521000000 | -16521000000 | 0 | -2523000000 | -48486000000 | -29000000 | 648000000 | 14224000000 | 13576000000 | 76740000000 | -20622000000 | 56118000000 | 0 | 0 |
+| date | str | str | str | date | datetime\[μs\] | i32 | str | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 | i64 |
+| 2025-06-30 | "MSFT" | "USD" | "0000789019" | 2025-07-30 | 2025-07-30 16:11:40 | 2025 | "FY" | 101832000000 | 34153000000 | -7056000000 | 11974000000 | -5350000000 | -10581000000 | 309000000 | 569000000 | 4353000000 | 609000000 | 136162000000 | -64551000000 | -5978000000 | -29775000000 | 25388000000 | 2317000000 | -72599000000 | -8962000000 | -3216000000 | -5746000000 | -16364000000 | -16364000000 | 2056000000 | -18420000000 | 0 | -24082000000 | -24082000000 | 0 | -2291000000 | -51699000000 | 63000000 | 11927000000 | 30242000000 | 18315000000 | 136162000000 | -64551000000 | 71611000000 | 0 | 0 |
+| 2024-06-30 | "MSFT" | "USD" | "0000789019" | 2024-07-30 | 2024-07-30 16:06:22 | 2024 | "FY" | 88136000000 | 22287000000 | -4738000000 | 10734000000 | 1824000000 | -7191000000 | 1284000000 | 3545000000 | 4186000000 | 305000000 | 118548000000 | -44477000000 | -69132000000 | -17732000000 | 35669000000 | -1298000000 | -96970000000 | 575000000 | -4675000000 | 5250000000 | -15252000000 | -15252000000 | 2002000000 | -17254000000 | 0 | -21771000000 | -21771000000 | 0 | -1309000000 | -37757000000 | -210000000 | -16389000000 | 18315000000 | 34704000000 | 118548000000 | -44477000000 | 74071000000 | 0 | 0 |
+| 2023-06-30 | "MSFT" | "USD" | "0000789019" | 2023-07-27 | 2023-07-27 16:01:56 | 2023 | "FY" | 72361000000 | 13861000000 | -6059000000 | 9611000000 | -2388000000 | -4087000000 | 1242000000 | -2721000000 | 3178000000 | 196000000 | 87582000000 | -28107000000 | -1670000000 | -37651000000 | 47864000000 | -3116000000 | -22680000000 | -2750000000 | -2750000000 | 0 | -20379000000 | -20379000000 | 1866000000 | -22245000000 | 0 | -19800000000 | -19800000000 | 0 | -1006000000 | -43935000000 | -194000000 | 20773000000 | 34704000000 | 13931000000 | 87582000000 | -28107000000 | 59475000000 | 0 | 0 |
+| 2022-06-30 | "MSFT" | "USD" | "0000789019" | 2022-07-28 | 2022-07-28 16:06:19 | 2022 | "FY" | 72738000000 | 14460000000 | -5702000000 | 7502000000 | 446000000 | -6834000000 | -1123000000 | 2943000000 | 5460000000 | -409000000 | 89035000000 | -23886000000 | -22038000000 | -26456000000 | 44894000000 | -2825000000 | -30311000000 | -9023000000 | -9023000000 | 0 | -30855000000 | -30855000000 | 1841000000 | -32696000000 | 0 | -18135000000 | -18135000000 | 0 | -863000000 | -58876000000 | -141000000 | -293000000 | 13931000000 | 14224000000 | 89035000000 | -23886000000 | 65149000000 | 0 | 0 |
+| 2021-06-30 | "MSFT" | "USD" | "0000789019" | 2021-07-29 | 2021-07-29 16:21:55 | 2021 | "FY" | 61271000000 | 11686000000 | -150000000 | 6118000000 | -936000000 | -6481000000 | -737000000 | 2798000000 | 3484000000 | -1249000000 | 76740000000 | -20622000000 | -8909000000 | -62924000000 | 65800000000 | -922000000 | -27577000000 | -3750000000 | -3750000000 | 0 | -25692000000 | -25692000000 | 1693000000 | -27385000000 | 0 | -16521000000 | -16521000000 | 0 | -2523000000 | -48486000000 | -29000000 | 648000000 | 14224000000 | 13576000000 | 76740000000 | -20622000000 | 56118000000 | 0 | 0 |
 
 In subsequent sections, we will use cash flow data to calculate important cash flow ratios that help assess a company’s liquidity, capital allocation efficiency, and overall financial sustainability. The combination of all three financial statements - balance sheet, income statement, and cash flow statement - provides a comprehensive view of a company’s financial health and performance.
 
@@ -369,21 +366,21 @@ sample = [
 params = {"period": "annual", "limit": 5}
 
 balance_sheet_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="balance-sheet-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="balance-sheet-statement", symbol=x, params=params
+    ) for x in sample]
 )
 
 income_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="income-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="income-statement", symbol=x, params=params
+    ) for x in sample]
 )
 
 cash_flow_statements = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="cash-flow-statement", symbol=x, params=params, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="cash-flow-statement", symbol=x, params=params
+    ) for x in sample]
 )
 ```
 
@@ -609,17 +606,13 @@ The evolution of debt-to-asset ratios among these major technology companies rev
 ## R
 
 ``` r
-selected_colors <- c("#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey")
-
 balance_sheet_statements |>
   filter(fiscal_year == 2023) |>
   ggplot(
     aes(x = debt_to_asset, y = fct_reorder(symbol, debt_to_asset), fill = label)
   ) +
   geom_col() +
-  scale_x_continuous(labels = percent) +
-  scale_fill_manual(values = selected_colors) +
-  labs(
+  scale_x_continuous(labels = percent) +  labs(
     x = NULL,
     y = NULL,
     color = NULL,
@@ -635,8 +628,6 @@ Figure 10: Debt-to-asset ratios are based on financial statements provided thro
 ## Python
 
 ``` python
-selected_colors = ["#F21A00", "#EBCC2A", "#78B7C5", "#3B9AB2", "lightgrey"]
-
 debt_to_asset_comparison = (balance_sheet_statements
   .filter(pl.col("fiscal_year") == 2023)
 )
@@ -656,9 +647,7 @@ debt_to_asset_comparison_figure = (
   )
   + geom_col()
   + coord_flip()
-  + scale_y_continuous(labels=percent_format())
-  + scale_fill_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="", y="", fill="",
       title="Debt-to-asset ratios of selected stocks in 2023"
     )
@@ -687,9 +676,7 @@ income_statements |>
   geom_point(size = 2) +
   geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
   scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  scale_y_continuous(labels = percent) +  labs(
     x = "Debt-to-Asset",
     y = "Interest Coverage",
     title = "Debt-to-asset ratios and interest coverages for selected stocks"
@@ -718,9 +705,7 @@ interest_coverage_figure = (
   + geom_point(size=2)
   + geom_label(aes(label="label"), adjust_text={"arrowprops": {"arrowstyle": "-"}})
   + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="Debt-to-Asset", y="Interest Coverage",
       title="Debt-to-asset ratios and interest coverages for selected stocks"
     )
@@ -944,9 +929,7 @@ combined_statements |>
   geom_point(size = 2) +
   geom_label_repel(aes(label = label), seed = 42, box.padding = 0.75) +
   scale_x_continuous(labels = percent) +
-  scale_y_continuous(labels = percent) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  scale_y_continuous(labels = percent) +  labs(
     x = "Gross margin",
     y = "Profit margin",
     title = "Gross and profit margins for selected stocks in 2023"
@@ -976,9 +959,7 @@ profit_margins_figure = (
       adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
   + scale_x_continuous(labels=percent_format())
-  + scale_y_continuous(labels=percent_format())
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + scale_y_continuous(labels=percent_format())  + labs(
       x="Gross margin", y="Profit margin",
       title="Gross and profit margins for selected stocks in 2023"
     )
@@ -1036,9 +1017,7 @@ financial_ratios |>
   summarize(rank = mean(rank), .groups = "drop") |>
   filter(symbol %in% selected_symbols) |>
   ggplot(aes(x = rank, y = type, color = symbol)) +
-  geom_point(shape = 17, size = 4) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  geom_point(shape = 17, size = 4) +  labs(
     x = "Average rank",
     y = NULL,
     color = NULL,
@@ -1091,9 +1070,7 @@ final_ranks_figure = (
     final_ranks,
     aes(x="rank", y="type", color="symbol")
   )
-  + geom_point(shape="^", size=4)
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + geom_point(shape="^", size=4)  + labs(
       x="Average rank", y="", color="",
       title="Average rank among selected stocks"
   )
@@ -1158,9 +1135,9 @@ combined_statements_ff <- combined_statements |>
 
 ``` python
 market_cap = pl.concat(
-  [pl.from_pandas(fmp_get(
-      resource="historical-market-capitalization", symbol=x, to_pandas=True
-    )) for x in sample]
+  [fmp_get(
+      resource="historical-market-capitalization", symbol=x
+    ) for x in sample]
 )
 
 min_date = market_cap["date"].min()
@@ -1209,9 +1186,7 @@ combined_statements_ff |>
   ungroup() |>
   filter(symbol %in% selected_symbols) |>
   ggplot(aes(x = rank, y = name, color = symbol)) +
-  geom_point(shape = 17, size = 4) +
-  scale_color_manual(values = selected_colors) +
-  labs(
+  geom_point(shape = 17, size = 4) +  labs(
     x = "Rank",
     y = NULL,
     color = NULL,
@@ -1247,9 +1222,7 @@ factors_ranks_figure = (
     factors_ranks,
     aes(x="rank", y="name", color="symbol")
   )
-  + geom_point(shape="^", size=4)
-  + scale_color_manual(values=selected_colors)
-  + labs(
+  + geom_point(shape="^", size=4)  + labs(
       x="Rank", y="", color="",
       title="Rank in Fama-French variables for selected stocks"
   )

@@ -15,6 +15,8 @@ library(tidyverse)
 library(tidyfinance)
 library(scales)
 library(ggrepel)
+
+theme_set(theme_minimal())
 ```
 
 We introduce the `ggrepel` package for adding text labels to the figures in this chapter ([Slowikowski 2024](#ref-ggrepel)).
@@ -29,6 +31,9 @@ import tidyfinance as tf
 from plotnine import *
 from mizani.formatters import percent_format
 from adjustText import adjust_text
+
+tf.set_backend("polars")
+theme_set(theme_minimal())
 ```
 
 We introduce the `adjustText` package for adding text labels to the figures in this chapter ([Flyamer 2024](#ref-adjustText)).
@@ -62,16 +67,16 @@ prices_daily <- download_data(
 ## Python
 
 ``` python
-symbols = pl.from_pandas(tf.download_data(
+symbols = tf.download_data(
     domain="constituents", index="Dow Jones Industrial Average"
-))
+)
 
-prices_daily = pl.from_pandas(tf.download_data(
+prices_daily = tf.download_data(
     domain="stock_prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31",
-))
+)
 ```
 
 To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:
@@ -168,7 +173,8 @@ assets |>
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = "Volatility", y = "Expected return",
+    x = "Volatility",
+    y = "Expected return",
     title = "Expected returns and volatilities of Dow Jones index constituents"
   )
 ```
@@ -248,12 +254,13 @@ sigma |>
   ggplot(aes(x = symbol_a, y = fct_rev(symbol_b), fill = value)) +
   geom_tile() +
   labs(
-    x = NULL, y = NULL, fill = "(Co-)Variance",
+    x = NULL,
+    y = NULL,
+    fill = "(Co-)Variance",
     title = "Sample Variance-covariance matrix of Dow Jones index constituents"
   ) +
-  scale_fill_continuous(labels = percent)  +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
+  scale_fill_continuous(labels = percent) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 [![Title: Variance-covariance matrix of Dow Jones index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair.](modern-portfolio-theory_files/figure-html/fig-203-1.png)](modern-portfolio-theory_files/figure-html/fig-203-1.png "Figure 2: Variances and covariances based on monthly returns adjusted for dividend payments and stock splits.")
@@ -267,23 +274,18 @@ sigma_long = (
     pl.DataFrame(sigma, schema=symbol_order)
     .with_columns(symbol_a=pl.Series(symbol_order))
     .unpivot(index="symbol_a", variable_name="symbol_b", value_name="value")
-    .with_columns(
-        symbol_b=pl.col("symbol_b").cast(
-            pl.Enum(symbol_order[::-1])
-        )
-    )
+    .with_columns(symbol_b=pl.col("symbol_b").cast(pl.Enum(symbol_order[::-1])))
 )
 
 sigma_figure = (
-    ggplot(
-        sigma_long,
-        aes(x="symbol_a", y="symbol_b", fill="value")
-    )
+    ggplot(sigma_long, aes(x="symbol_a", y="symbol_b", fill="value"))
     + geom_tile()
     + labs(
-        x="", y="", fill="(Co-)Variance",
-        title="Sample Variance-covariance matrix of Dow Jones index constituents"
-        )
+        x="",
+        y="",
+        fill="(Co-)Variance",
+        title="Sample Variance-covariance matrix of Dow Jones index constituents",
+    )
     + scale_fill_continuous(labels=percent_format())
     + theme(axis_text_x=element_text(angle=45, hjust=1))
 )
@@ -333,12 +335,14 @@ Figure [Figure 3](#fig-204) shows the resulting portfolio weights.
 assets <- bind_cols(assets, omega_mvp = omega_mvp)
 
 assets |>
-  ggplot(aes(x = omega_mvp, y = fct_reorder(symbol, omega_mvp),
-             fill = omega_mvp > 0)) +
+  ggplot(aes(
+    x = omega_mvp,
+    y = fct_reorder(symbol, omega_mvp),
+    fill = omega_mvp > 0
+  )) +
   geom_col() +
   scale_x_continuous(labels = percent) +
-  labs(x = NULL, y = NULL,
-       title = "Minimum-variance portfolio weights") +
+  labs(x = NULL, y = NULL, title = "Minimum-variance portfolio weights") +
   theme(legend.position = "none")
 ```
 
@@ -393,7 +397,7 @@ summary_mvp
     # A tibble: 1 × 3
            mu  sigma type                      
         <dbl>  <dbl> <chr>                     
-    1 0.00875 0.0324 Minimum-Variance Portfolio
+    1 0.00895 0.0325 Minimum-Variance Portfolio
 
 ## Python
 
@@ -416,7 +420,7 @@ shape: (1, 3)
 | mu       | sigma    | type                         |
 |----------|----------|------------------------------|
 | f64      | f64      | str                          |
-| 0.008747 | 0.032358 | "Minimum-Variance Portfolio" |
+| 0.008952 | 0.032492 | "Minimum-Variance Portfolio" |
 
 ## Efficient Portfolios
 
@@ -455,7 +459,9 @@ C <- as.numeric(t(iota) %*% sigma_inv %*% iota)
 D <- as.numeric(t(iota) %*% sigma_inv %*% mu)
 E <- as.numeric(t(mu) %*% sigma_inv %*% mu)
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
-omega_efp <- as.vector(omega_mvp + lambda_tilde / 2 * (sigma_inv %*% mu - D * omega_mvp))
+omega_efp <- as.vector(
+  omega_mvp + lambda_tilde / 2 * (sigma_inv %*% mu - D * omega_mvp)
+)
 
 summary_efp <- tibble(
   mu = as.numeric(t(omega_efp) %*% mu),
@@ -486,7 +492,9 @@ Figure [Figure 4](#fig-205) shows the average return and volatility of the mini
 
 ``` r
 summaries <- bind_rows(
-  assets, summary_mvp, summary_efp
+  assets,
+  summary_mvp,
+  summary_efp
 )
 
 summaries |>
@@ -495,13 +503,16 @@ summaries |>
     data = summaries |> filter(is.na(type))
   ) +
   geom_point(
-    data = summaries |> filter(!is.na(type)), color = "#F21A00", size = 3
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
   ) +
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = "Volatility", y = "Expected return",
+    x = "Volatility",
+    y = "Expected return",
     title = "Efficient & minimum-variance portfolios"
   )
 ```
@@ -525,7 +536,9 @@ summaries_figure = (
         color="#F21A00", size=3
     )
     + geom_label(
-        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
     + scale_x_continuous(labels=percent_format())
     + scale_y_continuous(labels=percent_format())
@@ -592,8 +605,9 @@ Finally, it is simple to visualize the efficient frontier alongside the two effi
 
 ``` r
 summaries <- bind_rows(
-    summaries, efficient_frontier
-  )
+  summaries,
+  efficient_frontier
+)
 
 summaries |>
   ggplot(aes(x = sigma, y = mu)) +
@@ -601,13 +615,18 @@ summaries |>
     data = summaries |> filter(is.na(type))
   ) +
   geom_point(
-    data = summaries |> filter(!is.na(type)), color = "#F21A00", size = 3
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
   ) +
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
-  labs(x = "Volatility", y = "Expected return",
-       title = "Efficient frontier from historical moments of Dow Jones index constituents") +
+  labs(
+    x = "Volatility",
+    y = "Expected return",
+    title = "Efficient frontier from historical moments of Dow Jones index constituents"
+  ) +
   theme(legend.position = "none")
 ```
 
@@ -630,7 +649,9 @@ summaries_figure = (
         color="#F21A00", size=3
     )
     + geom_label(
-        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
     + scale_x_continuous(labels=percent_format())
     + scale_y_continuous(labels=percent_format())

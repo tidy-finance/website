@@ -27,6 +27,8 @@ library(tidyverse)
 library(tidyfinance)
 library(scales)
 library(fmpapi)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -46,6 +48,10 @@ load_dotenv()
 ```
 
     True
+
+``` python
+theme_set(theme_minimal())
+```
 
 > **TIP:**
 >
@@ -78,13 +84,13 @@ cash_flow_statements <- fmp_get(
 ``` python
 symbol = "MSFT"
 
-income_statements = pl.from_pandas(fmp_get(
-  "income-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
-))
+income_statements = fmp_get(
+  "income-statement", symbol, {"period": "annual", "limit": 5}
+)
 
-cash_flow_statements = pl.from_pandas(fmp_get(
-  "cash-flow-statement", symbol, {"period": "annual", "limit": 5}, to_pandas = True
-))
+cash_flow_statements = fmp_get(
+  "cash-flow-statement", symbol, {"period": "annual", "limit": 5}
+)
 ```
 
 Our analysis centers on Free Cash Flow (FCF), which represents the cash available to all investors after the company has covered its operational needs and capital investments. We calculate FCF using the following formula:
@@ -263,12 +269,12 @@ We demonstrate this forecasting approach in [Figure 2](#fig-501). Note that our
 
 ``` r
 dcf_data_forecast_ratios <- tribble(
-  ~year, ~operating_margin, ~da_margin, ~taxes_to_revenue, ~delta_working_capital_to_revenue, ~capex_to_revenue,
-  2026, 0.41, 0.09, 0.08, 0.001, -0.2,
-  2027, 0.42, 0.09, 0.07, 0.001, -0.22,
-  2028, 0.43, 0.09, 0.06, 0.001, -0.2,
-  2029, 0.44, 0.09, 0.06, 0.001, -0.18,
-  2030, 0.45, 0.09, 0.06, 0.001, -0.16
+  ~year , ~operating_margin , ~da_margin , ~taxes_to_revenue , ~delta_working_capital_to_revenue , ~capex_to_revenue ,
+   2026 , 0.41              , 0.09       , 0.08              , 0.001                             , -0.2              ,
+   2027 , 0.42              , 0.09       , 0.07              , 0.001                             , -0.22             ,
+   2028 , 0.43              , 0.09       , 0.06              , 0.001                             , -0.2              ,
+   2029 , 0.44              , 0.09       , 0.06              , 0.001                             , -0.18             ,
+   2030 , 0.45              , 0.09       , 0.06              , 0.001                             , -0.16
 ) |>
   mutate(type = "Forecast")
 
@@ -798,8 +804,7 @@ sensitivity |>
     y = "Perpetual growth rate",
     fill = "Enterprise value",
     title = "Enterprise value of Microsoft for different WACC and growth rate scenarios"
-  ) +
-  guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
+  )
 ```
 
 [![Title: Enterprise value of Microsoft for different WACC and growth rate scenarios. The figure shows a tile chart with different WACC values on the horizontal axis and perpetual growth rates on the vertical axis. Each tile shows a corresponding DCF value, illustrating the sensitivity of the DCF analysis to assumptions.](discounted-cash-flow-analysis_files/figure-html/fig-504-1.png)](discounted-cash-flow-analysis_files/figure-html/fig-504-1.png "Figure 5: The enterprise values combine data from FMP API, ad-hoc forecasts of financial ratios, and IMF WEO growth forecasts.")
