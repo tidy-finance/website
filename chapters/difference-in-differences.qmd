@@ -371,13 +371,13 @@ etable(
 model_without_fe = pf.feols(
     "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
     vcov = "iid",
-    data = bonds_panel.to_pandas()
+    data = bonds_panel
 )
 
 model_with_fe = pf.feols(
     "avg_yield ~ treated | cusip_id + date",
     vcov = "iid",
-    data = bonds_panel.to_pandas()
+    data = bonds_panel
 )
 
 pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
@@ -453,7 +453,7 @@ model_without_fe_coefs |>
 model_without_fe_time = pf.feols(
     "avg_yield ~ C(polluter)/C(date) + time_to_maturity + log_offering_amt",
     vcov = "iid",
-    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
+    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8))
 )
 
 model_without_fe_coefs = (pl.DataFrame({
@@ -626,25 +626,23 @@ In the next code chunk, we assemble the model formula and regress the monthly yi
 
 ```{python}
 #| label: difference-in-differences-fe-time-regression-py
-bonds_panel_alt = bonds_panel_alt.to_pandas()
-variables_pd = variables.to_pandas()
+formula = "avg_yield ~ 1"
+lead_lag_columns = []
 
-formula = "avg_yield ~ 1 + "
-
-for j in range(variables_pd.shape[0]):
-    if variables_pd["diff_to_treatment"].iloc[j] != 0:
-        old_names=list(bonds_panel_alt.columns)
-
-        bonds_panel_alt["new_var"] = (
-          bonds_panel_alt["diff_to_treatment"] ==
-            variables_pd["diff_to_treatment"].iloc[j]
-        ) & bonds_panel_alt["polluter"]
-
-        new_var_name=variables_pd["variable_name"].iloc[j]
-        bonds_panel_alt[new_var_name]=bonds_panel_alt["new_var"]
-        formula += (f" + {new_var_name}" if j > 0 else new_var_name)
+for row in variables.iter_rows(named=True):
+    if row["diff_to_treatment"] != 0:
+        new_var_name = row["variable_name"]
+        lead_lag_columns.append(
+            (
+                (pl.col("diff_to_treatment") == row["diff_to_treatment"])
+                & pl.col("polluter")
+            ).alias(new_var_name)
+        )
+        formula += f" + {new_var_name}"
 
 formula = formula + " | cusip_id + date "
+
+bonds_panel_alt = bonds_panel_alt.with_columns(lead_lag_columns)
 
 model_with_fe_time = pf.feols(
     formula,

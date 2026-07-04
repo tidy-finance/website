@@ -356,7 +356,7 @@ We hence perform the following pre-processing steps:
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
 
-Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Because `scikit-learn` operates on `pandas` objects, we convert the data frame with `to_pandas()` at the boundary before feeding it into the modeling pipeline.
+Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Recent versions of `scikit-learn` accept `polars` data frames directly, so we can feed them into the modeling pipeline without any conversion.
 
 ```{python}
 #| label: factor-selection-via-machine-learning-preprocessor-py
@@ -520,9 +520,8 @@ data_manufacturing = data.filter(pl.col("industry") == "manuf").sort("date")
 n_train = int(len(data_manufacturing) * 4 / 5)
 data_manufacturing_training = data_manufacturing.head(n_train)
 
-# scikit-learn operates on pandas/numpy, so we convert at the modeling boundary.
 lm_fit = lm_pipeline.fit(
-  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training,
   data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
@@ -537,7 +536,7 @@ First, we focus on the in-sample predicted values $\hat{y}_t = x_t\hat\beta^\tex
 predicted_values = (
   pl.DataFrame({
     "date": data_manufacturing["date"],
-    "Fitted value": lm_fit.predict(data_manufacturing.to_pandas()),
+    "Fitted value": lm_fit.predict(data_manufacturing),
     "Realization": data_manufacturing["ret_excess"]
   })
   .unpivot(index="date", variable_name="Variable", value_name="return")
@@ -635,7 +634,7 @@ We estimate the coefficients $\hat\beta^\text{Lasso}$ directly for a grid of dif
 ```{python}
 #| label: factor-selection-via-machine-learning-glmnet-fits-py
 #| warning: false
-x = preprocessor.fit_transform(data_manufacturing.to_pandas())
+x = preprocessor.fit_transform(data_manufacturing)
 y = data_manufacturing["ret_excess"].to_numpy()
 
 alphas = np.logspace(-5, 5, 100)
@@ -817,7 +816,7 @@ finder = GridSearchCV(
 )
 
 finder = finder.fit(
-  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training,
   data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
@@ -992,7 +991,7 @@ for industry in all_industries:
   )
 
   finder = finder.fit(
-    industry_training.to_pandas(),
+    industry_training,
     industry_training["ret_excess"].to_numpy()
   )
   results.append(finder.best_estimator_.named_steps.regressor.coef_ != 0)
