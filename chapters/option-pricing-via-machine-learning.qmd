@@ -317,14 +317,19 @@ nnet_fit <- workflow() |>
 
 ### Python
 
-The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. We set the number of training iterations to `max_iter=1000`. Otherwise, we rely on the default settings of `MLPRegressor()`, which include the ReLU activation function.
+The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. To keep the specification consistent with the R implementation, we use the logistic (sigmoid) activation function, the quasi-Newton solver LBFGS (which is also the default optimizer of `brulee`), and the same weight decay penalty `alpha=0.0001`. We set the number of training iterations to `max_iter=500`.
 
 ```{python}
 #| label: option-pricing-via-machine-learning-nnet-model-py
-max_iter = 1000
+max_iter = 500
 
 nnet_model = MLPRegressor(
-    hidden_layer_sizes=10, max_iter=max_iter, random_state=random_state
+    hidden_layer_sizes=10,
+    activation="logistic",
+    solver="lbfgs",
+    alpha=0.0001,
+    max_iter=max_iter,
+    random_state=random_state,
 )
 ```
 
@@ -332,6 +337,7 @@ We can follow the straightforward workflow as in the chapter before: define a wo
 
 ```{python}
 #| label: option-pricing-via-machine-learning-nnet-fit-py
+#| warning: false
 nnet_pipeline = Pipeline(
     [("preprocessor", preprocessor), ("regressor", nnet_model)]
 )
@@ -346,7 +352,7 @@ nnet_fit = nnet_pipeline.fit(
 
 One word of caution regarding the training of neural networks: For illustrative purposes, we sequentially update the parameters by reiterating through the training data many times. Typically, however, early stopping rules are advised that aim to interrupt the process of updating parameters as soon as the predictive performance on a validation set seems to deteriorate. A detailed discussion of these implementation details would go beyond the scope of this book.
 
-Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node.
+Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where a node must contain at least 2,000 observations to be split further.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -375,12 +381,12 @@ rf_fit <- workflow() |>
 
 ### Python
 
-The random forests are trained using the function `RandomForestRegressor()`.
+The random forests are trained using the function `RandomForestRegressor()`, where the argument `min_samples_split` corresponds to `min_n` in the R implementation.
 
 ```{python}
 #| label: option-pricing-via-machine-learning-rf-model-py
 rf_model = RandomForestRegressor(
-    n_estimators=50, min_samples_leaf=2000, random_state=random_state
+    n_estimators=50, min_samples_split=2000, random_state=random_state
 )
 ```
 
@@ -433,7 +439,7 @@ deep_nnet_fit <- workflow() |>
 
 ### Python
 
-The following code chunk implements a deep neural network with three hidden layers of size ten each and logistic activation functions.
+The following code chunk implements a deep neural network with three hidden layers of size ten each, using the same activation function, solver, and penalty as for the single-layer network above.
 
 ```{python}
 #| label: option-pricing-via-machine-learning-deep-nnet-fit-py
@@ -442,6 +448,7 @@ deep_nnet_model = MLPRegressor(
     hidden_layer_sizes=(10, 10, 10),
     activation="logistic",
     solver="lbfgs",
+    alpha=0.0001,
     max_iter=max_iter,
     random_state=random_state,
 )
@@ -460,12 +467,12 @@ deep_nnet_fit = deep_nnet_pipeline.fit(
 
 ### Universal approximation
 
-Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables' polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd) on how to tune the model hyperparameters).
+Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables' polynomial expansions and interaction terms. We fit a Lasso regression model with the polynomially expanded predictors and a pre-specified penalty term (consult [Factor Selection via Machine Learning](factor-selection-via-machine-learning.qmd) on how to tune the model hyperparameters).
 
 ::: {.panel-tabset group="language"}
 ### R
 
-To illustrate this, we first define a new recipe, `rec_linear`, which processes the training data even further. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between $r^2$ and $r^3$ is the same as the term $r^5$).
+We first define a new recipe, `rec_linear`, which processes the training data even further: We include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between $r^2$ and $r^3$ is the same as the term $r^5$).
 
 ```{r}
 #| label: option-pricing-via-machine-learning-linear-lasso-fit
@@ -487,6 +494,8 @@ lm_fit <- workflow() |>
 ```
 
 ### Python
+
+The function `PolynomialFeatures()` generates all polynomial and interaction terms of the predictors up to a total degree of five. Note that the resulting set of features hence differs slightly from the R implementation, which expands each predictor individually up to the fifth degree before adding pairwise interactions of the expanded terms. We use the same penalty value as in the R implementation.
 
 ```{python}
 #| label: option-pricing-via-machine-learning-linear-lasso-fit-py
