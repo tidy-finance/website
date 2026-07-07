@@ -34,9 +34,9 @@ library(tidyfinance)
 library(dbplyr)
 library(nanoparquet)
 library(RPostgres)
-```
 
-Compared to previous chapters, we load the `devtools` package [@devtools] to source code that we provided to the public via [Gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists)
+theme_set(theme_minimal())
+```
 
 ### Python
 
@@ -45,25 +45,17 @@ Compared to previous chapters, we load the `devtools` package [@devtools] to sou
 import polars as pl
 import numpy as np
 import tidyfinance as tf
-import httpimport
-import time
 
 from datetime import date
 from plotnine import *
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
 from mizani.formatters import comma_format
-```
 
-Compared to previous chapters, we load `httpimport` [@httpimport] to source code provided in the public [Gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) Note that you should be careful with loading anything from the web via this method, and it is highly discouraged to use any unsecured "HTTP" links. Also, you might encounter a problem when using this from a corporate computer that prevents downloading data through a firewall.
+tf.set_backend("polars")
+theme_set(theme_minimal())
+```
 
 :::
-
-```{python}
-#| label: trace-and-fisd-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## Bond Data from WRDS
 
@@ -324,7 +316,7 @@ You can set the credentials with `tf.set_wrds_credentials()`.
 #| label: trace-and-fisd-download-fisd-py
 #| output: false
 #| eval: false
-fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
+fisd = tf.download_data(domain="wrds", dataset="fisd")
 ```
 
 :::
@@ -377,33 +369,7 @@ fisd = pl.read_parquet("data/fisd.parquet")
 
 The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE).\index{Data!TRACE} In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants: standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties' roles and the direction of the trade report. These items become essential in cleaning the messages.
 
-Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
-
-::: {.panel-tabset group="language"}
-### R
-
-The `tidyfinance` package downloads and cleans enhanced TRACE for us in the loop below, so there is no separate sourcing step here.
-
-### Python
-
-We store code for cleaning enhanced TRACE with Python on the following GitHub [Gist.](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) \index{GitHub!Gist} [Clean Enhanced TRACE with Python](clean-enhanced-trace.qmd) also contains the code for reference. We only need to source the code from the Gist, which we can do with the code below using `httpimport`. In the chunk, we explicitly load the necessary function interpreting the Gist as a module (i.e., you could also use it as a module and precede the function calls with the module's name). Alternatively, you can also go to the Gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd), and a start and end date, respectively.
-
-```{python}
-#| label: trace-and-fisd-source-cleaning
-#| warning: false
-import requests
-
-url = (
-    "https://gist.githubusercontent.com/patrick-weiss/"
-    "86ddef6de978fbdfb22609a7840b5d8b/raw/"
-    "8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
-)
-
-response = requests.get(url, verify=False)
-exec(response.text)
-```
-
-:::
+Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by @Dick2009 in detail, and @Dick2014 shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup: The `tidyfinance` package downloads and cleans enhanced TRACE following @Dick2009 and @Dick2014 for us in the loop below, so there is no separate sourcing step. If you are interested in the underlying steps, [Clean Enhanced TRACE with Python](clean-enhanced-trace.qmd) contains the cleaning code for reference.
 
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.\index{Paris (Climate) Agreement}
 
@@ -479,25 +445,13 @@ for j in range(1, batches + 1):
             ((j-1)*batch_size):(min(j*batch_size, len(cusips)))
     ]
 
-    cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
-    cusip_string = f"({cusip_batch_formatted})"
-
-    # WRDS may close a long-running connection; retry the batch with a fresh
-    # connection if the server drops it unexpectedly.
-    for attempt in range(5):
-        try:
-            trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
-                    cusips=cusip_string,
-                    connection=wrds,
-                    start_date="'01/01/2014'",
-                    end_date="'11/30/2016'"
-            )).with_columns(pl.col("trd_exctn_dt").cast(pl.Date))
-            break
-        except OperationalError:
-            wrds.dispose()
-            time.sleep(10)
-    else:
-        raise RuntimeError(f"Batch {j} failed after repeated connection errors.")
+    trace_enhanced_sub = tf.download_data(
+        domain="wrds",
+        dataset="trace_enhanced",
+        cusips=cusip_batch,
+        start_date="2014-01-01",
+        end_date="2016-11-30"
+    )
 
     if not trace_enhanced_sub.is_empty():
             trace_enhanced_sub.with_columns(batch=pl.lit(j)).write_parquet(

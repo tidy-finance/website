@@ -34,6 +34,8 @@ library(tidyverse)
 library(tidyfinance)
 library(scales)
 library(ggrepel)
+
+theme_set(theme_minimal())
 ```
 
 We introduce the `ggrepel` package for adding text labels to the figures in this chapter [@ggrepel].
@@ -49,17 +51,14 @@ import tidyfinance as tf
 from plotnine import *
 from mizani.formatters import percent_format
 from adjustText import adjust_text
+
+tf.set_backend("polars")
+theme_set(theme_minimal())
 ```
 
 We introduce the `adjustText` package for adding text labels to the figures in this chapter [@adjustText].
 
 :::
-
-```{python}
-#| label: modern-portfolio-theory-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## The Asset Universe
 
@@ -94,16 +93,16 @@ prices_daily <- download_data(
 
 ```{python}
 #| label: modern-portfolio-theory-download-data-py
-symbols = pl.from_pandas(tf.download_data(
+symbols = tf.download_data(
     domain="constituents", index="Dow Jones Industrial Average"
-))
+)
 
-prices_daily = pl.from_pandas(tf.download_data(
+prices_daily = tf.download_data(
     domain="stock_prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31",
-))
+)
 ```
 
 :::
@@ -221,7 +220,8 @@ assets |>
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = "Volatility", y = "Expected return",
+    x = "Volatility",
+    y = "Expected return",
     title = "Expected returns and volatilities of Dow Jones index constituents"
   )
 ```
@@ -292,7 +292,7 @@ sigma = np.cov(
 
 :::
 
-Figure @fig-203 illustrates the resulting variance-covariance matrix.
+@fig-203 illustrates the resulting variance-covariance matrix.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -307,12 +307,13 @@ sigma |>
   ggplot(aes(x = symbol_a, y = fct_rev(symbol_b), fill = value)) +
   geom_tile() +
   labs(
-    x = NULL, y = NULL, fill = "(Co-)Variance",
+    x = NULL,
+    y = NULL,
+    fill = "(Co-)Variance",
     title = "Sample Variance-covariance matrix of Dow Jones index constituents"
   ) +
-  scale_fill_continuous(labels = percent)  +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  guides(fill = guide_colorbar(barwidth = 15, barheight = 0.5))
+  scale_fill_continuous(labels = percent) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ### Python
@@ -325,23 +326,18 @@ sigma_long = (
     pl.DataFrame(sigma, schema=symbol_order)
     .with_columns(symbol_a=pl.Series(symbol_order))
     .unpivot(index="symbol_a", variable_name="symbol_b", value_name="value")
-    .with_columns(
-        symbol_b=pl.col("symbol_b").cast(
-            pl.Enum(symbol_order[::-1])
-        )
-    )
+    .with_columns(symbol_b=pl.col("symbol_b").cast(pl.Enum(symbol_order[::-1])))
 )
 
 sigma_figure = (
-    ggplot(
-        sigma_long,
-        aes(x="symbol_a", y="symbol_b", fill="value")
-    )
+    ggplot(sigma_long, aes(x="symbol_a", y="symbol_b", fill="value"))
     + geom_tile()
     + labs(
-        x="", y="", fill="(Co-)Variance",
-        title="Sample Variance-covariance matrix of Dow Jones index constituents"
-        )
+        x="",
+        y="",
+        fill="(Co-)Variance",
+        title="Sample Variance-covariance matrix of Dow Jones index constituents",
+    )
     + scale_fill_continuous(labels=percent_format())
     + theme(axis_text_x=element_text(angle=45, hjust=1))
 )
@@ -386,7 +382,7 @@ omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
 
 :::
 
-Figure @fig-204 shows the resulting portfolio weights.
+@fig-204 shows the resulting portfolio weights.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -398,12 +394,14 @@ Figure @fig-204 shows the resulting portfolio weights.
 assets <- bind_cols(assets, omega_mvp = omega_mvp)
 
 assets |>
-  ggplot(aes(x = omega_mvp, y = fct_reorder(symbol, omega_mvp),
-             fill = omega_mvp > 0)) +
+  ggplot(aes(
+    x = omega_mvp,
+    y = fct_reorder(symbol, omega_mvp),
+    fill = omega_mvp > 0
+  )) +
   geom_col() +
   scale_x_continuous(labels = percent) +
-  labs(x = NULL, y = NULL,
-       title = "Minimum-variance portfolio weights") +
+  labs(x = NULL, y = NULL, title = "Minimum-variance portfolio weights") +
   theme(legend.position = "none")
 ```
 
@@ -502,9 +500,9 @@ $$\min_\omega \omega^{\prime}\Sigma\omega \text{ s.t. } \omega^{\prime}\iota = 1
 
 The analytic solution for the efficient portfolio can be derived as:
 
-$$\omega_{efp} = \frac{\lambda^*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
+$$\omega_{efp} = \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
 
-where $\lambda^* = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. For details, we again refer to the [Proofs](proofs.qmd) in the Appendix.
+where $\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. For details, we again refer to the [Proofs](proofs.qmd) in the Appendix.
 
 The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
 
@@ -517,7 +515,9 @@ C <- as.numeric(t(iota) %*% sigma_inv %*% iota)
 D <- as.numeric(t(iota) %*% sigma_inv %*% mu)
 E <- as.numeric(t(mu) %*% sigma_inv %*% mu)
 lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
-omega_efp <- as.vector(omega_mvp + lambda_tilde / 2 * (sigma_inv %*% mu - D * omega_mvp))
+omega_efp <- as.vector(
+  omega_mvp + lambda_tilde / 2 * (sigma_inv %*% mu - D * omega_mvp)
+)
 
 summary_efp <- tibble(
   mu = as.numeric(t(omega_efp) %*% mu),
@@ -545,7 +545,7 @@ summary_efp = pl.DataFrame(
 
 :::
 
-Figure @fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
+@fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -556,7 +556,9 @@ Figure @fig-205 shows the average return and volatility of the minimum-variance 
 #| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents."
 #| warning: false
 summaries <- bind_rows(
-  assets, summary_mvp, summary_efp
+  assets,
+  summary_mvp,
+  summary_efp
 )
 
 summaries |>
@@ -565,13 +567,16 @@ summaries |>
     data = summaries |> filter(is.na(type))
   ) +
   geom_point(
-    data = summaries |> filter(!is.na(type)), color = "#F21A00", size = 3
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
   ) +
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
   labs(
-    x = "Volatility", y = "Expected return",
+    x = "Volatility",
+    y = "Expected return",
     title = "Efficient & minimum-variance portfolios"
   )
 ```
@@ -595,7 +600,9 @@ summaries_figure = (
         color="#F21A00", size=3
     )
     + geom_label(
-        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
     + scale_x_continuous(labels=percent_format())
     + scale_y_continuous(labels=percent_format())
@@ -670,8 +677,9 @@ Finally, it is simple to visualize the efficient frontier alongside the two effi
 #| fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
 #| warning: false
 summaries <- bind_rows(
-    summaries, efficient_frontier
-  )
+  summaries,
+  efficient_frontier
+)
 
 summaries |>
   ggplot(aes(x = sigma, y = mu)) +
@@ -679,13 +687,18 @@ summaries |>
     data = summaries |> filter(is.na(type))
   ) +
   geom_point(
-    data = summaries |> filter(!is.na(type)), color = "#F21A00", size = 3
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
   ) +
   geom_label_repel(aes(label = type)) +
   scale_x_continuous(labels = percent) +
   scale_y_continuous(labels = percent) +
-  labs(x = "Volatility", y = "Expected return",
-       title = "Efficient frontier from historical moments of Dow Jones index constituents") +
+  labs(
+    x = "Volatility",
+    y = "Expected return",
+    title = "Efficient frontier from historical moments of Dow Jones index constituents"
+  ) +
   theme(legend.position = "none")
 ```
 
@@ -708,7 +721,9 @@ summaries_figure = (
         color="#F21A00", size=3
     )
     + geom_label(
-        aes(label="type"), adjust_text={"arrowprops": {"arrowstyle": "-"}}
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
     )
     + scale_x_continuous(labels=percent_format())
     + scale_y_continuous(labels=percent_format())

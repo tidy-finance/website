@@ -17,7 +17,7 @@ exec(open("assets/render-settings.py").read())
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing [e.g., @BaliEngleMurray2016]. The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in [Value and Bivariate Sorts](value-and-bivariate-sorts.qmd).
 
-A univariate portfolio sort considers only one sorting variable $x_{t-1,i}$.\index{Portfolio sorts!Univariate} Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$. The objective is to assess the cross-sectional relation between $x_{t-1,i}$ and, typically, stock excess returns $r_{t,i}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
+A univariate portfolio sort considers only one sorting variable $x_{i,t-1}$.\index{Portfolio sorts!Univariate} Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$. The objective is to assess the cross-sectional relation between $x_{i,t-1}$ and, typically, stock excess returns $r_{i,t}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
 We use the following packages throughout this chapter:
 
@@ -33,6 +33,8 @@ library(scales)
 library(lmtest)
 library(broom)
 library(sandwich)
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce `lmtest` [@lmtest] for inference for estimated coefficients, `broom` package [@broom] to tidy the estimation output of many estimated linear models, and `sandwich` [@sandwich] for different covariance matrix estimators
@@ -46,15 +48,11 @@ import pyfixest as pf
 
 from plotnine import *
 from mizani.formatters import percent_format
+
+theme_set(theme_minimal())
 ```
 
 :::
-
-```{python}
-#| label: univariate-portfolio-sorts-render-plotnine
-#| echo: false
-exec(open("assets/render-plotnine-custom.py").read())
-```
 
 ## Data Preparation
 
@@ -215,12 +213,12 @@ We compute the average return and the corresponding standard error to test wheth
 ::: {.panel-tabset group="language"}
 ### R
 
-While it seems that researchers often default on choosing a pre-specified lag length of 6 months, we instead recommend a data-driven approach. This automatic selection is advocated by @Newey1994 and available in the `sandwich` package. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function. If you want to implement the typical 6-lag default setting, you can enforce it by passing the arguments `lag = 6, prewhite = FALSE` to the `coeftest()` function in the code below and it passes them on to `NeweyWest()`.
+Researchers often default to a pre-specified lag length of six months. A data-driven alternative advocated by @Newey1994 is available in the `sandwich` package via `NeweyWest()`, but we use the common six-lag setting here to keep the R and Python results comparable. To implement this test, we compute the average return via `lm()` and then employ the `coeftest()` function, passing the arguments `lag = 6, prewhite = FALSE` on to `NeweyWest()`.
 
 ```{r}
 #| label: univariate-portfolio-sorts-median-newey-west
 model_fit <- lm(long_short ~ 1, data = beta_longshort)
-coeftest(model_fit, vcov = NeweyWest)
+coeftest(model_fit, vcov = NeweyWest, lag = 6, prewhite = FALSE)
 ```
 
 ### Python
@@ -592,7 +590,10 @@ Again, the resulting long-short strategy does not exhibit statistically signific
 
 ```{r}
 #| label: univariate-portfolio-sorts-decile-newey-west
-coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
+coeftest(
+  lm(long_short ~ 1, data = beta_longshort),
+  vcov = NeweyWest, lag = 6, prewhite = FALSE
+)
 ```
 
 ### Python
@@ -602,7 +603,7 @@ coeftest(lm(long_short ~ 1, data = beta_longshort), vcov = NeweyWest)
 model_fit = pf.feols(
     "long_short ~ 1",
     data=beta_longshort,
-    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
 model_fit.summary()
 ```
@@ -618,7 +619,7 @@ However, controlling for the effect of beta, the long-short portfolio yields a s
 #| label: univariate-portfolio-sorts-decile-capm-alpha
 coeftest(
   lm(long_short ~ 1 + mkt_excess, data = beta_longshort),
-  vcov = NeweyWest
+  vcov = NeweyWest, lag = 6, prewhite = FALSE
 )
 ```
 
@@ -629,7 +630,7 @@ coeftest(
 model_fit = pf.feols(
     "long_short ~ 1 + mkt_excess",
     data=beta_longshort,
-    vcov="NW", vcov_kwargs={"lag": 1, "time_id": "date"}
+    vcov="NW", vcov_kwargs={"lag": 6, "time_id": "date"}
 )
 model_fit.summary()
 ```

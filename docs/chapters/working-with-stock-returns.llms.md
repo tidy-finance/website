@@ -14,18 +14,10 @@ You typically have to install a package once before you can load it into your ac
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidyfinance)
-```
-
-    Warning: package 'tidyfinance' was built under R version 4.5.3
-
-``` r
 library(scales)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -37,9 +29,11 @@ You typically have to install a package once before you can load it into your ac
 ``` python
 import polars as pl
 import tidyfinance as tf
+
+tf.set_backend("polars")
 ```
 
-Note that `import polars as pl` implies that we can call all polars functions later with a simple `pl.function()`. Instead, utilizing `from polars import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `polars` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pl` abbreviation is a very convenient way to prevent this.
+Note that `import polars as pl` implies that we can call all polars functions later with a simple `pl.function()`. Instead, utilizing `from polars import *` is generally discouraged, as it leads to namespace pollution. This statement imports all functions and classes from `polars` into your current namespace, potentially causing conflicts with functions you define or those from other imported libraries. Using the `pl` abbreviation is a very convenient way to prevent this. With `tf.set_backend("polars")`, all `tidyfinance` download functions return `polars` data frames directly.
 
 ## Downloading Data
 
@@ -58,6 +52,16 @@ prices <- download_data(
   start_date = "2000-01-01",
   end_date = "2024-12-31"
 )
+```
+
+    Warning: download_data(domain = "stock_prices") was deprecated in tidyfinance
+    0.6.1.
+    ℹ Please use download_data(domain = "Stock Prices") instead.
+    ℹ The deprecated feature was likely used in the tidyfinance package.
+      Please report the issue at
+      <https://github.com/tidy-finance/r-tidyfinance/issues>.
+
+``` r
 prices
 ```
 
@@ -73,16 +77,14 @@ prices
 
 ## Python
 
-Because `tf.download_data()` returns a `pandas` data frame, we wrap the call in `pl.from_pandas()` to obtain a `polars` data frame that we work with for the rest of the chapter. Since `pandas` represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
+Because we set the `polars` backend above, `tf.download_data()` returns a `polars` data frame that we work with for the rest of the chapter. Since the download represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
 
 ``` python
-prices = pl.from_pandas(
-    tf.download_data(
-        domain="stock_prices",
-        symbols="AAPL",
-        start_date="2000-01-01",
-        end_date="2024-12-31"
-    )
+prices = tf.download_data(
+    domain="stock_prices",
+    symbols="AAPL",
+    start_date="2000-01-01",
+    end_date="2024-12-31"
 ).with_columns(pl.col("date").cast(pl.Date))
 prices.head()
 ```
@@ -127,6 +129,8 @@ We use the `plotnine` package ([Kibirige 2023](#ref-plotnine)) to visualize the 
 
 ``` python
 from plotnine import *
+
+theme_set(theme_minimal())
 ```
 
 Creating figures becomes very intuitive with the Grammar of Graphics, as the following code chunk demonstrates.
@@ -307,7 +311,7 @@ shape: (9, 2)
 | "std"        | 0.024404  |
 | "min"        | -0.518692 |
 | "25%"        | -0.009818 |
-| "50%"        | 0.000947  |
+| "50%"        | 0.000948  |
 | "75%"        | 0.012684  |
 | "max"        | 0.139049  |
 
@@ -420,6 +424,16 @@ symbols <- download_data(
   domain = "constituents",
   index = "Dow Jones Industrial Average"
 )
+```
+
+    Warning: download_data(domain = "constituents") was deprecated in tidyfinance
+    0.6.1.
+    ℹ Please use download_data(domain = "Index Constituents") instead.
+    ℹ The deprecated feature was likely used in the tidyfinance package.
+      Please report the issue at
+      <https://github.com/tidy-finance/r-tidyfinance/issues>.
+
+``` r
 symbols
 ```
 
@@ -430,17 +444,15 @@ symbols
     2 CAT    CATERPILLAR INC         Vereinigte Staaten New Yor… USD     
     3 UNH    UNITEDHEALTH GROUP INC  Vereinigte Staaten New Yor… USD     
     4 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
-    5 AXP    AMERICAN EXPRESS        Vereinigte Staaten New Yor… USD     
+    5 AMGN   AMGEN INC               Vereinigte Staaten NASDAQ   USD     
     # ℹ 25 more rows
 
 ## Python
 
 ``` python
-symbols = pl.from_pandas(
-    tf.download_data(
-        domain="constituents",
-        index="Dow Jones Industrial Average"
-    )
+symbols = tf.download_data(
+    domain="constituents",
+    index="Dow Jones Industrial Average"
 )
 ```
 
@@ -460,17 +472,15 @@ prices_daily <- download_data(
 ## Python
 
 ``` python
-prices_daily = pl.from_pandas(
-    tf.download_data(
-        domain="stock_prices",
-        symbols=symbols["symbol"].to_list(),
-        start_date="2000-01-01",
-        end_date="2024-12-31"
-    )
+prices_daily = tf.download_data(
+    domain="stock_prices",
+    symbols=symbols["symbol"].to_list(),
+    start_date="2000-01-01",
+    end_date="2024-12-31"
 ).with_columns(pl.col("date").cast(pl.Date))
 ```
 
-The resulting data frame contains 185455 daily observations for GS, CAT, UNH, MSFT, AXP, AMGN, HD, V, JPM, SHW, TRV, AAPL, MCD, IBM, AMZN, HON, JNJ, BA, NVDA, CVX, MMM, CRM, PG, CSCO, WMT, MRK, DIS, KO, VZ, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, AMGN, V, GOOGL, HD, SHW, AXP, TRV, JPM, AAPL, IBM, MCD, JNJ, AMZN, HON, BA, NVDA, CVX, CRM, MMM, PG, MRK, CSCO, WMT, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -555,25 +565,25 @@ returns_daily |>
      8 CSCO     0.000342   0.0230    -0.162     0.244
      9 CVX      0.000493   0.0173    -0.221     0.227
     10 DIS      0.000436   0.0193    -0.184     0.160
-    11 GS       0.000607   0.0226    -0.190     0.265
-    12 HD       0.000548   0.0189    -0.287     0.141
-    13 HON      0.000495   0.0189    -0.174     0.282
-    14 IBM      0.000342   0.0163    -0.155     0.120
-    15 JNJ      0.000356   0.0120    -0.158     0.122
-    16 JPM      0.000644   0.0236    -0.207     0.251
-    17 KO       0.000320   0.0129    -0.101     0.139
-    18 MCD      0.000517   0.0144    -0.159     0.181
-    19 MMM      0.000418   0.0154    -0.129     0.230
-    20 MRK      0.000348   0.0165    -0.268     0.130
-    21 MSFT     0.000574   0.0190    -0.156     0.196
-    22 NKE      0.000632   0.0193    -0.200     0.155
-    23 NVDA     0.00186    0.0374    -0.352     0.424
-    24 PG       0.000374   0.0131    -0.302     0.120
-    25 SHW      0.000844   0.0178    -0.208     0.153
-    26 TRV      0.000577   0.0180    -0.208     0.256
-    27 UNH      0.000913   0.0195    -0.186     0.348
-    28 V        0.000928   0.0182    -0.136     0.150
-    29 VZ       0.000250   0.0150    -0.118     0.146
+    11 GOOGL    0.00103    0.0193    -0.116     0.200
+    12 GS       0.000607   0.0226    -0.190     0.265
+    13 HD       0.000548   0.0189    -0.287     0.141
+    14 HON      0.000499   0.0189    -0.174     0.282
+    15 IBM      0.000342   0.0163    -0.155     0.120
+    16 JNJ      0.000356   0.0120    -0.158     0.122
+    17 JPM      0.000644   0.0236    -0.207     0.251
+    18 KO       0.000320   0.0129    -0.101     0.139
+    19 MCD      0.000517   0.0144    -0.159     0.181
+    20 MMM      0.000418   0.0154    -0.129     0.230
+    21 MRK      0.000348   0.0165    -0.268     0.130
+    22 MSFT     0.000574   0.0190    -0.156     0.196
+    23 NKE      0.000632   0.0193    -0.200     0.155
+    24 NVDA     0.00186    0.0374    -0.352     0.424
+    25 PG       0.000374   0.0131    -0.302     0.120
+    26 SHW      0.000844   0.0178    -0.208     0.153
+    27 TRV      0.000577   0.0180    -0.208     0.256
+    28 UNH      0.000913   0.0195    -0.186     0.348
+    29 V        0.000928   0.0182    -0.136     0.150
     30 WMT      0.000401   0.0147    -0.114     0.117
 
 ## Python
@@ -616,10 +626,10 @@ shape: (30, 9)
 | "AXP"  | 6287  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
 | "BA"   | 6287  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
 | …      | …     | …     | …     | …      | …      | …      | …     | …     |
+| "SHW"  | 6287  | 0.001 | 0.018 | -0.208 | -0.008 | 0.001  | 0.009 | 0.153 |
 | "TRV"  | 6287  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
 | "UNH"  | 6287  | 0.001 | 0.019 | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
 | "V"    | 4224  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
-| "VZ"   | 6287  | 0.0   | 0.015 | -0.118 | -0.007 | 0.0    | 0.007 | 0.146 |
 | "WMT"  | 6287  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
 
 Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just download the constituents with `domain = "constituents", index = "S&P 500"`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!

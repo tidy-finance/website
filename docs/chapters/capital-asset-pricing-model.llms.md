@@ -11,6 +11,8 @@ library(tidyverse)
 library(tidyfinance)
 library(scales)
 library(ggrepel)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -24,6 +26,9 @@ import pyfixest as pf
 from plotnine import *
 from mizani.formatters import percent_format
 from adjustText import adjust_text
+
+tf.set_backend("polars")
+theme_set(theme_minimal())
 ```
 
 ## Asset Returns & Volatilities
@@ -63,20 +68,16 @@ returns_monthly <- prices_daily |>
 ## Python
 
 ``` python
-symbols = pl.from_pandas(
-    tf.download_data(
-        domain="constituents",
-        index="Dow Jones Industrial Average"
-    )
+symbols = tf.download_data(
+    domain="constituents",
+    index="Dow Jones Industrial Average"
 )
 
-prices_daily = pl.from_pandas(
-    tf.download_data(
-        domain="stock_prices",
-        symbols=symbols["symbol"].to_list(),
-        start_date="2000-01-01",
-        end_date="2024-12-31"
-    )
+prices_daily = tf.download_data(
+    domain="stock_prices",
+    symbols=symbols["symbol"].to_list(),
+    start_date="2000-01-01",
+    end_date="2024-12-31"
 ).select(["symbol", "date", "adjusted_close"])
 
 prices_daily = (prices_daily
@@ -165,9 +166,7 @@ rf <- mean(risk_free_monthly$risk_free)
 
 ``` python
 risk_free_monthly = (
-  pl.from_pandas(
-    tf.download_data(domain="stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
-  )
+  tf.download_data(domain="stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
   .with_columns(
     risk_free=(1 + pl.col("adjusted_close") / 100)**(1/12) - 1
   )
@@ -278,6 +277,7 @@ assets |>
   ggplot(aes(x = sigma, y = mu)) +
   geom_point() +
   geom_point(data = efficient_portfolios, color = "blue") +
+  geom_abline(aes(intercept = rf, slope = sharpe_ratio), linetype = "dotted") +
   geom_label_repel(data = efficient_portfolios,
                    aes(label = symbol), parse = TRUE) +
   scale_x_continuous(labels = percent) +
@@ -285,8 +285,7 @@ assets |>
   labs(
     x = "Volatility", y = "Expected return",
     title = "The efficient frontier with a risk-free asset and Dow index constituents"
-  ) +
-  geom_abline(aes(intercept = rf, slope = sharpe_ratio), linetype = "dotted")
+  )
 ```
 
 [![Title: The efficient frontier with a risk-free asset and Dow index constituents. The figure shows a scatter plot with volatities on the horizontal axis and expected returns on the vertical axis.](capital-asset-pricing-model_files/figure-html/fig-300-1.png)](capital-asset-pricing-model_files/figure-html/fig-300-1.png "Figure 1: Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits.")
@@ -300,6 +299,7 @@ efficient_portfolios_figure = (
     ggplot(assets, aes(x="sigma", y="mu"))
     + geom_point()
     + geom_point(data=efficient_portfolios, color="blue")
+    + geom_abline(aes(intercept=rf, slope=sharpe_ratio), linetype="dotted")
     + geom_label(
         aes(label="symbol"),
         data=efficient_portfolios,
@@ -313,7 +313,6 @@ efficient_portfolios_figure = (
         y="Expected return",
         title="The efficient frontier with a risk-free asset and Dow index constituents",
     )
-    + geom_abline(aes(intercept=rf, slope=sharpe_ratio), linetype="dotted")
 )
 efficient_portfolios_figure.show()
 ```
@@ -425,16 +424,21 @@ factors <- download_data(
   select(date, mkt_excess, risk_free)
 ```
 
+    Warning: download_data(domain = "factors_ff") was deprecated in tidyfinance
+    0.6.1.
+    ℹ Please use download_data(domain = "Fama-French") instead.
+    ℹ The deprecated feature was likely used in the tidyfinance package.
+      Please report the issue at
+      <https://github.com/tidy-finance/r-tidyfinance/issues>.
+
 ## Python
 
 ``` python
-factors = pl.from_pandas(
-    tf.download_data(
-        domain="famafrench",
-        dataset="Fama/French 5 Factors (2x3)",
-        start_date="2000-01-01",
-        end_date="2024-09-30",
-    )
+factors = tf.download_data(
+    domain="famafrench",
+    dataset="Fama/French 5 Factors (2x3)",
+    start_date="2000-01-01",
+    end_date="2024-09-30",
 ).select(["date", "mkt_excess", "risk_free"])
 ```
 
@@ -477,8 +481,8 @@ returns_excess_monthly |>
   ))
 ```
 
-    # A tibble: 28 × 3
-    # Groups:   symbol [28]
+    # A tibble: 27 × 3
+    # Groups:   symbol [27]
       symbol data               capm            
       <chr>  <list>             <list>          
     1 AAPL   <tibble [299 × 3]> <named list [2]>
@@ -486,7 +490,7 @@ returns_excess_monthly |>
     3 AMZN   <tibble [299 × 3]> <named list [2]>
     4 AXP    <tibble [299 × 3]> <named list [2]>
     5 BA     <tibble [299 × 3]> <named list [2]>
-    # ℹ 23 more rows
+    # ℹ 22 more rows
 
 ## Python
 
