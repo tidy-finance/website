@@ -10,25 +10,14 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidymodels)
 library(torch)
-```
-
-    Warning: package 'torch' was built under R version 4.5.3
-
-``` r
 library(brulee)
-library(hardhat)
 library(ranger)
 library(glmnet)
 ```
 
-The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests and `hardhat` ([Vaughan and Kuhn 2022](#ref-hardhat)) is a helper function for robust data preprocessing at fit time and prediction time.
+The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
 
 ## Python
 
@@ -59,13 +48,13 @@ Formally, we partition the predictor space into \\J\\ non-overlapping regions, \
 
 \\ R_1(j,s) = \\x \mid x_j \< s\\ \mbox{ and } R_2(j,s) = \\x \mid x_j \geq s\\. \tag{1}\\
 
-To pick \\j\\ and \\s\\, we find the pair that minimizes the residual sum of square (RSS):
+To pick \\j\\ and \\s\\, we find the pair that minimizes the residual sum of squares (RSS):
 
 \\ \sum\_{i:\\ x_i \in R_1(j,s)} (y_i - \hat{y}\_{R_1})^2 + \sum\_{i:\\ x_i \in R_2(j,s)} (y_i - \hat{y}\_{R_2})^2 \tag{2}\\
 
 As in [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md) in the context of penalized regressions, the first relevant question is: what are the hyperparameter decisions? Instead of a regularization parameter, trees are fully determined by the number of branches used to generate a partition (sometimes one specifies the minimum number of observations in each final branch instead of the maximum number of branches).
 
-Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build \\B\\ decision trees \\T_1, \ldots, T_B\\ using the training sample. For that purpose, we randomly select features to be included in the building of each tree. For each observation in the test set, we then form a prediction \\\hat{y} = \frac{1}{B}\sum\limits\_{i=1}^B\hat{y}\_{T_i}\\.
+Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build \\B\\ decision trees \\T_1, \ldots, T_B\\ using the training sample. In addition, only a random subset of the features is considered as split candidates at each node of each tree. For each observation in the test set, we then form a prediction \\\hat{y} = \frac{1}{B}\sum\limits\_{i=1}^B\hat{y}\_{T_i}\\.
 
 ## Neural Networks
 
@@ -73,7 +62,7 @@ Roughly speaking, neural networks propagate information from an input layer, thr
 
 Each neuron applies a non-linear *activation function* \\f\\ to its aggregated signal before sending its output to the next layer \\ x_k^l = f\left(\theta^k\_{0} + \sum\limits\_{j = 1}^{N ^l}z_j\theta\_{l,j}^k\right) \tag{3}\\
 
-Here, \\\theta\\ are the parameters to fit, \\N^l\\ denotes the number of units (a hyperparameter to tune), and \\z_j\\ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layer \\z_j = x_k-1\\. While the easiest case with \\f(x) = \alpha + \beta x\\ resembles linear regression, typical activation functions are sigmoid (i.e., \\f(x) = (1+e^{-x})^{-1}\\) or ReLu (i.e., \\f(x) = max(x, 0)\\).
+Here, \\\theta\\ are the parameters to fit, \\N^l\\ denotes the number of units (a hyperparameter to tune), and \\z_j\\ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layer \\z_j = x_j^{l-1}\\. While the easiest case with \\f(x) = \alpha + \beta x\\ resembles linear regression, typical activation functions are sigmoid (i.e., \\f(x) = (1+e^{-x})^{-1}\\) or ReLU (i.e., \\f(x) = \max(x, 0)\\).
 
 Neural networks gain their flexibility from chaining multiple layers together. Naturally, this imposes many degrees of freedom on the network architecture for which no clear theoretical guidance exists. The specification of a neural network requires, at a minimum, a stance on depth (number of hidden layers), the activation function, the number of neurons, the connection structure of the units (dense or sparse), and the application of regularization techniques to avoid overfitting. Finally, *learning* means to choose optimal parameters relying on numerical optimization, which often requires specifying an appropriate learning rate.
 
@@ -87,16 +76,16 @@ Despite these computational challenges, implementation in Python is not tedious 
 
 ## Option Pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price \\K\\) at a specific date (the exercise date \\T\\). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by \\ \begin{aligned} C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r T} \\ d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r_f + \frac{\sigma^2}{2}\right)T\right) \\ d_2 &= d_1 - \sigma\sqrt{T} \end{aligned} \tag{4}\\
+To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price \\K\\) at a specific date (the exercise date \\T\\). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by \\ \begin{aligned} C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r T} \\ d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r + \frac{\sigma^2}{2}\right)T\right) \\ d_2 &= d_1 - \sigma\sqrt{T} \end{aligned} \tag{4}\\
 
-where \\C(S, T)\\ is the price of the option as a function of today’s stock price of the underlying, \\S\\, with time to maturity \\T\\, \\r_f\\ is the risk-free interest rate, and \\\sigma\\ is the volatility of the underlying stock return. \\\Phi\\ is the cumulative distribution function of a standard normal random variable.
+where \\C(S, T)\\ is the price of the option as a function of today’s stock price of the underlying, \\S\\, with time to maturity \\T\\, \\r\\ is the risk-free interest rate, and \\\sigma\\ is the volatility of the underlying stock return. \\\Phi\\ is the cumulative distribution function of a standard normal random variable.
 
-The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters \\S, K, r_f, T\\, and \\\sigma\\ are specified (arguably, in a realistic context, all parameters are easy to specify except for \\\sigma\\ which has to be estimated). A simple function allows computing the price as we do below.
+The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters \\S, K, r, T\\, and \\\sigma\\ are specified (arguably, in a realistic context, all parameters are easy to specify except for \\\sigma\\ which has to be estimated). A simple function allows computing the price as we do below.
 
 ## R
 
 ``` r
-black_scholes_price <- function(S, K = 70, r = 0, T = 1, sigma = 0.2) {
+black_scholes_price <- function(S, K, r, T, sigma) {
 
   d1 <- (log(S / K) + (r + sigma^2 / 2) * T) / (sigma * sqrt(T))
   d2 <- d1 - sigma * sqrt(T)
@@ -133,6 +122,7 @@ In order to keep the analysis reproducible, we set a random seed. A random seed 
 
 ``` r
 set.seed(420)
+torch_manual_seed(420)
 
 option_prices <- expand_grid(
   S = 40:60,
@@ -143,12 +133,11 @@ option_prices <- expand_grid(
 ) |>
   mutate(
     black_scholes = black_scholes_price(S, K, r, T, sigma),
-    observed_price = map_dbl(
-      black_scholes,
-      function(x) x + rnorm(1, sd = 0.15)
-    )
+    observed_price = black_scholes + rnorm(n(), sd = 0.15)
   )
 ```
+
+Note that `set.seed()` controls the random numbers that R generates, e.g., for the noise term above, while `torch_manual_seed()` ensures that the training of neural networks via `torch` further below is reproducible as well.
 
 ## Python
 
@@ -190,7 +179,7 @@ Next, we split the data into a training set (which contains 1 percent of all the
 
 ## R
 
-Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,745 observations and is therefore relatively small.
+Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,744 observations and is therefore relatively small.
 
 ``` r
 split <- initial_split(option_prices, prop = 1 / 100)
@@ -200,7 +189,7 @@ We process the training dataset further before we fit the different ML models. W
 
 ``` r
 rec <- recipe(observed_price ~ .,
-  data = option_prices
+  data = training(split)
 ) |>
   step_rm(black_scholes) |>
   step_normalize(all_predictors())
@@ -208,7 +197,7 @@ rec <- recipe(observed_price ~ .,
 
 ## Python
 
-Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,745 observations and is therefore relatively small.
+Note that the entire grid of possible combinations contains 1,574,496 different specifications. Thus, the sample to learn the Black-Scholes price contains only 15,744 observations and is therefore relatively small.
 
 ``` python
 train_data, test_data = train_test_split(
@@ -233,7 +222,7 @@ preprocessor = ColumnTransformer(
 
 ### Single layer networks and random forests
 
-Next, we show how to fit a neural network to the data. The specification below defines a single layer feed-forward neural network with ten hidden units.
+Next, we show how to fit a neural network to the data. The specification below defines a single layer feed-forward neural network with ten hidden units. Note that we fix the hyperparameters of all models in this chapter at sensible values to focus on the implementation workflow. In a real application, they should be tuned via cross-validation, as we illustrate in [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md).
 
 ## R
 
@@ -250,7 +239,7 @@ nnet_model <- mlp(
   set_engine("brulee", verbose = FALSE)
 ```
 
-The `verbose = FALSE` argument prevents logging the results to the console. We can follow the straightforward `tidymodel` workflow as in [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md): define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data.
+The `verbose = FALSE` argument prevents logging the results to the console. We can follow the straightforward `tidymodels` workflow as in [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md): define a workflow, equip it with the recipe, and specify the associated model. Finally, fit the model with the training data.
 
 ``` r
 nnet_fit <- workflow() |>
@@ -261,13 +250,18 @@ nnet_fit <- workflow() |>
 
 ## Python
 
-The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. We set the number of training iterations to `max_iter=1000`.
+The function `MLPRegressor()` from the package `scikit-learn` provides the functionality to initialize a single layer, feed-forward neural network. To keep the specification consistent with the R implementation, we use the logistic (sigmoid) activation function, the quasi-Newton solver LBFGS (which is also the default optimizer of `brulee`), and the same weight decay penalty `alpha=0.0001`. We set the number of training iterations to `max_iter=500`.
 
 ``` python
-max_iter = 1000
+max_iter = 500
 
 nnet_model = MLPRegressor(
-    hidden_layer_sizes=10, max_iter=max_iter, random_state=random_state
+    hidden_layer_sizes=10,
+    activation="logistic",
+    solver="lbfgs",
+    alpha=0.0001,
+    max_iter=max_iter,
+    random_state=random_state,
 )
 ```
 
@@ -284,9 +278,9 @@ nnet_fit = nnet_pipeline.fit(
 )
 ```
 
-One word of caution regarding the training of Neural networks: For illustrative purposes we sequentially update the parameters by reiterating through the data 1,000 times (`max_iter=1000`). Typically, however, early stopping rules are advised that aim to interrupt the process of updating parameters as soon as the predictive performance on the validation test seems to deteriorate. A detailed discussion of these details in the implementation would go beyond the scope of this book.
+One word of caution regarding the training of neural networks: For illustrative purposes, we sequentially update the parameters by reiterating through the training data many times. Typically, however, early stopping rules are advised that aim to interrupt the process of updating parameters as soon as the predictive performance on a validation set seems to deteriorate. A detailed discussion of these implementation details would go beyond the scope of this book.
 
-Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where we require at least 2000 observations in a node.
+Once you are familiar with the workflow, it is a piece of cake to fit other models. For instance, the model below initializes a random forest with 50 trees contained in the ensemble, where a node must contain at least 100 observations to be split further and three of the five predictors are randomly selected as split candidates at each node.
 
 ## R
 
@@ -294,8 +288,9 @@ The random forests are trained using the package `ranger`, which is required to 
 
 ``` r
 rf_model <- rand_forest(
+  mtry = 3,
   trees = 50,
-  min_n = 2000
+  min_n = 100
 ) |>
   set_engine("ranger") |>
   set_mode("regression")
@@ -312,11 +307,14 @@ rf_fit <- workflow() |>
 
 ## Python
 
-The random forests are trained using the function `RandomForestRegressor()`.
+The random forests are trained using the function `RandomForestRegressor()`, where the arguments `min_samples_split` and `max_features` correspond to `min_n` and `mtry` in the R implementation.
 
 ``` python
 rf_model = RandomForestRegressor(
-    n_estimators=50, min_samples_leaf=2000, random_state=random_state
+    n_estimators=50,
+    min_samples_split=100,
+    max_features=3,
+    random_state=random_state,
 )
 ```
 
@@ -339,7 +337,7 @@ A deep neural network is a neural network with multiple layers between the input
 
 ## R
 
-Note that while the `tidymodels` workflow is extremely convenient, these more sophisticated multi-layer (so-called *deep*) neural networks are not supported by `tidymodels` yet (as of September 2022). Instead, an implementation of a deep neural network in R requires additional computational tools. For that reason, the code snippet below illustrates how to initialize a sequential model with three hidden layers with 10 units per layer. The `brulee` package provides a convenient interface to `torch` and is flexible enough to handle different activation functions.
+Fitting deep neural networks is straightforward within the `tidymodels` workflow: `mlp()` accepts a vector of hidden units, where each element corresponds to one hidden layer. The code snippet below initializes a network with three hidden layers with ten units per layer. Under the hood, the `brulee` package translates this specification into a `torch` model and is flexible enough to handle different activation functions.
 
 ``` r
 deep_nnet_model <- mlp(
@@ -352,7 +350,7 @@ deep_nnet_model <- mlp(
   set_engine("brulee", verbose = FALSE)
 ```
 
-To train the neural network, we provide the inputs (`x`) and the variable to predict (`y`) and then fit the parameters. Note the slightly tedious use of the method `extract_mold(nnet_fit)`. Instead of simply using the *raw* data, we fit the neural network with the same processed data that is used for the single-layer feed-forward network. What is the difference to simply calling `x = training(data) |> select(-observed_price, -black_scholes)`? Recall that the recipe standardizes the variables such that all columns have unit standard deviation and zero mean. Further, it adds consistency if we ensure that all models are trained using the same recipe such that a change in the recipe is reflected in the performance of any model. A final note on a potentially irritating observation: `fit()` alters the model - this is one of the few instances, where a function in R alters the *input* such that after the function call the object `model` is not same anymore!
+Since we reuse the workflow logic from above, fitting the deep neural network requires no additional steps. Note that we again equip the workflow with the recipe `rec`: Reusing the same recipe ensures that all models are trained with identically processed data, e.g., with standardized predictors, such that a change in the recipe is reflected in the performance of every model.
 
 ``` r
 deep_nnet_fit <- workflow() |>
@@ -363,13 +361,14 @@ deep_nnet_fit <- workflow() |>
 
 ## Python
 
-The following code chunk implements a deep neural network with three hidden layers of size ten each and logistic activation functions.
+The following code chunk implements a deep neural network with three hidden layers of size ten each, using the same activation function, solver, and penalty as for the single-layer network above.
 
 ``` python
 deep_nnet_model = MLPRegressor(
     hidden_layer_sizes=(10, 10, 10),
     activation="logistic",
     solver="lbfgs",
+    alpha=0.0001,
     max_iter=max_iter,
     random_state=random_state,
 )
@@ -386,11 +385,11 @@ deep_nnet_fit = deep_nnet_pipeline.fit(
 
 ### Universal approximation
 
-Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions. To illustrate this, we include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. We fit a Lasso regression model with a pre-specified penalty term (consult [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md) on how to tune the model hyperparameters).
+Before we evaluate the results, we implement one more model. In principle, any non-linear function can also be approximated by a linear model containing the input variables’ polynomial expansions and interaction terms. We fit a Lasso regression model with the polynomially expanded predictors and a pre-specified penalty term (consult [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md) on how to tune the model hyperparameters).
 
 ## R
 
-To illustrate this, we first define a new recipe, `rec_linear`, which processes the training data even further. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between \\r^2\\ and \\r^3\\ is the same as the term \\r^5\\).
+We first define a new recipe, `rec_linear`, which processes the training data even further: We include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between \\r^2\\ and \\r^3\\ is the same as the term \\r^5\\).
 
 ``` r
 rec_linear <- rec |>
@@ -401,7 +400,7 @@ rec_linear <- rec |>
   step_interact(terms = ~ all_predictors():all_predictors()) |>
   step_lincomb(all_predictors())
 
-lm_model <- linear_reg(penalty = 0.01) |>
+lm_model <- linear_reg(penalty = 0.01, mixture = 1) |>
   set_engine("glmnet")
 
 lm_fit <- workflow() |>
@@ -411,6 +410,8 @@ lm_fit <- workflow() |>
 ```
 
 ## Python
+
+The function `PolynomialFeatures()` generates all polynomial and interaction terms of the predictors up to a total degree of five. Note that the resulting set of features hence differs slightly from the R implementation, which expands each predictor individually up to the fifth degree before adding pairwise interactions of the expanded terms. We use the same penalty value as in the R implementation.
 
 ``` python
 lm_pipeline = Pipeline(
@@ -438,27 +439,25 @@ Finally, we collect all predictions to compare the *out-of-sample* prediction er
 
 ## R
 
-Note that for the evaluation, we use the call to `extract_mold()` to ensure that we use the same pre-processing steps for the testing data across each model. We also use the somewhat advanced functionality in `forge()`, which provides an easy, consistent, and robust pre-processor at prediction time.
+Note that the fitted workflows automatically apply the recipe steps to new data at prediction time, which ensures that all models use consistently pre-processed testing data. We collect the fitted workflows in a named list and call `augment()` on each of them, which returns the data augmented with a column of predictions, `.pred`.
 
 ``` r
 out_of_sample_data <- testing(split) |>
   slice_sample(n = 10000)
 
-predictive_performance <- deep_nnet_fit |>
-  predict(out_of_sample_data)|>
-  rename("Deep NN" = .pred) |>
-  bind_cols(nnet_fit |>
-    predict(out_of_sample_data)) |>
-  rename("Single layer" = .pred) |>
-  bind_cols(lm_fit |> predict(out_of_sample_data)) |>
-  rename("Lasso" = .pred) |>
-  bind_cols(rf_fit |> predict(out_of_sample_data)) |>
-  rename("Random forest" = .pred) |>
-  bind_cols(out_of_sample_data) |>
-  pivot_longer("Deep NN":"Random forest", names_to = "Model") |>
+model_fits <- list(
+  "Deep NN" = deep_nnet_fit,
+  "Lasso" = lm_fit,
+  "Random forest" = rf_fit,
+  "Single layer" = nnet_fit
+)
+
+predictive_performance <- model_fits |>
+  map(augment, new_data = out_of_sample_data) |>
+  list_rbind(names_to = "Model") |>
   mutate(
-    moneyness = (S - K),
-    pricing_error = abs(value - black_scholes)
+    moneyness = S - K,
+    pricing_error = abs(.pred - black_scholes)
   )
 ```
 
@@ -516,14 +515,14 @@ predictive_performance |>
   geom_smooth(se = FALSE, method = "gam", formula = y ~ s(x, bs = "cs")) +
   facet_wrap(~Model, ncol = 2) +
   labs(
-    x = "Moneyness (S - K)", color = NULL,
+    x = "Moneyness (S - K)",
     y = "Absolute prediction error (USD)",
-    title = "Prediction errors of call option prices for different models",
-    linetype = NULL
-  )
+    title = "Prediction errors of call option prices for different models"
+  ) +
+  theme(legend.position = "none")
 ```
 
-[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money.](option-pricing-via-machine-learning_files/figure-html/fig-431-1.png)](option-pricing-via-machine-learning_files/figure-html/fig-431-1.png "Figure 1: Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
+[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness.](option-pricing-via-machine-learning_files/figure-html/fig-431-1.png)](option-pricing-via-machine-learning_files/figure-html/fig-431-1.png "Figure 1: Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
 
 Figure 1: Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
 
@@ -539,14 +538,14 @@ predictive_performance_figure = (
     + facet_wrap("Model")
     + labs(
         x="Moneyness (S - K)", y="Absolute prediction error (USD)",
-        title="Prediction errors of call options for different models"
+        title="Prediction errors of call option prices for different models"
         )
     + theme(legend_position="")
 )
 predictive_performance_figure.show()
 ```
 
-[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (strike price minus stock price). The figure indicates variation across the models and across moneyness. The random forest approach performs worst, in particular out of the money.](option-pricing-via-machine-learning_files/figure-html/option-pricing-via-machine-learning-fig-431-py-1.png)](option-pricing-via-machine-learning_files/figure-html/option-pricing-via-machine-learning-fig-431-py-1.png "Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
+[![Title: Prediction errors of call option prices for different models. The figure shows the pricing error of the different machine learning methods for call options for different levels of moneyness (stock price minus strike price). The figure indicates variation across the models and across moneyness.](option-pricing-via-machine-learning_files/figure-html/option-pricing-via-machine-learning-fig-431-py-1.png)](option-pricing-via-machine-learning_files/figure-html/option-pricing-via-machine-learning-fig-431-py-1.png "Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.")
 
 Absolute prediction error in USD for the different fitted methods. The prediction error is evaluated on a sample of call options that were not used for training.
 
@@ -554,14 +553,14 @@ The results can be summarized as follows.
 
 ## R
 
-1.  All ML methods seem to be able to price call options after observing the training test set.
+1.  All ML methods seem to be able to price call options after observing the training set.
 2.  The average prediction errors increase for far in-the-money options.
 3.  Random forest and the Lasso seem to perform consistently worse in predicting option prices than the neural networks.
 4.  The complexity of the deep neural network relative to the single-layer neural network does not result in better out-of-sample predictions.
 
 ## Python
 
-1.  All ML methods seem to be able to price call options after observing the training test set.
+1.  All ML methods seem to be able to price call options after observing the training set.
 2.  Random forest and the Lasso seem to perform consistently worse in predicting option prices than the neural networks.
 3.  For random forest and Lasso, the average prediction errors increase for far in-the-money options.
 4.  The increased complexity of the deep neural network relative to the single-layer neural network results in lower prediction errors.
@@ -576,10 +575,11 @@ The results can be summarized as follows.
 
 1.  Write a function that takes `y` and a matrix of predictors `X` as inputs and returns a characterization of the relevant parameters of a regression tree with one branch.
 2.  Create a function that creates predictions for a new matrix of predictors `newX` based on the estimated regression tree.
-3.  Use the package `rpart` to *grow* a tree based on the training data and use the illustration tools in `rpart` to understand which characteristics the tree deems relevant for option pricing.
+3.  Use the package `rpart` (R) or the module `sklearn.tree` (Python) to *grow* a tree based on the training data and use the corresponding illustration tools to understand which characteristics the tree deems relevant for option pricing.
 4.  Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
-5.  Use `brulee` to initialize a sequential neural network that can take the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. *This sounds harder than it is:* see a simple [regression example here.](https://tensorflow.rstudio.com/tutorials/beginners/basic-ml/tutorial_basic_regression/) How many parameters does the neural network you aim to fit have?
-6.  Compile the object from the previous exercise. It is important that you specify a loss function. Illustrate the difference in predictive accuracy for different architecture choices.
+5.  Use `brulee` (R) or `scikit-learn` (Python) to initialize a neural network that takes the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. How many parameters does the neural network you aim to fit have?
+6.  Fit the network from the previous exercise. Pay special attention to the loss function used for training. Illustrate the difference in predictive accuracy for different architecture choices, e.g., regarding the depth of the network or the number of hidden units.
+7.  The test data in this chapter is sampled from the same parameter grid as the training data, so the models only have to *interpolate*. Design an experiment that evaluates *extrapolation* instead: For instance, train the models only on options with volatilities \\\sigma \leq 0.5\\ and evaluate the pricing errors for options with \\\sigma \> 0.5\\. Which of the methods deteriorates most, and why are regression trees particularly ill-suited for extrapolation?
 
 ## References
 
@@ -608,7 +608,5 @@ Jiang, Jingwen, Bryan T. Kelly, and Dacheng Xiu. 2023. “(Re-)Imag(in)ing Price
 Kuhn, Max, and Daniel Falbel. 2023. *brulee: High-Level Modeling Functions with ’torch’*. <https://CRAN.R-project.org/package=brulee>.
 
 Paszke, Adam, Sam Gross, Francisco Massa, et al. 2019. “PyTorch: An Imperative Style, High-Performance Deep Learning Library.” In *Advances in Neural Information Processing Systems 32*. Curran Associates, Inc. <http://papers.neurips.cc/paper/9015-pytorch-an-imperative-style-high-performance-deep-learning-library.pdf>.
-
-Vaughan, Davis, and Max Kuhn. 2022. *hardhat: Construct modeling packages*. <https://CRAN.R-project.org/package=hardhat>.
 
 Wright, Marvin N., and Andreas Ziegler. 2017. “ranger: A fast implementation of random forests for high dimensional data in C++ and R.” *Journal of Statistical Software* 77 (1): 1–17. <http://dx.doi.org/10.18637/jss.v077.i01>.
