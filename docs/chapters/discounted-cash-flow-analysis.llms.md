@@ -868,7 +868,7 @@ Combining these adjustments, we can compute the equity value that belongs to sha
 
 We leave it as an exercise to calculate the equity value using the DCF value from above.
 
-## Key takeaways
+## Key Takeaways
 
 - Free Cash Flow can be calculated by transforming financial statement data into standardized ratios linked to company revenue.
 - Forecasting future cash flows requires both historical financial data and macroeconomic projections such as GDP growth rates.

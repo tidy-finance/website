@@ -10,17 +10,7 @@ We use the following packages throughout this chapter. Later on, we load more pa
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(tidyfinance)
-```
-
-    Warning: package 'tidyfinance' was built under R version 4.5.3
-
-``` r
 library(scales)
 ```
 
@@ -33,6 +23,8 @@ import io
 import re
 import zipfile
 from curl_cffi import requests
+
+tf.set_backend("polars")
 ```
 
 Moreover, we initially define the date range for which we fetch and store the financial data, making future data updates tractable. In case you need another time frame, you can adjust the dates below. Our data starts with 1960 since most asset pricing studies use data from 1962 on.
@@ -94,7 +86,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpiAW7BK\file70ac5117797e.zip' (13044 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpATlL3L\filea141be9247f.zip' (13045 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -126,7 +118,7 @@ factors_ff3_monthly_raw <- as_tibble(factors_ff3_monthly_raw)
 factors_ff3_monthly_raw
 ```
 
-    # A tibble: 1,198 × 5
+    # A tibble: 1,199 × 5
         date `Mkt-RF`   SMB   HML    RF
        <int>    <dbl> <dbl> <dbl> <dbl>
     1 192607     2.89 -2.55 -2.39  0.22
@@ -134,7 +126,7 @@ factors_ff3_monthly_raw
     3 192609     0.38 -1.36  0.05  0.23
     4 192610    -3.27 -0.14  0.82  0.32
     5 192611     2.54 -0.11 -0.61  0.31
-    # ℹ 1,193 more rows
+    # ℹ 1,194 more rows
 
 Finally, we still have to clean the data. The set *Fama/French 3 Factors* contains the return time series of the market `mkt_excess`, size `smb`, and value `hml` factors alongside the risk-free rate `risk_free`. Cleaning involves a handful of steps:
 
@@ -264,11 +256,11 @@ shape: (780, 5)
 | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
 | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
 | …          | …          | …       | …       | …         |
-| 2024-08-01 | 0.016      | -0.035  | -0.011  | 0.0048    |
-| 2024-09-01 | 0.0172     | -0.0012 | -0.0277 | 0.004     |
-| 2024-10-01 | -0.01      | -0.0096 | 0.0089  | 0.0039    |
-| 2024-11-01 | 0.0649     | 0.0454  | 0.0029  | 0.004     |
-| 2024-12-01 | -0.0317    | -0.027  | -0.0298 | 0.0037    |
+| 2024-08-01 | 0.016      | -0.0349 | -0.0113 | 0.0048    |
+| 2024-09-01 | 0.0172     | -0.0013 | -0.0273 | 0.004     |
+| 2024-10-01 | -0.01      | -0.0095 | 0.0091  | 0.0039    |
+| 2024-11-01 | 0.0649     | 0.0449  | 0.0038  | 0.004     |
+| 2024-12-01 | -0.0317    | -0.027  | -0.0297 | 0.0037    |
 
 All of these steps are doable, but none of them are really about finance—they are just the technical scaffolding required before you can work with the actual factor returns. That is where a dedicated package becomes invaluable.
 
@@ -289,17 +281,13 @@ factors_ff3_monthly <- download_data(
 
 ## Python
 
-Because the downloaded data arrives with timestamp columns, we cast the `date` column to the polars `Date` type — calendar dates rather than timestamps — a convention we use for all tables we store in this book.
-
 ``` python
-factors_ff3_monthly = pl.from_pandas(
-    tf.download_data(
-        domain="famafrench",
-        dataset="Fama/French 3 Factors",
-        start_date=start_date,
-        end_date=end_date,
-    )
-).with_columns(pl.col("date").cast(pl.Date))
+factors_ff3_monthly = tf.download_data(
+    domain="famafrench",
+    dataset="Fama/French 3 Factors",
+    start_date=start_date,
+    end_date=end_date,
+)
 ```
 
 We also download the set *5 Factors (2x3)*, which additionally includes the return time series of the profitability `rmw` and investment `cma` factors. We demonstrate how the monthly factors are constructed in the chapter [Replicating Fama and French Factors](../chapters/replicating-fama-and-french-factors.llms.md).
@@ -318,14 +306,12 @@ factors_ff5_monthly <- download_data(
 ## Python
 
 ``` python
-factors_ff5_monthly = pl.from_pandas(
-    tf.download_data(
-        domain="famafrench",
-        dataset="Fama/French 5 Factors (2x3)",
-        start_date=start_date,
-        end_date=end_date,
-    )
-).with_columns(pl.col("date").cast(pl.Date))
+factors_ff5_monthly = tf.download_data(
+    domain="famafrench",
+    dataset="Fama/French 5 Factors (2x3)",
+    start_date=start_date,
+    end_date=end_date,
+)
 ```
 
 It is straightforward to download the corresponding *daily* Fama-French factors with the same function.
@@ -344,14 +330,12 @@ factors_ff3_daily <- download_data(
 ## Python
 
 ``` python
-factors_ff3_daily = pl.from_pandas(
-    tf.download_data(
-        domain="famafrench",
-        dataset="Fama/French 3 Factors [Daily]",
-        start_date=start_date,
-        end_date=end_date,
-    )
-).with_columns(pl.col("date").cast(pl.Date))
+factors_ff3_daily = tf.download_data(
+    domain="famafrench",
+    dataset="Fama/French 3 Factors [Daily]",
+    start_date=start_date,
+    end_date=end_date,
+)
 ```
 
 In a subsequent chapter, we also use the monthly returns of 10 industry portfolios, so let us fetch that data, too.
@@ -370,14 +354,12 @@ industries_ff_monthly <- download_data(
 ## Python
 
 ``` python
-industries_ff_monthly = pl.from_pandas(
-    tf.download_data(
-        domain="famafrench",
-        dataset="10 Industry Portfolios",
-        start_date=start_date,
-        end_date=end_date,
-    )
-).with_columns(pl.col("date").cast(pl.Date))
+industries_ff_monthly = tf.download_data(
+    domain="famafrench",
+    dataset="10 Industry Portfolios",
+    start_date=start_date,
+    end_date=end_date,
+)
 ```
 
 It is worth taking a look at all available portfolio return time series from Kenneth French’s homepage.
@@ -468,20 +450,22 @@ tf.download_data(
 )
 ```
 
-              date  risk_free  mkt_excess        me        ia       roe        eg
-    0   1967-01-01   0.003927    0.081852  0.068122 -0.029263  0.018813 -0.025511
-    1   1967-02-01   0.003743    0.007557  0.016235 -0.002915  0.035399  0.021792
-    2   1967-03-01   0.003693    0.040169  0.019836 -0.016772  0.018417 -0.011192
-    3   1967-04-01   0.003344    0.038786 -0.006700 -0.028972  0.010253 -0.016371
-    4   1967-05-01   0.003126   -0.042807  0.027457  0.021864  0.005901  0.001191
-    ..         ...        ...         ...       ...       ...       ...       ...
-    691 2024-08-01   0.004419    0.016518 -0.040817  0.004687  0.018369  0.008116
-    692 2024-09-01   0.004619    0.016806 -0.011967 -0.000010  0.007408 -0.032810
-    693 2024-10-01   0.003907   -0.009701 -0.011261 -0.011676 -0.002314 -0.008335
-    694 2024-11-01   0.003955    0.065002  0.043985 -0.049491 -0.015370 -0.021420
-    695 2024-12-01   0.003663   -0.031637 -0.051564 -0.003684 -0.021442  0.049624
+shape: (696, 7)
 
-    [696 rows x 7 columns]
+| date       | risk_free | mkt_excess | me        | ia        | roe       | eg        |
+|------------|-----------|------------|-----------|-----------|-----------|-----------|
+| date       | f64       | f64        | f64       | f64       | f64       | f64       |
+| 1967-01-01 | 0.003927  | 0.081852   | 0.068122  | -0.029263 | 0.018813  | -0.025511 |
+| 1967-02-01 | 0.003743  | 0.007557   | 0.016235  | -0.002915 | 0.035399  | 0.021792  |
+| 1967-03-01 | 0.003693  | 0.040169   | 0.019836  | -0.016772 | 0.018417  | -0.011192 |
+| 1967-04-01 | 0.003344  | 0.038786   | -0.0067   | -0.028972 | 0.010253  | -0.016371 |
+| 1967-05-01 | 0.003126  | -0.042807  | 0.027457  | 0.021864  | 0.005901  | 0.001191  |
+| …          | …         | …          | …         | …         | …         | …         |
+| 2024-08-01 | 0.004419  | 0.016518   | -0.040817 | 0.004687  | 0.018369  | 0.008116  |
+| 2024-09-01 | 0.004619  | 0.016806   | -0.011967 | -0.00001  | 0.007408  | -0.03281  |
+| 2024-10-01 | 0.003907  | -0.009701  | -0.011261 | -0.011676 | -0.002314 | -0.008335 |
+| 2024-11-01 | 0.003955  | 0.065002   | 0.043985  | -0.049491 | -0.01537  | -0.02142  |
+| 2024-12-01 | 0.003663  | -0.031637  | -0.051564 | -0.003684 | -0.021442 | 0.049624  |
 
 ## Macroeconomic Predictors
 
@@ -647,20 +631,22 @@ tf.download_data(
 )
 ```
 
-               date    rp_div        dp        dy  ...     ltr     tms     dfy      infl
-    1068 1960-01-01  0.006165 -3.394191 -3.468337  ...  0.0112  0.0006  0.0073 -0.003401
-    1069 1960-02-01 -0.015793 -3.383903 -3.374774  ...  0.0204  0.0033  0.0078  0.003413
-    1070 1960-03-01 -0.020521 -3.350808 -3.364804  ...  0.0282  0.0080  0.0076  0.000000
-    1071 1960-04-01  0.023755 -3.331425 -3.349108  ... -0.0170  0.0103  0.0075  0.003401
-    1072 1960-05-01  0.016046 -3.356176 -3.329677  ...  0.0152  0.0088  0.0082  0.000000
-    ...         ...       ...       ...       ...  ...     ...     ...     ...       ...
-    1830 2023-07-01 -0.022065 -4.198545 -4.167881  ... -0.0035 -0.0135  0.0108  0.001908
-    1831 2023-08-01 -0.053627 -4.177780 -4.195656  ... -0.0052 -0.0113  0.0107  0.004367
-    1832 2023-09-01 -0.026090 -4.124953 -4.174900  ... -0.0221 -0.0094  0.0103  0.002485
-    1833 2023-10-01  0.079457 -4.097976 -4.120201  ... -0.0121 -0.0054  0.0102 -0.000383
-    1834 2023-11-01  0.038308 -4.178670 -4.093246  ...  0.0347 -0.0077  0.0101 -0.002015
+shape: (767, 15)
 
-    [767 rows x 15 columns]
+| date | rp_div | dp | dy | ep | de | svar | bm | ntis | tbl | lty | ltr | tms | dfy | infl |
+|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| date | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 |
+| 1960-01-01 | 0.006165 | -3.394191 | -3.468337 | -2.797533 | -0.596658 | 0.000919 | 0.499502 | 0.022116 | 0.0435 | 0.0441 | 0.0112 | 0.0006 | 0.0073 | -0.003401 |
+| 1960-02-01 | -0.015793 | -3.383903 | -3.374774 | -2.806662 | -0.577241 | 0.00115 | 0.493557 | 0.024037 | 0.0396 | 0.0429 | 0.0204 | 0.0033 | 0.0078 | 0.003413 |
+| 1960-03-01 | -0.020521 | -3.350808 | -3.364804 | -2.792666 | -0.558142 | 0.000969 | 0.549798 | 0.025593 | 0.0331 | 0.0411 | 0.0282 | 0.008 | 0.0076 | 0.0 |
+| 1960-04-01 | 0.023755 | -3.331425 | -3.349108 | -2.787838 | -0.543587 | 0.000645 | 0.563404 | 0.025577 | 0.0323 | 0.0426 | -0.017 | 0.0103 | 0.0075 | 0.003401 |
+| 1960-05-01 | 0.016046 | -3.356176 | -3.329677 | -2.827389 | -0.528786 | 0.000424 | 0.541966 | 0.024414 | 0.0329 | 0.0417 | 0.0152 | 0.0088 | 0.0082 | 0.0 |
+| … | … | … | … | … | … | … | … | … | … | … | … | … | … | … |
+| 2023-07-01 | -0.022065 | -4.198545 | -4.167881 | -3.226908 | -0.971637 | 0.000537 | 0.205917 | -0.016677 | 0.0525 | 0.039 | -0.0035 | -0.0135 | 0.0108 | 0.001908 |
+| 2023-08-01 | -0.053627 | -4.17778 | -4.195656 | -3.203119 | -0.974662 | 0.001337 | 0.210885 | -0.016514 | 0.053 | 0.0417 | -0.0052 | -0.0113 | 0.0107 | 0.004367 |
+| 2023-09-01 | -0.02609 | -4.124953 | -4.1749 | -3.147294 | -0.97766 | 0.001023 | 0.218528 | -0.017989 | 0.0532 | 0.0438 | -0.0221 | -0.0094 | 0.0103 | 0.002485 |
+| 2023-10-01 | 0.079457 | -4.097976 | -4.120201 | -3.110379 | -0.987598 | 0.001678 | 0.221534 | -0.014711 | 0.0534 | 0.048 | -0.0121 | -0.0054 | 0.0102 | -0.000383 |
+| 2023-11-01 | 0.038308 | -4.17867 | -4.093246 | -3.181326 | -0.997345 | 0.001341 | 0.203676 | -0.020618 | 0.0527 | 0.045 | 0.0347 | -0.0077 | 0.0101 | -0.002015 |
 
 ## Other Macroeconomic Data
 
@@ -699,17 +685,14 @@ cpi_monthly <- resp_csv |>
   select(date, series, value, cpi)
 ```
 
-    Warning: The `file` argument of `vroom()` must use `I()` for literal data as
-    of vroom 1.5.0.
+    Warning: The `file` argument of `read_csv()` should use `I()` for literal
+    data as of readr 2.2.0.
       
-      # Bad:
-      vroom("X,Y\n1.5,2.3\n")
+      # Bad (for example):
+      read_csv("x,y\n1,2")
       
       # Good:
-      vroom(I("X,Y\n1.5,2.3\n"))
-    ℹ The deprecated feature was likely used in the readr package.
-      Please report the issue at
-      <https://github.com/tidyverse/readr/issues>.
+      read_csv(I("x,y\n1,2"))
 
 ## Python
 
@@ -754,6 +737,12 @@ download_data(
 )
 ```
 
+    Warning: download_data(domain = "fred") was deprecated in tidyfinance 0.6.1.
+    ℹ Please use download_data(domain = "FRED") instead.
+    ℹ The deprecated feature was likely used in the tidyfinance package.
+      Please report the issue at
+      <https://github.com/tidy-finance/r-tidyfinance/issues>.
+
     # A tibble: 780 × 3
       date       value series  
       <date>     <dbl> <chr>   
@@ -767,29 +756,27 @@ download_data(
 ## Python
 
 ``` python
-pl.from_pandas(
-    tf.download_data(
-        domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
-    )
+tf.download_data(
+    domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
 )
 ```
 
 shape: (780, 3)
 
-| date                | series     | value   |
-|---------------------|------------|---------|
-| datetime\[ns\]      | str        | f64     |
-| 1960-01-01 00:00:00 | "CPIAUCNS" | 29.3    |
-| 1960-02-01 00:00:00 | "CPIAUCNS" | 29.4    |
-| 1960-03-01 00:00:00 | "CPIAUCNS" | 29.4    |
-| 1960-04-01 00:00:00 | "CPIAUCNS" | 29.5    |
-| 1960-05-01 00:00:00 | "CPIAUCNS" | 29.5    |
-| …                   | …          | …       |
-| 2024-08-01 00:00:00 | "CPIAUCNS" | 314.796 |
-| 2024-09-01 00:00:00 | "CPIAUCNS" | 315.301 |
-| 2024-10-01 00:00:00 | "CPIAUCNS" | 315.664 |
-| 2024-11-01 00:00:00 | "CPIAUCNS" | 315.493 |
-| 2024-12-01 00:00:00 | "CPIAUCNS" | 315.605 |
+| date       | series     | value   |
+|------------|------------|---------|
+| date       | str        | f64     |
+| 1960-01-01 | "CPIAUCNS" | 29.3    |
+| 1960-02-01 | "CPIAUCNS" | 29.4    |
+| 1960-03-01 | "CPIAUCNS" | 29.4    |
+| 1960-04-01 | "CPIAUCNS" | 29.5    |
+| 1960-05-01 | "CPIAUCNS" | 29.5    |
+| …          | …          | …       |
+| 2024-08-01 | "CPIAUCNS" | 314.796 |
+| 2024-09-01 | "CPIAUCNS" | 315.301 |
+| 2024-10-01 | "CPIAUCNS" | 315.664 |
+| 2024-11-01 | "CPIAUCNS" | 315.493 |
+| 2024-12-01 | "CPIAUCNS" | 315.605 |
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key.
 
@@ -814,8 +801,6 @@ Parquet files are easily created - the code below is really all there is. You do
 ``` r
 library(nanoparquet)
 ```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
 
 ``` r
 if (!dir.exists("data")) {
@@ -885,11 +870,11 @@ shape: (780, 5)
 | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
 | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
 | …          | …          | …       | …       | …         |
-| 2024-08-01 | 0.016      | -0.035  | -0.011  | 0.0048    |
-| 2024-09-01 | 0.0172     | -0.0012 | -0.0277 | 0.004     |
-| 2024-10-01 | -0.01      | -0.0096 | 0.0089  | 0.0039    |
-| 2024-11-01 | 0.0649     | 0.0454  | 0.0029  | 0.004     |
-| 2024-12-01 | -0.0317    | -0.027  | -0.0298 | 0.0037    |
+| 2024-08-01 | 0.016      | -0.0349 | -0.0113 | 0.0048    |
+| 2024-09-01 | 0.0172     | -0.0013 | -0.0273 | 0.004     |
+| 2024-10-01 | -0.01      | -0.0095 | 0.0091  | 0.0039    |
+| 2024-11-01 | 0.0649     | 0.0449  | 0.0038  | 0.004     |
+| 2024-12-01 | -0.0317    | -0.027  | -0.0297 | 0.0037    |
 
 The last couple of code chunks are really all there is to organizing a simple database! You can also share the parquet files across devices and programming languages.
 

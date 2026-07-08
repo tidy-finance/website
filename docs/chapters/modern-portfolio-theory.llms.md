@@ -243,7 +243,7 @@ sigma = np.cov(
 )
 ```
 
-Figure [Figure 2](#fig-203) illustrates the resulting variance-covariance matrix.
+[Figure 2](#fig-203) illustrates the resulting variance-covariance matrix.
 
 ## R
 
@@ -327,7 +327,7 @@ sigma_inv = np.linalg.inv(sigma)
 omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
 ```
 
-Figure [Figure 3](#fig-204) shows the resulting portfolio weights.
+[Figure 3](#fig-204) shows the resulting portfolio weights.
 
 ## R
 
@@ -397,7 +397,7 @@ summary_mvp
     # A tibble: 1 × 3
            mu  sigma type                      
         <dbl>  <dbl> <chr>                     
-    1 0.00895 0.0325 Minimum-Variance Portfolio
+    1 0.00896 0.0325 Minimum-Variance Portfolio
 
 ## Python
 
@@ -420,7 +420,7 @@ shape: (1, 3)
 | mu       | sigma    | type                         |
 |----------|----------|------------------------------|
 | f64      | f64      | str                          |
-| 0.008952 | 0.032492 | "Minimum-Variance Portfolio" |
+| 0.008958 | 0.032492 | "Minimum-Variance Portfolio" |
 
 ## Efficient Portfolios
 
@@ -446,9 +446,9 @@ Formally, the optimization problem is given by
 
 The analytic solution for the efficient portfolio can be derived as:
 
-\\\omega\_{efp} = \frac{\lambda^\*}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
+\\\omega\_{efp} = \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
 
-where \\\lambda^\* = 2\frac{\bar\mu - D/C}{E-D^2/C}\\, \\C = \iota'\Sigma^{-1}\iota\\, \\D=\iota'\Sigma^{-1}\mu\\, and \\E=\mu'\Sigma^{-1}\mu\\. For details, we again refer to the [Proofs](../chapters/proofs.llms.md) in the Appendix.
+where \\\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}\\, \\C = \iota'\Sigma^{-1}\iota\\, \\D=\iota'\Sigma^{-1}\mu\\, and \\E=\mu'\Sigma^{-1}\mu\\. For details, we again refer to the [Proofs](../chapters/proofs.llms.md) in the Appendix.
 
 The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
 
@@ -486,7 +486,7 @@ summary_efp = pl.DataFrame(
 )
 ```
 
-Figure [Figure 4](#fig-205) shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
+[Figure 4](#fig-205) shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
 
 ## R
 

@@ -64,7 +64,7 @@ Building on our analysis from the previous chapter on [Modern Portfolio Theory](
 #| label: capital-asset-pricing-model-download-returns
 #| output: false
 symbols <- download_data(
-  domain = "constituents",
+  domain = "Index Constituents",
   index = "Dow Jones Industrial Average"
 )
 
@@ -95,26 +95,22 @@ returns_monthly <- prices_daily |>
 ```{python}
 #| label: capital-asset-pricing-model-download-returns-py
 symbols = tf.download_data(
-    domain="constituents",
-    index="Dow Jones Industrial Average"
+    domain="constituents", index="Dow Jones Industrial Average"
 )
 
 prices_daily = tf.download_data(
     domain="stock_prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2024-12-31"
+    end_date="2024-12-31",
 ).select(["symbol", "date", "adjusted_close"])
 
-prices_daily = (prices_daily
-    .with_columns(
-        counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
-    )
-    .filter(pl.col("counts") == pl.col("counts").max())
-)
+prices_daily = prices_daily.with_columns(
+    counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
+).filter(pl.col("counts") == pl.col("counts").max())
 
-returns_monthly = (prices_daily
-    .sort(["symbol", "date"])
+returns_monthly = (
+    prices_daily.sort(["symbol", "date"])
     .with_columns(month=pl.col("date").dt.truncate("1mo"))
     .group_by(["symbol", "month"], maintain_order=True)
     .agg(adjusted_close=pl.col("adjusted_close").last())

@@ -6,7 +6,7 @@ Researchers use the two-stage regression approach to estimate risk premiums in v
 
 The Fama-MacBeth procedure is a simple two-step approach: The first step uses the exposures (characteristics) as explanatory variables in \\T\\ cross-sectional regressions. For example, if \\r\_{i,t+1}\\ denote the excess returns of asset \\i\\ in month \\t+1\\, then the famous Fama-French three-factor model implies the following return generating process (see also [Campbell et al. 1998](#ref-Campbell1998)):
 
-\\\begin{aligned}r\_{i,t+1} = \alpha_i + \lambda^{M}\_t \beta^M\_{i,t} + \lambda^{SMB}\_t \beta^{SMB}\_{i,t} + \lambda^{HML}\_t \beta^{HML}\_{i,t} + \epsilon\_{i,t}.\end{aligned} \tag{1}\\
+\\\begin{aligned}r\_{i,t+1} = \alpha_t + \lambda^{M}\_t \beta^M\_{i,t} + \lambda^{SMB}\_t \beta^{SMB}\_{i,t} + \lambda^{HML}\_t \beta^{HML}\_{i,t} + \epsilon\_{i,t+1}.\end{aligned} \tag{1}\\
 
 Here, we are interested in the compensation \\\lambda^{f}\_t\\ for the exposure to each risk factor \\\beta^{f}\_{i,t}\\ at each time point, i.e., the risk premium. Note the terminology: \\\beta^{f}\_{i,t}\\ is an asset-specific characteristic, e.g., a factor exposure or an accounting variable. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., \\\lambda_t^{f}\neq0\\.
 
@@ -20,17 +20,7 @@ We use the following packages throughout this chapter:
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
-
-    Warning: package 'nanoparquet' was built under R version 4.5.3
-
-``` r
 library(sandwich)
 library(broom)
 ```
@@ -40,6 +30,9 @@ library(broom)
 ``` python
 import polars as pl
 import pyfixest as pf
+import tidyfinance as tf
+
+tf.set_backend("polars")
 ```
 
 ## Data Preparation
@@ -321,11 +314,7 @@ You can mirror the manual Newey-West specification above by passing the correspo
 
 ``` r
 library(tidyfinance)
-```
 
-    Warning: package 'tidyfinance' was built under R version 4.5.3
-
-``` r
 estimate_fama_macbeth(
   data_fama_macbeth,
   "ret_excess_lead ~ beta + bm + log_mktcap",
@@ -351,17 +340,34 @@ estimate_fama_macbeth(
 
 ## Python
 
-You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors:
+You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors and returns a data frame with the columns `factor`, `risk_premium`, `standard_error`, `t_statistic`, and `n` (the number of periods used). Note that the intercept row is labeled `Intercept`:
 
 ``` python
-import tidyfinance as tf
-
 tf.estimate_fama_macbeth(
-    data=data_fama_macbeth.to_pandas(),
-    model="ret_excess_lead ~ beta + bm + log_mktcap",
-    vcov="newey-west"
+    data=data_fama_macbeth,
+    model="ret_excess_lead ~ beta + bm + log_mktcap"
 )
 ```
+
+You can mirror the manual Newey-West specification above by passing the corresponding arguments through `vcov_options`:
+
+``` python
+tf.estimate_fama_macbeth(
+    data=data_fama_macbeth,
+    model="ret_excess_lead ~ beta + bm + log_mktcap",
+    vcov_options={"lag": 6, "prewhite": 0}
+)
+```
+
+shape: (4, 5)
+
+| factor       | risk_premium | standard_error | t_statistic | n     |
+|--------------|--------------|----------------|-------------|-------|
+| str          | f64          | f64            | f64         | f64   |
+| "Intercept"  | 0.011497     | 0.002864       | 4.014727    | 725.0 |
+| "beta"       | -0.000011    | 0.001087       | -0.010546   | 725.0 |
+| "bm"         | 0.001575     | 0.000512       | 3.077702    | 725.0 |
+| "log_mktcap" | -0.000934    | 0.000365       | -2.558543   | 725.0 |
 
 ## Key Takeaways
 

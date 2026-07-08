@@ -1,6 +1,6 @@
 # Other Data Providers
 
-In the previous chapters, we introduced many ways to get financial data that researchers regularly use. We showed how to load data from Yahoo Finance and commonly used file types, such as comma-separated or Excel files. Then, we introduced remotely connecting to WRDS and downloading data from there. However, this is only a subset of the vast amounts of data available these days.
+In the previous chapters, we introduced many ways to get financial data that researchers regularly use. We showed how to load data from Yahoo Finance and commonly used file types, such as comma-separated or Excel files. We relied on the `tidyfinance` package for downloading and cleaning data from various sources and on `fmpapi` for financial statements. Then, we introduced remotely connecting to WRDS and downloading data from there. However, this is only a subset of the vast amounts of data available these days.
 
 In this short chapter, we aim to provide an overview of common alternative data providers for which direct access via dedicated packages exists. Such a list requires constant adjustments because both data providers and access methods change. However, we want to emphasize two main insights: First, the number of packages that provide access to (financial) data is large. Too large actually to survey here exhaustively. Instead, we can only cover the tip of the iceberg. Second, both R and Python provide the functionalities to access basically any form of files or data available online. Thus, even if a desired data source does not come with a well-established package, chances are high that data can be retrieved by establishing your own API connection or by scraping the content.
 
@@ -16,7 +16,7 @@ For further inspiration on potential data sources, we recommend reading the [Awe
 
 Also, the `requests` library in Python provides a versatile and direct way to interact with APIs (Application Programming Interfaces) offered by various financial data providers. The package simplifies the process of making [HTTP requests,](https://requests.readthedocs.io/) handling authentication, and parsing the received data.
 
-Apart from the list below, we want to advertise some amazing data compiled by others. First, there is [Open Source Asset Pricing](https://www.openassetpricing.com/data) related to Chen and Zimmermann ([2022](#ref-Chen2022)). They provide return data for over 200 trading strategies with different time periods and specifications. The authors also provide signals and explanations of the factor construction. Moreover, in the same spirit, [Global factor data](https://www.jkpfactors.com) provides the data related to Jensen2022b. They provide return data for characteristic-managed portfolios from around the world. The database includes factors for 153 characteristics in 13 themes, using data from 93 countries.
+Apart from the list below, we want to advertise some amazing data compiled by others. First, there is [Open Source Asset Pricing](https://www.openassetpricing.com/data) related to Chen and Zimmermann ([2022](#ref-Chen2022)). They provide return data for over 200 trading strategies with different time periods and specifications. The authors also provide signals and explanations of the factor construction. Moreover, in the same spirit, [Global factor data](https://www.jkpfactors.com) provides the data related to Jensen et al. ([n.d.](#ref-Jensen2022b)). They provide return data for characteristic-managed portfolios from around the world. The database includes factors for 153 characteristics in 13 themes, using data from 93 countries.
 
 > **NOTE:**
 >
@@ -30,11 +30,11 @@ The data sources differ across languages because the available packages differ. 
 |----|----|----|
 |  | **Macroeconomic Variables** |  |
 | FED | The Federal Reserve Bank of St. Louis provides more than 818,000 US and international time series from 109 sources via the API FRED. The data is freely available and can be browsed online on the [FRED homepage.](https://fred.stlouisfed.org/) | `fredr` ([Boysel and Vaughan 2021](#ref-fredr)) and `alfred` ([Kleen 2021](#ref-alfred)) |
-| ECB | The European Central Bank’s [Statistical Data Warehouse](https://sdw.ecb.europa.eu/) provides data on Euro area monetary policy, financial stability, and other topics relevant to the activities of the ECB and the European System of Central Banks (ESCB). | `ecb` ([Persson 2021](#ref-ecb)) |
+| ECB | The European Central Bank’s [Data Portal](https://data.ecb.europa.eu/) (which replaced the former Statistical Data Warehouse) provides data on Euro area monetary policy, financial stability, and other topics relevant to the activities of the ECB and the European System of Central Banks (ESCB). | `ecb` ([Persson 2021](#ref-ecb)) |
 |  | **Financial data** |  |
 | [Bloomberg](https://www.bloomberg.com/) | Bloomberg’s Fundamental coverage includes current and normalized historical data for the balance sheet, income statement, cash flows statement, and financial ratios. Additionally, it provides industry-specific data for communications, consumer, energy, health care, and many more. In order to retrieve Bloomberg data, a paid subscription is needed. | `Rblpapi` ([Armstrong et al. 2022](#ref-Rblpapi)) |
-| [Refinitiv Eikon](https://www.refinitiv.com/en/financial-data) | Eikon provides access to real-time market data, news, fundamental data, analytics, trading, and messaging tools. Refinitiv’s Eikon is a paid service. Apart from the CRAN version, there is also `https://github.com/philaris/eikonapir`. | `DatastreamDSWS2R` ([Cara 2021](#ref-DatastreamDSWS2R)) and `eikonapir` |
-| [Nasdaq Data Link (Quandl)](data.nasdaq.com/publishers/qdl) | Quandl is a publisher of alternative data. Quandl publishes free data, scraped from many different sources from the web. However, some of the data requires specific subscriptions on the Quandl platform. | `Quandl` ([McTaggart et al. 2021](#ref-Quandl)) |
+| [LSEG Eikon](https://www.lseg.com/en/data-analytics) | Eikon (now part of LSEG, formerly Refinitiv) provides access to real-time market data, news, fundamental data, analytics, trading, and messaging tools. Eikon is a paid service. Apart from the CRAN version, there is also `https://github.com/philaris/eikonapir`. | `DatastreamDSWS2R` ([Cara 2021](#ref-DatastreamDSWS2R)) and `eikonapir` |
+| [Nasdaq Data Link (Quandl)](https://data.nasdaq.com/publishers/qdl) | Quandl is a publisher of alternative data. Quandl publishes free data, scraped from many different sources from the web. However, some of the data requires specific subscriptions on the Quandl platform. | `Quandl` ([McTaggart et al. 2021](#ref-Quandl)) |
 | [Simfin](https://simfin.com/) | Simfin makes fundamental financial data freely available to private investors, researchers, and students. The data provider applies automating data collection processes to collect a large set of publicly available information from firms’ financial statements. | `simfinapi` ([Gomolka 2021](#ref-simfinapi)) |
 |  | **High-frequency data** |  |
 | IEX | The IEX Group operates the Investors Exchange (IEX), a stock exchange for US equities. IEX offers US reference and market data including end-of-day and *intraday pricing data*. IEX offers an API which is freely available. | `Riex` ([Ibrahim 2021](#ref-Riex)) |
@@ -42,7 +42,7 @@ The data sources differ across languages because the available packages differ. 
 |  | **Other (free) data** |  |
 | [CoinMarketCap](https://coinmarketcap.com/) | The data provider CoinMarketCap provides cryptocurrency information and historical prices, as well as information on the exchanges they are listed on. | `crypto2` ([Stoeckl 2022](#ref-crypto2)) |
 | [CoinGecko](https://www.coingecko.com/) | CoinGecko is an alternative crypto data provider of current and historical data on a myriad of coins and exchanges. | `geckor` ([Mastitsky 2021](#ref-geckor)) |
-| Twitter | Twitter provides (limited) access for academic research to extract and analyze Tweets. | `rtweet` ([Kearney 2019](#ref-rtweet)) |
+| X (Twitter) | X (formerly Twitter) provides API access to extract and analyze posts. Note that access has become considerably more restricted and largely paid since the platform’s rebranding. | `rtweet` ([Kearney 2019](#ref-rtweet)) |
 | SEC company fillings | The [EDGAR](https://www.sec.gov/edgar/about) database provides free public access to corporate information, allowing you to research a public company’s financial information and operations by reviewing the filings the company makes with the SEC. You can also research information provided by mutual funds (including money market funds), exchange-traded funds (ETFs), and variable annuities. | `edgarWebR` ([Waldstein 2021](#ref-edgarWebR)) |
 | Google trends | Google offers public access to global search volumes through its search engine through the [Google Trends portal.](https://trends.google.com/trends/?geo=DK) | `globaltrends` ([Puhr and Müllner 2021](#ref-globaltrends)) and `gtrends` ([Massicotte and Eddelbuettel 2022](#ref-gtrendsR)) |
 
@@ -93,6 +93,8 @@ Chen, Andrew Y., and Tom Zimmermann. 2022. “Open Source Cross-Sectional Asset 
 Gomolka, Matthias. 2021. *Simfinapi: Accessing ’SimFin’ Data*. <https://CRAN.R-project.org/package=simfinapi>.
 
 Ibrahim, Myriam. 2021. *Riex: IEX Stocks and Market Data*. <https://CRAN.R-project.org/package=Riex>.
+
+Jensen, Theis Ingerslev, Bryan T. Kelly, and Lasse Heje Pedersen. n.d. “Is There a Replication Crisis in Finance?” *The Journal of Finance (forthcoming)* 78 (5): 2465–518.
 
 Kearney, Michael W. 2019. “Rtweet: Collecting and Analyzing Twitter Data.” *Journal of Open Source Software* 4 (42): 1829. <https://joss.theoj.org/papers/10.21105/joss.01829>.
 

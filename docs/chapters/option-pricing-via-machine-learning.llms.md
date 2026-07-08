@@ -15,6 +15,8 @@ library(torch)
 library(brulee)
 library(ranger)
 library(glmnet)
+
+theme_set(theme_minimal())
 ```
 
 The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
@@ -36,6 +38,8 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import Lasso
+
+theme_set(theme_minimal())
 ```
 
 We rely on `scikit-learn` to implement random forests and neural networks with tidy principles.
@@ -60,7 +64,7 @@ Models with a single tree may suffer from high predictive variance. Random fores
 
 Roughly speaking, neural networks propagate information from an input layer, through one or multiple hidden layers, to an output layer. While the number of units (neurons) in the input layer is equal to the dimension of the predictors, the output layer usually consists of one neuron (for regression) or multiple neurons for classification. The output layer predicts the future data, similar to the fitted value in a regression analysis. Neural networks have theoretical underpinnings as *universal approximators* for any smooth predictive association ([Hornik 1991](#ref-Hornik1991)). Their complexity, however, ranks neural networks among the least transparent, least interpretable, and most highly parameterized ML tools. In finance, applications of neural networks can be found in many different contexts, e.g., Avramov et al. ([2022](#ref-Avramov2022)), Chen et al. ([2023](#ref-Chen2019)), and Gu et al. ([2020](#ref-Gu2020)).
 
-Each neuron applies a non-linear *activation function* \\f\\ to its aggregated signal before sending its output to the next layer \\ x_k^l = f\left(\theta^k\_{0} + \sum\limits\_{j = 1}^{N ^l}z_j\theta\_{l,j}^k\right) \tag{3}\\
+Each neuron applies a non-linear *activation function* \\f\\ to its aggregated signal before sending its output to the next layer \\ x_k^l = f\left(\theta\_{k,0}^l + \sum\limits\_{j = 1}^{N^{l-1}}z_j\theta\_{k,j}^l\right) \tag{3}\\
 
 Here, \\\theta\\ are the parameters to fit, \\N^l\\ denotes the number of units (a hyperparameter to tune), and \\z_j\\ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layer \\z_j = x_j^{l-1}\\. While the easiest case with \\f(x) = \alpha + \beta x\\ resembles linear regression, typical activation functions are sigmoid (i.e., \\f(x) = (1+e^{-x})^{-1}\\) or ReLU (i.e., \\f(x) = \max(x, 0)\\).
 
@@ -76,7 +80,7 @@ Despite these computational challenges, implementation in Python is not tedious 
 
 ## Option Pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price \\K\\) at a specific date (the exercise date \\T\\). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by \\ \begin{aligned} C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r T} \\ d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r + \frac{\sigma^2}{2}\right)T\right) \\ d_2 &= d_1 - \sigma\sqrt{T} \end{aligned} \tag{4}\\
+To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price \\K\\) at a specific date (the exercise date \\T\\). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by \\ \begin{aligned} C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r_f T} \\ d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r_f + \frac{\sigma^2}{2}\right)T\right) \\ d_2 &= d_1 - \sigma\sqrt{T} \end{aligned} \tag{4}\\
 
 where \\C(S, T)\\ is the price of the option as a function of today’s stock price of the underlying, \\S\\, with time to maturity \\T\\, \\r\\ is the risk-free interest rate, and \\\sigma\\ is the volatility of the underlying stock return. \\\Phi\\ is the cumulative distribution function of a standard normal random variable.
 
@@ -201,7 +205,7 @@ Note that the entire grid of possible combinations contains 1,574,496 different 
 
 ``` python
 train_data, test_data = train_test_split(
-    option_prices.to_pandas(), train_size=0.01, random_state=random_state
+    option_prices, train_size=0.01, random_state=random_state
 )
 ```
 
@@ -273,8 +277,8 @@ nnet_pipeline = Pipeline(
 )
 
 nnet_fit = nnet_pipeline.fit(
-    train_data.drop(columns=["observed_price"]),
-    train_data.get("observed_price"),
+    train_data.drop("observed_price"),
+    train_data["observed_price"],
 )
 ```
 
@@ -326,8 +330,8 @@ rf_pipeline = Pipeline(
 )
 
 rf_fit = rf_pipeline.fit(
-    train_data.drop(columns=["observed_price"]),
-    train_data.get("observed_price"),
+    train_data.drop("observed_price"),
+    train_data["observed_price"],
 )
 ```
 
@@ -378,8 +382,8 @@ deep_nnet_pipeline = Pipeline(
 )
 
 deep_nnet_fit = deep_nnet_pipeline.fit(
-    train_data.drop(columns=["observed_price"]),
-    train_data.get("observed_price"),
+    train_data.drop("observed_price"),
+    train_data["observed_price"],
 )
 ```
 
@@ -428,8 +432,8 @@ lm_pipeline = Pipeline(
 )
 
 lm_fit = lm_pipeline.fit(
-    train_data.get(["S", "K", "r", "T", "sigma"]),
-    train_data.get("observed_price"),
+    train_data.select(["S", "K", "r", "T", "sigma"]),
+    train_data["observed_price"],
 )
 ```
 
@@ -464,12 +468,11 @@ predictive_performance <- model_fits |>
 ## Python
 
 ``` python
-out_of_sample_data = test_data.sample(n=10000, random_state=random_state)
-test_X = out_of_sample_data.get(["S", "K", "r", "T", "sigma"])
-test_y = out_of_sample_data.get("observed_price")
+out_of_sample_data = test_data.sample(n=10000, seed=random_state)
+test_X = out_of_sample_data.select(["S", "K", "r", "T", "sigma"])
 
 predictive_performance = (
-    pl.from_pandas(out_of_sample_data)
+    out_of_sample_data
     .with_columns(
         **{
             "Random forest": rf_fit.predict(test_X),

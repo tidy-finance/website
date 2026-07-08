@@ -122,14 +122,14 @@ We ensure a single observation per year and stock by a call of `unique()` at the
 ``` python
 size = (crsp_monthly
     .filter(pl.col("date").dt.month() == 6)
-    .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo").cast(pl.Date))
+    .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo"))
     .select(["permno", "exchange", "sorting_date", "mktcap"])
     .rename({"mktcap": "size"})
 )
 
 market_equity = (crsp_monthly
     .filter(pl.col("date").dt.month() == 12)
-    .with_columns(sorting_date=pl.col("date").dt.offset_by("7mo").cast(pl.Date))
+    .with_columns(sorting_date=pl.col("date").dt.offset_by("7mo"))
     .select(["permno", "gvkey", "sorting_date", "mktcap"])
     .rename({"mktcap": "me"})
 )
@@ -362,12 +362,12 @@ summary(model_smb)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.020200 -0.001371  0.000008  0.001434  0.015442 
+    -0.020196 -0.001380  0.000007  0.001438  0.015446 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    -0.000168   0.000125   -1.34     0.18    
-    smb_replicated  0.979119   0.004107  238.38   <2e-16 ***
+    (Intercept)    -0.000171   0.000125   -1.37     0.17    
+    smb_replicated  0.979135   0.004107  238.38   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -390,14 +390,15 @@ model_smb.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: smb, Fixed effects: 0
+    Dep. var.: smb
+    sample: None = all
     Inference:  iid
     Observations:  762
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |     -0.000 |        0.000 |    -1.338 |      0.181 | -0.000 |   0.000 |
-    | smb_replicated |      0.979 |        0.004 |   238.383 |      0.000 |  0.971 |   0.987 |
+    | Intercept      |     -0.000 |        0.000 |    -1.368 |      0.172 | -0.000 |   0.000 |
+    | smb_replicated |      0.979 |        0.004 |   238.380 |      0.000 |  0.971 |   0.987 |
     ---
     RMSE: 0.003 R2: 0.987 
 
@@ -416,12 +417,12 @@ summary(model_hml)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.023587 -0.002528 -0.000181  0.002026  0.031125 
+    -0.023588 -0.002530 -0.000178  0.002022  0.031115 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000404   0.000210    1.93    0.055 .  
-    hml_replicated 0.955124   0.006915  138.12   <2e-16 ***
+    (Intercept)    0.000407   0.000209    1.94    0.052 .  
+    hml_replicated 0.955073   0.006908  138.26   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -444,14 +445,15 @@ model_hml.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: hml, Fixed effects: 0
+    Dep. var.: hml
+    sample: None = all
     Inference:  iid
     Observations:  762
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.000 |        0.000 |     1.926 |      0.055 | -0.000 |   0.001 |
-    | hml_replicated |      0.955 |        0.007 |   138.117 |      0.000 |  0.942 |   0.969 |
+    | Intercept      |      0.000 |        0.000 |     1.942 |      0.052 | -0.000 |   0.001 |
+    | hml_replicated |      0.955 |        0.007 |   138.261 |      0.000 |  0.942 |   0.969 |
     ---
     RMSE: 0.006 R2: 0.962 
 
@@ -773,13 +775,13 @@ summary(model_smb)
     lm(formula = smb ~ smb_replicated, data = test)
 
     Residuals:
-         Min       1Q   Median       3Q      Max 
-    -0.01939 -0.00187  0.00015  0.00195  0.01345 
+          Min        1Q    Median        3Q       Max 
+    -0.019387 -0.001871  0.000153  0.001938  0.013449 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    -0.000229   0.000129   -1.77    0.077 .  
-    smb_replicated  0.959233   0.004104  233.73   <2e-16 ***
+    (Intercept)    -0.000232   0.000129    -1.8    0.073 .  
+    smb_replicated  0.959262   0.004104   233.8   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -802,14 +804,15 @@ model_smb.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: smb, Fixed effects: 0
+    Dep. var.: smb
+    sample: None = all
     Inference:  iid
     Observations:  738
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |     -0.000 |        0.000 |    -1.768 |      0.077 | -0.000 |   0.000 |
-    | smb_replicated |      0.959 |        0.004 |   233.729 |      0.000 |  0.951 |   0.967 |
+    | Intercept      |     -0.000 |        0.000 |    -1.796 |      0.073 | -0.000 |   0.000 |
+    | smb_replicated |      0.959 |        0.004 |   233.761 |      0.000 |  0.951 |   0.967 |
     ---
     RMSE: 0.003 R2: 0.987 
 
@@ -828,18 +831,18 @@ summary(model_hml)
 
     Residuals:
          Min       1Q   Median       3Q      Max 
-    -0.04314 -0.00405 -0.00034  0.00386  0.03455 
+    -0.04314 -0.00407 -0.00033  0.00386  0.03455 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000603   0.000288     2.1    0.036 *  
-    hml_replicated 0.979547   0.009801    99.9   <2e-16 ***
+    (Intercept)    0.000606   0.000287    2.11    0.035 *  
+    hml_replicated 0.979502   0.009794  100.01   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00779 on 736 degrees of freedom
+    Residual standard error: 0.00778 on 736 degrees of freedom
     Multiple R-squared:  0.931, Adjusted R-squared:  0.931 
-    F-statistic: 9.99e+03 on 1 and 736 DF,  p-value: <2e-16
+    F-statistic: 1e+04 on 1 and 736 DF,  p-value: <2e-16
 
 The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.98 and an R-squared around 93 percent.
 
@@ -856,14 +859,15 @@ model_hml.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: hml, Fixed effects: 0
+    Dep. var.: hml
+    sample: None = all
     Inference:  iid
     Observations:  738
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.001 |        0.000 |     2.095 |      0.036 |  0.000 |   0.001 |
-    | hml_replicated |      0.980 |        0.010 |    99.940 |      0.000 |  0.960 |   0.999 |
+    | Intercept      |      0.001 |        0.000 |     2.108 |      0.035 |  0.000 |   0.001 |
+    | hml_replicated |      0.980 |        0.010 |   100.008 |      0.000 |  0.960 |   0.999 |
     ---
     RMSE: 0.008 R2: 0.931 
 
@@ -882,12 +886,12 @@ summary(model_rmw)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.018496 -0.003051 -0.000013  0.003297  0.018493 
+    -0.018492 -0.003071 -0.000012  0.003300  0.018495 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    2.83e-05   1.99e-04    0.14     0.89    
-    rmw_replicated 9.49e-01   8.72e-03  108.79   <2e-16 ***
+    (Intercept)    2.74e-05   1.99e-04    0.14     0.89    
+    rmw_replicated 9.49e-01   8.72e-03  108.80   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -910,14 +914,15 @@ model_rmw.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: rmw, Fixed effects: 0
+    Dep. var.: rmw
+    sample: None = all
     Inference:  iid
     Observations:  738
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.000 |        0.000 |     0.142 |      0.887 | -0.000 |   0.000 |
-    | rmw_replicated |      0.949 |        0.009 |   108.793 |      0.000 |  0.932 |   0.966 |
+    | Intercept      |      0.000 |        0.000 |     0.137 |      0.891 | -0.000 |   0.000 |
+    | rmw_replicated |      0.949 |        0.009 |   108.804 |      0.000 |  0.932 |   0.966 |
     ---
     RMSE: 0.005 R2: 0.941 
 
@@ -935,17 +940,17 @@ summary(model_cma)
     lm(formula = cma ~ cma_replicated, data = test)
 
     Residuals:
-          Min        1Q    Median        3Q       Max 
-    -0.028737 -0.002733  0.000006  0.002622  0.021216 
+         Min       1Q   Median       3Q      Max 
+    -0.02874 -0.00273  0.00002  0.00262  0.02122 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000519   0.000172    3.01   0.0027 ** 
-    cma_replicated 0.954025   0.008163  116.87   <2e-16 ***
+    (Intercept)    0.000520   0.000172    3.02   0.0026 ** 
+    cma_replicated 0.953961   0.008162  116.88   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00466 on 736 degrees of freedom
+    Residual standard error: 0.00465 on 736 degrees of freedom
     Multiple R-squared:  0.949, Adjusted R-squared:  0.949 
     F-statistic: 1.37e+04 on 1 and 736 DF,  p-value: <2e-16
 
@@ -964,14 +969,15 @@ model_cma.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: cma, Fixed effects: 0
+    Dep. var.: cma
+    sample: None = all
     Inference:  iid
     Observations:  738
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.001 |        0.000 |     3.013 |      0.003 |  0.000 |   0.001 |
-    | cma_replicated |      0.954 |        0.008 |   116.871 |      0.000 |  0.938 |   0.970 |
+    | Intercept      |      0.001 |        0.000 |     3.020 |      0.003 |  0.000 |   0.001 |
+    | cma_replicated |      0.954 |        0.008 |   116.881 |      0.000 |  0.938 |   0.970 |
     ---
     RMSE: 0.005 R2: 0.949 
 

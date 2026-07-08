@@ -30,7 +30,7 @@ An alternative to Ridge regression is the Lasso (*l*east *a*bsolute *s*hrinkage 
 
 ### Elastic Net
 
-The Elastic Net ([Zou and Hastie 2005](#ref-Zou2005)) combines \\L_1\\ with \\L_2\\ penalization and encourages a grouping effect, where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: \\\hat\beta^\text{EN} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda(1-\rho)\sum\limits\_{k=1}^K\|\beta_k\| +\frac{1}{2}\lambda\rho\sum\limits\_{k=1}^K\beta_k^2\\ Now, we have to choose two hyperparameters: the *shrinkage* factor \\\lambda\\ and the *weighting parameter* \\\rho\\. The Elastic Net resembles Lasso for \\\rho = 0\\ and Ridge regression for \\\rho = 1\\. While efficient algorithms exist to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use a dedicated back-end.
+The Elastic Net ([Zou and Hastie 2005](#ref-Zou2005)) combines \\L_1\\ with \\L_2\\ penalization and encourages a grouping effect, where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: \\\hat\beta^\text{EN} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\rho\sum\limits\_{k=1}^K\|\beta_k\| +\frac{1}{2}\lambda(1-\rho)\sum\limits\_{k=1}^K\beta_k^2\\ Now, we have to choose two hyperparameters: the *shrinkage* factor \\\lambda\\ and the *weighting parameter* \\\rho\\. The Elastic Net resembles Lasso for \\\rho = 1\\ and Ridge regression for \\\rho = 0\\. While efficient algorithms exist to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use a dedicated back-end.
 
 ## Data Preparation
 
@@ -48,6 +48,8 @@ library(scales)
 library(furrr)
 library(glmnet)
 library(timetk)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -69,6 +71,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import ElasticNet, Lasso, Ridge
+
+theme_set(theme_minimal())
 ```
 
 In this analysis, we use four different data sources that we load from our Parquet files introduced in [Accessing and Managing Financial Data](../chapters/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../chapters/wrds-crsp-and-compustat.llms.md). We start with two different sets of factor portfolio returns which have been suggested as representing practical risk factor exposure and thus should be relevant when it comes to asset pricing applications.
@@ -301,7 +305,7 @@ We hence perform the following pre-processing steps:
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
 
-Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Because `scikit-learn` operates on `pandas` objects, we convert the data frame with `to_pandas()` at the boundary before feeding it into the modeling pipeline.
+Scaling is often necessary in machine learning applications, especially when combining variables of different magnitudes or units, or when using algorithms sensitive to feature scales (e.g., gradient descent-based algorithms). We use `ColumnTransformer()` to scale all regressors using `StandardScaler()`. The `remainder="drop"` ensures that only the specified columns are retained in the output, and others are dropped. The option `verbose_feature_names_out=False` ensures that the output feature names remain unchanged. We construct each interaction term as a `polars` expression that multiplies a macroeconomic predictor with a factor return and assigns it a descriptive name via `alias()`, and then add all of these columns to the data with `with_columns()`. Recent versions of `scikit-learn` accept `polars` data frames directly, so we can feed them into the modeling pipeline without any conversion.
 
 ``` python
 macro_variables = [c for c in data.columns if c.startswith("macro")]
@@ -377,7 +381,7 @@ lm_fit
 
 ## Python
 
-In the application at hand, \\X\\ contains 130 columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor \\\lambda\\ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of \\1-\rho\\, hence setting `l1_ratio=1` implies the Lasso.
+In the application at hand, \\X\\ contains 130 columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor \\\lambda\\ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of \\\rho\\, hence setting `l1_ratio=1` implies the Lasso.
 
 ``` python
 lm_model = ElasticNet(
@@ -472,9 +476,8 @@ data_manufacturing = data.filter(pl.col("industry") == "manuf").sort("date")
 n_train = int(len(data_manufacturing) * 4 / 5)
 data_manufacturing_training = data_manufacturing.head(n_train)
 
-# scikit-learn operates on pandas/numpy, so we convert at the modeling boundary.
 lm_fit = lm_pipeline.fit(
-  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training,
   data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
@@ -485,7 +488,7 @@ First, we focus on the in-sample predicted values \\\hat{y}\_t = x_t\hat\beta^\t
 predicted_values = (
   pl.DataFrame({
     "date": data_manufacturing["date"],
-    "Fitted value": lm_fit.predict(data_manufacturing.to_pandas()),
+    "Fitted value": lm_fit.predict(data_manufacturing),
     "Realization": data_manufacturing["ret_excess"]
   })
   .unpivot(index="date", variable_name="Variable", value_name="return")
@@ -581,7 +584,7 @@ Figure 3: The figure shows estimated coefficient paths for different penalty fa
 We estimate the coefficients \\\hat\beta^\text{Lasso}\\ directly for a grid of different \\\lambda\\’s, using the `Lasso` and `Ridge` estimators from `scikit-learn` on the pre-processed regressor matrix.
 
 ``` python
-x = preprocessor.fit_transform(data_manufacturing.to_pandas())
+x = preprocessor.fit_transform(data_manufacturing)
 y = data_manufacturing["ret_excess"].to_numpy()
 
 alphas = np.logspace(-5, 5, 100)
@@ -768,7 +771,7 @@ finder = GridSearchCV(
 )
 
 finder = finder.fit(
-  data_manufacturing_training.to_pandas(),
+  data_manufacturing_training,
   data_manufacturing_training["ret_excess"].to_numpy()
 )
 ```
@@ -876,7 +879,11 @@ select_variables <- function(input) {
 
   return(estimated_coefficients)
 }
+```
 
+With the `select_variables()` function in place, we apply it to each industry. We nest the data by industry and map the function across the resulting list with `future_map()`, which uses `furrr` to distribute the industries across workers. The option `seed = TRUE` makes the cross-validation process reproducible.
+
+``` r
 # Parallelization
 plan(sequential)
 
@@ -889,7 +896,7 @@ selected_factors <- data |>
   ))
 ```
 
-What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten in parallel. The final option `seed = TRUE` is required to make the cross-validation process reproducible. Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in [Figure 5](#fig-1405).
+What has just happened? In principle, exactly the same as before but instead of computing the Lasso coefficients for one industry, we did it for ten. Now, we just have to do some housekeeping and keep only variables that Lasso does *not* set to zero. We illustrate the results in a heat map in [Figure 5](#fig-1405).
 
 ## Python
 
@@ -924,7 +931,7 @@ for industry in all_industries:
   )
 
   finder = finder.fit(
-    industry_training.to_pandas(),
+    industry_training,
     industry_training["ret_excess"].to_numpy()
   )
   results.append(finder.best_estimator_.named_steps.regressor.coef_ != 0)

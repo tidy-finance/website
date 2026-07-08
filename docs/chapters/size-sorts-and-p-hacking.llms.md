@@ -16,6 +16,8 @@ library(sandwich)
 library(lmtest)
 library(furrr)
 library(rlang)
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce the `rlang` package ([Henry and Wickham 2022](#ref-rlang)) for more advanced parsing of functional expressions.
@@ -30,6 +32,8 @@ from plotnine import *
 from mizani.formatters import percent_format
 from itertools import product
 from joblib import Parallel, delayed, cpu_count
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce `itertools`, which is a component of the Python standard library and provides fast, memory-efficient tools for working with iterators.
@@ -64,23 +68,19 @@ Before we build our size portfolios, we investigate the distribution of the vari
 ## R
 
 ``` r
+top_share <- function(mktcap, q) {
+  sum(mktcap[mktcap >= quantile(mktcap, q)]) / sum(mktcap)
+}
+
 crsp_monthly |>
   group_by(date) |>
-  mutate(
-    top01 = if_else(mktcap >= quantile(mktcap, 0.99), 1, 0),
-    top05 = if_else(mktcap >= quantile(mktcap, 0.95), 1, 0),
-    top10 = if_else(mktcap >= quantile(mktcap, 0.90), 1, 0),
-    top25 = if_else(mktcap >= quantile(mktcap, 0.75), 1, 0)
-  ) |>
   summarize(
-    total_market_cap = sum(mktcap),
-    `Largest 1% of stocks` = sum(mktcap[top01 == 1]) / total_market_cap,
-    `Largest 5% of stocks` = sum(mktcap[top05 == 1]) / total_market_cap,
-    `Largest 10% of stocks` = sum(mktcap[top10 == 1]) / total_market_cap,
-    `Largest 25% of stocks` = sum(mktcap[top25 == 1]) / total_market_cap,
+    `Largest 1% of stocks` = top_share(mktcap, 0.99),
+    `Largest 5% of stocks` = top_share(mktcap, 0.95),
+    `Largest 10% of stocks` = top_share(mktcap, 0.90),
+    `Largest 25% of stocks` = top_share(mktcap, 0.75),
     .groups = "drop"
   ) |>
-  select(-total_market_cap) |>
   pivot_longer(cols = -date) |>
   mutate(
     name = factor(
@@ -239,17 +239,17 @@ The function `summary()` does not include all statistics we are interested in, w
 ``` r
 create_summary <- function(data, column_name) {
   data |>
-    select(value = {{ column_name }}) |>
     summarize(
-      mean = mean(value),
-      sd = sd(value),
-      min = min(value),
-      q05 = quantile(value, 0.05),
-      q50 = quantile(value, 0.50),
-      q95 = quantile(value, 0.95),
-      max = max(value),
-      n = n()
-    )
+      count = n(),
+      mean = mean({{ column_name }}),
+      std = sd({{ column_name }}),
+      min = min({{ column_name }}),
+      `5%` = quantile({{ column_name }}, 0.05),
+      `50%` = quantile({{ column_name }}, 0.50),
+      `95%` = quantile({{ column_name }}, 0.95),
+      max = max({{ column_name }})
+    ) |>
+    mutate(across(where(is.numeric), \(x) round(x, 0)))
 }
 
 crsp_monthly |>
@@ -265,12 +265,12 @@ crsp_monthly |>
 ```
 
     # A tibble: 4 × 9
-      exchange   mean      sd    min    q05    q50    q95      max     n
-      <chr>     <dbl>   <dbl>  <dbl>  <dbl>  <dbl>  <dbl>    <dbl> <int>
-    1 AMEX       195.    512.  1.61    3.54   45.7   870.    3921.   154
-    2 NASDAQ   12558. 141814.  0.169   6.13  318.  20095. 3766500.  2379
-    3 NYSE     21862.  63583. 15.3   179.   4048.  90119.  732872.  1256
-    4 Overall  15139. 118291.  0.169   7.86  730.  47134. 3766500.  3789
+      exchange count  mean    std   min  `5%` `50%` `95%`     max
+      <chr>    <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl>   <dbl>
+    1 AMEX       154   195    512     2     4    46   870    3921
+    2 NASDAQ    2379 12558 141814     0     6   318 20095 3766500
+    3 NYSE      1256 21862  63583    15   179  4048 90119  732872
+    4 Overall   3789 15139 118291     0     8   730 47134 3766500
 
 ## Python
 
@@ -410,9 +410,17 @@ Apart from computing breakpoints on different samples, researchers often use dif
 
 ## R
 
-We implement the two weighting schemes in the function `compute_size_premium()` that takes a logical argument to weight the returns by firm value. We deliberately avoid the name `compute_portfolio_returns()` here, as the `tidyfinance` package exports a function of that name with a different signature that returns a full panel of portfolio returns rather than a single size premium. The statement `if_else(value_weighted, weighted.mean(ret_excess, mktcap_lag), mean(ret_excess))` generates value-weighted returns if `value_weighted = TRUE`. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](../chapters/univariate-portfolio-sorts.llms.md).
+We implement the two weighting schemes in the function `compute_size_premium()` that takes a logical argument to weight the returns by firm value. We deliberately avoid the name `compute_portfolio_returns()` here, as the `tidyfinance` package exports a function of that name with a different signature that returns a full panel of portfolio returns rather than a single size premium. The helper `calculate_returns()` generates value-weighted returns if `value_weighted = TRUE` and equal-weighted returns otherwise. Additionally, the long-short portfolio is long in the smallest firms and short in the largest firms, consistent with research showing that small firms outperform their larger counterparts. Apart from these two changes, the function is similar to the procedure in [Univariate Portfolio Sorts](../chapters/univariate-portfolio-sorts.llms.md).
 
 ``` r
+calculate_returns <- function(ret_excess, mktcap_lag, value_weighted) {
+  if (value_weighted) {
+    weighted.mean(ret_excess, mktcap_lag)
+  } else {
+    mean(ret_excess)
+  }
+}
+
 compute_size_premium <- function(
   n_portfolios = 10,
   exchanges = c("NYSE", "NASDAQ", "AMEX"),
@@ -430,11 +438,7 @@ compute_size_premium <- function(
     ) |>
     group_by(date, portfolio) |>
     summarize(
-      ret = if_else(
-        value_weighted,
-        weighted.mean(ret_excess, mktcap_lag),
-        mean(ret_excess)
-      ),
+      ret = calculate_returns(ret_excess, mktcap_lag, value_weighted),
       .groups = "drop_last"
     ) |>
     summarize(
@@ -548,16 +552,16 @@ data = pl.DataFrame({
     "Exchanges": ["NYSE, NASDAQ & AMEX", "NYSE"],
     "Premium": [ret_all*100, ret_nyse*100]
 })
-data.with_columns(pl.col("Premium").round(2))
+data
 ```
 
 shape: (2, 2)
 
-| Exchanges             | Premium |
-|-----------------------|---------|
-| str                   | f64     |
-| "NYSE, NASDAQ & AMEX" | 0.04    |
-| "NYSE"                | 0.13    |
+| Exchanges             | Premium  |
+|-----------------------|----------|
+| str                   | f64      |
+| "NYSE, NASDAQ & AMEX" | 0.04083  |
+| "NYSE"                | 0.128926 |
 
 The table shows that the size premium is more than three times as large if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
 
@@ -608,7 +612,7 @@ p_hacking_setup = list(
 )
 ```
 
-To speed the computation up, we parallelize the (many) different sorting procedures, as in [Beta Estimation](../chapters/beta-estimation.llms.md). Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios.
+To speed the computation up, we parallelize the (many) different sorting procedures across the available cores. Finally, we report the resulting size premiums in descending order. There are indeed substantial size premiums possible in our data, in particular when we use equal-weighted portfolios.
 
 ## R
 

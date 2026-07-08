@@ -28,6 +28,8 @@ import numpy as np
 import tidyfinance as tf
 import string
 import os
+
+tf.set_backend("polars")
 ```
 
 We store the data in the folder `data`. Be careful: if you already downloaded the data from WRDS, the code in this chapter overwrites your local files!
@@ -100,7 +102,7 @@ write_parquet(crsp_monthly, "data/crsp_monthly.parquet")
 ## Python
 
 ``` python
-crsp_monthly = pl.from_pandas(tf.download_data(
+crsp_monthly = tf.download_data(
     domain="pseudo",
     dataset="crsp_monthly",
     start_date=start_date,
@@ -108,7 +110,7 @@ crsp_monthly = pl.from_pandas(tf.download_data(
     n_assets=n_assets,
     add_ccm_links=True,
     seed=seed
-))
+)
 
 crsp_monthly.write_parquet("data/crsp_monthly.parquet")
 ```
@@ -135,14 +137,14 @@ write_parquet(crsp_daily, "data/crsp_daily.parquet")
 ## Python
 
 ``` python
-crsp_daily = pl.from_pandas(tf.download_data(
+crsp_daily = tf.download_data(
     domain="pseudo",
     dataset="crsp_daily",
     start_date=start_date,
     end_date=end_date,
     n_assets=n_assets,
     seed=seed
-))
+)
 
 crsp_daily.write_parquet("data/crsp_daily.parquet")
 ```
@@ -169,14 +171,14 @@ write_parquet(compustat_annual, "data/compustat_annual.parquet")
 ## Python
 
 ``` python
-compustat_annual = pl.from_pandas(tf.download_data(
+compustat_annual = tf.download_data(
     domain="pseudo",
     dataset="compustat_annual",
     start_date=start_date,
     end_date=end_date,
     n_assets=n_assets,
     seed=seed
-))
+)
 
 compustat_annual.write_parquet("data/compustat_annual.parquet")
 ```

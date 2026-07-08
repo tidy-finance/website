@@ -77,7 +77,7 @@ prices
 
 ## Python
 
-Because we set the `polars` backend above, `tf.download_data()` returns a `polars` data frame that we work with for the rest of the chapter. Since the download represents dates as timestamps, we also cast the `date` column to the `polars` `Date` type — daily prices are calendar-dated, and we use this convention throughout the book.
+Because we set the `polars` backend above, `tf.download_data()` returns a `polars` data frame that we work with for the rest of the chapter. The `date` column arrives as the `polars` `Date` type — calendar dates without a time component — a convention we use throughout the book.
 
 ``` python
 prices = tf.download_data(
@@ -85,7 +85,7 @@ prices = tf.download_data(
     symbols="AAPL",
     start_date="2000-01-01",
     end_date="2024-12-31"
-).with_columns(pl.col("date").cast(pl.Date))
+)
 prices.head()
 ```
 
@@ -193,14 +193,14 @@ shape: (6_288, 3)
 | "AAPL" | 2000-01-03 | null      |
 | "AAPL" | 2000-01-04 | -0.08431  |
 | "AAPL" | 2000-01-05 | 0.014633  |
-| "AAPL" | 2000-01-06 | -0.086538 |
+| "AAPL" | 2000-01-06 | -0.086539 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
 | "AAPL" | 2024-12-23 | 0.003065  |
 | "AAPL" | 2024-12-24 | 0.011478  |
 | "AAPL" | 2024-12-26 | 0.003176  |
 | "AAPL" | 2024-12-27 | -0.013242 |
-| "AAPL" | 2024-12-30 | -0.013263 |
+| "AAPL" | 2024-12-30 | -0.013264 |
 
 The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value because there is no previous price.
 
@@ -311,9 +311,9 @@ shape: (9, 2)
 | "std"        | 0.024404  |
 | "min"        | -0.518692 |
 | "25%"        | -0.009818 |
-| "50%"        | 0.000948  |
+| "50%"        | 0.000947  |
 | "75%"        | 0.012684  |
-| "max"        | 0.139049  |
+| "max"        | 0.13905   |
 
 We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
 
@@ -477,10 +477,10 @@ prices_daily = tf.download_data(
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31"
-).with_columns(pl.col("date").cast(pl.Date))
+)
 ```
 
-The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, AMGN, V, GOOGL, HD, SHW, AXP, TRV, JPM, AAPL, IBM, MCD, JNJ, AMZN, HON, BA, NVDA, CVX, CRM, MMM, PG, MRK, CSCO, WMT, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, AMGN, GOOGL, V, AXP, HD, SHW, TRV, JPM, AAPL, IBM, MCD, JNJ, AMZN, BA, HON, NVDA, CVX, CRM, MMM, PG, MRK, CSCO, WMT, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -568,7 +568,7 @@ returns_daily |>
     11 GOOGL    0.00103    0.0193    -0.116     0.200
     12 GS       0.000607   0.0226    -0.190     0.265
     13 HD       0.000548   0.0189    -0.287     0.141
-    14 HON      0.000499   0.0189    -0.174     0.282
+    14 HON      0.000495   0.0189    -0.174     0.282
     15 IBM      0.000342   0.0163    -0.155     0.120
     16 JNJ      0.000356   0.0120    -0.158     0.122
     17 JPM      0.000644   0.0236    -0.207     0.251

@@ -39,7 +39,7 @@ Building on our analysis from the previous chapter on [Modern Portfolio Theory](
 
 ``` r
 symbols <- download_data(
-  domain = "constituents",
+  domain = "Index Constituents",
   index = "Dow Jones Industrial Average"
 )
 
@@ -69,26 +69,22 @@ returns_monthly <- prices_daily |>
 
 ``` python
 symbols = tf.download_data(
-    domain="constituents",
-    index="Dow Jones Industrial Average"
+    domain="constituents", index="Dow Jones Industrial Average"
 )
 
 prices_daily = tf.download_data(
     domain="stock_prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2024-12-31"
+    end_date="2024-12-31",
 ).select(["symbol", "date", "adjusted_close"])
 
-prices_daily = (prices_daily
-    .with_columns(
-        counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
-    )
-    .filter(pl.col("counts") == pl.col("counts").max())
-)
+prices_daily = prices_daily.with_columns(
+    counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
+).filter(pl.col("counts") == pl.col("counts").max())
 
-returns_monthly = (prices_daily
-    .sort(["symbol", "date"])
+returns_monthly = (
+    prices_daily.sort(["symbol", "date"])
     .with_columns(month=pl.col("date").dt.truncate("1mo"))
     .group_by(["symbol", "month"], maintain_order=True)
     .agg(adjusted_close=pl.col("adjusted_close").last())
@@ -126,7 +122,7 @@ The first-order conditions for this optimization problem yield:
 
 \\\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu = 0 \\\Leftrightarrow \omega^\* = \frac{\lambda}{2}\Sigma^{-1}\tilde\mu\\
 
-The constraint \\\omega^{\prime}\tilde\mu\_\omega\geq \bar\mu\\ delivers
+The constraint \\\omega^{\prime}\tilde\mu\geq \bar\mu\\ delivers
 
 \\ \bar\mu = \tilde\mu^{\prime}\omega^\* = \frac{\lambda}{2}\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu \\ \Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}. \\
 
@@ -402,7 +398,7 @@ This leads to a powerful conclusion: In equilibrium, all investors hold some com
 
 Empirically, the CAPM-equation boils down to a linear regression:
 
-\\r\_{t,i}-r_f = \beta_i (r\_{m,t} - r_f) + \varepsilon\_{i,t}.\\
+\\r\_{i,t}-r_f = \beta_i (r\_{m,t} - r_f) + \varepsilon\_{i,t}.\\
 
 Thus, a naive, but straightforward way of ‘estimating’ the CAPM is to run a linear regression of asset excess returns on market excess returns. The slope of the regression line is then the asset’s beta.
 

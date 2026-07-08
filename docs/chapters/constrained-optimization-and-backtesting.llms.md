@@ -11,6 +11,8 @@ library(tidyverse)
 library(nanoparquet)
 library(scales)
 library(nloptr)
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce the `nloptr` package ([Johnson 2007](#ref-nloptr)) to perform numerical constrained optimization for portfolio choice problems.
@@ -26,6 +28,8 @@ from mizani.formatters import percent_format
 from itertools import product
 from scipy.stats import expon
 from scipy.optimize import minimize
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce `expon` from `scipy.stats` to calculate exponential continuous random variables and `minimize` from `scipy.optimize` to perform numerical constrained optimization for portfolio choice problems.
@@ -185,8 +189,8 @@ w_efficient <- compute_efficient_weight(Sigma, mu)
 round(w_efficient, 3)
 ```
 
-     [1]  1.185  0.237 -1.639  0.614  0.449 -0.437  0.754  0.358 -0.047
-    [10] -0.475
+     [1]  1.185  0.237 -1.640  0.614  0.449 -0.437  0.754  0.358 -0.047
+    [10] -0.474
 
 ## Python
 
@@ -233,14 +237,14 @@ shape: (10, 2)
 | str      | f64                 |
 | "nodur"  | 1.185               |
 | "durbl"  | 0.237               |
-| "manuf"  | -1.639              |
+| "manuf"  | -1.64               |
 | "enrgy"  | 0.614               |
 | "hitec"  | 0.449               |
 | "telcm"  | -0.437              |
 | "shops"  | 0.754               |
 | "hlth"   | 0.358               |
 | "utils"  | -0.047              |
-| "other"  | -0.475              |
+| "other"  | -0.474              |
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient \\\gamma=2\\ in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of \\-1\\ implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter \\\beta\\ and risk aversion \\\gamma\\.
 
@@ -432,7 +436,6 @@ We rely on the powerful `scipy.optimize` package, which provides a common interf
 We illustrate the use of `minimize()` by replicating the analytical solutions for the minimum variance and efficient portfolio weights from above. Note that the equality constraint for both solutions is given by the requirement that the weights must sum up to one. In addition, we supply a vector of equal weights as an initial value for the algorithm in all applications. We verify that the output is equal to the above solution. Note that `np.allclose()` is a safe way to compare two vectors for pairwise equality. The alternative `==` is sensitive to small differences that may occur due to the representation of floating points on a computer, while `np.allclose()` has a built-in tolerance. It returns `True` if both are equal, which is the case in both applications below.
 
 ``` python
-# | output: false
 w_initial = np.ones(n_industries) / n_industries
 
 
@@ -473,8 +476,6 @@ w_mvp_numerical = minimize(
 np.allclose(w_mvp, w_mvp_numerical.x, atol=1e-3)
 ```
 
-    True
-
 ``` python
 def objective_efficient(w):
     return 2 * 0.5 * w.T @ sigma @ w - (1 + mu) @ w
@@ -497,11 +498,9 @@ w_efficient_numerical = minimize(
 np.allclose(w_efficient, w_efficient_numerical.x, atol=1e-3)
 ```
 
-    True
-
 The result above shows that the numerical procedure indeed recovered the optimal weights for a scenario where we already know the analytic solution.
 
-Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies \\N\\ inequality constraints of the form \\\omega_i \>=0\\. We can implement the short-sale constraints by imposing a vector of lower bounds.
+Next, we approach problems where no analytical solutions exist. First, we additionally impose short-sale constraints, which implies \\N\\ inequality constraints of the form \\\omega_i \geq 0\\. We can implement the short-sale constraints by imposing a vector of lower bounds.
 
 ## R
 
@@ -602,7 +601,7 @@ w_reg_t <- nloptr(
 round(w_reg_t$solution, 3)
 ```
 
-     [1]  0.358  0.000 -0.250  0.245  0.051  0.000  0.401  0.195  0.000
+     [1]  0.358  0.000 -0.250  0.245  0.051  0.000  0.400  0.195  0.000
     [10]  0.000
 
 ## Python
@@ -659,7 +658,7 @@ shape: (10, 2)
 | "enrgy"  | 0.245        |
 | "hitec"  | 0.051        |
 | "telcm"  | -0.0         |
-| "shops"  | 0.401        |
+| "shops"  | 0.4          |
 | "hlth"   | 0.195        |
 | "utils"  | 0.0          |
 | "other"  | -0.0         |
@@ -1062,7 +1061,7 @@ shape: (3, 5)
 | strategy  | mean   | sd     | sharpe_ratio | turnover |
 |-----------|--------|--------|--------------|----------|
 | str       | f64    | f64    | f64          | f64      |
-| "MV"      | -1.068 | 12.555 | null         | 209.885  |
+| "MV"      | -1.068 | 12.555 | null         | 209.884  |
 | "MV (TC)" | 12.068 | 15.131 | 0.798        | 0.019    |
 | "Naive"   | 12.054 | 15.133 | 0.797        | 0.236    |
 
@@ -1077,7 +1076,7 @@ The results clearly speak against mean-variance optimization. Turnover is huge w
 
 ## Exercises
 
-1.  Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter \\\gamma\\ \\\omega\_{t+1} ^\* = \arg\max\_{\omega \in \mathbb{R}^N, \iota'\omega = 1} \omega'\mu - \nu_t (\omega, \beta) - \frac{\gamma}{2}\omega'\Sigma\omega \tag{10}\\ where \\\Sigma\\ and \\\mu\\ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing *and* proportional to stock illiquidity such that \\\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega\_{t^+}\right)'B\left(\omega - \omega\_{t^+}\right) \tag{11}\\ where \\B = \text{diag}(ill_1, \ldots, ill_N)\\ is a diagonal matrix, where \\ill_1, \ldots, ill_N\\. Derive a closed-form solution for the mean-variance efficient portfolio \\\omega\_{t+1} ^\*\\ based on the transaction cost specification above. Discuss the effect of illiquidity \\ill_i\\ on the individual portfolio weights relative to an investor that myopically ignores transaction costs in their decision.
+1.  Consider the portfolio choice problem for transaction-cost adjusted certainty equivalent maximization with risk aversion parameter \\\gamma\\ \\\omega\_{t+1} ^\* = \arg\max\_{\omega \in \mathbb{R}^N, \iota'\omega = 1} \omega'\mu - \nu_t (\omega, B) - \frac{\gamma}{2}\omega'\Sigma\omega \tag{10}\\ where \\\Sigma\\ and \\\mu\\ are (estimators of) the variance-covariance matrix of the returns and the vector of expected returns. Assume for now that transaction costs are quadratic in rebalancing *and* proportional to stock illiquidity such that \\\nu_t\left(\omega, B\right) = \frac{\beta}{2} \left(\omega - \omega\_{t^+}\right)'B\left(\omega - \omega\_{t^+}\right) \tag{11}\\ where \\B = \text{diag}(ill_1, \ldots, ill_N)\\ is a diagonal matrix, where \\ill_1, \ldots, ill_N\\ measure the illiquidity of the individual assets. Derive a closed-form solution for the mean-variance efficient portfolio \\\omega\_{t+1} ^\*\\ based on the transaction cost specification above. Discuss the effect of illiquidity \\ill_i\\ on the individual portfolio weights relative to an investor that myopically ignores transaction costs in their decision.
 2.  Use the solution from the previous exercise to update the function `compute_efficient_weight()` such that you can compute optimal weights conditional on a matrix \\B\\ with illiquidity measures.
 3.  Illustrate the evolution of the *optimal* weights from the naive portfolio to the efficient portfolio in the mean-standard deviation diagram.
 4.  Is it always optimal to choose the same \\\beta\\ in the optimization problem than the value used in evaluating the portfolio performance? In other words, can it be optimal to choose theoretically sub-optimal portfolios based on transaction cost considerations that do not reflect the actual incurred costs? Evaluate the out-of-sample Sharpe ratio after transaction costs for a range of different values of imposed \\\beta\\ values.

@@ -16,9 +16,9 @@ library(tidyfinance)
 library(dbplyr)
 library(nanoparquet)
 library(RPostgres)
-```
 
-Compared to previous chapters, we load the `devtools` package ([Wickham et al. 2022](#ref-devtools)) to source code that we provided to the public via [Gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists)
+theme_set(theme_minimal())
+```
 
 ## Python
 
@@ -26,17 +26,15 @@ Compared to previous chapters, we load the `devtools` package ([Wickham et al. 2
 import polars as pl
 import numpy as np
 import tidyfinance as tf
-import httpimport
-import time
 
 from datetime import date
 from plotnine import *
 from sqlalchemy import create_engine
-from sqlalchemy.exc import OperationalError
 from mizani.formatters import comma_format
-```
 
-Compared to previous chapters, we load `httpimport` ([Torakis 2023](#ref-httpimport)) to source code provided in the public [Gist.](https://docs.github.com/en/get-started/writing-on-github/editing-and-sharing-content-with-gists/creating-gists) Note that you should be careful with loading anything from the web via this method, and it is highly discouraged to use any unsecured “HTTP” links. Also, you might encounter a problem when using this from a corporate computer that prevents downloading data through a firewall.
+tf.set_backend("polars")
+theme_set(theme_minimal())
+```
 
 ## Bond Data from WRDS
 
@@ -280,7 +278,7 @@ download_data(domain = "wrds", dataset = "fisd")
 You can set the credentials with `tf.set_wrds_credentials()`.
 
 ``` python
-fisd = pl.from_pandas(tf.download_data(domain="wrds", dataset="fisd"))
+fisd = tf.download_data(domain="wrds", dataset="fisd")
 ```
 
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
@@ -307,28 +305,7 @@ The FISD database also contains other data. The issue-based file contains inform
 
 The Financial Industry Regulatory Authority (FINRA) provides the Trade Reporting and Compliance Engine (TRACE). In TRACE, dealers that trade corporate bonds must report such trades individually. Hence, we observe trade messages in TRACE that contain information on the bond traded, the trade time, price, and volume. TRACE comes in two variants: standard and enhanced TRACE. We show how to download and clean enhanced TRACE as it contains uncapped volume, a crucial quantity missing in the standard distribution. Moreover, enhanced TRACE also provides information on the respective parties’ roles and the direction of the trade report. These items become essential in cleaning the messages.
 
-Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by Dick-Nielsen ([2009](#ref-Dick2009)) in detail, and Dick-Nielsen ([2014](#ref-Dick2014)) shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup.
-
-## R
-
-The `tidyfinance` package downloads and cleans enhanced TRACE for us in the loop below, so there is no separate sourcing step here.
-
-## Python
-
-We store code for cleaning enhanced TRACE with Python on the following GitHub [Gist.](https://gist.githubusercontent.com/patrick-weiss/86ddef6de978fbdfb22609a7840b5d8b) [Clean Enhanced TRACE with Python](../chapters/clean-enhanced-trace.llms.md) also contains the code for reference. We only need to source the code from the Gist, which we can do with the code below using `httpimport`. In the chunk, we explicitly load the necessary function interpreting the Gist as a module (i.e., you could also use it as a module and precede the function calls with the module’s name). Alternatively, you can also go to the Gist, download it, and manually execute it. The `clean_enhanced_trace()` function takes a vector of CUSIPs, a connection to WRDS explained in [WRDS, CRSP, and Compustat](../chapters/wrds-crsp-and-compustat.llms.md), and a start and end date, respectively.
-
-``` python
-import requests
-
-url = (
-    "https://gist.githubusercontent.com/patrick-weiss/"
-    "86ddef6de978fbdfb22609a7840b5d8b/raw/"
-    "8fbcc6c6f40f537cd3cd37368be4487d73569c6b/"
-)
-
-response = requests.get(url, verify=False)
-exec(response.text)
-```
+Why do we repeatedly talk about cleaning TRACE? Trade messages are submitted within a short time window after a trade is executed (less than 15 minutes). These messages can contain errors, and the reporters subsequently correct them or they cancel a trade altogether. The cleaning needs are described by Dick-Nielsen ([2009](#ref-Dick2009)) in detail, and Dick-Nielsen ([2014](#ref-Dick2014)) shows how to clean the enhanced TRACE data using SAS. We do not go into the cleaning steps here, since the code is lengthy and serves no educational purpose. However, downloading and cleaning enhanced TRACE data is straightforward with our setup: The `tidyfinance` package downloads and cleans enhanced TRACE following Dick-Nielsen ([2009](#ref-Dick2009)) and Dick-Nielsen ([2014](#ref-Dick2014)) for us in the loop below, so there is no separate sourcing step. If you are interested in the underlying steps, [Clean Enhanced TRACE with Python](../chapters/clean-enhanced-trace.llms.md) contains the cleaning code for reference.
 
 The TRACE database is considerably large. Therefore, we only download subsets of data at once. Specifying too many CUSIPs over a long time horizon will result in very long download times and a potential failure due to the size of the request to WRDS. The size limit depends on many parameters, and we cannot give you a guideline here. For the applications in this book, we need data around the Paris Agreement in December 2015 and download the data in ten sets, which we define below.
 
@@ -393,25 +370,13 @@ for j in range(1, batches + 1):
             ((j-1)*batch_size):(min(j*batch_size, len(cusips)))
     ]
 
-    cusip_batch_formatted = ", ".join(f"'{cusip}'" for cusip in cusip_batch)
-    cusip_string = f"({cusip_batch_formatted})"
-
-    # WRDS may close a long-running connection; retry the batch with a fresh
-    # connection if the server drops it unexpectedly.
-    for attempt in range(5):
-        try:
-            trace_enhanced_sub = pl.from_pandas(clean_enhanced_trace(
-                    cusips=cusip_string,
-                    connection=wrds,
-                    start_date="'01/01/2014'",
-                    end_date="'11/30/2016'"
-            )).with_columns(pl.col("trd_exctn_dt").cast(pl.Date))
-            break
-        except OperationalError:
-            wrds.dispose()
-            time.sleep(10)
-    else:
-        raise RuntimeError(f"Batch {j} failed after repeated connection errors.")
+    trace_enhanced_sub = tf.download_data(
+        domain="wrds",
+        dataset="trace_enhanced",
+        cusips=cusip_batch,
+        start_date="2014-01-01",
+        end_date="2016-11-30"
+    )
 
     if not trace_enhanced_sub.is_empty():
             trace_enhanced_sub.with_columns(batch=pl.lit(j)).write_parquet(
@@ -656,8 +621,8 @@ shape: (3, 8)
 | measure        | mean  | std    | min   | q05  | median | q95   | max     |
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
+| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
 
 We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
@@ -689,10 +654,10 @@ trace_enhanced |>
 ```
 
     # A tibble: 2 × 8
-      measure        mean     sd   min    q05    q50    q95    max
-      <chr>         <dbl>  <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
-    1 trade_number 51828. 10888. 878   35689. 52102  68765. 81678 
-    2 trade_size   25937.  7154.  34.4 12257. 26842. 35700. 42625.
+      measure        mean    sd   min    q05    q50    q95    max
+      <chr>         <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>  <dbl>
+    1 trade_number 25914. 5444. 439   17844. 26051  34383. 40839 
+    2 trade_size   12968. 3577.  17.2  6128. 13421. 17850. 21312.
 
 ## Python
 
@@ -724,11 +689,11 @@ average_trade_size.with_columns(pl.col(pl.Float64).round(0))
 
 shape: (2, 8)
 
-| measure        | mean    | std     | min   | q05     | median  | q95     | max     |
-|----------------|---------|---------|-------|---------|---------|---------|---------|
-| str            | f64     | f64     | f64   | f64     | f64     | f64     | f64     |
-| "trade_size"   | 25937.0 | 7154.0  | 34.0  | 12257.0 | 26842.0 | 35700.0 | 42625.0 |
-| "trade_number" | 51828.0 | 10888.0 | 878.0 | 35689.0 | 52102.0 | 68765.0 | 81678.0 |
+| measure        | mean    | std    | min   | q05     | median  | q95     | max     |
+|----------------|---------|--------|-------|---------|---------|---------|---------|
+| str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
+| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6128.0  | 13421.0 | 17850.0 | 21312.0 |
+| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17844.0 | 26051.0 | 34383.0 | 40839.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 
@@ -770,7 +735,3 @@ Huang, Jing-Zhi, and Zhan Shi. 2021. “What do we know about corporate bond ret
 Kelly, Bryan T., Diogo Palhares, and Seth Pruitt. 2021. “Modeling corporate bond returns.” *Working Paper*. <https://dx.doi.org/10.2139/ssrn.3720789>.
 
 O’Hara, Maureen, and Xing Alex Zhou. 2021. “Anatomy of a liquidity crisis: Corporate bonds in the COVID-19 crisis.” *Journal of Financial Economics* 142 (1): 46–68. <https://doi.org/10.1016/j.jfineco.2021.05.052>.
-
-Torakis, John. 2023. *Httpimport: Module for Remote in-Memory Python Package/Module Loading Through HTTP*. [Https://pypi.org/project/httpimport/](https://pypi.org/project/httpimport/).
-
-Wickham, Hadley, Jim Hester, Winston Chang, and Jennifer Bryan. 2022. *devtools: Tools to make developing R packages easier*. <https://devtools.r-lib.org/>.

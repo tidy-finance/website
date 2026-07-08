@@ -13,6 +13,8 @@ library(tidyverse)
 library(tidyfinance)
 library(nanoparquet)
 library(dbplyr)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -27,6 +29,9 @@ import tidyfinance as tf
 from plotnine import *
 from mizani.formatters import comma_format, percent_format
 from datetime import datetime
+
+tf.set_backend("polars")
+theme_set(theme_minimal())
 ```
 
 We use the same date range as in the previous chapter to ensure consistency.
@@ -135,6 +140,8 @@ Alternatively, you can also query the data structure with the function `dbSendQu
 
 ## Python
 
+Alternatively, you can also query the data structure by sending SQL queries via `pl.read_database()` using the connection object, for instance, against the `information_schema` tables that describe the tables and columns available on the WRDS server. If you are interested, check out WRDS’ tutorial on [“Querying WRDS Data using Python”.](https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-python/querying-wrds-data-python/)
+
 ## Downloading and Preparing CRSP
 
 [The Center for Research in Security Prices (CRSP)](https://crsp.org/) provides the most widely used data for US stocks. We use the `wrds` connection object that we just created to first access monthly CRSP return data. Actually, we need two tables to get the desired data: (i) the CRSP monthly security file (`msf`), and (ii) the historical identifying information (`stksecurityinfohist`).
@@ -154,6 +161,8 @@ stksecurityinfohist_db <- tbl(wrds, I("crsp.stksecurityinfohist"))
 ```
 
 ## Python
+
+In Python, we do not create lazy table objects. Instead, we write SQL queries that reference the tables directly by schema and name (i.e., `crsp.msf_v2` and `crsp.stksecurityinfohist`) and let the WRDS database execute them, as you can see in the next code chunk. There is hence nothing to prepare at this stage.
 
 We use the two remote tables to fetch the data we want to put into our local folder. Just as above, the idea is that we let the WRDS database do all the work and just download the data that we actually need. We apply common filters and data selection criteria to narrow down our data of interest: (i) we use only stock prices from NYSE, Amex, and NASDAQ (`primaryexch %in% c("N", "A", "Q")`) when or after issuance (`conditionaltype %in% c("RW", "NW")`) for actively traded stocks (`tradingstatusflg == "A"`)[^2], (ii) we keep only data in the time windows of interest, (iii) we keep only US-listed stocks as identified via no special share types (`sharetype = 'NS'`), security type equity (`securitytype = 'EQTY'`), security sub type common stock (`securitysubtype = 'COM'`), issuers that are a corporation (`issuertype %in% c("ACOR", "CORP")`), and (iv) we keep only months within permno-specific start dates (`secinfostartdt`) and end dates (`secinfoenddt`). As of July 2022, there is no need to additionally download delisting information since it is already contained in the most recent version of `msf` (see our blog post about [CRSP 2.0](https://blog.tidy-finance.org/posts/crsp-v2-update/) for more information). We refer to Schwarz et al. ([2026](#ref-SchwarzEtAl2026)) for details on the changes in the CRSP tape rolled out in 2025. Additionally, the industry information in `stksecurityinfohist` records the historic industry and should be used instead of the one stored under same variable name in `msf_v2`.
 
@@ -404,12 +413,12 @@ crsp_monthly <- download_data(
 ## Python
 
 ``` python
-crsp_monthly = pl.from_pandas(tf.download_data(
+crsp_monthly = tf.download_data(
     domain="wrds",
     dataset="crsp_monthly",
     start_date=start_date,
     end_date=end_date
-))
+)
 ```
 
 Since excess returns and market capitalization are crucial for all our analyses, we can safely exclude all observations with missing returns or market capitalization.
@@ -875,12 +884,12 @@ crsp_daily <- download_data(
 ## Python
 
 ``` python
-crsp_daily = pl.from_pandas(tf.download_data(
+crsp_daily = tf.download_data(
     domain="wrds",
     dataset="crsp_daily",
     start_date=start_date,
     end_date=end_date
-))
+)
 ```
 
 Note that you need at least 16 GB of memory to hold all the daily CRSP returns in memory. We hence recommend looping the function over different date periods and storing the results.
@@ -1079,12 +1088,12 @@ compustat_annual <- download_data(
 ## Python
 
 ``` python
-compustat_annual = pl.from_pandas(tf.download_data(
+compustat_annual = tf.download_data(
     domain="wrds",
     dataset="compustat_annual",
     start_date=start_date,
     end_date=end_date
-))
+)
 ```
 
 ## Merging CRSP with Compustat
@@ -1134,7 +1143,7 @@ ccm_links <- download_data(domain = "wrds", dataset = "ccm_links")
 ## Python
 
 ``` python
-ccm_links = pl.from_pandas(tf.download_data(domain="wrds", dataset="ccm_links"))
+ccm_links = tf.download_data(domain="wrds", dataset="ccm_links")
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data.
@@ -1269,26 +1278,6 @@ share_with_be_figure.show()
 End-of-year share of securities with book equity values by listing exchange.
 
 The difference arises from the distinct coverage of the two data sources. CRSP focuses on stock prices from the major US exchanges, capturing a narrower universe of firms. In contrast, Compustat provides financial statement data for a broader set of companies, including all US firms that file 10‑K reports, many Canadian firms, and those listed on major or regional exchanges, traded over‑the‑counter, or even companies with a notable amount of publicly issued debt.
-
-## Some Tricks for PostgreSQL Databases
-
-As we mentioned above, the WRDS database runs on PostgreSQL rather than SQLite. Finding the right tables for your data needs can be tricky in the WRDS PostgreSQL instance, as the tables are organized in schemas. If you wonder what the purpose of schemas is, check out [this documentation.](https://www.postgresql.org/docs/9.1/ddl-schemas.html) For instance, if you want to find all tables that live in the `crsp` schema, you run
-
-``` r
-dbListObjects(wrds, Id(schema = "crsp"))
-```
-
-This operation returns a list of all tables that belong to the `crsp` family on WRDS, e.g., `<Id> schema = crsp, table = msenames`. Similarly, you can fetch a list of all tables that belong to the `comp` family via
-
-``` r
-dbListObjects(wrds, Id(schema = "comp"))
-```
-
-If you want to get all schemas, then run
-
-``` r
-dbListObjects(wrds)
-```
 
 ## Key Takeaways
 

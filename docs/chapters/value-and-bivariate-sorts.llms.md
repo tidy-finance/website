@@ -10,15 +10,10 @@ The current chapter relies on this set of packages.
 
 ``` r
 library(tidyverse)
-```
-
-    Warning: package 'dplyr' was built under R version 4.5.3
-
-``` r
 library(nanoparquet)
-```
 
-    Warning: package 'nanoparquet' was built under R version 4.5.3
+theme_set(theme_minimal())
+```
 
 ## Python
 
@@ -28,6 +23,8 @@ import numpy as np
 
 from plotnine import *
 from mizani.formatters import percent_format
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we rely on `numpy` to construct evenly spaced breakpoints for the portfolio sorts later in this chapter. We also rely on `plotnine` for visualization.
@@ -635,7 +632,7 @@ We are now ready to visualize the results. We use `geom_tile()` to draw the 25 p
 portfolio_characteristics |>
   ggplot(aes(x = portfolio_size, y = portfolio_bm, fill = n_stocks)) +
   geom_tile() +
-  geom_text(aes(label = round(n_stocks))) +
+  geom_text(aes(label = round(n_stocks)), color = "white") +
   facet_wrap(~sorting_method) +
   scale_x_continuous(breaks = 1:5) +
   scale_y_continuous(breaks = 1:5) +
@@ -660,7 +657,7 @@ plot_counts = (
         aes(x="portfolio_size", y="portfolio_bm", fill="n_stocks")
     )
     + geom_tile()
-    + geom_text(aes(label="n_stocks_label"))
+    + geom_text(aes(label="n_stocks_label"), color="white")
     + facet_wrap("sorting_method")
     + scale_x_continuous(breaks=list(range(1, 6)))
     + scale_y_continuous(breaks=list(range(1, 6)))
@@ -684,7 +681,7 @@ Average number of stocks per portfolio for independent and dependent bivariate s
 portfolio_characteristics |>
   ggplot(aes(x = portfolio_size, y = portfolio_bm, fill = mktcap_share)) +
   geom_tile() +
-  geom_text(aes(label = scales::percent(mktcap_share, 0.1))) +
+  geom_text(aes(label = scales::percent(mktcap_share, 0.1)), color = "white") +
   facet_wrap(~sorting_method) +
   scale_x_continuous(breaks = 1:5) +
   scale_y_continuous(breaks = 1:5) +
@@ -709,7 +706,7 @@ plot_mktcap = (
         aes(x="portfolio_size", y="portfolio_bm", fill="mktcap_share")
     )
     + geom_tile()
-    + geom_text(aes(label="mktcap_share_label"))
+    + geom_text(aes(label="mktcap_share_label"), color="white")
     + facet_wrap("sorting_method")
     + scale_x_continuous(breaks=list(range(1, 6)))
     + scale_y_continuous(breaks=list(range(1, 6)))

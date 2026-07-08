@@ -15,6 +15,8 @@ library(tidyverse)
 library(nanoparquet)
 library(fixest)
 library(broom)
+
+theme_set(theme_minimal())
 ```
 
 ## Python
@@ -26,6 +28,8 @@ import pyfixest as pf
 
 from plotnine import *
 from scipy.stats import norm
+
+theme_set(theme_minimal())
 ```
 
 Compared to previous chapters, we introduce the `scipy.stats` module from `scipy` ([Virtanen et al. 2020](#ref-scipy)) for simple retrieval of quantiles of the standard normal distribution.
@@ -172,7 +176,6 @@ trace_aggregated = (trace_enhanced
     .with_columns(avg_yield=pl.col("weighted_yield_sum")/pl.col("weight_sum"))
     .drop_nulls("avg_yield")
     .filter(pl.col("trades") >= 5)
-    .with_columns(trd_exctn_dt=pl.col("trd_exctn_dt").cast(pl.Datetime))
     .with_columns(date=pl.col("trd_exctn_dt").dt.truncate("1mo"))
 )
 
@@ -251,9 +254,9 @@ bonds_panel |>
     # A tibble: 3 × 9
       measure           mean    sd    min   q05   q50   q95   max      n
       <chr>            <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl>  <int>
-    1 avg_yield         4.03 3.99  0.0595  1.30  3.46  7.72 128.  159892
-    2 log_offering_amt 13.1  0.924 4.64   11.9  13.1  14.5   16.5 159892
-    3 time_to_maturity  9.26 9.27  1.01    1.51  6.10 27.7  101.  159892
+    1 avg_yield         4.08 4.21  0.0595  1.27  3.38  8.10 128.  127530
+    2 log_offering_amt 13.3  0.823 4.64   12.2  13.2  14.5   16.5 127530
+    3 time_to_maturity  8.55 8.41  1.01    1.50  5.81 27.4  101.  127530
 
 ## Python
 
@@ -285,9 +288,9 @@ shape: (3, 9)
 | measure            | count  | mean  | std  | min  | q05   | median | q95   | max    |
 |--------------------|--------|-------|------|------|-------|--------|-------|--------|
 | str                | u32    | f64   | f64  | f64  | f64   | f64    | f64   | f64    |
-| "avg_yield"        | 159892 | 4.03  | 3.99 | 0.06 | 1.3   | 3.46   | 7.72  | 127.97 |
-| "log_offering_amt" | 159892 | 13.13 | 0.92 | 4.64 | 11.92 | 13.12  | 14.51 | 16.52  |
-| "time_to_maturity" | 159892 | 9.26  | 9.27 | 1.01 | 1.51  | 6.1    | 27.74 | 100.7  |
+| "avg_yield"        | 127530 | 4.08  | 4.21 | 0.06 | 1.27  | 3.38   | 8.1   | 127.97 |
+| "log_offering_amt" | 127530 | 13.27 | 0.82 | 4.64 | 12.21 | 13.22  | 14.51 | 16.52  |
+| "time_to_maturity" | 127530 | 8.55  | 8.41 | 1.01 | 1.5   | 5.81   | 27.41 | 100.7  |
 
 ## Panel Regressions
 
@@ -315,7 +318,7 @@ model_with_fe <- feols(
 )
 ```
 
-    NOTE: 205/0 fixed-effect singletons were removed (205 observations).
+    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
 
 ``` r
 etable(
@@ -330,20 +333,20 @@ etable(
                       model_without_fe   model_with_fe
     Dependent Var.:          avg_yield       avg_yield
                                                       
-    Constant            7.92*** (56.2)                
-    treatedTRUE        0.437*** (10.4) 0.823*** (29.7)
-    post_periodTRUE  -0.134*** (-5.28)                
-    polluterTRUE       0.364*** (13.9)                
-    log_offering_amt -0.342*** (-32.0)                
-    time_to_maturity   0.049*** (46.1)                
+    Constant            10.7*** (57.0)                
+    treatedTRUE        0.462*** (9.31) 0.983*** (29.5)
+    post_periodTRUE  -0.174*** (-5.92)                
+    polluterTRUE       0.481*** (15.3)                
+    log_offering_amt -0.551*** (-39.0)                
+    time_to_maturity   0.058*** (41.6)                
     Fixed-Effects:   ----------------- ---------------
     cusip_id                        No             Yes
     date                            No             Yes
     ________________ _________________ _______________
     VCOV type                      IID             IID
-    Observations               159,892         159,687
-    R2                           0.025           0.642
-    Within R2                       --           0.006
+    Observations               127,530         127,179
+    R2                           0.032           0.647
+    Within R2                       --           0.007
     ---
     Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -353,37 +356,29 @@ etable(
 model_without_fe = pf.feols(
     "avg_yield ~ treated + post_period + polluter + log_offering_amt + time_to_maturity",
     vcov = "iid",
-    data = bonds_panel.to_pandas()
+    data = bonds_panel
 )
 
 model_with_fe = pf.feols(
     "avg_yield ~ treated | cusip_id + date",
     vcov = "iid",
-    data = bonds_panel.to_pandas()
+    data = bonds_panel
 )
 
 pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 ```
 
-|  | avg_yield |  |
-|----|----|----|
-|  | \(1\) | \(2\) |
-| coef |  |  |
-| treated | 0.437\*\*\* (10.412) | 0.823\*\*\* (29.662) |
-| post_period | -0.134\*\*\* (-5.284) |  |
-| polluter | 0.364\*\*\* (13.859) |  |
-| log_offering_amt | -0.342\*\*\* (-32.010) |  |
-| time_to_maturity | 0.049\*\*\* (46.077) |  |
-| Intercept | 7.923\*\*\* (56.171) |  |
-| fe |  |  |
-| date | \- | x |
-| cusip_id | \- | x |
-| stats |  |  |
-| Observations | 159892 | 159687 |
-| S.E. type | iid | iid |
-| R² | 0.025 | 0.642 |
-| R² Within | \- | 0.006 |
-| Significance levels: \* p \< 0.05, \*\* p \< 0.01, \*\*\* p \< 0.001. Format of coefficient cell: Coefficient (t-stats) |  |  |
+    GT(_tbl_data=  __index_level_0__ __index_level_1__                 0               1
+    0              coef           treated     0.462 (9.308)  0.983 (29.534)
+    1              coef       post_period   -0.174 (-5.923)                
+    2              coef          polluter    0.481 (15.280)                
+    3              coef  log_offering_amt  -0.551 (-38.976)                
+    4              coef  time_to_maturity    0.058 (41.556)                
+    5              coef         Intercept   10.734 (57.015)                
+    6                fe              date                 -               x
+    7                fe         cusip_id                  -               x
+    8             stats      Observations           127,530         127,179
+    9             stats                R²             0.032           0.647, _body=<great_tables._gt_data.Body object at 0x000002D31AA1FB50>, _boxhead=Boxhead([ColInfo(var='__index_level_0__', type=<ColInfoTypeEnum.row_group: 3>, column_label='__index_level_0__', column_align='center', column_width=None), ColInfo(var='__index_level_1__', type=<ColInfoTypeEnum.stub: 2>, column_label='__index_level_1__', column_align='center', column_width=None), ColInfo(var='0', type=<ColInfoTypeEnum.default: 1>, column_label='(1)', column_align='center', column_width=None), ColInfo(var='1', type=<ColInfoTypeEnum.default: 1>, column_label='(2)', column_align='center', column_width=None)]), _stub=<great_tables._gt_data.Stub object at 0x000002D31AA09190>, _spanners=Spanners([SpannerInfo(spanner_id='avg_yield', spanner_level=1, spanner_label='avg_yield', spanner_units=None, spanner_pattern=None, vars=['0', '1'], built=None)]), _heading=Heading(title=None, subtitle=None, preheader=None), _stubhead=None, _summary_rows=<great_tables._gt_data.SummaryRows object at 0x000002D31AA1F290>, _summary_rows_grand=<great_tables._gt_data.SummaryRows object at 0x000002D31AA83A10>, _source_notes=['Format of coefficient cell: Coefficient (t-stats)'], _footnotes=[], _styles=[], _locale=<great_tables._gt_data.Locale object at 0x000002D31AA093D0>, _formats=[], _substitutions=[], _col_merge=[], _transforms=[], _options=Options(table_id=OptionsInfo(scss=False, category='table', type='value', value=None), table_caption=OptionsInfo(scss=False, category='table', type='value', value=None), table_width=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_layout=OptionsInfo(scss=True, category='table', type='value', value='fixed'), table_margin_left=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_margin_right=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_background_color=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_additional_css=OptionsInfo(scss=False, category='table', type='values', value=[]), table_font_names=OptionsInfo(scss=False, category='table', type='values', value=['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Helvetica Neue', 'Fira Sans', 'Droid Sans', 'Arial', 'sans-serif']), table_font_size=OptionsInfo(scss=True, category='table', type='px', value='16px'), table_font_weight=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_style=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_color=OptionsInfo(scss=True, category='table', type='value', value='#333333'), table_font_color_light=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_border_top_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_top_style=OptionsInfo(scss=True, category='table', type='value', value='solid'), table_border_top_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_top_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_right_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_right_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_right_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), table_border_bottom_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_bottom_style=OptionsInfo(scss=True, category='table', type='value', value='hidden'), table_border_bottom_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_bottom_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_left_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_left_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_left_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), heading_background_color=OptionsInfo(scss=True, category='heading', type='value', value=None), heading_align=OptionsInfo(scss=True, category='heading', type='value', value='center'), heading_title_font_size=OptionsInfo(scss=True, category='heading', type='px', value='16px'), heading_title_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_subtitle_font_size=OptionsInfo(scss=True, category='heading', type='px', value='85%'), heading_subtitle_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_padding=OptionsInfo(scss=True, category='heading', type='px', value='6px'), heading_padding_horizontal=OptionsInfo(scss=True, category='heading', type='px', value='5px'), heading_border_bottom_style=OptionsInfo(scss=True, category='heading', type='value', value='solid'), heading_border_bottom_width=OptionsInfo(scss=True, category='heading', type='px', value='2px'), heading_border_bottom_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), heading_border_lr_style=OptionsInfo(scss=True, category='heading', type='value', value='none'), heading_border_lr_width=OptionsInfo(scss=True, category='heading', type='px', value='1px'), heading_border_lr_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), column_labels_background_color=OptionsInfo(scss=True, category='column_labels', type='value', value=None), column_labels_font_size=OptionsInfo(scss=True, category='column_labels', type='px', value='16px'), column_labels_font_weight=OptionsInfo(scss=True, category='column_labels', type='value', value='normal'), column_labels_text_transform=OptionsInfo(scss=True, category='column_labels', type='value', value='inherit'), column_labels_padding=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_padding_horizontal=OptionsInfo(scss=True, category='column_labels', type='px', value='5px'), column_labels_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), column_labels_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), column_labels_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), column_labels_border_top_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_top_width=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_border_top_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_bottom_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_bottom_width=OptionsInfo(scss=True, category='column_labels', type='px', value='0.25px'), column_labels_border_bottom_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_lr_style=OptionsInfo(scss=True, category='column_labels', type='value', value='none'), column_labels_border_lr_width=OptionsInfo(scss=True, category='column_labels', type='px', value='1px'), column_labels_border_lr_color=OptionsInfo(scss=True, category='column_labels', type='value', value='#D3D3D3'), column_labels_hidden=OptionsInfo(scss=False, category='column_labels', type='boolean', value=False), row_group_background_color=OptionsInfo(scss=True, category='row_group', type='value', value=None), row_group_font_size=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_font_weight=OptionsInfo(scss=True, category='row_group', type='value', value='initial'), row_group_text_transform=OptionsInfo(scss=True, category='row_group', type='value', value='inherit'), row_group_padding=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_padding_horizontal=OptionsInfo(scss=True, category='row_group', type='px', value='5px'), row_group_border_top_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_top_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_top_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_right_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_right_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_right_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_border_bottom_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_bottom_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_bottom_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_left_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_left_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_left_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_as_column=OptionsInfo(scss=False, category='row_group', type='boolean', value=False), table_body_hlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_hlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='1px'), table_body_hlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='#D3D3D3'), table_body_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), table_body_border_top_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_top_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_border_top_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), table_body_border_bottom_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_bottom_width=OptionsInfo(scss=True, category='table_body', type='px', value='2px'), table_body_border_bottom_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), data_row_padding=OptionsInfo(scss=True, category='data_row', type='px', value='2px'), data_row_padding_horizontal=OptionsInfo(scss=True, category='data_row', type='px', value='5px'), stub_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_font_size=OptionsInfo(scss=True, category='stub', type='px', value='16px'), stub_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_border_style=OptionsInfo(scss=True, category='stub', type='value', value='hidden'), stub_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), stub_row_group_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_row_group_font_size=OptionsInfo(scss=True, category='stub', type='px', value='100%'), stub_row_group_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_row_group_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_row_group_border_style=OptionsInfo(scss=True, category='stub', type='value', value='solid'), stub_row_group_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_row_group_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), summary_row_padding=OptionsInfo(scss=True, category='summary_row', type='px', value='8px'), summary_row_padding_horizontal=OptionsInfo(scss=True, category='summary_row', type='px', value='5px'), summary_row_background_color=OptionsInfo(scss=True, category='summary_row', type='value', value=None), summary_row_text_transform=OptionsInfo(scss=True, category='summary_row', type='value', value='inherit'), summary_row_border_style=OptionsInfo(scss=True, category='summary_row', type='value', value='solid'), summary_row_border_width=OptionsInfo(scss=True, category='summary_row', type='px', value='2px'), summary_row_border_color=OptionsInfo(scss=True, category='summary_row', type='value', value='#D3D3D3'), grand_summary_row_padding=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='8px'), grand_summary_row_padding_horizontal=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='5px'), grand_summary_row_background_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value=None), grand_summary_row_text_transform=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='inherit'), grand_summary_row_border_style=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='double'), grand_summary_row_border_width=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='6px'), grand_summary_row_border_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='#D3D3D3'), footnotes_marks=OptionsInfo(scss=False, category='footnotes', type='values', value='numbers'), source_notes_padding=OptionsInfo(scss=True, category='source_notes', type='px', value='4px'), source_notes_padding_horizontal=OptionsInfo(scss=True, category='source_notes', type='px', value='5px'), source_notes_background_color=OptionsInfo(scss=True, category='source_notes', type='value', value=None), source_notes_font_size=OptionsInfo(scss=True, category='source_notes', type='px', value='10px'), source_notes_border_bottom_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_bottom_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_bottom_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_border_lr_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_lr_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_lr_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_multiline=OptionsInfo(scss=False, category='source_notes', type='boolean', value=True), source_notes_sep=OptionsInfo(scss=False, category='source_notes', type='value', value=' '), row_striping_background_color=OptionsInfo(scss=True, category='row', type='value', value='#F4F4F4'), row_striping_include_stub=OptionsInfo(scss=False, category='row', type='boolean', value=False), row_striping_include_table_body=OptionsInfo(scss=False, category='row', type='boolean', value=False), container_width=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_height=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_padding_x=OptionsInfo(scss=False, category='container', type='px', value='0px'), container_padding_y=OptionsInfo(scss=False, category='container', type='px', value='10px'), container_overflow_x=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), container_overflow_y=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), quarto_disable_processing=OptionsInfo(scss=False, category='quarto', type='logical', value=False), quarto_use_bootstrap=OptionsInfo(scss=False, category='quarto', type='logical', value=False)), _google_font_imports=GoogleFontImports(imports=frozenset()), _has_built=False)
 
 Both models indicate that polluters have significantly higher yields after the PA than non-polluting firms. Note that the magnitude of the `treated` coefficient varies considerably across models.
 
@@ -449,7 +444,7 @@ Figure 1: The figure shows the coefficient estimates and 95 percent confidence 
 model_without_fe_time = pf.feols(
     "avg_yield ~ C(polluter)/C(date) + time_to_maturity + log_offering_amt",
     vcov = "iid",
-    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8)).to_pandas()
+    data = bonds_panel.with_columns(pl.col("date").cast(pl.Utf8))
 )
 
 model_without_fe_coefs = (pl.DataFrame({
@@ -460,7 +455,7 @@ model_without_fe_coefs = (pl.DataFrame({
     .filter(pl.col("term").str.contains("date"))
     .with_columns(
         treatment=pl.col("term").str.contains("True", literal=True),
-        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})\]"),
+        date=pl.col("term").str.extract(r"\[T\.(\d{4}-\d{2}-\d{2})"),
         ci_up=pl.col("estimate")+norm.ppf(0.975)*pl.col("std_error"),
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
@@ -545,7 +540,7 @@ model_with_fe_time <- feols(
 )
 ```
 
-    NOTE: 205/0 fixed-effect singletons were removed (205 observations).
+    NOTE: 351/0 fixed-effect singletons were removed (351 observations).
 
 ``` r
 model_with_fe_time_coefs <- tidy(model_with_fe_time) |>
@@ -610,36 +605,39 @@ variables = (bonds_panel_alt
     .select(["diff_to_treatment", "date"])
     .unique()
     .sort("date")
-    .with_columns(variable_name=pl.lit(None, dtype=pl.Utf8))
+    .with_columns(
+        variable_name=pl.when(pl.col("diff_to_treatment") == 0)
+        .then(pl.lit(None, dtype=pl.Utf8))
+        .otherwise(
+            pl.when(pl.col("diff_to_treatment") < 0)
+            .then(pl.lit("lag"))
+            .otherwise(pl.lit("lead"))
+            + pl.col("diff_to_treatment").abs().cast(pl.Utf8)
+        )
+    )
 )
 ```
 
 In the next code chunk, we assemble the model formula and regress the monthly yields on the set of time dummies and `cusip_id` and `date` fixed effects.
 
 ``` python
-bonds_panel_alt = bonds_panel_alt.to_pandas()
-variables = variables.to_pandas()
+formula = "avg_yield ~ 1"
+lead_lag_columns = []
 
-formula = "avg_yield ~ 1 + "
-
-for j in range(variables.shape[0]):
-    if variables["diff_to_treatment"].iloc[j] != 0:
-        old_names=list(bonds_panel_alt.columns)
-
-        bonds_panel_alt["new_var"] = (
-          bonds_panel_alt["diff_to_treatment"] ==
-            variables["diff_to_treatment"].iloc[j]
-        ) & bonds_panel_alt["polluter"]
-
-        diff_to_treatment_value=variables["diff_to_treatment"].iloc[j]
-        direction="lag" if diff_to_treatment_value < 0 else "lead"
-        abs_diff_to_treatment=int(abs(diff_to_treatment_value))
-        new_var_name=f"{direction}{abs_diff_to_treatment}"
-        variables.at[j, "variable_name"]=new_var_name
-        bonds_panel_alt[new_var_name]=bonds_panel_alt["new_var"]
-        formula += (f" + {new_var_name}" if j > 0 else new_var_name)
+for row in variables.iter_rows(named=True):
+    if row["diff_to_treatment"] != 0:
+        new_var_name = row["variable_name"]
+        lead_lag_columns.append(
+            (
+                (pl.col("diff_to_treatment") == row["diff_to_treatment"])
+                & pl.col("polluter")
+            ).alias(new_var_name)
+        )
+        formula += f" + {new_var_name}"
 
 formula = formula + " | cusip_id + date "
+
+bonds_panel_alt = bonds_panel_alt.with_columns(lead_lag_columns)
 
 model_with_fe_time = pf.feols(
     formula,
@@ -658,7 +656,7 @@ lag0_row = pl.DataFrame({
     "ci_up": [0.0],
     "ci_low": [0.0],
     "diff_to_treatment": [0],
-    "date": [treatment_month]
+    "date": [treatment_month.date()]
 })
 
 model_with_fe_time_coefs = (pl.DataFrame({
@@ -671,7 +669,7 @@ model_with_fe_time_coefs = (pl.DataFrame({
         ci_low=pl.col("estimate")+norm.ppf(0.025)*pl.col("std_error")
     )
     .join(
-        pl.from_pandas(variables),
+        variables,
         how="left", left_on="term", right_on="variable_name"
     )
 )
