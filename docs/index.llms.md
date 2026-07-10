@@ -4,7 +4,7 @@
 
 Tidy Finance takes an opinionated, fully transparent approach to empirical research in financial economics. One open-source code base now covers R and Python, side by side in every chapter.
 
-[Start here](chapters/working-with-stock-returns.llms.md) [Factor Library](https://factors.tidy-finance.org) [Python Library](https://python.tidy-finance.org) [R Package](https://r.tidy-finance.org)
+[Start here](chapters/working-with-stock-returns.llms.md) [Python Library](https://python.tidy-finance.org) [R Package](https://r.tidy-finance.org)
 
 download & plot prices
 
