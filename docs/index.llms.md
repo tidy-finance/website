@@ -50,7 +50,7 @@ prices = tf.download_data(
 
 100% Open source & reproducible
 
-## Everything you need for reproducible reserach in finance
+## Everything you need for reproducible research in finance
 
 A single, transparent code base takes you from raw data to publication-quality results, in R and Python.
 
