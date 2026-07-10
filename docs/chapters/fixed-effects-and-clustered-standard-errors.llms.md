@@ -1,0 +1,632 @@
+# Fixed Effects and Clustered Standard Errors
+
+In this chapter, we provide an intuitive introduction to the two popular concepts of *fixed effects regressions* and *clustered standard errors*. When working with regressions in empirical finance, you will sooner or later be confronted with discussions around how you deal with omitted variables bias and dependence in your residuals. The concepts we introduce in this chapter are designed to address such concerns.
+
+We focus on a classical panel regression common to the corporate finance literature (e.g., [Fazzari et al. 1988](#ref-Fazzari1988); [Erickson and Whited 2012](#ref-Erickson2012); [Gulen and Ion 2015](#ref-Gulen2015)): firm investment modeled as a function that increases in firm cash flow and firm investment opportunities.
+
+Typically, this investment regression uses quarterly balance sheet data provided via Compustat because it allows for richer dynamics in the regressors and more opportunities to construct variables. As we focus on the implementation of fixed effects and clustered standard errors, we use the annual Compustat data from our previous chapters and leave the estimation using quarterly data as an exercise. We demonstrate below that the regression based on annual data yields qualitatively similar results to estimations based on quarterly data from the literature, namely confirming the positive relationships between investment and the two regressors.
+
+We use the following packages throughout this chapter:
+
+## R
+
+``` r
+library(tidyverse)
+library(nanoparquet)
+library(fixest)
+```
+
+Compared to previous chapters, we introduce `fixest` ([Bergé 2018](#ref-fixest)) for the fixed effects regressions, the implementation of standard error clusters, and tidy estimation output.
+
+## Python
+
+``` python
+import polars as pl
+import pyfixest as pf
+```
+
+Compared to previous chapters, we introduce `pyfixest` ([Fischer 2024](#ref-pyfixest)), which provides tools for estimating various econometric models such as panel regressions.
+
+## Data Preparation
+
+We use CRSP and annual Compustat as data sources from our Parquet files introduced in [Accessing and Managing Financial Data](../chapters/accessing-and-managing-financial-data.llms.md) and [WRDS, CRSP, and Compustat](../chapters/wrds-crsp-and-compustat.llms.md). In particular, Compustat provides balance sheet and income statement data on a firm level, while CRSP provides market valuations.
+
+## R
+
+``` r
+crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
+  select(gvkey, date, mktcap)
+
+compustat_annual <- read_parquet("data/compustat_annual.parquet") |>
+  select(datadate, gvkey, year, at, be, capx, oancf, txdb)
+```
+
+## Python
+
+``` python
+crsp_monthly = (
+    pl.read_parquet("data/crsp_monthly.parquet")
+    .select(["gvkey", "date", "mktcap"])
+)
+
+compustat_annual = (
+    pl.read_parquet("data/compustat_annual.parquet")
+    .select(["datadate", "gvkey", "year", "at", "be", "capx", "oancf", "txdb"])
+)
+```
+
+The classical investment regressions model the capital investment of a firm as a function of operating cash flows and Tobin’s q, a measure of a firm’s investment opportunities. We start by constructing investment and cash flows which are usually normalized by lagged total assets of a firm. In the following code chunk, we construct a *panel* of firm-year observations, so we have both cross-sectional information on firms as well as time-series information for each firm.
+
+## R
+
+``` r
+data_investment <- compustat_annual |>
+  mutate(date = floor_date(datadate, "month")) |>
+  left_join(
+    compustat_annual |>
+      select(gvkey, year, at_lag = at) |>
+      mutate(year = year + 1),
+    join_by(gvkey, year)
+  ) |>
+  filter(at > 0, at_lag > 0) |>
+  mutate(
+    investment = capx / at_lag,
+    cash_flows = oancf / at_lag
+  )
+
+data_investment <- data_investment |>
+  left_join(
+    data_investment |>
+      select(gvkey, year, investment_lead = investment) |>
+      mutate(year = year - 1),
+    join_by(gvkey, year)
+  )
+```
+
+## Python
+
+``` python
+data_investment = (compustat_annual
+    .with_columns(
+        date=pl.col("datadate").dt.truncate("1mo")
+    )
+    .join(compustat_annual
+            .select(["gvkey", "year", "at"])
+            .rename({"at": "at_lag"})
+            .with_columns(year=pl.col("year")+1),
+            on=["gvkey", "year"], how="left")
+    .filter((pl.col("at") > 0) & (pl.col("at_lag") > 0))
+    .with_columns(investment=pl.col("capx")/pl.col("at_lag"),
+                  cash_flows=pl.col("oancf")/pl.col("at_lag"))
+)
+
+data_investment = (data_investment
+    .join(data_investment.select(["gvkey", "year", "investment"])
+            .rename({"investment": "investment_lead"})
+            .with_columns(year=pl.col("year")-1),
+            on=["gvkey", "year"], how="left")
+)
+```
+
+Tobin’s q is the ratio of the market value of capital to its replacement costs. It is one of the most common regressors in corporate finance applications (e.g., [Fazzari et al. 1988](#ref-Fazzari1988); [Erickson and Whited 2012](#ref-Erickson2012)). We follow the implementation of Gulen and Ion ([2015](#ref-Gulen2015)) and compute Tobin’s q as the market value of equity (`mktcap`) plus the book value of assets (`at`) minus book value of equity (`be`) plus deferred taxes (`txdb`), all divided by book value of assets (`at`). Finally, we only keep observations where all variables of interest are non-missing, and the reported book value of assets is strictly positive.
+
+## R
+
+``` r
+data_investment <- data_investment |>
+  left_join(crsp_monthly, join_by(gvkey, date)) |>
+  mutate(tobins_q = (mktcap + at - be + txdb) / at) |>
+  select(gvkey, year, investment_lead, cash_flows, tobins_q) |>
+  drop_na()
+```
+
+## Python
+
+``` python
+data_investment = (data_investment
+    .join(crsp_monthly, on=["gvkey", "date"], how="left")
+    .with_columns(
+        tobins_q=(
+        (pl.col("mktcap")+pl.col("at")-pl.col("be")+pl.col("txdb"))/pl.col("at")
+        )
+    )
+    .select(["gvkey", "year", "investment_lead", "cash_flows", "tobins_q"])
+    .drop_nulls()
+)
+```
+
+As the variable construction typically leads to extreme values that are most likely related to data issues (e.g., reporting errors), many papers include winsorization of the variables of interest. Winsorization involves replacing values of extreme outliers with quantiles on the respective end. The following function implements the winsorization for any percentage cut that should be applied on either end of the distributions. In the specific example, we winsorize the main variables (`investment`, `cash_flows`, and `tobins_q`) at the one percent level.
+
+## R
+
+``` r
+winsorize <- function(x, cut) {
+  x <- replace(
+    x,
+    x > quantile(x, 1 - cut, na.rm = T),
+    quantile(x, 1 - cut, na.rm = T)
+  )
+  x <- replace(
+    x,
+    x < quantile(x, cut, na.rm = T),
+    quantile(x, cut, na.rm = T)
+  )
+  return(x)
+}
+
+data_investment <- data_investment |>
+  mutate(across(
+    c(investment_lead, cash_flows, tobins_q),
+    ~ winsorize(., 0.01)
+  ))
+```
+
+## Python
+
+Note that `polars` operations never modify a data frame in place; every expression returns a new data frame. Our `winsorize` function therefore returns a `polars` expression that we apply via `with_columns()`, so the original data frame is never altered unintentionally.
+
+``` python
+def winsorize(col, cut):
+    """Winsorize a column at cut level."""
+
+    x = pl.col(col)
+    upper_quantile = x.quantile(1 - cut, interpolation="linear")
+    lower_quantile = x.quantile(cut, interpolation="linear")
+    return (
+        pl.when(x > upper_quantile).then(upper_quantile)
+        .when(x < lower_quantile).then(lower_quantile)
+        .otherwise(x)
+        .alias(col)
+    )
+
+data_investment = (data_investment
+    .with_columns(
+        winsorize("investment_lead", 0.01),
+        winsorize("cash_flows", 0.01),
+        winsorize("tobins_q", 0.01)
+    )
+)
+```
+
+Before proceeding to any estimations, we highly recommend tabulating summary statistics of the variables that enter the regression. These simple tables allow you to check the plausibility of your numerical variables, as well as spot any obvious errors or outliers. Additionally, for panel data, plotting the time series of the variable’s mean and the number of observations is a useful exercise to spot potential problems.
+
+## R
+
+``` r
+data_investment |>
+  pivot_longer(
+    cols = c(investment_lead, cash_flows, tobins_q),
+    names_to = "measure"
+  ) |>
+  group_by(measure) |>
+  summarize(
+    mean = mean(value),
+    sd = sd(value),
+    min = min(value),
+    q05 = quantile(value, 0.05),
+    q50 = quantile(value, 0.50),
+    q95 = quantile(value, 0.95),
+    max = max(value),
+    n = n(),
+    .groups = "drop"
+  )
+```
+
+    # A tibble: 3 × 9
+      measure      mean     sd    min      q05    q50   q95    max      n
+      <chr>       <dbl>  <dbl>  <dbl>    <dbl>  <dbl> <dbl>  <dbl>  <int>
+    1 cash_fl… -4.86e-4 0.292  -1.66  -5.23e-1 0.0601 0.270  0.478 139861
+    2 investm…  5.61e-2 0.0762  0      5.40e-4 0.0313 0.202  0.460 139861
+    3 tobins_q  2.06e+0 1.81    0.568  7.96e-1 1.41   5.61  11.6   139861
+
+## Python
+
+``` python
+data_investment_summary = (data_investment
+    .unpivot(index=["gvkey", "year"], variable_name="measure",
+             on=["investment_lead", "cash_flows", "tobins_q"])
+    .select(["measure", "value"])
+    .group_by("measure")
+    .agg(
+        count=pl.len(),
+        mean=pl.col("value").mean(),
+        std=pl.col("value").std(),
+        min=pl.col("value").min(),
+        q05=pl.col("value").quantile(0.05, interpolation="linear"),
+        median=pl.col("value").median(),
+        q95=pl.col("value").quantile(0.95, interpolation="linear"),
+        max=pl.col("value").max(),
+    )
+    .sort("measure")
+    .with_columns(pl.col(pl.Float64).round(2))
+)
+data_investment_summary
+```
+
+shape: (3, 9)
+
+| measure           | count  | mean | std  | min   | q05   | median | q95  | max   |
+|-------------------|--------|------|------|-------|-------|--------|------|-------|
+| str               | u32    | f64  | f64  | f64   | f64   | f64    | f64  | f64   |
+| "cash_flows"      | 139861 | -0.0 | 0.29 | -1.66 | -0.52 | 0.06   | 0.27 | 0.48  |
+| "investment_lead" | 139861 | 0.06 | 0.08 | 0.0   | 0.0   | 0.03   | 0.2  | 0.46  |
+| "tobins_q"        | 139861 | 2.06 | 1.81 | 0.57  | 0.8   | 1.41   | 5.61 | 11.62 |
+
+## Fixed Effects
+
+To illustrate fixed effects regressions, we use the `fixest` (R) and `pyfixest` (Python) packages, which are both computationally powerful and flexible with respect to model specifications. We start out with the basic investment regression using the simple model
+
+\\ \text{Investment}\_{i,t+1} = \alpha + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{1}\\
+
+where \\\varepsilon\_{i,t}\\ is i.i.d. normally distributed across time and firms.
+
+## R
+
+We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below, but you could also use `lm()`.
+
+``` r
+model_ols <- feols(
+  fml = investment_lead ~ cash_flows + tobins_q,
+  vcov = "iid",
+  data = data_investment
+)
+model_ols
+```
+
+    OLS estimation, Dep. Var.: investment_lead
+    Observations: 139,861
+    Standard-errors: IID 
+                Estimate Std. Error t value  Pr(>|t|)    
+    (Intercept)   0.0425   0.000309   137.5 < 2.2e-16 ***
+    cash_flows    0.0448   0.000710    63.2 < 2.2e-16 ***
+    tobins_q      0.0066   0.000115    57.5 < 2.2e-16 ***
+    ---
+    Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    RMSE: 0.07469   Adj. R2: 0.03963
+
+## Python
+
+We use the `feols()`-function to estimate the simple model so that the output has the same structure as the other regressions below. We reuse the same `polars` data frame across all model specifications.
+
+``` python
+model_ols = pf.feols(
+    "investment_lead ~ cash_flows + tobins_q",
+    vcov = "iid",
+    data = data_investment
+)
+model_ols.summary()
+```
+
+    ###
+
+    Estimation:  OLS
+    Dep. var.: investment_lead
+    sample: None = all
+    Inference:  iid
+    Observations:  139861
+
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | Intercept     |      0.043 |        0.000 |   137.514 |      0.000 |  0.042 |   0.043 |
+    | cash_flows    |      0.045 |        0.001 |    63.162 |      0.000 |  0.043 |   0.046 |
+    | tobins_q      |      0.007 |        0.000 |    57.539 |      0.000 |  0.006 |   0.007 |
+    ---
+    RMSE: 0.075 R2: 0.04 
+
+As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.
+
+One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects*; i.e., model parameters that are fixed for specific groups (e.g., [Wooldridge 2010](#ref-Wooldridge2010)). In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
+
+\\ \text{Investment}\_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{2}\\
+
+where \\\alpha_i\\ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms’ investments as deviations from the firms’ average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm’s average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
+
+To include the firm fixed effect, we use `gvkey` (Compustat’s firm identifier) as follows:
+
+## R
+
+``` r
+model_fe_firm <- feols(
+  investment_lead ~ cash_flows + tobins_q | gvkey,
+  vcov = "iid",
+  data = data_investment
+)
+```
+
+    NOTE: 1,656 fixed-effect singletons were removed (1,656 observations).
+
+``` r
+model_fe_firm
+```
+
+    OLS estimation, Dep. Var.: investment_lead
+    Observations: 138,205
+    Fixed-effects: gvkey: 13,313
+    Standard-errors: IID 
+               Estimate Std. Error t value  Pr(>|t|)    
+    cash_flows  0.01132   0.000824    13.7 < 2.2e-16 ***
+    tobins_q    0.00964   0.000118    81.8 < 2.2e-16 ***
+    ---
+    Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    RMSE: 0.050177     Adj. R2: 0.516082
+                     Within R2: 0.051363
+
+## Python
+
+``` python
+model_fe_firm = pf.feols(
+    "investment_lead ~ cash_flows + tobins_q | gvkey",
+    vcov = "iid",
+    data = data_investment
+)
+model_fe_firm.summary()
+```
+
+    ###
+
+    Estimation:  OLS
+    Dep. var.: investment_lead, Fixed effects: gvkey
+    sample: None = all
+    Inference:  iid
+    Observations:  138205
+
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | cash_flows    |      0.011 |        0.001 |    13.730 |      0.000 |  0.010 |   0.013 |
+    | tobins_q      |      0.010 |        0.000 |    81.822 |      0.000 |  0.009 |   0.010 |
+    ---
+    RMSE: 0.05 R2: 0.563 R2 Within: 0.051 
+
+The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
+
+There is another source of variation that we can get rid of in our setting: average investment across firms might vary over time due to macroeconomic factors that affect all firms, such as economic crises. By including year fixed effects, we can take out the effect of unobservables that vary over time. The two-way fixed effects regression is then
+
+\\ \text{Investment}\_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{3}\\
+
+where \\\alpha_t\\ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows.
+
+## R
+
+``` r
+model_fe_firmyear <- feols(
+  investment_lead ~ cash_flows + tobins_q | gvkey + year,
+  vcov = "iid",
+  data = data_investment
+)
+```
+
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+
+``` r
+model_fe_firmyear
+```
+
+    OLS estimation, Dep. Var.: investment_lead
+    Observations: 138,205
+    Fixed-effects: gvkey: 13,313,  year: 37
+    Standard-errors: IID 
+               Estimate Std. Error t value  Pr(>|t|)    
+    cash_flows  0.01409   0.000805    17.5 < 2.2e-16 ***
+    tobins_q    0.00883   0.000116    75.9 < 2.2e-16 ***
+    ---
+    Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    RMSE: 0.048849     Adj. R2: 0.541223
+                     Within R2: 0.045387
+
+## Python
+
+``` python
+model_fe_firmyear = pf.feols(
+    "investment_lead ~ cash_flows + tobins_q | gvkey + year",
+    vcov = "iid",
+    data = data_investment
+)
+model_fe_firmyear.summary()
+```
+
+    ###
+
+    Estimation:  OLS
+    Dep. var.: investment_lead, Fixed effects: gvkey + year
+    sample: None = all
+    Inference:  iid
+    Observations:  138205
+
+    | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
+    |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
+    | cash_flows    |      0.014 |        0.001 |    17.498 |      0.000 |  0.013 |   0.016 |
+    | tobins_q      |      0.009 |        0.000 |    75.943 |      0.000 |  0.009 |   0.009 |
+    ---
+    RMSE: 0.049 R2: 0.586 R2 Within: 0.045 
+
+The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time.
+
+How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are colinear with the fixed effects, and the estimation becomes void.
+
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. We recommend printing \\t\\-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects ([Wasserstein and Lazar 2016](#ref-Wasserstein2016)). The \\t\\-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.
+
+## R
+
+Fortunately, the `etable()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX).
+
+``` r
+etable(
+  model_ols,
+  model_fe_firm,
+  model_fe_firmyear,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
+)
+```
+
+                           model_ols   model_fe_firm model_fe_firm..
+    Dependent Var.:  investment_lead investment_lead investment_lead
+                                                                    
+    Constant        0.042*** (137.5)                                
+    cash_flows       0.045*** (63.2) 0.011*** (13.7) 0.014*** (17.5)
+    tobins_q         0.007*** (57.5) 0.010*** (81.8) 0.009*** (75.9)
+    Fixed-Effects:  ---------------- --------------- ---------------
+    gvkey                         No             Yes             Yes
+    year                          No              No             Yes
+    _______________ ________________ _______________ _______________
+    VCOV type                    IID             IID             IID
+    Observations             139,861         138,205         138,205
+    R2                         0.040           0.563           0.586
+    Within R2                     --           0.051           0.045
+    ---
+    Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+## Python
+
+Fortunately, the `pf.etable()` function provides a convenient way to tabulate the regression output (with many parameters to customize and even print the output in LaTeX).
+
+``` python
+pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt = "b (t)")
+```
+
+    GT(_tbl_data=  __index_level_0__ __index_level_1__  ...               1               2
+    0              coef        cash_flows  ...  0.011 (13.730)  0.014 (17.498)
+    1              coef          tobins_q  ...   0.01 (81.822)  0.009 (75.943)
+    2              coef         Intercept  ...                                
+    3                fe              year  ...               -               x
+    4                fe             gvkey  ...               x               -
+    5                fe            gvkey   ...               -               x
+    6             stats      Observations  ...         138,205         138,205
+    7             stats                R²  ...           0.563           0.586
+
+    [8 rows x 5 columns], _body=<great_tables._gt_data.Body object at 0x000002062B950250>, _boxhead=Boxhead([ColInfo(var='__index_level_0__', type=<ColInfoTypeEnum.row_group: 3>, column_label='__index_level_0__', column_align='center', column_width=None), ColInfo(var='__index_level_1__', type=<ColInfoTypeEnum.stub: 2>, column_label='__index_level_1__', column_align='center', column_width=None), ColInfo(var='0', type=<ColInfoTypeEnum.default: 1>, column_label='(1)', column_align='center', column_width=None), ColInfo(var='1', type=<ColInfoTypeEnum.default: 1>, column_label='(2)', column_align='center', column_width=None), ColInfo(var='2', type=<ColInfoTypeEnum.default: 1>, column_label='(3)', column_align='center', column_width=None)]), _stub=<great_tables._gt_data.Stub object at 0x000002062B925D10>, _spanners=Spanners([SpannerInfo(spanner_id='investment_lead', spanner_level=1, spanner_label='investment_lead', spanner_units=None, spanner_pattern=None, vars=['0', '1', '2'], built=None)]), _heading=Heading(title=None, subtitle=None, preheader=None), _stubhead=None, _summary_rows=<great_tables._gt_data.SummaryRows object at 0x000002062FA12ED0>, _summary_rows_grand=<great_tables._gt_data.SummaryRows object at 0x000002062B925150>, _source_notes=['Format of coefficient cell: Coefficient (t-stats)'], _footnotes=[], _styles=[], _locale=<great_tables._gt_data.Locale object at 0x000002062B924F10>, _formats=[], _substitutions=[], _col_merge=[], _transforms=[], _options=Options(table_id=OptionsInfo(scss=False, category='table', type='value', value=None), table_caption=OptionsInfo(scss=False, category='table', type='value', value=None), table_width=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_layout=OptionsInfo(scss=True, category='table', type='value', value='fixed'), table_margin_left=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_margin_right=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_background_color=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_additional_css=OptionsInfo(scss=False, category='table', type='values', value=[]), table_font_names=OptionsInfo(scss=False, category='table', type='values', value=['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Helvetica Neue', 'Fira Sans', 'Droid Sans', 'Arial', 'sans-serif']), table_font_size=OptionsInfo(scss=True, category='table', type='px', value='16px'), table_font_weight=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_style=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_color=OptionsInfo(scss=True, category='table', type='value', value='#333333'), table_font_color_light=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_border_top_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_top_style=OptionsInfo(scss=True, category='table', type='value', value='solid'), table_border_top_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_top_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_right_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_right_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_right_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), table_border_bottom_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_bottom_style=OptionsInfo(scss=True, category='table', type='value', value='hidden'), table_border_bottom_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_bottom_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_left_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_left_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_left_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), heading_background_color=OptionsInfo(scss=True, category='heading', type='value', value=None), heading_align=OptionsInfo(scss=True, category='heading', type='value', value='center'), heading_title_font_size=OptionsInfo(scss=True, category='heading', type='px', value='16px'), heading_title_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_subtitle_font_size=OptionsInfo(scss=True, category='heading', type='px', value='85%'), heading_subtitle_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_padding=OptionsInfo(scss=True, category='heading', type='px', value='6px'), heading_padding_horizontal=OptionsInfo(scss=True, category='heading', type='px', value='5px'), heading_border_bottom_style=OptionsInfo(scss=True, category='heading', type='value', value='solid'), heading_border_bottom_width=OptionsInfo(scss=True, category='heading', type='px', value='2px'), heading_border_bottom_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), heading_border_lr_style=OptionsInfo(scss=True, category='heading', type='value', value='none'), heading_border_lr_width=OptionsInfo(scss=True, category='heading', type='px', value='1px'), heading_border_lr_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), column_labels_background_color=OptionsInfo(scss=True, category='column_labels', type='value', value=None), column_labels_font_size=OptionsInfo(scss=True, category='column_labels', type='px', value='16px'), column_labels_font_weight=OptionsInfo(scss=True, category='column_labels', type='value', value='normal'), column_labels_text_transform=OptionsInfo(scss=True, category='column_labels', type='value', value='inherit'), column_labels_padding=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_padding_horizontal=OptionsInfo(scss=True, category='column_labels', type='px', value='5px'), column_labels_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), column_labels_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), column_labels_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), column_labels_border_top_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_top_width=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_border_top_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_bottom_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_bottom_width=OptionsInfo(scss=True, category='column_labels', type='px', value='0.25px'), column_labels_border_bottom_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_lr_style=OptionsInfo(scss=True, category='column_labels', type='value', value='none'), column_labels_border_lr_width=OptionsInfo(scss=True, category='column_labels', type='px', value='1px'), column_labels_border_lr_color=OptionsInfo(scss=True, category='column_labels', type='value', value='#D3D3D3'), column_labels_hidden=OptionsInfo(scss=False, category='column_labels', type='boolean', value=False), row_group_background_color=OptionsInfo(scss=True, category='row_group', type='value', value=None), row_group_font_size=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_font_weight=OptionsInfo(scss=True, category='row_group', type='value', value='initial'), row_group_text_transform=OptionsInfo(scss=True, category='row_group', type='value', value='inherit'), row_group_padding=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_padding_horizontal=OptionsInfo(scss=True, category='row_group', type='px', value='5px'), row_group_border_top_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_top_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_top_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_right_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_right_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_right_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_border_bottom_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_bottom_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_bottom_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_left_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_left_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_left_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_as_column=OptionsInfo(scss=False, category='row_group', type='boolean', value=False), table_body_hlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_hlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='1px'), table_body_hlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='#D3D3D3'), table_body_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), table_body_border_top_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_top_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_border_top_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), table_body_border_bottom_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_bottom_width=OptionsInfo(scss=True, category='table_body', type='px', value='2px'), table_body_border_bottom_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), data_row_padding=OptionsInfo(scss=True, category='data_row', type='px', value='2px'), data_row_padding_horizontal=OptionsInfo(scss=True, category='data_row', type='px', value='5px'), stub_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_font_size=OptionsInfo(scss=True, category='stub', type='px', value='16px'), stub_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_border_style=OptionsInfo(scss=True, category='stub', type='value', value='hidden'), stub_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), stub_row_group_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_row_group_font_size=OptionsInfo(scss=True, category='stub', type='px', value='100%'), stub_row_group_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_row_group_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_row_group_border_style=OptionsInfo(scss=True, category='stub', type='value', value='solid'), stub_row_group_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_row_group_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), summary_row_padding=OptionsInfo(scss=True, category='summary_row', type='px', value='8px'), summary_row_padding_horizontal=OptionsInfo(scss=True, category='summary_row', type='px', value='5px'), summary_row_background_color=OptionsInfo(scss=True, category='summary_row', type='value', value=None), summary_row_text_transform=OptionsInfo(scss=True, category='summary_row', type='value', value='inherit'), summary_row_border_style=OptionsInfo(scss=True, category='summary_row', type='value', value='solid'), summary_row_border_width=OptionsInfo(scss=True, category='summary_row', type='px', value='2px'), summary_row_border_color=OptionsInfo(scss=True, category='summary_row', type='value', value='#D3D3D3'), grand_summary_row_padding=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='8px'), grand_summary_row_padding_horizontal=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='5px'), grand_summary_row_background_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value=None), grand_summary_row_text_transform=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='inherit'), grand_summary_row_border_style=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='double'), grand_summary_row_border_width=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='6px'), grand_summary_row_border_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='#D3D3D3'), footnotes_marks=OptionsInfo(scss=False, category='footnotes', type='values', value='numbers'), source_notes_padding=OptionsInfo(scss=True, category='source_notes', type='px', value='4px'), source_notes_padding_horizontal=OptionsInfo(scss=True, category='source_notes', type='px', value='5px'), source_notes_background_color=OptionsInfo(scss=True, category='source_notes', type='value', value=None), source_notes_font_size=OptionsInfo(scss=True, category='source_notes', type='px', value='10px'), source_notes_border_bottom_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_bottom_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_bottom_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_border_lr_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_lr_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_lr_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_multiline=OptionsInfo(scss=False, category='source_notes', type='boolean', value=True), source_notes_sep=OptionsInfo(scss=False, category='source_notes', type='value', value=' '), row_striping_background_color=OptionsInfo(scss=True, category='row', type='value', value='#F4F4F4'), row_striping_include_stub=OptionsInfo(scss=False, category='row', type='boolean', value=False), row_striping_include_table_body=OptionsInfo(scss=False, category='row', type='boolean', value=False), container_width=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_height=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_padding_x=OptionsInfo(scss=False, category='container', type='px', value='0px'), container_padding_y=OptionsInfo(scss=False, category='container', type='px', value='10px'), container_overflow_x=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), container_overflow_y=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), quarto_disable_processing=OptionsInfo(scss=False, category='quarto', type='logical', value=False), quarto_use_bootstrap=OptionsInfo(scss=False, category='quarto', type='logical', value=False)), _google_font_imports=GoogleFontImports(imports=frozenset()), _has_built=False)
+
+## Clustering Standard Errors
+
+Apart from biased estimators, we usually have to deal with potentially complex dependencies of our residuals with each other. Such dependencies in the residuals invalidate the i.i.d. assumption of OLS and lead to biased standard errors. With biased OLS standard errors, we cannot reliably interpret the statistical significance of our estimated coefficients.
+
+In our setting, the residuals may be correlated across years for a given firm (time-series dependence), or, alternatively, the residuals may be correlated across different firms (cross-section dependence). One of the most common approaches to dealing with such dependence is the use of *clustered standard errors* ([Petersen 2008](#ref-Petersen2008)). The idea behind clustering is that the correlation of residuals *within* a cluster can be of any form. As the number of clusters grows, the cluster-robust standard errors become consistent ([Donald and Lang 2007](#ref-Lang2007); [Wooldridge 2010](#ref-Wooldridge2010)). A natural requirement for clustering standard errors in practice is hence a sufficiently large number of clusters. Typically, around at least 30 to 50 clusters are seen as sufficient ([Cameron et al. 2011](#ref-Cameron2011)).
+
+Instead of relying on the i.i.d. assumption, we can use the cluster option in the `feols()`-function as above. The code chunk below applies both one-way clustering by firm as well as two-way clustering by firm and year.
+
+## R
+
+``` r
+model_cluster_firm <- feols(
+  investment_lead ~ cash_flows + tobins_q | gvkey + year,
+  cluster = "gvkey",
+  data = data_investment
+)
+```
+
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+
+``` r
+model_cluster_firmyear <- feols(
+  investment_lead ~ cash_flows + tobins_q | gvkey + year,
+  cluster = c("gvkey", "year"),
+  data = data_investment
+)
+```
+
+    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+
+## Python
+
+``` python
+model_cluster_firm = pf.feols(
+    "investment_lead ~ cash_flows + tobins_q | gvkey + year",
+    vcov = {"CRV1": "gvkey"},
+    data = data_investment
+)
+
+model_cluster_firmyear = pf.feols(
+    "investment_lead ~ cash_flows + tobins_q | gvkey + year",
+    vcov = {"CRV1": "gvkey + year"},
+    data = data_investment
+)
+```
+
+The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin’s q. By clustering the standard errors on the firm level, the \\t\\-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin’s q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the \\t\\-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
+
+## R
+
+``` r
+etable(
+  model_fe_firmyear,
+  model_cluster_firm,
+  model_cluster_firmyear,
+  coefstat = "tstat",
+  digits = 3,
+  digits.stats = 3
+)
+```
+
+                    model_fe_firm.. model_cluster.. model_cluster...1
+    Dependent Var.: investment_lead investment_lead   investment_lead
+                                                                     
+    cash_flows      0.014*** (17.5) 0.014*** (10.1)   0.014*** (8.30)
+    tobins_q        0.009*** (75.9) 0.009*** (35.6)   0.009*** (14.3)
+    Fixed-Effects:  --------------- ---------------   ---------------
+    gvkey                       Yes             Yes               Yes
+    year                        Yes             Yes               Yes
+    _______________ _______________ _______________   _______________
+    VCOV type                   IID       by: gvkey  by: gvkey & year
+    Observations            138,205         138,205           138,205
+    R2                        0.586           0.586             0.586
+    Within R2                 0.045           0.045             0.045
+    ---
+    Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+## Python
+
+``` python
+pf.etable([model_fe_firmyear, model_cluster_firm, model_cluster_firmyear], coef_fmt = "b (t)")
+```
+
+    GT(_tbl_data=  __index_level_0__ __index_level_1__  ...               1               2
+    0              coef        cash_flows  ...  0.014 (10.122)   0.014 (8.297)
+    1              coef          tobins_q  ...  0.009 (35.632)  0.009 (14.303)
+    2                fe              year  ...               x               x
+    3                fe            gvkey   ...               x               x
+    4             stats      Observations  ...         138,205         138,205
+    5             stats                R²  ...           0.586           0.586
+
+    [6 rows x 5 columns], _body=<great_tables._gt_data.Body object at 0x00000206313FBB90>, _boxhead=Boxhead([ColInfo(var='__index_level_0__', type=<ColInfoTypeEnum.row_group: 3>, column_label='__index_level_0__', column_align='center', column_width=None), ColInfo(var='__index_level_1__', type=<ColInfoTypeEnum.stub: 2>, column_label='__index_level_1__', column_align='center', column_width=None), ColInfo(var='0', type=<ColInfoTypeEnum.default: 1>, column_label='(1)', column_align='center', column_width=None), ColInfo(var='1', type=<ColInfoTypeEnum.default: 1>, column_label='(2)', column_align='center', column_width=None), ColInfo(var='2', type=<ColInfoTypeEnum.default: 1>, column_label='(3)', column_align='center', column_width=None)]), _stub=<great_tables._gt_data.Stub object at 0x0000020630314090>, _spanners=Spanners([SpannerInfo(spanner_id='investment_lead', spanner_level=1, spanner_label='investment_lead', spanner_units=None, spanner_pattern=None, vars=['0', '1', '2'], built=None)]), _heading=Heading(title=None, subtitle=None, preheader=None), _stubhead=None, _summary_rows=<great_tables._gt_data.SummaryRows object at 0x00000206313F9750>, _summary_rows_grand=<great_tables._gt_data.SummaryRows object at 0x00000206313F9910>, _source_notes=['Format of coefficient cell: Coefficient (t-stats)'], _footnotes=[], _styles=[], _locale=<great_tables._gt_data.Locale object at 0x00000206313F9650>, _formats=[], _substitutions=[], _col_merge=[], _transforms=[], _options=Options(table_id=OptionsInfo(scss=False, category='table', type='value', value=None), table_caption=OptionsInfo(scss=False, category='table', type='value', value=None), table_width=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_layout=OptionsInfo(scss=True, category='table', type='value', value='fixed'), table_margin_left=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_margin_right=OptionsInfo(scss=True, category='table', type='px', value='auto'), table_background_color=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_additional_css=OptionsInfo(scss=False, category='table', type='values', value=[]), table_font_names=OptionsInfo(scss=False, category='table', type='values', value=['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Helvetica Neue', 'Fira Sans', 'Droid Sans', 'Arial', 'sans-serif']), table_font_size=OptionsInfo(scss=True, category='table', type='px', value='16px'), table_font_weight=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_style=OptionsInfo(scss=True, category='table', type='value', value='normal'), table_font_color=OptionsInfo(scss=True, category='table', type='value', value='#333333'), table_font_color_light=OptionsInfo(scss=True, category='table', type='value', value='#FFFFFF'), table_border_top_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_top_style=OptionsInfo(scss=True, category='table', type='value', value='solid'), table_border_top_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_top_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_right_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_right_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_right_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), table_border_bottom_include=OptionsInfo(scss=False, category='table', type='boolean', value=True), table_border_bottom_style=OptionsInfo(scss=True, category='table', type='value', value='hidden'), table_border_bottom_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_bottom_color=OptionsInfo(scss=True, category='table', type='value', value='#A8A8A8'), table_border_left_style=OptionsInfo(scss=True, category='table', type='value', value='none'), table_border_left_width=OptionsInfo(scss=True, category='table', type='px', value='2px'), table_border_left_color=OptionsInfo(scss=True, category='table', type='value', value='#D3D3D3'), heading_background_color=OptionsInfo(scss=True, category='heading', type='value', value=None), heading_align=OptionsInfo(scss=True, category='heading', type='value', value='center'), heading_title_font_size=OptionsInfo(scss=True, category='heading', type='px', value='16px'), heading_title_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_subtitle_font_size=OptionsInfo(scss=True, category='heading', type='px', value='85%'), heading_subtitle_font_weight=OptionsInfo(scss=True, category='heading', type='value', value='initial'), heading_padding=OptionsInfo(scss=True, category='heading', type='px', value='6px'), heading_padding_horizontal=OptionsInfo(scss=True, category='heading', type='px', value='5px'), heading_border_bottom_style=OptionsInfo(scss=True, category='heading', type='value', value='solid'), heading_border_bottom_width=OptionsInfo(scss=True, category='heading', type='px', value='2px'), heading_border_bottom_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), heading_border_lr_style=OptionsInfo(scss=True, category='heading', type='value', value='none'), heading_border_lr_width=OptionsInfo(scss=True, category='heading', type='px', value='1px'), heading_border_lr_color=OptionsInfo(scss=True, category='heading', type='value', value='#D3D3D3'), column_labels_background_color=OptionsInfo(scss=True, category='column_labels', type='value', value=None), column_labels_font_size=OptionsInfo(scss=True, category='column_labels', type='px', value='16px'), column_labels_font_weight=OptionsInfo(scss=True, category='column_labels', type='value', value='normal'), column_labels_text_transform=OptionsInfo(scss=True, category='column_labels', type='value', value='inherit'), column_labels_padding=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_padding_horizontal=OptionsInfo(scss=True, category='column_labels', type='px', value='5px'), column_labels_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), column_labels_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), column_labels_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), column_labels_border_top_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_top_width=OptionsInfo(scss=True, category='column_labels', type='px', value='2px'), column_labels_border_top_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_bottom_style=OptionsInfo(scss=True, category='column_labels', type='value', value='solid'), column_labels_border_bottom_width=OptionsInfo(scss=True, category='column_labels', type='px', value='0.25px'), column_labels_border_bottom_color=OptionsInfo(scss=True, category='column_labels', type='value', value='black'), column_labels_border_lr_style=OptionsInfo(scss=True, category='column_labels', type='value', value='none'), column_labels_border_lr_width=OptionsInfo(scss=True, category='column_labels', type='px', value='1px'), column_labels_border_lr_color=OptionsInfo(scss=True, category='column_labels', type='value', value='#D3D3D3'), column_labels_hidden=OptionsInfo(scss=False, category='column_labels', type='boolean', value=False), row_group_background_color=OptionsInfo(scss=True, category='row_group', type='value', value=None), row_group_font_size=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_font_weight=OptionsInfo(scss=True, category='row_group', type='value', value='initial'), row_group_text_transform=OptionsInfo(scss=True, category='row_group', type='value', value='inherit'), row_group_padding=OptionsInfo(scss=True, category='row_group', type='px', value='0px'), row_group_padding_horizontal=OptionsInfo(scss=True, category='row_group', type='px', value='5px'), row_group_border_top_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_top_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_top_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_right_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_right_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_right_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_border_bottom_style=OptionsInfo(scss=True, category='row_group', type='value', value='solid'), row_group_border_bottom_width=OptionsInfo(scss=True, category='row_group', type='px', value='0.25px'), row_group_border_bottom_color=OptionsInfo(scss=True, category='row_group', type='value', value='black'), row_group_border_left_style=OptionsInfo(scss=True, category='row_group', type='value', value='none'), row_group_border_left_width=OptionsInfo(scss=True, category='row_group', type='px', value='1px'), row_group_border_left_color=OptionsInfo(scss=True, category='row_group', type='value', value='white'), row_group_as_column=OptionsInfo(scss=False, category='row_group', type='boolean', value=False), table_body_hlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_hlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='1px'), table_body_hlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='#D3D3D3'), table_body_vlines_style=OptionsInfo(scss=True, category='table_body', type='value', value='none'), table_body_vlines_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_vlines_color=OptionsInfo(scss=True, category='table_body', type='value', value='white'), table_body_border_top_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_top_width=OptionsInfo(scss=True, category='table_body', type='px', value='0px'), table_body_border_top_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), table_body_border_bottom_style=OptionsInfo(scss=True, category='table_body', type='value', value='solid'), table_body_border_bottom_width=OptionsInfo(scss=True, category='table_body', type='px', value='2px'), table_body_border_bottom_color=OptionsInfo(scss=True, category='table_body', type='value', value='black'), data_row_padding=OptionsInfo(scss=True, category='data_row', type='px', value='2px'), data_row_padding_horizontal=OptionsInfo(scss=True, category='data_row', type='px', value='5px'), stub_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_font_size=OptionsInfo(scss=True, category='stub', type='px', value='16px'), stub_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_border_style=OptionsInfo(scss=True, category='stub', type='value', value='hidden'), stub_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), stub_row_group_background_color=OptionsInfo(scss=True, category='stub', type='value', value=None), stub_row_group_font_size=OptionsInfo(scss=True, category='stub', type='px', value='100%'), stub_row_group_font_weight=OptionsInfo(scss=True, category='stub', type='value', value='initial'), stub_row_group_text_transform=OptionsInfo(scss=True, category='stub', type='value', value='inherit'), stub_row_group_border_style=OptionsInfo(scss=True, category='stub', type='value', value='solid'), stub_row_group_border_width=OptionsInfo(scss=True, category='stub', type='px', value='2px'), stub_row_group_border_color=OptionsInfo(scss=True, category='stub', type='value', value='#D3D3D3'), summary_row_padding=OptionsInfo(scss=True, category='summary_row', type='px', value='8px'), summary_row_padding_horizontal=OptionsInfo(scss=True, category='summary_row', type='px', value='5px'), summary_row_background_color=OptionsInfo(scss=True, category='summary_row', type='value', value=None), summary_row_text_transform=OptionsInfo(scss=True, category='summary_row', type='value', value='inherit'), summary_row_border_style=OptionsInfo(scss=True, category='summary_row', type='value', value='solid'), summary_row_border_width=OptionsInfo(scss=True, category='summary_row', type='px', value='2px'), summary_row_border_color=OptionsInfo(scss=True, category='summary_row', type='value', value='#D3D3D3'), grand_summary_row_padding=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='8px'), grand_summary_row_padding_horizontal=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='5px'), grand_summary_row_background_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value=None), grand_summary_row_text_transform=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='inherit'), grand_summary_row_border_style=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='double'), grand_summary_row_border_width=OptionsInfo(scss=True, category='grand_summary_row', type='px', value='6px'), grand_summary_row_border_color=OptionsInfo(scss=True, category='grand_summary_row', type='value', value='#D3D3D3'), footnotes_marks=OptionsInfo(scss=False, category='footnotes', type='values', value='numbers'), source_notes_padding=OptionsInfo(scss=True, category='source_notes', type='px', value='4px'), source_notes_padding_horizontal=OptionsInfo(scss=True, category='source_notes', type='px', value='5px'), source_notes_background_color=OptionsInfo(scss=True, category='source_notes', type='value', value=None), source_notes_font_size=OptionsInfo(scss=True, category='source_notes', type='px', value='10px'), source_notes_border_bottom_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_bottom_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_bottom_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_border_lr_style=OptionsInfo(scss=True, category='source_notes', type='value', value='none'), source_notes_border_lr_width=OptionsInfo(scss=True, category='source_notes', type='px', value='2px'), source_notes_border_lr_color=OptionsInfo(scss=True, category='source_notes', type='value', value='#D3D3D3'), source_notes_multiline=OptionsInfo(scss=False, category='source_notes', type='boolean', value=True), source_notes_sep=OptionsInfo(scss=False, category='source_notes', type='value', value=' '), row_striping_background_color=OptionsInfo(scss=True, category='row', type='value', value='#F4F4F4'), row_striping_include_stub=OptionsInfo(scss=False, category='row', type='boolean', value=False), row_striping_include_table_body=OptionsInfo(scss=False, category='row', type='boolean', value=False), container_width=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_height=OptionsInfo(scss=False, category='container', type='px', value='auto'), container_padding_x=OptionsInfo(scss=False, category='container', type='px', value='0px'), container_padding_y=OptionsInfo(scss=False, category='container', type='px', value='10px'), container_overflow_x=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), container_overflow_y=OptionsInfo(scss=False, category='container', type='overflow', value='auto'), quarto_disable_processing=OptionsInfo(scss=False, category='quarto', type='logical', value=False), quarto_use_bootstrap=OptionsInfo(scss=False, category='quarto', type='logical', value=False)), _google_font_imports=GoogleFontImports(imports=frozenset()), _has_built=False)
+
+Inspired by Abadie et al. ([2017](#ref-AbadieEtAl2017)), we want to close this chapter by highlighting that choosing the right dimensions for clustering is a design problem. Even if the data is informative about whether clustering matters for standard errors, they do not tell you whether you should adjust the standard errors for clustering. Clustering at too aggregate levels can hence lead to unnecessarily inflated standard errors.
+
+## Key Takeaways
+
+- Fixed effects regressions control for unobserved firm and time-specific factors, reducing omitted variable bias in panel data models.
+- The `fixest` (R) and `pyfixest` (Python) packages streamline the estimation of fixed effects and support clustering standard errors for robust inference.
+- Clustered standard errors adjust for residual dependence across firms or years, leading to more accurate \\t\\-statistics and confidence in significance tests.
+- Two-way clustering by firm and year is commonly used in finance to address both time-series and cross-sectional correlation in residuals.
+- Careful model specification, including winsorization and proper clustering choices, enhances the credibility and reliability of empirical finance results.
+
+## Exercises
+
+1.  Estimate the two-way fixed effects model with two-way clustered standard errors using quarterly Compustat data from WRDS. Note that you can access quarterly data via `tbl(wrds, I("comp.fundq"))`.
+2.  Following Peters and Taylor ([2017](#ref-Peters2017)), compute Tobin’s q as the market value of outstanding equity `mktcap` plus the book value of debt (`dltt` + `dlc`) minus the current assets `atc` and everything divided by the book value of property, plant and equipment `ppegt`. What is the correlation between the measures of Tobin’s q? What is the impact on the two-way fixed effects regressions?
+
+## References
+
+Abadie, Alberto, Susan Athey, Guido W Imbens, and Jeffrey Wooldridge. 2017. “When should you adjust standard errors for clustering?” *Working Paper*. <http://www.nber.org/papers/w24003>.
+
+Bergé, Laurent. 2018. “Efficient estimation of maximum likelihood models with multiple fixed-effects: The R package FENmlm.” *CREA Discussion Papers*. <https://lrberge.github.io/fixest/>.
+
+Cameron, A. Colin, Jonah B. Gelbach, and Douglas L. Miller. 2011. “Robust inference with multiway clustering.” *Journal of Business & Economic Statistics* 29 (2): 238–49. <http://www.jstor.org/stable/25800796>.
+
+Donald, Stephen, and Kevin Lang. 2007. “Inference with difference-in-differences and other panel data.” *The Review of Economics and Statistics* 89 (2): 221–33. <https://doi.org/10.1162/rest.89.2.221>.
+
+Erickson, Timothy, and Toni M. Whited. 2012. “Treating measurement error in Tobin’s q.” *Review of Financial Studies* 25 (4): 1286–329. <https://doi.org/10.1093/rfs/hhr120>.
+
+Fazzari, Steven M., R. Glenn Hubbard, Bruce C. Petersen, Alan S. Blinder, and James M. Poterba. 1988. “Financing constraints and corporate investment.” *Brookings Papers on Economic Activity* 1988 (1): 141–206. <http://www.jstor.org/stable/2534426>.
+
+Fischer, Alexander. 2024. *PyFixest: Fast High-Dimensional Fixed Effects Regression in Python*. [Https://pypi.org/project/pyfixest/](https://pypi.org/project/pyfixest/).
+
+Gulen, Huseyin, and Mihai Ion. 2015. “Policy uncertainty and corporate investment.” *Review of Financial Studies* 29 (3): 523–64. <https://doi.org/10.1093/rfs/hhv050>.
+
+Peters, Ryan H., and Lucian A. Taylor. 2017. “Intangible capital and the investment-q relation.” *Journal of Financial Economics* 123 (2): 251–72. <https://doi.org/10.1016/j.jfineco.2016.03.011>.
+
+Petersen, Mitchell A. 2008. “Estimating standard errors in finance panel data sets: Comparing approaches.” *Review of Financial Studies* 22 (1): 435–80. <https://doi.org/10.1093/rfs/hhn053>.
+
+Wasserstein, Ronald L., and Nicole A. Lazar. 2016. “The ASA Statement on p-Values: Context, process, and purpose.” *The American Statistician* 70 (2): 129–33. <https://doi.org/10.1080/00031305.2016.1154108>.
+
+Wooldridge, Jefrey M. 2010. *Econometric analysis of cross section and panel data*. The MIT Press. <http://www.jstor.org/stable/j.ctt5hhcfr>.

@@ -1,0 +1,755 @@
+---
+title: Modern Portfolio Theory
+aliases:
+  - ../modern-portfolio-theory.html
+  - ../r/modern-portfolio-theory.html
+  - ../python/modern-portfolio-theory.html
+metadata:
+  pagetitle: Modern Portfolio Theory
+  description-meta: Learn how to use R and Python for implementing the Markowitz model for portfolio optimization.
+---
+
+```{python}
+#| label: modern-portfolio-theory-setup
+#| echo: false
+exec(open("assets/render-settings.py").read())
+```
+
+In the previous chapter, we show how to download and analyze stock market data with figures and summary statistics. Now, we move to a typical question in finance: How should an investor allocate their wealth across assets that differ in expected returns, variance, and correlations to optimize their portfolio’s performance?\index{Portfolio choice} Modern Portfolio Theory (MPT), introduced by @Markowitz1952, revolutionized the way how we think about such investment decisions by formalizing the trade-off between risk and expected return. Markowitz's framework laid the foundation for much of modern finance, also earning him the Sveriges Riksbank Prize in Economic Sciences in 1990.
+
+MPT relies on the fact that portfolio risk depends on individual asset volatilities as well as on the correlations between asset returns. This insight highlights the power of diversification: Combining assets with low or negative correlations with a given portfolio reduces the overall portfolio risk. This principle is often illustrated with the analogy of a fruit basket: If all you have are apples and they spoil, you lose everything. With a variety of fruits, some fruits may spoil, but others will stay fresh.
+
+At the heart of MPT is mean-variance analysis, which evaluates portfolios based on two dimensions: expected return and risk, defined as the variance of the portfolio returns. By balancing these two components, investors can construct portfolios that either maximize their expected return for a given level of risk or minimize their taken risk for a desired level of return. In this chapter, we first derive the optimal portfolio decisions and implement the mean-variance approach.
+
+We use the following packages throughout this chapter:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-packages
+#| message: false
+#| warning: false
+library(tidyverse)
+library(tidyfinance)
+library(scales)
+library(ggrepel)
+
+theme_set(theme_minimal())
+```
+
+We introduce the `ggrepel` package for adding text labels to the figures in this chapter [@ggrepel].
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-packages-py
+import polars as pl
+import numpy as np
+import tidyfinance as tf
+
+from plotnine import *
+from mizani.formatters import percent_format
+from adjustText import adjust_text
+
+tf.set_backend("polars")
+theme_set(theme_minimal())
+```
+
+We introduce the `adjustText` package for adding text labels to the figures in this chapter [@adjustText].
+
+:::
+
+## The Asset Universe
+
+Suppose that $N$ different risky assets are available to the investor. Each asset $i$ delivers expected returns $\mu_i$, representing the anticipated profit from holding the asset for one period. The investor can allocate their wealth across these assets by choosing the portfolio weights $\omega_i$ for each asset $i$. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option, such as keeping your money under a mattress. The overarching question of this chapter is: How should the investor allocate their wealth across these assets to optimize their portfolio's performance?
+
+According to @Markowitz1952, portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience. Second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated. You need historical data or other considerations to generate estimates of the distribution of future returns. Only then can one proceed to optimal decision-making *conditional* on your estimation.
+
+To keep things conceptually simple, we focus on the latter part for now and assume that the actual distribution of the asset returns is known. In later chapters, we discuss the issues that arise once we take estimation uncertainty into account. To provide some meaningful illustrations, we rely on historical data to compute reasonable proxies for the expected returns and the variance-covariance of the assets' returns, but we will work under the assumption that these are the true parameters of the return distribution.
+
+Thus, leveraging the approach introduced in [Working with Stock Returns](working-with-stock-returns.qmd), we download the constituents of the Dow Jones Industrial Average as an example portfolio as well as their daily adjusted close prices.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-download-data
+#| output: false
+symbols <- download_data(
+  domain = "constituents",
+  index = "Dow Jones Industrial Average"
+)
+
+prices_daily <- download_data(
+  domain = "stock_prices",
+  symbols = symbols$symbol,
+  start_date = "2000-01-01",
+  end_date = "2024-12-31"
+)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-download-data-py
+symbols = tf.download_data(
+    domain="constituents", index="Dow Jones Industrial Average"
+)
+
+prices_daily = tf.download_data(
+    domain="stock_prices",
+    symbols=symbols["symbol"].to_list(),
+    start_date="2000-01-01",
+    end_date="2024-12-31",
+)
+```
+
+:::
+
+To have a stable stock universe and to keep the analysis simple, we ensure that all stocks were traded over the whole sample period:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-filter-stable-universe
+prices_daily <- prices_daily |>
+  group_by(symbol) |>
+  mutate(n = n()) |>
+  ungroup() |>
+  filter(n == max(n)) |>
+  select(-n)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-filter-stable-universe-py
+prices_daily = (prices_daily
+    .with_columns(
+        counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
+    )
+    .filter(pl.col("counts") == pl.col("counts").max())
+    .drop("counts")
+)
+```
+
+:::
+
+We compute the sample average returns as $\frac{1}{T} \sum_{t=1}^{T} r_{i,t},$ where $r_{i,t}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods. As noted above, we treat the vector of sample averages as the true expected returns of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-compute-monthly-returns
+returns_monthly <- prices_daily |>
+  mutate(date = floor_date(date, "month")) |>
+  group_by(symbol, date) |>
+  summarize(price = last(adjusted_close), .groups = "drop_last") |>
+  mutate(ret = price / lag(price) - 1) |>
+  drop_na(ret) |>
+  select(-price)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-compute-monthly-returns-py
+returns_monthly = (prices_daily
+    .sort("date")
+    .with_columns(date=pl.col("date").dt.truncate("1mo"))
+    .group_by(["symbol", "date"])
+    .agg(adjusted_close=pl.col("adjusted_close").last())
+    .sort(["symbol", "date"])
+    .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
+    .drop_nulls("ret")
+    .select(["symbol", "date", "ret"])
+)
+```
+
+:::
+
+Individual asset risk in MPT is typically quantified using variance (i.e., $\sigma^2_i$) or volatilities (i.e., $\sigma_i$).^[Alternative approaches include value-at-risk, expected shortfall, or higher-order moments such as skewness and kurtosis.] We suppose that the true volatilities of the assets are also given by the sample standard deviation.\index{Variance}\index{Volatility}\index{Sample standard deviation}
+
+We compute the sample standard deviation for each asset:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-compute-mu-sigma
+assets <- returns_monthly |>
+  group_by(symbol) |>
+  summarize(
+    mu = mean(ret),
+    sigma = sd(ret)
+  )
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-compute-mu-sigma-py
+assets = (returns_monthly
+    .group_by("symbol")
+    .agg(
+        mu=pl.col("ret").mean(),
+        sigma=pl.col("ret").std()
+    )
+    .sort("symbol")
+)
+```
+
+:::
+
+We can illustrate the resulting distribution of the asset returns in @fig-201, showing the volatility on the horizontal axis and the expected return on the vertical axis.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-201
+#| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Expected returns and volatilities of Dow Jones index constituents. The figure is a scatter plot with volatilities on the horizontal and expected returns on the vertical axis."
+assets |>
+  ggplot(aes(x = sigma, y = mu, label = symbol)) +
+  geom_point() +
+  geom_text_repel() +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = "Volatility",
+    y = "Expected return",
+    title = "Expected returns and volatilities of Dow Jones index constituents"
+  )
+```
+
+### Python
+
+```{python}
+#| label: mpt-fig-201-py
+#| fig-cap: "Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Expected returns and volatilities of Dow Jones index constituents. The figure is a scatter plot with volatilities on the horizontal and expected returns on the vertical axis."
+assets_figure = (
+    ggplot(
+        assets,
+        aes(x="sigma", y="mu", label="symbol")
+    )
+    + geom_point()
+    + geom_text(adjust_text={"arrowprops": {"arrowstyle": "-"}})
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility", y="Expected return",
+        title="Expected returns and volatilities of Dow Jones index constituents"
+    )
+)
+assets_figure.show()
+```
+
+:::
+
+As highlighted above, a key innovation of MPT is to consider interactions between assets. The *variance-covariance matrix* collects this information. Again, we proxy the true variance-covariance matrix $\Sigma$ of the returns by the sample covariance.\index{Covariance}
+
+The interpretation of the covariance is straightforward: While a positive covariance between assets indicates that these assets tend to move in the same direction, a negative covariance indicates that the assets move in opposite directions.
+
+::: {.panel-tabset group="language"}
+### R
+
+We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
+
+```{r}
+#| label: modern-portfolio-theory-covariance-matrix
+returns_wide <- returns_monthly |>
+  pivot_wider(names_from = symbol, values_from = ret)
+
+sigma <- returns_wide |>
+  select(-date) |>
+  cov()
+```
+
+### Python
+
+We can use `numpy`'s `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot()` with the new column names from the `symbol`-column and setting the values to `ret`. We sort the columns by symbol so that the order matches `assets`, drop the rows with missing returns, and hand the resulting matrix to `numpy` at the boundary.
+
+```{python}
+#| label: modern-portfolio-theory-covariance-matrix-py
+symbol_order = assets["symbol"].to_list()
+
+returns_wide = (returns_monthly
+    .pivot(index="date", on="symbol", values="ret")
+    .sort("date")
+    .select(["date"] + symbol_order)
+)
+
+sigma = np.cov(
+    returns_wide.drop("date").drop_nulls().to_numpy(),
+    rowvar=False
+)
+```
+
+:::
+
+@fig-203 illustrates the resulting variance-covariance matrix.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-203
+#| fig-cap: "Variances and covariances based on monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Variance-covariance matrix of Dow Jones index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
+sigma |>
+  as_tibble(rownames = "symbol_a") |>
+  pivot_longer(-symbol_a, names_to = "symbol_b") |>
+  ggplot(aes(x = symbol_a, y = fct_rev(symbol_b), fill = value)) +
+  geom_tile() +
+  labs(
+    x = NULL,
+    y = NULL,
+    fill = "(Co-)Variance",
+    title = "Sample Variance-covariance matrix of Dow Jones index constituents"
+  ) +
+  scale_fill_continuous(labels = percent) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Python
+
+```{python}
+#| label: mpt-fig-203-py
+#| fig-cap: "Variances and covariances based on monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Variance-covariance matrix of Dow Jones index constituents. The figure shows 900 tiles with variances and covariances between each constituent-pair."
+sigma_long = (
+    pl.DataFrame(sigma, schema=symbol_order)
+    .with_columns(symbol_a=pl.Series(symbol_order))
+    .unpivot(index="symbol_a", variable_name="symbol_b", value_name="value")
+    .with_columns(symbol_b=pl.col("symbol_b").cast(pl.Enum(symbol_order[::-1])))
+)
+
+sigma_figure = (
+    ggplot(sigma_long, aes(x="symbol_a", y="symbol_b", fill="value"))
+    + geom_tile()
+    + labs(
+        x="",
+        y="",
+        fill="(Co-)Variance",
+        title="Sample Variance-covariance matrix of Dow Jones index constituents",
+    )
+    + scale_fill_continuous(labels=percent_format())
+    + theme(axis_text_x=element_text(angle=45, hjust=1))
+)
+sigma_figure.show()
+```
+
+:::
+
+## The Minimum-Variance Framework
+
+Suppose now the investor allocates their wealth in a portfolio given by the weight vector $\omega$. The resulting portfolio returns $\omega^\prime r$ have an expected return $\mu_\omega = \omega^{\prime}\mu = \sum_{i=1}^N \omega_i \mu_i$. The variance of the portfolio returns is $\sigma^2_\omega = \omega^{\prime}\Sigma\omega = \sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \sigma_{ij}$ where $\omega_i$ and  $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\sigma_{ij}$ is the covariance between returns of assets $i$ and $j$.
+
+We first consider an investor who wants to invest in a portfolio that delivers the lowest possible variance as a reference point. Thus, the optimization problem of the minimum-variance investor is given by
+
+$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \sigma_{ij} = \min_\omega \omega^{\prime}\Sigma\omega.$$
+
+While staying fully invested across all available assets $N$, $\sum_{i=1}^{N} \omega_i = 1$. The analytical solution for the minimum-variance portfolio is
+
+$$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},$$
+
+where $\iota$ is a vector of 1's and $\Sigma^{-1}$ is the inverse of the variance-covariance matrix $\Sigma$. See [Proofs](proofs.qmd) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-minimum-variance-weights
+iota <- rep(1, dim(sigma)[1])
+sigma_inv <- solve(sigma)
+omega_mvp <- as.vector(sigma_inv %*% iota) /
+  as.numeric(t(iota) %*% sigma_inv %*% iota)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-minimum-variance-weights-py
+iota = np.ones(sigma.shape[0])
+sigma_inv = np.linalg.inv(sigma)
+omega_mvp = (sigma_inv @ iota) / (iota @ sigma_inv @ iota)
+```
+
+:::
+
+@fig-204 shows the resulting portfolio weights.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-204
+#| fig-cap: "Weights are based on historical moments of monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each DOW Jones index constituent."
+assets <- bind_cols(assets, omega_mvp = omega_mvp)
+
+assets |>
+  ggplot(aes(
+    x = omega_mvp,
+    y = fct_reorder(symbol, omega_mvp),
+    fill = omega_mvp > 0
+  )) +
+  geom_col() +
+  scale_x_continuous(labels = percent) +
+  labs(x = NULL, y = NULL, title = "Minimum-variance portfolio weights") +
+  theme(legend.position = "none")
+```
+
+### Python
+
+```{python}
+#| label: mpt-fig-204-py
+#| fig-cap: "Weights are based on historical moments of monthly returns adjusted for dividend payments and stock splits."
+#| fig-alt: "Title: Minimum-variance portfolio weights. The figure shows a bar chart with portfolio weights for each DOW Jones index constituent."
+assets = assets.with_columns(omega_mvp=pl.Series(omega_mvp))
+
+symbol_levels = assets.sort("omega_mvp")["symbol"].to_list()
+assets = assets.with_columns(
+    symbol=pl.col("symbol").cast(pl.Enum(symbol_levels)),
+    omega_positive=pl.col("omega_mvp") > 0
+)
+
+omega_figure = (
+    ggplot(
+        assets,
+        aes(y="omega_mvp", x="symbol", fill="omega_positive")
+    )
+    + geom_col()
+    + coord_flip()
+    + scale_y_continuous(labels=percent_format())
+    + labs(x="", y="", title="Minimum-variance portfolio weights")
+    + theme(legend_position="none")
+)
+omega_figure.show()
+```
+
+:::
+
+Before we move on to other portfolios, we collect the return and volatility of the minimum-variance portfolio in a data frame:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-minimum-variance-summary
+mu <- assets$mu
+
+summary_mvp <- tibble(
+  mu = as.numeric(t(omega_mvp) %*% mu),
+  sigma = as.numeric(sqrt(t(omega_mvp) %*% sigma %*% omega_mvp)),
+  type = "Minimum-Variance Portfolio"
+)
+summary_mvp
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-minimum-variance-summary-py
+mu = assets["mu"].to_numpy()
+mu_mvp = omega_mvp @ mu
+sigma_mvp = np.sqrt(omega_mvp @ sigma @ omega_mvp)
+summary_mvp = pl.DataFrame(
+    {
+        "mu": [mu_mvp],
+        "sigma": [sigma_mvp],
+        "type": ["Minimum-Variance Portfolio"],
+    }
+)
+summary_mvp
+```
+
+:::
+
+## Efficient Portfolios
+
+In many instances, earning the lowest possible variance may not be the desired outcome. Instead, we generalize the concept of efficient portfolios, where, in addition to minimizing portfolio variance, the investor aims to earn a **minimum expected return** $\omega^{\prime}\mu \geq \bar{\mu}.$ In other words, when $\bar\mu\geq \omega_\text{mvp}^{\prime}\mu$, the investor is willing to accept a higher portfolio variance in return for earning a higher expected return.
+
+Suppose, for instance, the investor wants to earn at least the historical average return of the asset that delivered the highest average returns in the past:
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-target-return
+mu_bar <- max(assets$mu)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-target-return-py
+mu_bar = assets["mu"].max()
+```
+
+:::
+
+Formally, the optimization problem is given by
+
+$$\min_\omega \omega^{\prime}\Sigma\omega \text{ s.t. } \omega^{\prime}\iota = 1 \text{ and } \omega^{\prime}\mu\geq\bar\mu.$$
+
+The analytic solution for the efficient portfolio can be derived as:
+
+$$\omega_{efp} = \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
+
+where $\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. For details, we again refer to the [Proofs](proofs.qmd) in the Appendix.
+
+The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-efficient-portfolio
+C <- as.numeric(t(iota) %*% sigma_inv %*% iota)
+D <- as.numeric(t(iota) %*% sigma_inv %*% mu)
+E <- as.numeric(t(mu) %*% sigma_inv %*% mu)
+lambda_tilde <- as.numeric(2 * (mu_bar - D / C) / (E - D^2 / C))
+omega_efp <- as.vector(
+  omega_mvp + lambda_tilde / 2 * (sigma_inv %*% mu - D * omega_mvp)
+)
+
+summary_efp <- tibble(
+  mu = as.numeric(t(omega_efp) %*% mu),
+  sigma = as.numeric(sqrt(t(omega_efp) %*% sigma %*% omega_efp)),
+  type = "Efficient Portfolio"
+)
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-efficient-portfolio-py
+C = iota @ sigma_inv @ iota
+D = iota @ sigma_inv @ mu
+E = mu @ sigma_inv @ mu
+lambda_tilde = 2 * (mu_bar - D / C) / (E - (D**2) / C)
+omega_efp = omega_mvp + (lambda_tilde / 2) * (sigma_inv @ mu - D * omega_mvp)
+mu_efp = omega_efp @ mu
+sigma_efp = np.sqrt(omega_efp @ sigma @ omega_efp)
+
+summary_efp = pl.DataFrame(
+    {"mu": [mu_efp], "sigma": [sigma_efp], "type": ["Efficient Portfolio"]}
+)
+```
+
+:::
+
+@fig-205 shows the average return and volatility of the minimum-variance and the efficient portfolio relative to the index constituents. As expected, the efficient portfolio has a higher expected return at the cost of higher volatility compared to the minimum-variance portfolio.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-205
+#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents."
+#| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents."
+#| warning: false
+summaries <- bind_rows(
+  assets,
+  summary_mvp,
+  summary_efp
+)
+
+summaries |>
+  ggplot(aes(x = sigma, y = mu)) +
+  geom_point(
+    data = summaries |> filter(is.na(type))
+  ) +
+  geom_point(
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
+  ) +
+  geom_label_repel(aes(label = type)) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = "Volatility",
+    y = "Expected return",
+    title = "Efficient & minimum-variance portfolios"
+  )
+```
+
+### Python
+
+```{python}
+#| label: mpt-fig-205-py
+#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents."
+#| fig-alt: "Title: Efficient & minimum-variance portfolios. The figure shows big dots indicating the location of the minimum-variance and the efficient portfolio that delivers the expected return of the stock with the highest return, respectively. The small dots indicate the location of the individual constituents."
+#| warning: false
+summaries = pl.concat(
+    [assets, summary_mvp, summary_efp], how="diagonal"
+)
+
+summaries_figure = (
+    ggplot(summaries, aes(x="sigma", y="mu"))
+    + geom_point(data=summaries.filter(pl.col("type").is_null()))
+    + geom_point(
+        data=summaries.filter(pl.col("type").is_not_null()),
+        color="#F21A00", size=3
+    )
+    + geom_label(
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
+    )
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility",
+        y="Expected return",
+        title="Efficient & minimum-variance portfolios",
+    )
+)
+summaries_figure.show()
+```
+
+:::
+
+The figure illustrates the substantial diversification benefits: Instead of allocating all wealth into one asset that delivered a high average return in the past (at a substantial volatility), the efficient portfolio promises exactly the same expected returns but at a much lower volatility.
+
+It should be noted that the level of desired returns $\bar\mu$ reflects the risk-aversion of the investor. Less risk-averse investors may require a higher level of desired returns. In contrast, more risk-averse investors may only choose $\bar\mu$ closer to the expected return of the minimum-variance portfolio. Very often, the mean-variance framework is instead derived as the optimal decision framework of an investor with a mean-variance utility function with a coefficient of relative risk aversion $\gamma$. In the [Proofs](proofs.qmd) in the Appendix, we show that there is a one-to-one mapping from $\gamma$ to the desired level of expected returns $\bar\mu$, which implies that the resulting efficient portfolios are equivalent and do not depend on the way the optimization problem is formulated.
+
+## The Efficient Frontier
+
+\index{Efficient frontier} The set of portfolios that satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility is called the *efficient frontier*, see, e.g., @Merton1972.\index{Return volatility} \index{Separation theorem}. To derive the portfolios that span the efficient frontier, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) proves very helpful. In short, the theorem states that as soon as we have two efficient portfolios (such as the minimum-variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\bar\mu$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. \index{Efficient frontier} In other words, the efficient frontier can be characterized by the following equation:
+
+$$\omega_{a\mu_1 + (1-a)\mu_2} = a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2},$$
+
+where $a$ is a scalar between 0 and 1, $\omega_{\mu_i}$ is an efficient portfolio that delivers the expected return $\mu_i$. It is straightforward to prove the theorem. Consider the analytical solution for the efficient portfolio, which delivers expected returns $\mu_i$, implying:
+
+$$a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2} = \left(\frac{a\mu_1 + (1-a)\mu_2- D/C }{E-D^2/C}\right)\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
+
+which corresponds to the efficient portfolio earning $a\mu_1 + (1-a)\mu_2$ in expectation.
+
+The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: modern-portfolio-theory-efficient-frontier
+efficient_frontier <- tibble(
+  a = seq(from = -1, to = 2, by = 0.01),
+) |>
+  mutate(
+    omega = map(a, \(x) x * omega_efp + (1 - x) * omega_mvp),
+    mu = map_dbl(omega, \(x) t(x) %*% mu),
+    sigma = map_dbl(omega, \(x) sqrt(t(x) %*% sigma %*% x)),
+  )
+```
+
+### Python
+
+```{python}
+#| label: modern-portfolio-theory-efficient-frontier-py
+a_grid = np.arange(-1, 2.01, 0.01)
+omega_grid = [a * omega_efp + (1 - a) * omega_mvp for a in a_grid]
+
+efficient_frontier = pl.DataFrame({
+    "a": a_grid,
+    "mu": [omega @ mu for omega in omega_grid],
+    "sigma": [np.sqrt(omega @ sigma @ omega) for omega in omega_grid],
+})
+```
+
+:::
+
+Finally, it is simple to visualize the efficient frontier alongside the two efficient portfolios in a figure using `ggplot` (see @fig-206). We also add the individual stocks in the same plot.\index{Graph!Efficient frontier}
+
+::: {.panel-tabset group="language"}
+### R
+
+```{r}
+#| label: fig-206
+#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers three times the expected return of the minimum-variance portfolio, respectively. The small dots indicate the location of the individual constituents."
+#| fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
+#| warning: false
+summaries <- bind_rows(
+  summaries,
+  efficient_frontier
+)
+
+summaries |>
+  ggplot(aes(x = sigma, y = mu)) +
+  geom_point(
+    data = summaries |> filter(is.na(type))
+  ) +
+  geom_point(
+    data = summaries |> filter(!is.na(type)),
+    color = "#F21A00",
+    size = 3
+  ) +
+  geom_label_repel(aes(label = type)) +
+  scale_x_continuous(labels = percent) +
+  scale_y_continuous(labels = percent) +
+  labs(
+    x = "Volatility",
+    y = "Expected return",
+    title = "Efficient frontier from historical moments of Dow Jones index constituents"
+  ) +
+  theme(legend.position = "none")
+```
+
+### Python
+
+```{python}
+#| label: mpt-fig-206-py
+#| fig-cap: "The big dots indicate the location of the minimum-variance and the efficient portfolio that delivers three times the expected return of the minimum-variance portfolio, respectively. The small dots indicate the location of the individual constituents."
+#| fig-alt: "Title: Efficient frontier constructed from historical data for Dow Jones index constituents. The figure shows Dow index constituents in a mean-variance diagram. A hyperbola indicates the efficient frontier of portfolios that dominate the individual holdings in the sense that they deliver higher expected returns for the same level of volatility."
+#| warning: false
+summaries = pl.concat(
+    [summaries, efficient_frontier], how="diagonal"
+)
+
+summaries_figure = (
+    ggplot(summaries, aes(x="sigma", y="mu"))
+    + geom_point(data=summaries.filter(pl.col("type").is_null()))
+    + geom_point(
+        data=summaries.filter(pl.col("type").is_not_null()),
+        color="#F21A00", size=3
+    )
+    + geom_label(
+        aes(label="type"),
+        nudge_x=-0.002, nudge_y=0.0004,
+        adjust_text={"arrowprops": {"arrowstyle": "-"}}
+    )
+    + scale_x_continuous(labels=percent_format())
+    + scale_y_continuous(labels=percent_format())
+    + labs(
+        x="Volatility",
+        y="Expected return",
+        title="Efficient frontier from historical moments of Dow Jones index constituents",
+    )
+    + theme(legend_position="none")
+)
+summaries_figure.show()
+```
+
+:::
+
+## Key Takeaways
+
+- Modern Portfolio Theory provides an intuitive framework to allocate capital by balancing expected return against risk.
+- Mean-variance optimization allows investors to construct portfolios that either minimize risk or maximize return based on historical return and volatility data.
+- Portfolio risk is not only determined by individual asset volatility but also by the correlation between assets, which highlights the value of diversification.
+- The minimum-variance portfolio identifies the asset allocation that yields the lowest possible volatility while remaining fully invested.
+- Efficient portfolios are those that deliver the highest expected return for a given level of risk.
+- The efficient frontier visually represents the set of optimal portfolios, helping investors understand the trade-off between risk and return.
+
+## Exercises
+
+1. We restricted our sample to all assets trading every day since 2000-01-01. Discuss why this restriction might introduce survivorship bias and how it could affect inferences about future expected portfolio performance.
+1. The efficient frontier characterizes portfolios with the highest expected return for different levels of risk. Identify the portfolio with the highest expected return per unit of standard deviation (risk). Which famous performance measure corresponds to the ratio of average returns to standard deviation?
+1. Analyze how varying the correlation coefficients between asset returns influences the shape of the efficient frontier. Use hypothetical data for a small number of assets to visualize and interpret these changes.

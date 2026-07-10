@@ -1,0 +1,410 @@
+# WRDS Pseudo Data
+
+In this appendix chapter, we show how readers without access to WRDS can still run the WRDS-based code chunks in this book. Instead of building these tables by hand, we rely on the pseudo data backend that ships with the `tidyfinance` package. The package mirrors the structure of the WRDS tables we use, so the same `download_data()` call that retrieves data from WRDS can also return pseudo data with an identical schema. We do not create pseudo data for tables from open-source data providers because you can freely download them from the original sources; see [Accessing and Managing Financial Data](../chapters/accessing-and-managing-financial-data.llms.md).
+
+The idea is simple: wherever the book calls `download_data()` with `domain = "wrds"`, you can switch to `domain = "pseudo"` to obtain a table with the same columns, types, and panel structure. The `tidyfinance` package is the single source of truth for the pseudo data, which keeps the pseudo data in sync with the schema returned by WRDS without us re-implementing any generators in the book.
+
+We deliberately use the *pseudo* label because the data does not allow you to replicate any results of the book. For legal reasons, it does not contain any samples of the original data. Instead, the package draws independent random numbers for all columns. As a consequence, returns and characteristics carry no economic signal, and any factor premia or other estimates you obtain from pseudo data are pure noise and not economically interpretable.
+
+Two arguments control how the pseudo data is generated. `seed` makes the generated panels reproducible across runs, and `n_assets` sets the size of the cross-section (the package default is 1,000). We use the same `seed` and `n_assets` for all stock tables below so that the identifiers line up across CRSP and Compustat, which is what makes the joins in later chapters work.
+
+If you do have WRDS access, you do not need this chapter. Set your credentials once via `set_wrds_credentials()` (in Python, `tf.set_wrds_credentials()`), which stores them in your `.Renviron`, and every `download_data()` call with `domain = "wrds"` connects to WRDS automatically.
+
+To generate the pseudo data, we use the following packages:
+
+## R
+
+``` r
+library(tidyverse)
+library(tidyfinance)
+library(nanoparquet)
+```
+
+## Python
+
+``` python
+import polars as pl
+import numpy as np
+import tidyfinance as tf
+import string
+import os
+
+tf.set_backend("polars")
+```
+
+We store the data in the folder `data`. Be careful: if you already downloaded the data from WRDS, the code in this chapter overwrites your local files!
+
+## R
+
+``` r
+if (!dir.exists("data")) {
+  dir.create("data")
+}
+```
+
+## Python
+
+``` python
+if not os.path.exists("data"):
+    os.makedirs("data")
+```
+
+Next, we fix the parameters that control the pseudo data. We set a seed for reproducibility, choose the size of the cross-section, and define the sample period that we want the pseudo data to span. We use the same range as in [WRDS, CRSP, and Compustat](../chapters/wrds-crsp-and-compustat.llms.md).
+
+## R
+
+``` r
+seed <- 1234
+set.seed(seed)
+
+n_assets <- 100
+
+start_date <- "1960-01-01"
+end_date <- "2024-12-31"
+```
+
+## Python
+
+``` python
+seed = 1234
+np.random.seed(seed)
+
+n_assets = 100
+
+start_date = "1960-01-01"
+end_date = "2024-12-31"
+```
+
+## Stock Pseudo Data
+
+We start with the core data used throughout the book: CRSP stock returns and Compustat firm fundamentals. Each of the following calls returns a table with exactly the schema of its WRDS counterpart, but with pseudo values. We then write each table to the `data` folder under the same file name that the WRDS chapters use, so the rest of the book can read them without any further changes.
+
+### Pseudo `crsp_monthly` table
+
+The monthly CRSP table is the backbone of most analyses. We set `add_ccm_links = TRUE` so that the table carries the Compustat firm identifier `gvkey`, just like the merged file produced in [WRDS, CRSP, and Compustat](../chapters/wrds-crsp-and-compustat.llms.md). Because we reuse the same `seed` and `n_assets` below, the `gvkey` values match those in the pseudo Compustat table.
+
+## R
+
+``` r
+crsp_monthly <- download_data(
+  domain = "pseudo",
+  dataset = "crsp_monthly",
+  start_date = start_date,
+  end_date = end_date,
+  n_assets = n_assets,
+  add_ccm_links = TRUE,
+  seed = seed
+)
+
+write_parquet(crsp_monthly, "data/crsp_monthly.parquet")
+```
+
+## Python
+
+``` python
+crsp_monthly = tf.download_data(
+    domain="pseudo",
+    dataset="crsp_monthly",
+    start_date=start_date,
+    end_date=end_date,
+    n_assets=n_assets,
+    add_ccm_links=True,
+    seed=seed
+)
+
+crsp_monthly.write_parquet("data/crsp_monthly.parquet")
+```
+
+### Pseudo `crsp_daily` table
+
+The daily CRSP table contains the daily (excess) returns that we use, for instance, to estimate betas from daily data.
+
+## R
+
+``` r
+crsp_daily <- download_data(
+  domain = "pseudo",
+  dataset = "crsp_daily",
+  start_date = start_date,
+  end_date = end_date,
+  n_assets = n_assets,
+  seed = seed
+)
+
+write_parquet(crsp_daily, "data/crsp_daily.parquet")
+```
+
+## Python
+
+``` python
+crsp_daily = tf.download_data(
+    domain="pseudo",
+    dataset="crsp_daily",
+    start_date=start_date,
+    end_date=end_date,
+    n_assets=n_assets,
+    seed=seed
+)
+
+crsp_daily.write_parquet("data/crsp_daily.parquet")
+```
+
+### Pseudo `compustat_annual` table
+
+Finally, we generate the annual Compustat fundamentals. The table shares the `gvkey` identifiers with the pseudo `crsp_monthly` table above, so the firm-level joins in later chapters return matched observations.
+
+## R
+
+``` r
+compustat_annual <- download_data(
+  domain = "pseudo",
+  dataset = "compustat_annual",
+  start_date = start_date,
+  end_date = end_date,
+  n_assets = n_assets,
+  seed = seed
+)
+
+write_parquet(compustat_annual, "data/compustat_annual.parquet")
+```
+
+## Python
+
+``` python
+compustat_annual = tf.download_data(
+    domain="pseudo",
+    dataset="compustat_annual",
+    start_date=start_date,
+    end_date=end_date,
+    n_assets=n_assets,
+    seed=seed
+)
+
+compustat_annual.write_parquet("data/compustat_annual.parquet")
+```
+
+## Bond Pseudo Data
+
+The pseudo backend of `tidyfinance` does not yet cover the bond data sources, so we generate Mergent FISD and enhanced TRACE manually, as in earlier editions of the book. We merely draw random numbers for all columns that we use in [TRACE and FISD](../chapters/trace-and-fisd.llms.md) and [Difference in Differences](../chapters/difference-in-differences.llms.md).
+
+### Pseudo `fisd` data
+
+To create pseudo data with the structure of Mergent FISD, we sample a small cross-section of bonds with completely made-up `complete_cusip`, `issue_id`, and `issuer_id` and draw random values for the remaining columns.
+
+## R
+
+``` r
+number_of_bonds <- 100
+
+bond_dates <- seq(ymd("2003-01-01"), ymd("2022-12-31"), "1 day")
+
+fisd_pseudo <- 1:number_of_bonds |>
+  map_df(
+    function(x) {
+      tibble(
+        complete_cusip = str_to_upper(
+          str_c(
+            sample(c(letters, 0:9), 12, replace = TRUE),
+            collapse = ""
+          )
+        ),
+      )
+    }
+  ) |>
+  mutate(
+    maturity = sample(bond_dates, n(), replace = TRUE),
+    offering_amt = sample(seq(1:100) * 100000, n(), replace = TRUE),
+    offering_date = maturity - sample(seq(1:25) * 365, n(), replace = TRUE),
+    dated_date = offering_date - sample(-10:10, n(), replace = TRUE),
+    interest_frequency = sample(c(0, 1, 2, 4, 12), n(), replace = TRUE),
+    coupon = sample(seq(0, 2, by = 0.1), n(), replace = TRUE),
+    last_interest_date = pmax(maturity, offering_date, dated_date),
+    issue_id = row_number(),
+    issuer_id = sample(1:250, n(), replace = TRUE),
+    sic_code = as.character(sample(seq(1:9) * 1000, n(), replace = TRUE))
+  )
+
+write_parquet(fisd_pseudo, "data/fisd.parquet")
+```
+
+## Python
+
+``` python
+number_of_bonds = 100
+
+bond_dates = pl.date_range(
+    pl.date(2003, 1, 1), pl.date(2022, 12, 31), interval="1d", eager=True
+).to_numpy()
+
+
+def generate_cusip():
+    """Generate cusip."""
+
+    characters = list(string.ascii_uppercase + string.digits)
+    cusip = ("".join(np.random.choice(characters, size=12))).upper()
+
+    return cusip
+
+
+fisd_pseudo = (
+    pl.DataFrame(
+        {"complete_cusip": [generate_cusip() for _ in range(number_of_bonds)]}
+    )
+    .with_columns(
+        maturity=np.random.choice(bond_dates, number_of_bonds, replace=True),
+        offering_amt=np.random.choice(
+            np.arange(1, 101) * 100000, number_of_bonds, replace=True
+        ),
+    )
+    .with_columns(
+        offering_date=(
+            pl.col("maturity")
+            - pl.duration(
+                days=pl.Series(
+                    np.random.choice(
+                        np.arange(1, 26) * 365, number_of_bonds, replace=True
+                    )
+                )
+            )
+        )
+    )
+    .with_columns(
+        dated_date=(
+            pl.col("offering_date")
+            - pl.duration(
+                days=pl.Series(
+                    np.random.choice(
+                        np.arange(-10, 11), number_of_bonds, replace=True
+                    )
+                )
+            )
+        ),
+        interest_frequency=np.random.choice(
+            [0, 1, 2, 4, 12], number_of_bonds, replace=True
+        ),
+        coupon=np.random.choice(
+            np.arange(0, 2.1, 0.1), number_of_bonds, replace=True
+        ),
+    )
+    .with_columns(
+        last_interest_date=pl.max_horizontal(
+            "maturity", "offering_date", "dated_date"
+        ),
+        issue_id=pl.int_range(1, number_of_bonds + 1),
+        issuer_id=np.random.choice(
+            np.arange(1, 251), number_of_bonds, replace=True
+        ),
+        sic_code=(
+            np.random.choice(
+                np.arange(1, 10) * 1000, number_of_bonds, replace=True
+            )
+        ).astype(str),
+    )
+)
+
+fisd_pseudo.write_parquet("data/fisd.parquet")
+```
+
+### Pseudo `trace_enhanced` data
+
+Finally, we create pseudo bond transaction data for the fictional CUSIPs of the pseudo `fisd` data. We take the date range that we also analyze in the book and ensure that we have at least five transactions per day to fulfill a filtering step in the book. We store the result in the `data/trace_enhanced` folder, which is the partitioned dataset layout that the book reads.
+
+## R
+
+``` r
+trace_start_date <- as.Date("2014-01-01")
+trace_end_date <- as.Date("2016-11-30")
+
+bonds_panel <- expand_grid(
+  fisd_pseudo |>
+    select(cusip_id = complete_cusip),
+  tibble(
+    trd_exctn_dt = seq(trace_start_date, trace_end_date, "1 day")
+  )
+)
+
+trace_enhanced_pseudo <- bind_rows(
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel,
+  bonds_panel
+) |>
+  mutate(
+    trd_exctn_tm = str_c(
+      sample(0:23, n(), replace = TRUE),
+      ":",
+      sample(0:59, n(), replace = TRUE),
+      ":",
+      sample(0:59, n(), replace = TRUE)
+    ),
+    rptd_pr = runif(n(), 10, 200),
+    entrd_vol_qt = sample(1:20, n(), replace = TRUE) * 1000,
+    yld_pt = runif(n(), -10, 10),
+    rpt_side_cd = sample(c("B", "S"), n(), replace = TRUE),
+    cntra_mp_id = sample(c("C", "D"), n(), replace = TRUE)
+  )
+
+if (!dir.exists("data/trace_enhanced")) {
+  dir.create("data/trace_enhanced")
+}
+
+write_parquet(
+  trace_enhanced_pseudo, "data/trace_enhanced/trace_enhanced.parquet"
+)
+```
+
+## Python
+
+``` python
+trace_start_date = pl.date(2014, 1, 1)
+trace_end_date = pl.date(2016, 11, 30)
+
+trading_dates = pl.date_range(
+    trace_start_date, trace_end_date, interval="1d", eager=True
+).to_numpy()
+
+bonds_panel = pl.DataFrame(
+    {
+        "cusip_id": np.tile(
+            fisd_pseudo["complete_cusip"], len(trading_dates)
+        ),
+        "trd_exctn_dt": np.repeat(
+            trading_dates, len(fisd_pseudo)
+        ),
+    }
+)
+
+n_transactions = len(bonds_panel) * 5
+
+trace_enhanced_pseudo = (
+    pl.concat([bonds_panel] * 5)
+    .with_columns(
+        trd_exctn_tm=(
+            pl.col("trd_exctn_dt").cast(pl.Datetime)
+            + pl.duration(
+                hours=pl.Series(np.random.randint(0, 24, size=n_transactions)),
+                minutes=pl.Series(np.random.randint(0, 60, size=n_transactions)),
+                seconds=pl.Series(np.random.randint(0, 60, size=n_transactions)),
+            )
+        ),
+        rptd_pr=np.random.uniform(10, 200, n_transactions),
+        entrd_vol_qt=1000
+        * np.random.choice(range(1, 21), n_transactions, replace=True),
+        yld_pt=np.random.uniform(-10, 10, n_transactions),
+        rpt_side_cd=np.random.choice(
+            ["B", "S"], n_transactions, replace=True
+        ),
+        cntra_mp_id=np.random.choice(
+            ["C", "D"], n_transactions, replace=True
+        ),
+    )
+)
+
+os.makedirs("data/trace_enhanced", exist_ok=True)
+trace_enhanced_pseudo.write_parquet(
+    "data/trace_enhanced/trace_enhanced.parquet"
+)
+```
+
+With these files in place, you can run the WRDS-based chapters of the book without access to WRDS. Tables that the book derives from these inputs, such as the estimated betas in `data/beta.parquet`, are written by the chapters that compute them (here, [Beta Estimation](../chapters/beta-estimation.llms.md)). As stated in the introduction, the data does *not* contain any samples of the original data, and the pseudo values carry no economic signal.

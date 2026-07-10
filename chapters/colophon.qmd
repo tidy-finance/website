@@ -1,0 +1,83 @@
+---
+title: Colophon
+aliases:
+  - ../colophon.html
+  - ../r/colophon.html
+  - ../python/colophon.html
+engine: knitr
+---
+```{python}
+#| label: colophon-setup
+#| echo: false
+exec(open("assets/render-settings.py").read())
+```
+
+In this appendix chapter, we provide details on the package versions used in this edition. We rendered the book with `quarto` [@quarto] and host it via GitHub Pages; the complete source is [available from GitHub](https://github.com/tidy-finance/website).\index{GitHub} \index{Quarto} \index{Colophon} Select your language below to see the corresponding package versions.
+
+::: {.panel-tabset group="language"}
+### R
+
+This version of the book was built with R [@R-base] version `{r} paste0(version$major,".", version$minor, " (",version$year, "-", version$month, "-", version$day,", ", version$nickname,")")` and the following packages. We generated all R plots using `ggplot2` and its minimal theme (`theme_minimal()`).\index{ggplot2 theme}
+
+```{r}
+#| label: colophon-package-versions
+#| echo: false
+#| message: false
+#| warning: false
+library(ggplot2) # Packages are not needed but loaded to show up in the colophon
+library(dplyr)
+library(tidyr)
+library(readr)
+library(purrr)
+library(tibble)
+library(stringr)
+library(forcats)
+dependencies <- renv::dependencies(progress = FALSE) |> count(Package)
+packages <- jsonlite::fromJSON("renv.lock", flatten = TRUE)
+do.call("rbind", packages$Packages) |>
+  as_tibble() |>
+  select(Package, Version) |>
+  unnest(cols = c("Package", "Version")) |>
+  inner_join(dependencies, join_by("Package")) |>
+  arrange(Package) |>
+  select(-n) |>
+  kableExtra::kbl(booktabs = TRUE) |>
+  kableExtra::kable_styling(full_width = TRUE)
+```
+
+### Python
+
+The book was built with Python [@python] version 3.11.13 and the following packages:
+
+```{python}
+#| label: colophon-package-versions-py
+#| echo: false
+import polars as pl
+import tomllib
+from great_tables import GT
+
+def parse_uv_lock(file_path):
+    """Parse a uv.lock file and return a list of (package, version) tuples."""
+    with open(file_path, 'rb') as file:
+        data = tomllib.load(file)
+
+    parsed = []
+    for package in data.get('package', []):
+        name = package.get('name', '')
+        version = package.get('version', '')
+        if name:
+            parsed.append((name, version))
+
+    return parsed
+
+def to_dataframe(data):
+    """Convert parsed data to a polars DataFrame."""
+    df = pl.DataFrame(data, schema=["Package", "Version"], orient="row")
+    return df
+
+data = parse_uv_lock("uv.lock")
+df = to_dataframe(data)
+GT(df)
+```
+
+:::
