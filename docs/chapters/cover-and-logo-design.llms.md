@@ -1,23 +1,25 @@
 # Cover and Logo Design
 
-The cover of the book is inspired by the fast growing generative art community in R. Generative art refers to art that in whole or in part has been created with the use of an autonomous system. Instead of creating random dynamics, we rely on what is core to the book: The evolution of financial markets. Each circle in the cover figure corresponds to daily market return within one year of our sample. Deviations from the circle line indicate positive or negative returns. The colors are determined by the standard deviation of market returns during the particular year. The few lines of code below replicate the entire figure. We use the Wes Andersen color palette (also throughout the entire book), provided by the package `wesanderson` ([Ram and Wickham 2018](#ref-wesanderson))
+The covers of Tidy Finance are inspired by the fast growing generative art community in R. Generative art refers to art that in whole or in part has been created with the use of an autonomous system. Instead of creating random dynamics, we rely on what is core to the book: the evolution of financial markets. The two versions share this idea but draw on different data: the R cover renders one ring per year from daily market returns, while the Python cover renders one ring per industry from the 12 industry portfolios. The few lines of code below replicate each figure in full.
+
+## R
+
+Each circle in the cover figure corresponds to the daily market return within one year of our sample. Deviations from the circle line indicate positive or negative returns, and the colors are determined by the standard deviation of market returns during that year. We use the Wes Anderson color palette (also used throughout the book), provided by the `wesanderson` package ([Ram and Wickham 2018](#ref-wesanderson)).
 
 ``` r
 library(tidyverse)
-library(RSQLite)
+library(tidyfinance)
 library(wesanderson)
 
-tidy_finance <- dbConnect(
-  SQLite(),
-  "data/tidy_finance_r.sqlite",
-  extended_types = TRUE
-)
+start_date <- ymd("1962-01-01")
+end_date <- ymd("2021-12-31")
 
-factors_ff3_daily <- tbl(
-  tidy_finance,
-  "factors_ff3_daily"
-) |>
-  collect()
+factors_ff3_daily <- download_data(
+  domain = "famafrench",
+  dataset = "Fama/French 3 Factors [Daily]",
+  start_date = start_date,
+  end_date = end_date
+)
 
 data_plot <- factors_ff3_daily |>
   select(date, mkt_excess) |>
@@ -45,10 +47,7 @@ cp <- coord_polar(
 )
 
 cp$is_free <- function() TRUE
-colors <- wes_palette("Zissou1",
-  n_groups(data_plot),
-  type = "continuous"
-)
+colors <- wes_palette("Zissou1", n_groups(data_plot), type = "continuous")
 
 cover <- data_plot |>
   mutate(vola = factor(vola, levels = levels)) |>
@@ -59,16 +58,16 @@ cover <- data_plot |>
     fill = vola
   )) +
   cp +
-  geom_ribbon(aes(
-    ymin = ymin,
-    ymax = ymax,
-    fill = vola
-  ), alpha = 0.90) +
-  theme_void() +
-  facet_wrap(~group_id,
-    ncol = 10,
-    scales = "free"
+  geom_ribbon(
+    aes(
+      ymin = ymin,
+      ymax = ymax,
+      fill = vola
+    ),
+    alpha = 0.90
   ) +
+  theme_void() +
+  facet_wrap(~group_id, ncol = 10, scales = "free") +
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
@@ -77,12 +76,101 @@ cover <- data_plot |>
   scale_fill_manual(values = colors)
 
 ggsave(
- plot = cover,
- width = 10,
- height = 6,
- filename = "images/cover.png",
- bg = "white"
+  plot = cover,
+  width = 10,
+  height = 6,
+  filename = "images/cover_r.png",
+  bg = "white"
 )
+```
+
+## Python
+
+Each panel in the cover figure corresponds to one of the 12 industry portfolios. The bars show the average daily return per year, scaled within each industry, and the colors are determined by the standard deviation of returns during that year. We recreate the Wes Anderson color palette (also used throughout the book) with a custom color map in `matplotlib`.
+
+``` python
+import numpy as np
+import polars as pl
+import tidyfinance as tf
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
+tf.set_backend("polars")
+
+main_colors = ["#3B9AB2", "#78B7C5", "#EBCC2A", "#E1AF00", "#F21A00"]
+colormap = LinearSegmentedColormap.from_list("Zissou1", main_colors)
+
+industries_ff_daily = tf.download_data(
+    domain="famafrench",
+    dataset="12 Industry Portfolios [Daily]",
+    start_date="1927-01-01",
+    end_date="2022-12-31",
+)
+
+industries_long = industries_ff_daily.unpivot(
+    index="date",
+    variable_name="name",
+    value_name="value",
+)
+
+industries_order = sorted(industries_long["name"].unique().to_list())
+
+data_figure = (
+    industries_long.with_columns(pl.col("date").dt.year().alias("year"))
+    .group_by(["year", "name"])
+    .agg(
+        total=pl.col("value").mean(),
+        vola=pl.col("value").std(),
+    )
+    .with_columns(vola_ntile=pl.col("vola").rank())
+)
+
+dpi = 300
+num_cols = 4
+num_rows = len(industries_order) // num_cols
+fig, axs = plt.subplots(
+    num_rows,
+    num_cols,
+    subplot_kw={"projection": "polar"},
+    figsize=(2400 / dpi, 1800 / dpi),
+    dpi=dpi,
+)
+axs = axs.flatten()
+
+for i, industry in enumerate(industries_order):
+    panel = data_figure.filter(pl.col("name") == industry).sort("year")
+    total = panel["total"].to_numpy()
+    vola_ntile = panel["vola_ntile"].to_numpy()
+    std_value = total.std()
+    total = 2 * (total - total.min()) / (total.max() - total.min()) - 1
+
+    angles = np.linspace(0, 2 * np.pi, len(panel), endpoint=False)
+    bar_width = 2 * np.pi / len(panel)
+
+    ax = axs[i]
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_ylim(-std_value * 1400, 1)
+    ax.set_frame_on(False)
+    ax.xaxis.grid(False)
+    ax.yaxis.grid(False)
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    normalize = plt.Normalize(vola_ntile.min(), vola_ntile.max())
+    colors = colormap(normalize(vola_ntile))
+
+    ax.bar(
+        angles,
+        total,
+        width=bar_width,
+        color=colors,
+        edgecolor="white",
+        linewidth=0.2,
+    )
+plt.tight_layout()
+plt.subplots_adjust(wspace=-0.2, hspace=-0.1)
+fig.savefig("images/cover_python.png", dpi=dpi, pad_inches=0, transparent=False)
+plt.close(fig)
 ```
 
 To generate our logo, we focus on year 2021 - the end of the sample period at the time we published tidy-finance.org for the first time.
@@ -98,34 +186,37 @@ logo <- data_plot |>
     fill = vola
   )) +
   cp +
-  geom_ribbon(aes(
-    ymin = ymin,
-    ymax = ymax,
-    fill = vola
-  ), alpha = 0.90) +
+  geom_ribbon(
+    aes(
+      ymin = ymin,
+      ymax = ymax,
+      fill = vola
+    ),
+    alpha = 0.90
+  ) +
   theme_void() +
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
-    plot.margin = unit(c(-0.15,-0.15,-0.15,-0.15), "null")
+    plot.margin = unit(c(-0.15, -0.15, -0.15, -0.15), "null")
   ) +
-  scale_fill_manual(values =  "white")
+  scale_fill_manual(values = "white")
 
 ggsave(
- plot = logo,
- width = 840,
- height = 840,
- units = "px",
- filename = "images/logo-website-white.png",
+  plot = logo,
+  width = 840,
+  height = 840,
+  units = "px",
+  filename = "images/logo-website-white.png",
 )
 
 ggsave(
- plot = logo +
-    scale_fill_manual(values =  wes_palette("Zissou1")[1]),
- width = 840,
- height = 840,
- units = "px",
- filename = "images/logo-website.png",
+  plot = logo +
+    scale_fill_manual(values = wes_palette("Zissou1")[1]),
+  width = 840,
+  height = 840,
+  units = "px",
+  filename = "images/logo-website.png",
 )
 ```
 
@@ -142,34 +233,37 @@ button_r <- data_plot |>
     fill = vola
   )) +
   cp +
-  geom_ribbon(aes(
-    ymin = ymin,
-    ymax = ymax,
-    fill = vola
-  ), alpha = 0.90) +
+  geom_ribbon(
+    aes(
+      ymin = ymin,
+      ymax = ymax,
+      fill = vola
+    ),
+    alpha = 0.90
+  ) +
   theme_void() +
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
-    plot.margin = unit(c(-0.15,-0.15,-0.15,-0.15), "null")
+    plot.margin = unit(c(-0.15, -0.15, -0.15, -0.15), "null")
   )
 
 ggsave(
- plot = button_r +
-    scale_fill_manual(values =  wes_palette("Zissou1")[1]),
- width = 100,
- height = 100,
- units = "px",
- filename = "images/button-r-blue.svg",
+  plot = button_r +
+    scale_fill_manual(values = wes_palette("Zissou1")[1]),
+  width = 100,
+  height = 100,
+  units = "px",
+  filename = "images/button-r-blue.svg",
 )
 
 ggsave(
- plot = button_r +
-    scale_fill_manual(values =  wes_palette("Zissou1")[4]),
- width = 100,
- height = 100,
- units = "px",
- filename = "images/button-r-orange.svg",
+  plot = button_r +
+    scale_fill_manual(values = wes_palette("Zissou1")[4]),
+  width = 100,
+  height = 100,
+  units = "px",
+  filename = "images/button-r-orange.svg",
 )
 
 button_python <- data_plot |>
@@ -182,34 +276,37 @@ button_python <- data_plot |>
     fill = vola
   )) +
   cp +
-  geom_ribbon(aes(
-    ymin = ymin,
-    ymax = ymax,
-    fill = vola
-  ), alpha = 0.90) +
+  geom_ribbon(
+    aes(
+      ymin = ymin,
+      ymax = ymax,
+      fill = vola
+    ),
+    alpha = 0.90
+  ) +
   theme_void() +
   theme(
     strip.text.x = element_blank(),
     legend.position = "None",
-    plot.margin = unit(c(-0.15,-0.15,-0.15,-0.15), "null")
+    plot.margin = unit(c(-0.15, -0.15, -0.15, -0.15), "null")
   )
 
 ggsave(
- plot = button_python +
-    scale_fill_manual(values =  wes_palette("Zissou1")[1]),
- width = 100,
- height = 100,
- units = "px",
- filename = "images/button-python-blue.svg",
+  plot = button_python +
+    scale_fill_manual(values = wes_palette("Zissou1")[1]),
+  width = 100,
+  height = 100,
+  units = "px",
+  filename = "images/button-python-blue.svg",
 )
 
 ggsave(
- plot = button_python +
-    scale_fill_manual(values =  wes_palette("Zissou1")[4]),
- width = 100,
- height = 100,
- units = "px",
- filename = "images/button-python-orange.svg",
+  plot = button_python +
+    scale_fill_manual(values = wes_palette("Zissou1")[4]),
+  width = 100,
+  height = 100,
+  units = "px",
+  filename = "images/button-python-orange.svg",
 )
 ```
 
