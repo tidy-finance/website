@@ -42,7 +42,6 @@ Compared to previous chapters, we introduce `slider` [@slider] for the rolling s
 import polars as pl
 import numpy as np
 import pyfixest as pf
-import os
 
 from plotnine import *
 from mizani.formatters import percent_format
@@ -435,7 +434,7 @@ capm_monthly
 
 ## Estimating Beta Using Daily Returns
 
-Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. As loading the full daily CRSP data requires relatively large amounts of memory, we split the beta estimation into smaller chunks. The logic follows the approach that we use to download the daily CRSP data (see [WRDS, CRSP, and Compustat](wrds-crsp-and-compustat.qmd)).
+Before we provide some descriptive statistics of our beta estimates, we implement the estimation for the daily CRSP sample as well. Depending on the application, you might either use longer horizon beta estimates based on monthly data or shorter horizon estimates based on daily returns. Because `roll_capm_estimation()` estimates all betas in a single vectorized pass, we can apply it directly to the full daily sample---just as we did for the monthly data, without splitting the estimation into batches.
 
 First, we load the daily Fama-French market excess returns.
 
@@ -459,42 +458,51 @@ factors_ff3_daily = (pl.read_parquet("data/factors_ff3_daily.parquet")
 
 :::
 
-We then create a connection to the daily CRSP data, but we don't load the whole table into our memory. We only extract all distinct `permno` because we loop the beta estimation over batches of stocks with size 500. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
+We then load the daily CRSP returns. To estimate the CAPM over a consistent lookback window while accommodating different return frequencies, we adjust the minimum required number of observations accordingly. Specifically, we require at least 1,000 daily returns over a five‑year period for a valid estimation. This threshold is consistent with the monthly requirement of 48 observations out of 60 months, given that there are roughly 252 trading days in a year.
 
 ::: {.panel-tabset group="language"}
 ### R
 
 ```{r}
-#| label: beta-estimation-setup-daily-batches
+#| label: beta-estimation-load-crsp-daily
 permnos <- list.dirs(
   "data/crsp_daily", full.names = FALSE, recursive = FALSE
 ) |>
   str_remove("permno=") |>
   as.integer()
 
-batch_size <- 500
-batches <- ceiling(length(permnos) / batch_size)
+crsp_daily <- permnos |>
+  map(\(p) {
+    paste0("data/crsp_daily/permno=", p) |>
+      list.files(full.names = TRUE) |>
+      map(read_parquet) |>
+      list_rbind() |>
+      mutate(permno = p)
+  }) |>
+  list_rbind() |>
+  select(permno, date, ret_excess)
+
 min_obs <- 1000
 ```
 
 ### Python
 
 ```{python}
-#| label: beta-estimation-setup-daily-batches-py
-permnos = [
-    int(folder.split("=")[1])
-    for folder in os.listdir("data/crsp_daily")
-    if folder.startswith("permno=")
-]
+#| label: beta-estimation-load-crsp-daily-py
+crsp_daily = (
+    pl.scan_parquet("data/crsp_daily", hive_partitioning=True)
+    .select(["permno", "date", "ret_excess"])
+    .collect()
+    # hive partition keys are read as integers; align with crsp_monthly
+    .with_columns(permno=pl.col("permno").cast(pl.Float64))
+)
 
-batch_size = 500
-batches = np.ceil(len(permnos) / batch_size).astype(int)
 min_obs = 1_000
 ```
 
 :::
 
-We then proceed to perform the same steps as with the monthly CRSP data, just in batches: We load the daily returns, truncate the daily dates to the beginning of the month, and hand each batch to `roll_capm_estimation()`, which again estimates the betas for all stocks in the batch at once.
+We then proceed exactly as with the monthly CRSP data: we join the daily market excess returns, truncate the daily dates to the beginning of the month so that we can still look back over 60 months and get one beta estimate per month, and hand the data to `roll_capm_estimation()`, which estimates the betas for all stocks at once.
 
 ::: {.panel-tabset group="language"}
 ### R
@@ -503,72 +511,23 @@ We then proceed to perform the same steps as with the monthly CRSP data, just in
 #| label: beta-estimation-estimate-daily-all
 #| output: false
 #| eval: false
-capm_daily <- list()
-
-for (j in 1:batches) {
-  permno_batch <- permnos[
-    ((j - 1) * batch_size + 1):min(j * batch_size, length(permnos))
-  ]
-
-  crsp_daily_sub <- permno_batch |>
-    map(\(p) {
-      paste0("data/crsp_daily/permno=", p) |>
-        list.files(full.names = TRUE) |>
-        map(read_parquet) |>
-        list_rbind() |>
-        mutate(permno = p)
-    }) |>
-    list_rbind() |>
-    select(permno, date, ret_excess)
-
-  capm_daily[[j]] <- crsp_daily_sub |>
-    inner_join(factors_ff3_daily, join_by(date)) |>
-    mutate(date = floor_date(date, "month")) |>
-    roll_capm_estimation(min_obs = min_obs)
-
-  message(
-    "Batch ",
-    j,
-    " out of ",
-    batches,
-    " done (",
-    scales::percent(j / batches),
-    ")\n"
-  )
-}
-capm_daily <- bind_rows(capm_daily)
+capm_daily <- crsp_daily |>
+  inner_join(factors_ff3_daily, join_by(date)) |>
+  mutate(date = floor_date(date, "month")) |>
+  roll_capm_estimation(min_obs = min_obs)
 ```
 
 ### Python
 
-Note that we also convert the daily date to the beginning of the month so that we can still look back over 60 months and get one beta estimate per month, even though we are using daily data.
-
 ```{python}
-#| label: beta-estimation-estimate-daily-batches-py
+#| label: beta-estimation-estimate-daily-all-py
 #| output: false
 #| eval: false
-capm_daily = []
-
-for j in range(1, batches + 1):
-    permno_batch = permnos[((j - 1) * batch_size) : (min(j * batch_size, len(permnos)))]
-
-    crsp_daily_sub = (
-        pl.scan_parquet("data/crsp_daily", hive_partitioning=True)
-        .filter(pl.col("permno").is_in(permno_batch))
-        .select(["permno", "date", "ret_excess"])
-        .collect()
-        # hive partition keys are read as integers; align with crsp_monthly
-        .with_columns(permno=pl.col("permno").cast(pl.Float64))
-        .join(factors_ff3_daily, how="inner", on="date")
-        .with_columns(date=pl.col("date").dt.truncate("1mo"))
-    )
-
-    capm_daily_sub = roll_capm_estimation(crsp_daily_sub, min_obs=min_obs)
-    capm_daily.append(capm_daily_sub)
-
-    print(f"Batch {j} out of {batches} done ({(j / batches) * 100:.2f}%)\n")
-
-capm_daily = pl.concat(capm_daily)
+capm_daily = (crsp_daily
+    .join(factors_ff3_daily, how="inner", on="date")
+    .with_columns(date=pl.col("date").dt.truncate("1mo"))
+    .pipe(roll_capm_estimation, min_obs=min_obs)
+)
 ```
 
 :::
