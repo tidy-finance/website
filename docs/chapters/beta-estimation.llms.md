@@ -166,11 +166,21 @@ roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
 
   bind_rows(
     estimates |>
-      transmute(permno, date, coefficient = "alpha",
-                estimate = alpha, t_statistic = t_alpha),
+      transmute(
+        permno,
+        date,
+        coefficient = "alpha",
+        estimate = alpha,
+        t_statistic = t_alpha
+      ),
     estimates |>
-      transmute(permno, date, coefficient = "mkt_excess",
-                estimate = beta, t_statistic = t_beta)
+      transmute(
+        permno,
+        date,
+        coefficient = "mkt_excess",
+        estimate = beta,
+        t_statistic = t_beta
+      )
   ) |>
     arrange(permno, date, coefficient) |>
     as_tibble()
@@ -386,14 +396,24 @@ capm_monthly <- roll_capm_estimation(crsp_monthly)
 capm_monthly
 ```
 
+    # A tibble: 4,665,538 × 5
+      permno date       coefficient estimate t_statistic
+       <dbl> <date>     <chr>          <dbl>       <dbl>
+    1  10001 1990-01-01 alpha         0.0111       1.38 
+    2  10001 1990-01-01 mkt_excess    0.0983       0.677
+    3  10001 1990-02-01 alpha         0.0106       1.34 
+    4  10001 1990-02-01 mkt_excess    0.0976       0.678
+    5  10001 1990-03-01 alpha         0.0105       1.35 
+    # ℹ 4,665,533 more rows
+
 Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
 
 ``` r
 library(tidyfinance)
 
 estimate_betas(
-  crsp_monthly,
-  "ret_excess ~ mkt_excess",
+  data = crsp_monthly,
+  model = "ret_excess ~ mkt_excess",
   lookback = months(60),
   min_obs = 48
 )
@@ -404,6 +424,36 @@ estimate_betas(
 ``` python
 capm_monthly = roll_capm_estimation(crsp_monthly)
 capm_monthly
+```
+
+shape: (4_665_538, 5)
+
+| permno  | date       | coefficient  | estimate | t_statistic |
+|---------|------------|--------------|----------|-------------|
+| f64     | date       | str          | f64      | f64         |
+| 10001.0 | 1990-01-01 | "alpha"      | 0.011065 | 1.378016    |
+| 10001.0 | 1990-01-01 | "mkt_excess" | 0.098333 | 0.677007    |
+| 10001.0 | 1990-02-01 | "alpha"      | 0.010577 | 1.342069    |
+| 10001.0 | 1990-02-01 | "mkt_excess" | 0.097602 | 0.677908    |
+| 10001.0 | 1990-03-01 | "alpha"      | 0.010462 | 1.353963    |
+| …       | …          | …            | …        | …           |
+| 93436.0 | 2024-10-01 | "mkt_excess" | 2.380626 | 5.488947    |
+| 93436.0 | 2024-11-01 | "alpha"      | 0.038041 | 1.593754    |
+| 93436.0 | 2024-11-01 | "mkt_excess" | 2.451092 | 5.645404    |
+| 93436.0 | 2024-12-01 | "alpha"      | 0.039498 | 1.654254    |
+| 93436.0 | 2024-12-01 | "mkt_excess" | 2.385498 | 5.496126    |
+
+Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
+
+``` python
+import tidyfinance as tf
+
+tf.estimate_betas(
+    data=crsp_monthly,
+    model="ret_excess ~ mkt_excess", 
+    lookback=60, 
+    min_obs=48
+)
 ```
 
 ## Estimating Beta Using Daily Returns
@@ -433,7 +483,9 @@ We then load the daily CRSP returns. To estimate the CAPM over a consistent look
 
 ``` r
 permnos <- list.dirs(
-  "data/crsp_daily", full.names = FALSE, recursive = FALSE
+  "data/crsp_daily",
+  full.names = FALSE,
+  recursive = FALSE
 ) |>
   str_remove("permno=") |>
   as.integer()
@@ -836,7 +888,7 @@ beta |>
     # A tibble: 2 × 9
       return_type  mean    sd    min    q05   q50   q95   max       n
       <chr>       <dbl> <dbl>  <dbl>  <dbl> <dbl> <dbl> <dbl>   <int>
-    1 daily       0.794 0.495  -3.67 0.0857 0.755  1.66  4.97 2354575
+    1 daily       0.784 0.505  -4.32 0.0706 0.740  1.68  7.50 2775594
     2 monthly     1.11  0.714 -13.1  0.132  1.04   2.33 11.7  2332769
 
 ## Python
@@ -864,7 +916,7 @@ shape: (2, 9)
 | return_type | count   | mean | std  | min    | q05  | q50  | q95  | max   |
 |-------------|---------|------|------|--------|------|------|------|-------|
 | str         | u32     | f64  | f64  | f64    | f64  | f64  | f64  | f64   |
-| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.09 | 0.75 | 1.66 | 4.97  |
+| "daily"     | 2775594 | 0.78 | 0.5  | -4.32  | 0.07 | 0.74 | 1.68 | 7.5   |
 | "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.13 | 1.04 | 2.33 | 11.72 |
 
 The summary statistics indicate that estimates based on daily returns are, on average, lower and less variable than those derived from monthly returns.
