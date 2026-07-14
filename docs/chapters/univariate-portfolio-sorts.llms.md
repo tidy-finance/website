@@ -577,6 +577,8 @@ model_fit.summary()
 
 However, controlling for the effect of beta, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting-against-beta factor ([Frazzini and Pedersen 2014](#ref-Frazzini2014)). Betting-against-beta corresponds to a strategy that shorts high-beta stocks and takes a (levered) long position in low-beta stocks. If borrowing constraints prevent investors from taking positions on the security market line they are instead incentivized to buy high-beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high-beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital-constrained investors with lower risk aversion.
 
+The evidence on the strategy is not undisputed, though. Novy-Marx and Velikov ([2022](#ref-NovyMarx2022)) point out that Frazzini and Pedersen ([2014](#ref-Frazzini2014)) do not construct their factor as a standard portfolio sort: they estimate betas by combining daily correlations over five years with daily volatilities over one year and shrink them toward one, weight stocks by their beta ranks, and scale the long and short legs to unit beta. Novy-Marx and Velikov ([2022](#ref-NovyMarx2022)) show that the strategy’s abnormal returns largely stem from these non-standard choices rather than from the relation between beta and returns as such.
+
 ## R
 
 ``` r
@@ -710,6 +712,8 @@ Frazzini, Andrea, and Lasse Heje Pedersen. 2014. “Betting against beta.” *Jo
 Newey, Whitney .K, and Kenneth D. West. 1994. “Automatic lag selection in covariance matrix estimation.” *The Review of Economic Studies* 61 (4): 631–53. <https://www.jstor.org/stable/2297912>.
 
 Newey, Whitney K., and Kenneth D. West. 1987. “A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance Matrix.” *Econometrica* 55 (3): 703–8. <http://www.jstor.org/stable/1913610>.
+
+Novy-Marx, Robert, and Mihail Velikov. 2022. “Betting against betting against beta.” *Journal of Financial Economics* 143 (1): 80–106. <https://doi.org/10.1016/j.jfineco.2021.05.032>.
 
 Robinson, David, Alex Hayes, and Simon Couch. 2022. *broom: Convert statistical objects into tidy tibbles*. <https://CRAN.R-project.org/package=broom>.
 

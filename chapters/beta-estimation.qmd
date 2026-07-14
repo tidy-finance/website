@@ -195,11 +195,21 @@ roll_capm_estimation <- function(data, look_back = 60, min_obs = 48) {
 
   bind_rows(
     estimates |>
-      transmute(permno, date, coefficient = "alpha",
-                estimate = alpha, t_statistic = t_alpha),
+      transmute(
+        permno,
+        date,
+        coefficient = "alpha",
+        estimate = alpha,
+        t_statistic = t_alpha
+      ),
     estimates |>
-      transmute(permno, date, coefficient = "mkt_excess",
-                estimate = beta, t_statistic = t_beta)
+      transmute(
+        permno,
+        date,
+        coefficient = "mkt_excess",
+        estimate = beta,
+        t_statistic = t_beta
+      )
   ) |>
     arrange(permno, date, coefficient) |>
     as_tibble()
@@ -401,7 +411,6 @@ We could distribute the estimation across several cores, but for the closed-form
 
 ```{r}
 #| label: beta-estimation-estimate-monthly-all
-#| eval: false
 capm_monthly <- roll_capm_estimation(crsp_monthly)
 capm_monthly
 ```
@@ -409,13 +418,13 @@ capm_monthly
 Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
 
 ```{r}
-#| label: beta-estimation-estimate-betas-tidyfinance
+#| label: beta-estimation-estimate-betas-tidyfinance-r
 #| eval: false
 library(tidyfinance)
 
 estimate_betas(
-  crsp_monthly,
-  "ret_excess ~ mkt_excess",
+  data = crsp_monthly,
+  model = "ret_excess ~ mkt_excess",
   lookback = months(60),
   min_obs = 48
 )
@@ -425,9 +434,23 @@ estimate_betas(
 
 ```{python}
 #| label: beta-estimation-estimate-monthly-all-py
-#| eval: false
 capm_monthly = roll_capm_estimation(crsp_monthly)
 capm_monthly
+```
+
+Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
+
+```{python}
+#| label: beta-estimation-estimate-betas-tidyfinance-py
+#| eval: false
+import tidyfinance as tf
+
+tf.estimate_betas(
+    data=crsp_monthly,
+    model="ret_excess ~ mkt_excess", 
+    lookback=60, 
+    min_obs=48
+)
 ```
 
 :::
@@ -466,7 +489,9 @@ We then load the daily CRSP returns. To estimate the CAPM over a consistent look
 ```{r}
 #| label: beta-estimation-load-crsp-daily
 permnos <- list.dirs(
-  "data/crsp_daily", full.names = FALSE, recursive = FALSE
+  "data/crsp_daily",
+  full.names = FALSE,
+  recursive = FALSE
 ) |>
   str_remove("permno=") |>
   as.integer()
@@ -510,7 +535,6 @@ We then proceed exactly as with the monthly CRSP data: we join the daily market 
 ```{r}
 #| label: beta-estimation-estimate-daily-all
 #| output: false
-#| eval: false
 capm_daily <- crsp_daily |>
   inner_join(factors_ff3_daily, join_by(date)) |>
   mutate(date = floor_date(date, "month")) |>
@@ -522,7 +546,6 @@ capm_daily <- crsp_daily |>
 ```{python}
 #| label: beta-estimation-estimate-daily-all-py
 #| output: false
-#| eval: false
 capm_daily = (crsp_daily
     .join(factors_ff3_daily, how="inner", on="date")
     .with_columns(date=pl.col("date").dt.truncate("1mo"))
@@ -541,38 +564,21 @@ What is a typical value for stock betas? First, let us extract the relevant esti
 
 ```{r}
 #| label: beta-estimation-extract-beta-monthly
-#| eval: false
 beta_monthly <- capm_monthly |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
   mutate(return_type = "monthly")
 ```
 
-```{r}
-#| label: beta-estimation-load-beta-monthly
-#| echo: false
-beta_monthly <- read_parquet("data/beta.parquet") |>
-  filter(return_type == "monthly")
-```
-
 ### Python
 
 ```{python}
 #| label: beta-estimation-extract-beta-monthly-py
-#| eval: false
 beta_monthly = (capm_monthly
     .filter(pl.col("coefficient") == "mkt_excess")
     .select(["permno", "date", "estimate"])
     .rename({"estimate": "beta"})
     .with_columns(return_type=pl.lit("monthly"))
-)
-```
-
-```{python}
-#| label: beta-estimation-load-beta-monthly-py
-#| echo: false
-beta_monthly = pl.read_parquet("data/beta.parquet").filter(
-    pl.col("return_type") == "monthly"
 )
 ```
 
@@ -723,7 +729,6 @@ To compare the difference between daily and monthly data, we combine beta estima
 
 ```{r}
 #| label: beta-estimation-combine-beta-estimates
-#| eval: false
 beta_daily <- capm_daily |>
   filter(coefficient == "mkt_excess") |>
   select(permno, date, beta = estimate) |>
@@ -732,17 +737,10 @@ beta_daily <- capm_daily |>
 beta <- bind_rows(beta_monthly, beta_daily)
 ```
 
-```{r}
-#| label: beta-estimation-load-beta
-#| echo: false
-beta <- read_parquet("data/beta.parquet")
-```
-
 ### Python
 
 ```{python}
 #| label: beta-estimation-combine-beta-estimates-py
-#| eval: false
 beta_daily = (capm_daily
     .filter(pl.col("coefficient") == "mkt_excess")
     .select(["permno", "date", "estimate"])
@@ -751,12 +749,6 @@ beta_daily = (capm_daily
 )
 
 beta = pl.concat([beta_monthly, beta_daily])
-```
-
-```{python}
-#| label: beta-estimation-load-beta-py
-#| echo: false
-beta = pl.read_parquet("data/beta.parquet")
 ```
 
 :::
@@ -829,7 +821,6 @@ Finally, we write the estimates to our local folder such that we can use them in
 
 ```{r}
 #| label: beta-estimation-write-beta
-#| eval: false
 write_parquet(beta, "data/beta.parquet")
 ```
 
@@ -837,7 +828,6 @@ write_parquet(beta, "data/beta.parquet")
 
 ```{python}
 #| label: beta-estimation-write-beta-py
-#| output: false
 beta.write_parquet("data/beta.parquet")
 ```
 
