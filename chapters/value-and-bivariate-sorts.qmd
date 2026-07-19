@@ -181,7 +181,7 @@ data_for_sorts <- data_for_sorts |>
 
 ### Python
 
-We carry forward the latest report via the `forward_fill()`-expression after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by adding `.over(["permno", "gvkey"])` as usual).
+We carry forward the latest report via the `forward_fill()`-expression after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by adding `.over("permno", "gvkey")` as usual).
 
 ```{python}
 #| label: value-and-bivariate-sorts-prepare-sorting-data-py
@@ -217,12 +217,12 @@ data_for_sorts = (crsp_monthly
 data_for_sorts = (data_for_sorts
     .sort("permno", "gvkey", "date")
     .with_columns(
-        bm=pl.col("bm").forward_fill().over(["permno", "gvkey"]),
-        accounting_date=pl.col("accounting_date").forward_fill().over(["permno", "gvkey"])
+        bm=pl.col("bm").forward_fill().over("permno", "gvkey"),
+        accounting_date=pl.col("accounting_date").forward_fill().over("permno", "gvkey")
     )
     .with_columns(threshold_date=pl.col("date").dt.offset_by("-12mo"))
     .filter(pl.col("accounting_date") > pl.col("threshold_date"))
-    .drop(["accounting_date", "threshold_date"])
+    .drop("accounting_date", "threshold_date")
     .drop_nulls()
 )
 ```
@@ -358,7 +358,7 @@ value_portfolios = (data_for_sorts
         )
         )
     )
-    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .group_by("date", "portfolio_bm", "portfolio_size")
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
             / pl.col("mktcap_lag").sum()
@@ -394,7 +394,7 @@ The resulting monthly value premium is `{r} round(value_premium$value_premium*10
 ```{python}
 #| label: value-and-bivariate-sorts-independent-value-premium-py
 value_premium = (value_portfolios
-    .group_by(["date", "portfolio_bm"])
+    .group_by("date", "portfolio_bm")
     .agg(ret=pl.col("ret").mean())
     .group_by("date")
     .agg(
@@ -489,7 +489,7 @@ value_portfolios = (
             )
         )
     )
-    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .group_by("date", "portfolio_bm", "portfolio_size")
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum()
@@ -497,7 +497,7 @@ value_portfolios = (
 )
 
 value_premium = (
-    value_portfolios.group_by(["date", "portfolio_bm"])
+    value_portfolios.group_by("date", "portfolio_bm")
     .agg(ret=pl.col("ret").mean())
     .group_by("date")
     .agg(
@@ -668,12 +668,12 @@ portfolio_characteristics <- bind_rows(
 #| label: value-and-bivariate-sorts-portfolio-characteristics-py
 portfolio_characteristics = (
     pl.concat([assignments_independent, assignments_dependent])
-    .group_by(["sorting_method", "date", "portfolio_size", "portfolio_bm"])
+    .group_by("sorting_method", "date", "portfolio_size", "portfolio_bm")
     .agg(
         n_stocks=pl.len(),
         mktcap=pl.col("mktcap_lag").sum()
     )
-    .group_by(["sorting_method", "portfolio_size", "portfolio_bm"])
+    .group_by("sorting_method", "portfolio_size", "portfolio_bm")
     .agg(
         n_stocks=pl.col("n_stocks").mean(),
         mktcap=pl.col("mktcap").mean()

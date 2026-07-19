@@ -618,7 +618,7 @@ crsp_monthly |>
 beta_industries = (beta_monthly
     .join(crsp_monthly, how="inner", on=["permno", "date"])
     .drop_nulls("beta")
-    .group_by(["industry", "permno"])
+    .group_by("industry", "permno")
     .agg(beta=pl.col("beta").mean())
 )
 
@@ -691,10 +691,10 @@ quantiles = np.arange(0.1, 1.0, 0.1)
 beta_quantiles = (
     beta_monthly
     .group_by("date")
-    .agg([
+    .agg(
         pl.col("beta").quantile(q, interpolation="linear").alias(str(int(round(q * 100))))
         for q in quantiles
-    ])
+    )
     .unpivot(index="date", variable_name="quantile", value_name="beta")
     .with_columns(pl.col("quantile").cast(pl.Int64))
     .drop_nulls()
@@ -878,7 +878,7 @@ return_types = pl.DataFrame({"return_type": ["monthly", "daily"]})
 beta_coverage = (
     crsp_monthly.join(return_types, how="cross")
     .join(beta, on=["permno", "date", "return_type"], how="left")
-    .group_by(["date", "return_type"])
+    .group_by("date", "return_type")
     .agg(share=pl.col("beta").is_not_null().mean())
 )
 
