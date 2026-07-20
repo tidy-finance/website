@@ -15,7 +15,7 @@ library(tidyfinance)
 library(ggplot2)
 
 prices <- download_data(
-  domain = "stock_prices",
+  domain = "Stock Prices",
   symbols = "AAPL",
   start_date = "2000-01-01",
   end_date = "2024-12-31"
@@ -33,7 +33,7 @@ import tidyfinance as tf
 from plotnine import ggplot, aes, geom_line
 
 prices = tf.download_data(
-  domain="stock_prices",
+  domain="Stock Prices",
   symbols="AAPL",
   start_date="2000-01-01",
   end_date="2024-12-31"

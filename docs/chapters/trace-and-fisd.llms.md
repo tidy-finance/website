@@ -270,7 +270,7 @@ To download the FISD data with the above filters and processing steps, you can u
 You can set the credentials with `set_wrds_credentials()`.
 
 ``` r
-download_data(domain = "wrds", dataset = "fisd")
+download_data(domain = "WRDS", dataset = "fisd")
 ```
 
 ## Python
@@ -278,7 +278,7 @@ download_data(domain = "wrds", dataset = "fisd")
 You can set the credentials with `tf.set_wrds_credentials()`.
 
 ``` python
-fisd = tf.download_data(domain="wrds", dataset="fisd")
+fisd = tf.download_data(domain="WRDS", dataset="fisd")
 ```
 
 Finally, we save the bond characteristics to our local folder. This selection of bonds also constitutes the sample for which we will collect trade reports from TRACE below.
@@ -338,7 +338,7 @@ batches <- length(fisd_parts)
 
 for (j in 1:batches) {
   trace_enhanced <- download_data(
-    domain = "wrds",
+    domain = "WRDS",
     dataset = "trace_enhanced",
     cusips = fisd_parts[[j]],
     start_date = ymd("2014-01-01"),
@@ -371,7 +371,7 @@ for j in range(1, batches + 1):
     ]
 
     trace_enhanced_sub = tf.download_data(
-        domain="wrds",
+        domain="WRDS",
         dataset="trace_enhanced",
         cusips=cusip_batch,
         start_date="2014-01-01",
@@ -392,7 +392,7 @@ If you want to download the prepared enhanced TRACE data for selected bonds via 
 
 ``` r
 download_data(
-  domain = "wrds",
+  domain = "WRDS",
   dataset = "trace_enhanced",
   cusips = c("00101JAH9"),
   start_date = "2019-01-01",
@@ -404,7 +404,7 @@ download_data(
 
 ``` python
 tf.download_data(
-    domain="wrds",
+    domain="WRDS",
     dataset="trace_enhanced",
     cusips=["00101JAH9"],
     start_date="2019-01-01",
@@ -622,8 +622,8 @@ shape: (3, 8)
 |----------------|-------|--------|-------|------|--------|-------|---------|
 | str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
 | "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
-| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 | "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
+| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
 
 We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
 
@@ -692,8 +692,8 @@ shape: (2, 8)
 | measure        | mean    | std    | min   | q05     | median  | q95     | max     |
 |----------------|---------|--------|-------|---------|---------|---------|---------|
 | str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
-| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6128.0  | 13421.0 | 17850.0 | 21312.0 |
 | "trade_number" | 25914.0 | 5444.0 | 439.0 | 17844.0 | 26051.0 | 34383.0 | 40839.0 |
+| "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6128.0  | 13421.0 | 17850.0 | 21312.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

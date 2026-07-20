@@ -20,7 +20,7 @@ Apart from the list below, we want to advertise some amazing data compiled by ot
 
 > **NOTE:**
 >
-> If you feel that we miss a fantastic financial data source, please get in touch via <contact@tidy-finance.org> - thank you very much for your support!
+> If you feel that we miss a fantastic financial data source, please get in touch via <christoph@tidy-finance.org> - thank you very much for your support!
 
 The data sources differ across languages because the available packages differ. We hence list them separately for R and Python.
 

@@ -44,7 +44,7 @@ symbols <- download_data(
 )
 
 prices_daily <- download_data(
-    domain = "stock_prices", symbols = symbols$symbol,
+    domain = "Stock Prices", symbols = symbols$symbol,
     start_date = "2000-01-01", end_date = "2024-12-31"
 ) |>
   select(symbol, date, adjusted_close)
@@ -69,11 +69,11 @@ returns_monthly <- prices_daily |>
 
 ``` python
 symbols = tf.download_data(
-    domain="constituents", index="Dow Jones Industrial Average"
+    domain="Index Constituents", index="Dow Jones Industrial Average"
 )
 
 prices_daily = tf.download_data(
-    domain="stock_prices",
+    domain="Stock Prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31",
@@ -146,7 +146,7 @@ For illustrative purposes, we compute the efficient tangency portfolio for our h
 
 ``` r
 risk_free_monthly <- download_data(
-  domain = "stock_prices", symbols = "^IRX",
+  domain = "Stock Prices", symbols = "^IRX",
   start_date = "2019-10-01", end_date = "2024-09-30"
 ) |>
   mutate(
@@ -162,7 +162,7 @@ rf <- mean(risk_free_monthly$risk_free)
 
 ``` python
 risk_free_monthly = (
-  tf.download_data(domain="stock_prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
+  tf.download_data(domain="Stock Prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
   .with_columns(
     risk_free=(1 + pl.col("adjusted_close") / 100)**(1/12) - 1
   )
@@ -414,24 +414,17 @@ Let’s turn to estimating CAPM parameters using real market data. Instead of us
 
 ``` r
 factors <- download_data(
-  domain = "factors_ff", dataset = "Fama/French 5 Factors (2x3)",
+  domain = "Fama-French", dataset = "Fama/French 5 Factors (2x3)",
   start_date = "2000-01-01", end_date = "2024-09-30"
 ) |>
   select(date, mkt_excess, risk_free)
 ```
 
-    Warning: download_data(domain = "factors_ff") was deprecated in tidyfinance
-    0.6.1.
-    ℹ Please use download_data(domain = "Fama-French") instead.
-    ℹ The deprecated feature was likely used in the tidyfinance package.
-      Please report the issue at
-      <https://github.com/tidy-finance/r-tidyfinance/issues>.
-
 ## Python
 
 ``` python
 factors = tf.download_data(
-    domain="famafrench",
+    domain="Fama-French",
     dataset="Fama/French 5 Factors (2x3)",
     start_date="2000-01-01",
     end_date="2024-09-30",
