@@ -40,7 +40,7 @@ crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "date", "ret_excess", "mktcap", "mktcap_lag"])
+    .select("permno", "date", "ret_excess", "mktcap", "mktcap_lag")
 )
 ```
 
@@ -58,7 +58,7 @@ factors_ff3_monthly <- read_parquet("data/factors_ff3_monthly.parquet") |>
 ``` python
 factors_ff3_monthly = (
     pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "mkt_excess"])
+    .select("date", "mkt_excess")
 )
 ```
 
@@ -90,7 +90,7 @@ data_portfolios <- crsp_monthly |>
 ``` python
 crsp_monthly_lags = (crsp_monthly
     .with_columns(date=pl.col("date").dt.offset_by("13mo"))
-    .select(["permno", "date", "mktcap"])
+    .select("permno", "date", "mktcap")
     .rename({"mktcap": "mktcap_13"})
 )
 
@@ -438,7 +438,7 @@ def evaluate_portfolio(weights_data,
 
     evaluation_stats = (evaluation
         .group_by("model")
-        .agg([
+        .agg(
           power_utility(pl.col("portfolio_return")).mean()
             .alias("Expected utility"),
           (length_year*pl.col("portfolio_return")).mean()
@@ -448,7 +448,7 @@ def evaluate_portfolio(weights_data,
           (pl.col("portfolio_return").mean()/
            pl.col("portfolio_return").std()*np.sqrt(length_year))
             .alias("Sharpe ratio")
-        ])
+        )
     )
 
     if capm_evaluation:
@@ -474,8 +474,8 @@ def evaluate_portfolio(weights_data,
         evaluation_weights = (weights_data
           .unpivot(index="date", on=["weight_benchmark", "weight_tilt"],
                    variable_name="model", value_name="weight")
-          .group_by(["model", "date"])
-          .agg([
+          .group_by("model", "date")
+          .agg(
             pl.col("weight").abs().mean().alias("Absolute weight"),
             pl.col("weight").max().alias("Max. weight"),
             pl.col("weight").min().alias("Min. weight"),
@@ -483,15 +483,15 @@ def evaluate_portfolio(weights_data,
               .mul(-1).alias("Avg. sum of negative weights"),
             (pl.col("weight") < 0).mean().alias("Avg. fraction of negative weights"),
             pl.len().alias("n")
-          ])
+          )
           # average across dates weighting each by its number of stocks (N_t),
           # matching the R aggregation
           .group_by("model")
-          .agg([
+          .agg(
             ((pl.col(c) * pl.col("n")).sum() / pl.col("n").sum() * 100).alias(c)
             for c in ["Absolute weight", "Max. weight", "Min. weight",
                       "Avg. sum of negative weights", "Avg. fraction of negative weights"]
-          ])
+          )
           .with_columns(model=pl.col("model").str.replace("weight_", ""))
         )
 
@@ -535,7 +535,7 @@ evaluate_portfolio(weights_crsp) |>
 
 ``` python
 (evaluate_portfolio(weights_crsp)
-    .select(["measure", "benchmark", "tilt"])
+    .select("measure", "benchmark", "tilt")
     .with_columns(pl.col("benchmark", "tilt").round(2))
 )
 ```
@@ -843,7 +843,7 @@ performance_table = (pl.concat([
     .pivot(index="measure", on="strategy", values="value")
     .with_columns(pl.col(pl.Float64).round(3))
 )
-performance_table.select(["measure", "EW", "VW"])
+performance_table.select("measure", "EW", "VW")
 ```
 
 shape: (11, 3)
@@ -864,7 +864,7 @@ shape: (11, 3)
 | "Avg. fraction of negative weig… | 0.0    | 0.0    |
 
 ``` python
-performance_table.select(["measure", "EW Optimal", "VW Optimal"])
+performance_table.select("measure", "EW Optimal", "VW Optimal")
 ```
 
 shape: (11, 3)
@@ -885,7 +885,7 @@ shape: (11, 3)
 | "Avg. fraction of negative weig… | 0.285      | 36.543     |
 
 ``` python
-performance_table.select(["measure", "EW Optimal (no s.)", "VW Optimal (no s.)"])
+performance_table.select("measure", "EW Optimal (no s.)", "VW Optimal (no s.)")
 ```
 
 shape: (11, 3)

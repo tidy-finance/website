@@ -60,19 +60,19 @@ beta <- read_parquet("data/beta.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "gvkey", "date", "ret_excess", "mktcap"])
+    .select("permno", "gvkey", "date", "ret_excess", "mktcap")
 )
 
 compustat_annual = (
     pl.read_parquet("data/compustat_annual.parquet")
-    .select(["datadate", "gvkey", "be"])
+    .select("datadate", "gvkey", "be")
     .filter(pl.col("be") > 0)
 )
 
 beta = (
     pl.read_parquet("data/beta.parquet")
     .filter(pl.col("return_type") == "monthly")
-    .select(["permno", "date", "beta"])
+    .select("permno", "date", "beta")
 )
 ```
 
@@ -121,14 +121,14 @@ characteristics = (compustat_annual
         log_mktcap=pl.col("mktcap").log(),
         sorting_date=pl.col("date").dt.offset_by("6mo")
     )
-    .select(["gvkey", "bm", "log_mktcap", "beta", "sorting_date"])
+    .select("gvkey", "bm", "log_mktcap", "beta", "sorting_date")
 )
 
 data_fama_macbeth = (crsp_monthly
     .join(characteristics,
             how="left",
             left_on=["gvkey", "date"], right_on=["gvkey", "sorting_date"])
-    .sort(["date", "permno"])
+    .sort("date", "permno")
     .with_columns(
         beta=pl.col("beta").forward_fill().over("permno"),
         bm=pl.col("bm").forward_fill().over("permno"),
@@ -138,13 +138,13 @@ data_fama_macbeth = (crsp_monthly
 
 data_fama_macbeth_lagged = (data_fama_macbeth
     .with_columns(date=pl.col("date").dt.offset_by("-1mo"))
-    .select(["permno", "date", "ret_excess"])
+    .select("permno", "date", "ret_excess")
     .rename({"ret_excess": "ret_excess_lead"})
 )
 
 data_fama_macbeth = (data_fama_macbeth
     .join(data_fama_macbeth_lagged, how="left", on=["permno", "date"])
-    .select(["permno", "date", "ret_excess_lead", "beta", "log_mktcap", "bm"])
+    .select("permno", "date", "ret_excess_lead", "beta", "log_mktcap", "bm")
     .drop_nulls()
 )
 ```
@@ -182,7 +182,7 @@ def estimate_cross_section(group):
 risk_premiums = pl.concat([
     estimate_cross_section(group)
     for group in data_fama_macbeth.partition_by("date")
-]).select(["date", "Intercept", "beta", "log_mktcap", "bm"]).sort("date")
+]).select("date", "Intercept", "beta", "log_mktcap", "bm").sort("date")
 ```
 
 ## Time-Series Aggregation

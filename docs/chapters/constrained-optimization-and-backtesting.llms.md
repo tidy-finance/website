@@ -861,7 +861,7 @@ We also define two helper functions: one to adjust the weights due to returns an
 
 ``` r
 adjust_weights <- function(w, next_return) {
-  w_prev <- 1 + w * next_return
+  w_prev <- w * (1 + next_return)
   as.numeric(w_prev / sum(as.vector(w_prev)))
 }
 
@@ -877,7 +877,7 @@ evaluate_performance <- function(w, w_previous, next_return, beta = 50) {
 
 ``` python
 def adjust_weights(w, next_return):
-    w_prev = 1 + w * next_return
+    w_prev = w * (1 + next_return)
     return np.array(w_prev / np.sum(np.array(w_prev)))
 
 
@@ -1019,9 +1019,9 @@ performance_table |>
     # A tibble: 3 × 5
       Strategy  Mean    SD `Sharpe ratio` Turnover
       <chr>    <dbl> <dbl>          <dbl>    <dbl>
-    1 MV       -1.07  12.6         NA     210.    
-    2 MV (TC)  12.1   15.1          0.798   0.0191
-    3 Naive    12.1   15.1          0.796   0.236 
+    1 MV        10.5  12.6          0.836    16.6 
+    2 MV (TC)   11.4  14.4          0.789     0   
+    3 Naive     11.9  15.1          0.788     2.34
 
 ## Python
 
@@ -1061,9 +1061,9 @@ shape: (3, 5)
 | strategy  | mean   | sd     | sharpe_ratio | turnover |
 |-----------|--------|--------|--------------|----------|
 | str       | f64    | f64    | f64          | f64      |
-| "MV"      | -1.068 | 12.555 | null         | 209.884  |
-| "MV (TC)" | 12.068 | 15.131 | 0.798        | 0.019    |
-| "Naive"   | 12.054 | 15.133 | 0.797        | 0.236    |
+| "MV"      | 10.531 | 12.601 | 0.836        | 16.566   |
+| "MV (TC)" | 11.401 | 14.446 | 0.789        | 0.0      |
+| "Naive"   | 11.927 | 15.133 | 0.788        | 2.345    |
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters \\\hat\mu_t\\ and \\\hat\Sigma_t\\ indicate that the current allocation is too far away from the optimal theoretical portfolio.
 

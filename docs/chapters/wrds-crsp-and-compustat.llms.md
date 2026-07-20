@@ -289,7 +289,7 @@ mktcap_lag = (crsp_monthly
         date=pl.col("date").dt.offset_by("1mo"),
         mktcap_lag=pl.col("mktcap")
     )
-    .select(["permno", "date", "mktcap_lag"])
+    .select("permno", "date", "mktcap_lag")
 )
 
 crsp_monthly = (crsp_monthly
@@ -387,7 +387,7 @@ crsp_monthly <- crsp_monthly |>
 
 ``` python
 factors_ff3_monthly = (pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "risk_free"])
+    .select("date", "risk_free")
 )
 
 crsp_monthly = (crsp_monthly
@@ -484,9 +484,9 @@ Figure 1: Number of stocks in the CRSP sample listed at each of the US exchange
 
 ``` python
 securities_per_exchange = (crsp_monthly
-    .group_by(["exchange", "date"])
+    .group_by("exchange", "date")
     .len(name="n")
-    .sort(["exchange", "date"])
+    .sort("exchange", "date")
 )
 
 securities_per_exchange_figure = (
@@ -553,9 +553,9 @@ cpi_monthly = pl.read_parquet("data/cpi_monthly.parquet")
 
 market_cap_per_exchange = (crsp_monthly
     .join(cpi_monthly, how="left", on="date")
-    .group_by(["date", "exchange"])
+    .group_by("date", "exchange")
     .agg(mktcap=pl.col("mktcap").sum()/pl.col("cpi").mean())
-    .sort(["date", "exchange"])
+    .sort("date", "exchange")
 )
 
 market_cap_per_exchange_figure = (
@@ -619,9 +619,9 @@ Figure 3: Number of stocks in the CRSP sample associated with different industr
 
 ``` python
 securities_per_industry = (crsp_monthly
-    .group_by(["industry", "date"])
+    .group_by("industry", "date")
     .len(name="n")
-    .sort(["industry", "date"])
+    .sort("industry", "date")
 )
 
 linetypes = ["-", "--", "-.", ":"]
@@ -683,9 +683,9 @@ Figure 4: Market capitalization is measured in billion USD, adjusted for consum
 ``` python
 market_cap_per_industry = (crsp_monthly
     .join(cpi_monthly, how="left", on="date")
-    .group_by(["date", "industry"])
+    .group_by("date", "industry")
     .agg(mktcap=pl.col("mktcap").sum()/pl.col("cpi").mean())
-    .sort(["date", "industry"])
+    .sort("date", "industry")
 )
 
 market_cap_per_industry_figure = (
@@ -851,12 +851,12 @@ for j in range(1, batches + 1):
 
     if not crsp_daily_sub.is_empty():
         crsp_daily_sub = (crsp_daily_sub.join(
-                factors_ff3_daily.select(["date", "risk_free"]), on="date", how="left"
+                factors_ff3_daily.select("date", "risk_free"), on="date", how="left"
             )
             .with_columns(
                 ret_excess=pl.col("ret") - pl.col("risk_free")
             )
-            .select(["permno", "date", "ret_excess"])
+            .select("permno", "date", "ret_excess")
         )
 
         crsp_daily_sub.write_parquet("data/crsp_daily", partition_by="permno")
@@ -1017,7 +1017,7 @@ compustat_annual <- compustat_annual |>
 compustat_annual = (
     compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
     .sort("datadate")
-    .group_by(["gvkey", "year"], maintain_order=True)
+    .group_by("gvkey", "year", maintain_order=True)
     .tail(1)
 )
 ```
@@ -1044,7 +1044,7 @@ compustat_annual <- compustat_annual |>
 
 ``` python
 compustat_annual_lag = (compustat_annual
-    .select(["gvkey", "year", "at"])
+    .select("gvkey", "year", "at")
     .with_columns(year=pl.col("year")+1)
     .rename({"at": "at_lag"})
 )
@@ -1177,7 +1177,7 @@ ccm_links = (crsp_monthly
         & (pl.col("date") >= pl.col("linkdt"))
         & (pl.col("date") <= pl.col("linkenddt"))
     )
-    .select(["permno", "gvkey", "date"])
+    .select("permno", "gvkey", "date")
 )
 
 crsp_monthly = (crsp_monthly
@@ -1242,17 +1242,17 @@ Figure 5: End-of-year share of securities with book equity values by listing ex
 share_with_be = (crsp_monthly
     .with_columns(year=pl.col("date").dt.year().cast(pl.Float64))
     .sort("date")
-    .group_by(["permno", "year"], maintain_order=True)
+    .group_by("permno", "year", maintain_order=True)
     .tail(1)
     .join(compustat_annual, how="left", on=["gvkey", "year"])
-    .group_by(["exchange", "year"])
+    .group_by("exchange", "year")
     .agg(
         share=(
             pl.col("permno").filter(pl.col("be").is_not_null()).n_unique()
             / pl.col("permno").n_unique()
         )
     )
-    .sort(["exchange", "year"])
+    .sort("exchange", "year")
 )
 
 share_with_be_figure = (

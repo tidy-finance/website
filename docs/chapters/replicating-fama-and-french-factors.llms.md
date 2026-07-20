@@ -57,24 +57,24 @@ factors_ff5_monthly <- read_parquet("data/factors_ff5_monthly.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "gvkey", "date", "ret_excess", "mktcap",
-        "mktcap_lag", "exchange"])
+    .select("permno", "gvkey", "date", "ret_excess", "mktcap",
+            "mktcap_lag", "exchange")
 )
 
 compustat_annual = (
     pl.read_parquet("data/compustat_annual.parquet")
-    .select(["gvkey", "datadate", "be", "op", "inv"])
+    .select("gvkey", "datadate", "be", "op", "inv")
     .filter(pl.col("be") > 0)
 )
 
 factors_ff3_monthly = (
     pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "smb", "hml"])
+    .select("date", "smb", "hml")
 )
 
 factors_ff5_monthly = (
     pl.read_parquet("data/factors_ff5_monthly.parquet")
-    .select(["date", "smb", "hml", "rmw", "cma"])
+    .select("date", "smb", "hml", "rmw", "cma")
 )
 ```
 
@@ -123,14 +123,14 @@ We ensure a single observation per year and stock by a call of `unique()` at the
 size = (crsp_monthly
     .filter(pl.col("date").dt.month() == 6)
     .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo"))
-    .select(["permno", "exchange", "sorting_date", "mktcap"])
+    .select("permno", "exchange", "sorting_date", "mktcap")
     .rename({"mktcap": "size"})
 )
 
 market_equity = (crsp_monthly
     .filter(pl.col("date").dt.month() == 12)
     .with_columns(sorting_date=pl.col("date").dt.offset_by("7mo"))
-    .select(["permno", "gvkey", "sorting_date", "mktcap"])
+    .select("permno", "gvkey", "sorting_date", "mktcap")
     .rename({"mktcap": "me"})
 )
 
@@ -140,7 +140,7 @@ book_to_market = (compustat_annual
     )
     .join(market_equity, how="inner", on=["gvkey", "sorting_date"])
     .with_columns(bm=pl.col("be") / pl.col("me"))
-    .select(["permno", "sorting_date", "me", "bm"])
+    .select("permno", "sorting_date", "me", "bm")
 )
 
 sorting_variables = (size
@@ -245,7 +245,7 @@ portfolios = (sorting_variables
         portfolio_bm=assign_portfolio(x, "bm", [0, 0.3, 0.7, 1])
         )
     )
-    .select(["permno", "sorting_date", "portfolio_size", "portfolio_bm"])
+    .select("permno", "sorting_date", "portfolio_size", "portfolio_bm")
 )
 ```
 
@@ -305,7 +305,7 @@ factors_replicated <- portfolios |>
 
 ``` python
 factors_replicated = (portfolios
-    .group_by(["portfolio_size", "portfolio_bm", "date"])
+    .group_by("portfolio_size", "portfolio_bm", "date")
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum())
     .group_by("date")
@@ -493,7 +493,7 @@ other_sorting_variables = (compustat_annual
     )
     .join(market_equity, how="inner", on=["gvkey", "sorting_date"])
     .with_columns(bm=pl.col("be") / pl.col("me"))
-    .select(["permno", "sorting_date", "me", "be", "bm", "op", "inv"])
+    .select("permno", "sorting_date", "me", "be", "bm", "op", "inv")
 )
 
 sorting_variables = (size
@@ -567,9 +567,9 @@ portfolios = (sorting_variables
         portfolio_inv=assign_portfolio(x, "inv", [0, 0.3, 0.7, 1])
         )
     )
-    .select(["permno", "sorting_date",
+    .select("permno", "sorting_date",
             "portfolio_size", "portfolio_bm",
-            "portfolio_op", "portfolio_inv"])
+            "portfolio_op", "portfolio_inv")
 )
 
 portfolios = (crsp_monthly
@@ -606,7 +606,7 @@ factors_value <- portfolios_value |>
 
 ``` python
 portfolios_value = (portfolios
-    .group_by(["portfolio_size", "portfolio_bm", "date"])
+    .group_by("portfolio_size", "portfolio_bm", "date")
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum())
 )
@@ -643,7 +643,7 @@ factors_profitability <- portfolios_profitability |>
 
 ``` python
 portfolios_profitability = (portfolios
-    .group_by(["portfolio_size", "portfolio_op", "date"])
+    .group_by("portfolio_size", "portfolio_op", "date")
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum())
 )
@@ -680,7 +680,7 @@ factors_investment <- portfolios_investment |>
 
 ``` python
 portfolios_investment = (portfolios
-    .group_by(["portfolio_size", "portfolio_inv", "date"])
+    .group_by("portfolio_size", "portfolio_inv", "date")
     .agg(ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum())
 )
@@ -715,9 +715,9 @@ factors_size <- bind_rows(
 ``` python
 factors_size = (
     pl.concat(
-        [portfolios_value.select(["portfolio_size", "date", "ret"]),
-         portfolios_profitability.select(["portfolio_size", "date", "ret"]),
-         portfolios_investment.select(["portfolio_size", "date", "ret"])]
+        [portfolios_value.select("portfolio_size", "date", "ret"),
+         portfolios_profitability.select("portfolio_size", "date", "ret"),
+         portfolios_investment.select("portfolio_size", "date", "ret")]
     )
     .group_by("date")
     .agg(smb_replicated=(

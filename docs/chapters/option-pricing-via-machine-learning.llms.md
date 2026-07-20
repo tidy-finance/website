@@ -432,7 +432,7 @@ lm_pipeline = Pipeline(
 )
 
 lm_fit = lm_pipeline.fit(
-    train_data.select(["S", "K", "r", "T", "sigma"]),
+    train_data.select("S", "K", "r", "T", "sigma"),
     train_data["observed_price"],
 )
 ```
@@ -469,7 +469,7 @@ predictive_performance <- model_fits |>
 
 ``` python
 out_of_sample_data = test_data.sample(n=10000, seed=random_state)
-test_X = out_of_sample_data.select(["S", "K", "r", "T", "sigma"])
+test_X = out_of_sample_data.select("S", "K", "r", "T", "sigma")
 
 predictive_performance = (
     out_of_sample_data

@@ -54,8 +54,8 @@ crsp_monthly <- read_parquet("data/crsp_monthly.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "gvkey", "date", "ret_excess", "mktcap",
-          "mktcap_lag", "exchange"])
+    .select("permno", "gvkey", "date", "ret_excess", "mktcap",
+            "mktcap_lag", "exchange")
     .drop_nulls()
 )
 ```
@@ -80,7 +80,7 @@ To achieve this, we use the `dt.truncate()` expression.
 
 ``` python
 book_equity = (pl.read_parquet("data/compustat_annual.parquet")
-    .select(["gvkey", "datadate", "be"])
+    .select("gvkey", "datadate", "be")
     .filter(pl.col("be") > 0)
     .drop_nulls()
     .with_columns(
@@ -148,13 +148,13 @@ data_for_sorts <- data_for_sorts |>
 
 ## Python
 
-We carry forward the latest report via the `forward_fill()`-expression after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by adding `.over(["permno", "gvkey"])` as usual).
+We carry forward the latest report via the `forward_fill()`-expression after sorting by date and firm (which we identify by `permno` and `gvkey`) and on a firm basis (which we do by adding `.over("permno", "gvkey")` as usual).
 
 ``` python
 size = (crsp_monthly
     .with_columns(sorting_date=pl.col("date").dt.offset_by("1mo"))
     .rename({"mktcap": "size"})
-    .select(["permno", "sorting_date", "size"])
+    .select("permno", "sorting_date", "size")
 )
 
 bm = (book_equity
@@ -164,7 +164,7 @@ bm = (book_equity
         sorting_date=pl.col("date").dt.offset_by("6mo")
     )
     .with_columns(accounting_date=pl.col("sorting_date"))
-    .select(["permno", "gvkey", "sorting_date", "accounting_date", "bm"])
+    .select("permno", "gvkey", "sorting_date", "accounting_date", "bm")
 )
 
 data_for_sorts = (crsp_monthly
@@ -176,19 +176,19 @@ data_for_sorts = (crsp_monthly
             how="left",
             left_on=["permno", "date"],
             right_on=["permno", "sorting_date"])
-    .select(["permno", "gvkey", "date", "ret_excess",
-            "mktcap_lag", "size", "bm", "exchange", "accounting_date"])
+    .select("permno", "gvkey", "date", "ret_excess",
+            "mktcap_lag", "size", "bm", "exchange", "accounting_date")
 )
 
 data_for_sorts = (data_for_sorts
-    .sort(["permno", "gvkey", "date"])
+    .sort("permno", "gvkey", "date")
     .with_columns(
-        bm=pl.col("bm").forward_fill().over(["permno", "gvkey"]),
-        accounting_date=pl.col("accounting_date").forward_fill().over(["permno", "gvkey"])
+        bm=pl.col("bm").forward_fill().over("permno", "gvkey"),
+        accounting_date=pl.col("accounting_date").forward_fill().over("permno", "gvkey")
     )
     .with_columns(threshold_date=pl.col("date").dt.offset_by("-12mo"))
     .filter(pl.col("accounting_date") > pl.col("threshold_date"))
-    .drop(["accounting_date", "threshold_date"])
+    .drop("accounting_date", "threshold_date")
     .drop_nulls()
 )
 ```
@@ -314,7 +314,7 @@ value_portfolios = (data_for_sorts
         )
         )
     )
-    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .group_by("date", "portfolio_bm", "portfolio_size")
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
             / pl.col("mktcap_lag").sum()
@@ -345,7 +345,7 @@ The resulting monthly value premium is 0.41 percent with an annualized return of
 
 ``` python
 value_premium = (value_portfolios
-    .group_by(["date", "portfolio_bm"])
+    .group_by("date", "portfolio_bm")
     .agg(ret=pl.col("ret").mean())
     .group_by("date")
     .agg(
@@ -435,7 +435,7 @@ value_portfolios = (
             )
         )
     )
-    .group_by(["date", "portfolio_bm", "portfolio_size"])
+    .group_by("date", "portfolio_bm", "portfolio_size")
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
         / pl.col("mktcap_lag").sum()
@@ -443,7 +443,7 @@ value_portfolios = (
 )
 
 value_premium = (
-    value_portfolios.group_by(["date", "portfolio_bm"])
+    value_portfolios.group_by("date", "portfolio_bm")
     .agg(ret=pl.col("ret").mean())
     .group_by("date")
     .agg(
@@ -599,12 +599,12 @@ portfolio_characteristics <- bind_rows(
 ``` python
 portfolio_characteristics = (
     pl.concat([assignments_independent, assignments_dependent])
-    .group_by(["sorting_method", "date", "portfolio_size", "portfolio_bm"])
+    .group_by("sorting_method", "date", "portfolio_size", "portfolio_bm")
     .agg(
         n_stocks=pl.len(),
         mktcap=pl.col("mktcap_lag").sum()
     )
-    .group_by(["sorting_method", "portfolio_size", "portfolio_bm"])
+    .group_by("sorting_method", "portfolio_size", "portfolio_bm")
     .agg(
         n_stocks=pl.col("n_stocks").mean(),
         mktcap=pl.col("mktcap").mean()

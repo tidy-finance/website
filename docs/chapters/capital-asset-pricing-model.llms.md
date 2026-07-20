@@ -77,22 +77,22 @@ prices_daily = tf.download_data(
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31",
-).select(["symbol", "date", "adjusted_close"])
+).select("symbol", "date", "adjusted_close")
 
 prices_daily = prices_daily.with_columns(
     counts=pl.col("adjusted_close").drop_nulls().len().over("symbol")
 ).filter(pl.col("counts") == pl.col("counts").max())
 
 returns_monthly = (
-    prices_daily.sort(["symbol", "date"])
+    prices_daily.sort("symbol", "date")
     .with_columns(month=pl.col("date").dt.truncate("1mo"))
-    .group_by(["symbol", "month"], maintain_order=True)
+    .group_by("symbol", "month", maintain_order=True)
     .agg(adjusted_close=pl.col("adjusted_close").last())
     .rename({"month": "date"})
-    .sort(["symbol", "date"])
+    .sort("symbol", "date")
     .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
     .drop_nulls("ret")
-    .select(["symbol", "date", "ret"])
+    .select("symbol", "date", "ret")
 )
 ```
 
@@ -166,7 +166,7 @@ risk_free_monthly = (
   .with_columns(
     risk_free=(1 + pl.col("adjusted_close") / 100)**(1/12) - 1
   )
-  .select(["date", "risk_free"])
+  .select("date", "risk_free")
   .drop_nulls()
 )
 
@@ -210,7 +210,7 @@ symbols_sorted = assets["symbol"].to_list()
 returns_wide = (returns_monthly
     .pivot(values="ret", index="date", on="symbol")
     .sort("date")
-    .select(["date", *symbols_sorted])
+    .select("date", *symbols_sorted)
 )
 
 sigma = np.cov(
@@ -428,7 +428,7 @@ factors = tf.download_data(
     dataset="Fama/French 5 Factors (2x3)",
     start_date="2000-01-01",
     end_date="2024-09-30",
-).select(["date", "mkt_excess", "risk_free"])
+).select("date", "mkt_excess", "risk_free")
 ```
 
 For our regression analysis, we first prepare the data by calculating excess returns for each stock. We join our monthly returns with the Fama-French factors and subtract the risk-free rate to obtain excess returns.
@@ -489,7 +489,7 @@ The `estimate_capm()` function then implements the regression equation we previo
 returns_excess_monthly = (returns_monthly
     .join(factors, on="date", how="left")
     .with_columns(ret_excess=pl.col("ret") - pl.col("risk_free"))
-    .select(["symbol", "date", "ret_excess", "mkt_excess"])
+    .select("symbol", "date", "ret_excess", "mkt_excess")
 )
 
 def estimate_capm(data):
@@ -504,7 +504,7 @@ def estimate_capm(data):
 
 capm_results = pl.concat([
     estimate_capm(data)
-    for (symbol,), data in returns_excess_monthly.group_by(["symbol"], maintain_order=True)
+    for (symbol,), data in returns_excess_monthly.group_by("symbol", maintain_order=True)
 ])
 ```
 

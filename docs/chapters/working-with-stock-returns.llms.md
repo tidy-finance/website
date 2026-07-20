@@ -170,7 +170,7 @@ returns
 returns = (prices
     .sort("date")
     .with_columns(ret=pl.col("adjusted_close").pct_change())
-    .select(["symbol", "date", "ret"])
+    .select("symbol", "date", "ret")
 )
 returns
 ```
@@ -183,7 +183,7 @@ shape: (6_288, 3)
 | "AAPL" | 2000-01-03 | null      |
 | "AAPL" | 2000-01-04 | -0.08431  |
 | "AAPL" | 2000-01-05 | 0.014633  |
-| "AAPL" | 2000-01-06 | -0.086538 |
+| "AAPL" | 2000-01-06 | -0.086539 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
 | "AAPL" | 2024-12-23 | 0.003065  |
@@ -300,10 +300,10 @@ shape: (9, 2)
 | "mean"       | 0.001217  |
 | "std"        | 0.024404  |
 | "min"        | -0.518692 |
-| "25%"        | -0.009818 |
-| "50%"        | 0.000947  |
+| "25%"        | -0.009819 |
+| "50%"        | 0.000948  |
 | "75%"        | 0.012684  |
-| "max"        | 0.139049  |
+| "max"        | 0.13905   |
 
 We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
 
@@ -574,7 +574,7 @@ Before computing the returns, we sort by symbol and date and add `.over("symbol"
 returns_daily = (prices_daily
     .sort("symbol", "date")
     .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
-    .select(["symbol", "date", "ret"])
+    .select("symbol", "date", "ret")
     .drop_nulls("ret")
 )
 
@@ -637,9 +637,9 @@ returns_monthly <- returns_daily |>
 ``` python
 returns_monthly = (returns_daily
     .with_columns(date=pl.col("date").dt.truncate("1mo"))
-    .group_by(["symbol", "date"])
+    .group_by("symbol", "date")
     .agg(ret=(pl.col("ret") + 1).product() - 1)
-    .sort(["symbol", "date"])
+    .sort("symbol", "date")
 )
 ```
 

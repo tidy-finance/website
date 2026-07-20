@@ -56,18 +56,18 @@ beta <- read_parquet("data/beta.parquet") |>
 ``` python
 crsp_monthly = (
     pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "date", "ret_excess", "mktcap_lag"])
+    .select("permno", "date", "ret_excess", "mktcap_lag")
 )
 
 factors_ff3_monthly = (
     pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "mkt_excess"])
+    .select("date", "mkt_excess")
 )
 
 beta = (
     pl.read_parquet("data/beta.parquet")
     .filter(pl.col("return_type") == "monthly")
-    .select(["permno", "date", "beta"])
+    .select("permno", "date", "beta")
 )
 ```
 
@@ -96,7 +96,7 @@ You may be tempted to simply use a call such as `crsp_monthly.with_columns(beta_
 ``` python
 beta_lag = (beta
     .with_columns(date=pl.col("date").dt.offset_by("1mo"))
-    .select(["permno", "date", "beta"])
+    .select("permno", "date", "beta")
     .rename({"beta": "beta_lag"})
     .drop_nulls()
 )
@@ -137,7 +137,7 @@ beta_portfolios = (data_for_sorts
             .qcut([0.5], labels=["low", "high"])
             .over("date")
     )
-    .group_by(["portfolio", "date"])
+    .group_by("portfolio", "date")
     .agg(
         ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
             / pl.col("mktcap_lag").sum()
@@ -303,7 +303,7 @@ beta_portfolios = (data_for_sorts
   .with_columns(
       portfolio=assign_portfolio("beta_lag", 10).over("date")
   )
-  .group_by(["portfolio", "date"])
+  .group_by("portfolio", "date")
   .agg(
       ret=(pl.col("ret_excess") * pl.col("mktcap_lag")).sum()
           / pl.col("mktcap_lag").sum()

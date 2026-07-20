@@ -117,7 +117,7 @@ industries_order = sorted(industries_long["name"].unique().to_list())
 
 data_figure = (
     industries_long.with_columns(pl.col("date").dt.year().alias("year"))
-    .group_by(["year", "name"])
+    .group_by("year", "name")
     .agg(
         total=pl.col("value").mean(),
         vola=pl.col("value").std(),
