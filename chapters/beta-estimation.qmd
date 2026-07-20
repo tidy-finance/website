@@ -77,11 +77,11 @@ crsp_monthly <- crsp_monthly |>
 ```{python}
 #| label: beta-estimation-load-crsp-monthly-py
 crsp_monthly = (pl.read_parquet("data/crsp_monthly.parquet")
-    .select(["permno", "date", "industry", "ret_excess"])
+    .select("permno", "date", "industry", "ret_excess")
 )
 
 factors_ff3_monthly = (pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "mkt_excess"])
+    .select("date", "mkt_excess")
 )
 
 crsp_monthly = (crsp_monthly
@@ -475,7 +475,7 @@ factors_ff3_daily <- read_parquet("data/factors_ff3_daily.parquet") |>
 ```{python}
 #| label: beta-estimation-load-ff3-daily-py
 factors_ff3_daily = (pl.read_parquet("data/factors_ff3_daily.parquet")
-    .select(["date", "mkt_excess"])
+    .select("date", "mkt_excess")
 )
 ```
 
@@ -516,7 +516,7 @@ min_obs <- 1000
 #| label: beta-estimation-load-crsp-daily-py
 crsp_daily = (
     pl.scan_parquet("data/crsp_daily", hive_partitioning=True)
-    .select(["permno", "date", "ret_excess"])
+    .select("permno", "date", "ret_excess")
     .collect()
     # hive partition keys are read as integers; align with crsp_monthly
     .with_columns(permno=pl.col("permno").cast(pl.Float64))
@@ -576,7 +576,7 @@ beta_monthly <- capm_monthly |>
 #| label: beta-estimation-extract-beta-monthly-py
 beta_monthly = (capm_monthly
     .filter(pl.col("coefficient") == "mkt_excess")
-    .select(["permno", "date", "estimate"])
+    .select("permno", "date", "estimate")
     .rename({"estimate": "beta"})
     .with_columns(return_type=pl.lit("monthly"))
 )
@@ -618,7 +618,7 @@ crsp_monthly |>
 beta_industries = (beta_monthly
     .join(crsp_monthly, how="inner", on=["permno", "date"])
     .drop_nulls("beta")
-    .group_by(["industry", "permno"])
+    .group_by("industry", "permno")
     .agg(beta=pl.col("beta").mean())
 )
 
@@ -691,10 +691,10 @@ quantiles = np.arange(0.1, 1.0, 0.1)
 beta_quantiles = (
     beta_monthly
     .group_by("date")
-    .agg([
+    .agg(
         pl.col("beta").quantile(q, interpolation="linear").alias(str(int(round(q * 100))))
         for q in quantiles
-    ])
+    )
     .unpivot(index="date", variable_name="quantile", value_name="beta")
     .with_columns(pl.col("quantile").cast(pl.Int64))
     .drop_nulls()
@@ -743,7 +743,7 @@ beta <- bind_rows(beta_monthly, beta_daily)
 #| label: beta-estimation-combine-beta-estimates-py
 beta_daily = (capm_daily
     .filter(pl.col("coefficient") == "mkt_excess")
-    .select(["permno", "date", "estimate"])
+    .select("permno", "date", "estimate")
     .rename({"estimate": "beta"})
     .with_columns(return_type=pl.lit("daily"))
 )
@@ -878,7 +878,7 @@ return_types = pl.DataFrame({"return_type": ["monthly", "daily"]})
 beta_coverage = (
     crsp_monthly.join(return_types, how="cross")
     .join(beta, on=["permno", "date", "return_type"], how="left")
-    .group_by(["date", "return_type"])
+    .group_by("date", "return_type")
     .agg(share=pl.col("beta").is_not_null().mean())
 )
 

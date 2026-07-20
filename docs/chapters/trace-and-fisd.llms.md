@@ -449,7 +449,7 @@ dates = pl.DataFrame(
 )
 
 bonds_outstanding = (dates
-    .join(fisd.select(["complete_cusip", "offering_date", "maturity"]), how="cross")
+    .join(fisd.select("complete_cusip", "offering_date", "maturity"), how="cross")
     .filter(
         (pl.col("date") >= pl.col("offering_date"))
         & (pl.col("date") <= pl.col("maturity"))
@@ -530,8 +530,8 @@ Figure 1: Number of corporate bonds outstanding each quarter as reported by Mer
 ``` python
 bonds_combined = pl.concat(
     [
-        bonds_outstanding.select(["date", "count", "type"]),
-        bonds_traded.select(["date", "count", "type"])
+        bonds_outstanding.select("date", "count", "type"),
+        bonds_traded.select("date", "count", "type")
     ]
 ).sort("date")
 
@@ -692,8 +692,8 @@ shape: (2, 8)
 | measure        | mean    | std    | min   | q05     | median  | q95     | max     |
 |----------------|---------|--------|-------|---------|---------|---------|---------|
 | str            | f64     | f64    | f64   | f64     | f64     | f64     | f64     |
-| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17844.0 | 26051.0 | 34383.0 | 40839.0 |
 | "trade_size"   | 12968.0 | 3577.0 | 17.0  | 6128.0  | 13421.0 | 17850.0 | 21312.0 |
+| "trade_number" | 25914.0 | 5444.0 | 439.0 | 17844.0 | 26051.0 | 34383.0 | 40839.0 |
 
 On average, around 13 billion USD of corporate bonds are traded daily in nearly 26,000 transactions. We can hence conclude that the corporate bond market is indeed significant in terms of trading volume and activity.
 

@@ -138,7 +138,7 @@ market_cap_concentration = (crsp_monthly
             "Largest 25%": top_share(0.75),
         }
     )
-    .select(["date", "Largest 1%", "Largest 5%", "Largest 10%", "Largest 25%"])
+    .select("date", "Largest 1%", "Largest 5%", "Largest 10%", "Largest 25%")
     .unique()
     .unpivot(index="date", variable_name="name", value_name="value")
 )
@@ -203,7 +203,7 @@ Figure 2: The figure shows the share of total market capitalization per listing
 
 ``` python
 market_cap_share = (crsp_monthly
-    .group_by(["date", "exchange"])
+    .group_by("date", "exchange")
     .agg(mktcap=pl.col("mktcap").sum())
     .with_columns(total_market_cap=pl.col("mktcap").sum().over("date"))
     .with_columns(share=pl.col("mktcap") / pl.col("total_market_cap"))
@@ -483,7 +483,7 @@ def compute_portfolio_returns(n_portfolios=10,
     ])
 
     portfolio_returns = (data_assigned
-      .group_by(["portfolio", "date"])
+      .group_by("portfolio", "date")
       .agg(ret=calculate_returns(value_weighted))
     )
 

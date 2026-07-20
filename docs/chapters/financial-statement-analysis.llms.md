@@ -472,7 +472,7 @@ Figure 8: Liquidity ratios are based on financial statements provided through t
 ``` python
 liquidity_ratios = (balance_sheet_statements
   .filter((pl.col("fiscal_year") == 2023) & pl.col("label").is_not_null())
-  .select(["symbol", "current_ratio", "quick_ratio", "cash_ratio"])
+  .select("symbol", "current_ratio", "quick_ratio", "cash_ratio")
   .unpivot(index=["symbol"], variable_name="name", value_name="value")
   .with_columns(
     name=pl.col("name").str.replace_all("_", " ").str.to_titlecase()
@@ -693,7 +693,7 @@ Figure 11: Debt-to-asset ratios and interest coverages are based on financial s
 ``` python
 interest_coverage = (income_statements
   .filter(pl.col("fiscal_year") == 2023)
-  .select(["symbol", "fiscal_year", "interest_coverage"])
+  .select("symbol", "fiscal_year", "interest_coverage")
   .join(balance_sheet_statements, on=["symbol", "fiscal_year"], how="left")
 )
 
@@ -793,15 +793,15 @@ combined_statements <- combined_statements |>
 ``` python
 combined_statements = (balance_sheet_statements
   .select(
-    ["symbol", "fiscal_year", "label", "current_ratio", "quick_ratio",
+    "symbol", "fiscal_year", "label", "current_ratio", "quick_ratio",
      "cash_ratio", "debt_to_equity", "debt_to_asset", "total_assets",
-     "total_equity"]
+     "total_equity"
   )
   .join(
     (income_statements
-      .select(["symbol", "fiscal_year", "interest_coverage", "revenue",
-            "cost_of_revenue", "selling_general_and_administrative_expenses",
-            "interest_expense","gross_profit", "net_income"])
+      .select("symbol", "fiscal_year", "interest_coverage", "revenue",
+              "cost_of_revenue", "selling_general_and_administrative_expenses",
+              "interest_expense","gross_profit", "net_income")
     ),
     on=["symbol", "fiscal_year"],
     how="left"
@@ -809,7 +809,7 @@ combined_statements = (balance_sheet_statements
   .join(
     (cash_flow_statements
       .with_columns(fiscal_year=pl.col("fiscal_year").cast(pl.Int64))
-      .select(["symbol", "fiscal_year", "inventory", "accounts_receivables"])
+      .select("symbol", "fiscal_year", "inventory", "accounts_receivables")
     ),
     on=["symbol", "fiscal_year"],
     how="left"
@@ -1056,11 +1056,11 @@ financial_ratios = (combined_statements
 )
 
 financial_ratios = financial_ratios.with_columns(
-  rank=pl.col("value").rank(method="ordinal", descending=True).over(["type", "name"])
+  rank=pl.col("value").rank(method="ordinal", descending=True).over("type", "name")
 )
 
 final_ranks = (financial_ratios
-  .group_by(["symbol", "type"])
+  .group_by("symbol", "type")
   .agg(rank=pl.col("rank").mean())
   .filter(pl.col("symbol").is_in(selected_symbols))
 )
@@ -1149,7 +1149,7 @@ combined_statements_ff = (combined_statements
   .join(
     (balance_sheet_statements
       .filter(pl.col("fiscal_year") == 2022)
-      .select(["symbol", "total_assets"])
+      .select("symbol", "total_assets")
       .rename({"total_assets": "total_assets_lag"})
     ),
     on="symbol", how="left"
@@ -1203,7 +1203,7 @@ Figure 15: Ranks are based on financial statements and historical market capita
 
 ``` python
 factors_ranks = (combined_statements_ff
-  .select(["symbol", "size", "book_to_market", "operating_profitability", "investment"])
+  .select("symbol", "size", "book_to_market", "operating_profitability", "investment")
   .rename({
     "size": "Size",
     "book_to_market": "Book-to-Market",

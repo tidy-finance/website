@@ -302,9 +302,9 @@ def clean_enhanced_trace(cusips,
   trace_post_XC = (trace_all
     .filter(pl.col("trc_st").is_in(["X", "C"]))
     .filter(pl.col("trd_rpt_dt") >= pl.lit("2012-02-06").str.to_date())
-    .select(["cusip_id", "msg_seq_nb", "entrd_vol_qt",
-             "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-             "trd_exctn_dt", "trd_exctn_tm"])
+    .select("cusip_id", "msg_seq_nb", "entrd_vol_qt",
+            "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+            "trd_exctn_dt", "trd_exctn_tm")
   )
 
   ## Cleaning corrected and cancelled trades
@@ -318,9 +318,9 @@ def clean_enhanced_trace(cusips,
   trace_post_Y = (trace_all
     .filter(pl.col("trc_st") == "Y")
     .filter(pl.col("trd_rpt_dt") >= pl.lit("2012-02-06").str.to_date())
-    .select(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
-             "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-             "trd_exctn_dt", "trd_exctn_tm"])
+    .select("cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
+            "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+            "trd_exctn_dt", "trd_exctn_tm")
     .rename({"orig_msg_seq_nb": "msg_seq_nb"})
   )
 
@@ -343,9 +343,9 @@ def clean_enhanced_trace(cusips,
   trace_pre_C = (trace_all
     .filter(pl.col("trc_st") == "C")
     .filter(pl.col("trd_rpt_dt") < pl.lit("2012-02-06").str.to_date())
-    .select(["cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
-             "rptd_pr", "rpt_side_cd", "cntra_mp_id",
-             "trd_exctn_dt", "trd_exctn_tm"])
+    .select("cusip_id", "orig_msg_seq_nb", "entrd_vol_qt",
+            "rptd_pr", "rpt_side_cd", "cntra_mp_id",
+            "trd_exctn_dt", "trd_exctn_tm")
     .rename({"orig_msg_seq_nb": "msg_seq_nb"})
   )
 
@@ -373,7 +373,7 @@ def clean_enhanced_trace(cusips,
     # Create placeholder
     ## Only identifying columns of trace_pre_T (for joins)
     placeholder_trace_pre_T = (trace_pre_T
-      .select(["cusip_id", "trd_exctn_dt", "msg_seq_nb"])
+      .select("cusip_id", "trd_exctn_dt", "msg_seq_nb")
       .rename({"msg_seq_nb": "orig_msg_seq_nb"})
     )
 
@@ -392,7 +392,7 @@ def clean_enhanced_trace(cusips,
     # Create placeholder
     ## Only identifying columns of trace_pre_W_correcting (for anti-joins)
     placeholder_trace_pre_W_correcting = (trace_pre_W_correcting
-      .select(["cusip_id", "trd_exctn_dt", "orig_msg_seq_nb"])
+      .select("cusip_id", "trd_exctn_dt", "orig_msg_seq_nb")
       .rename({"orig_msg_seq_nb": "msg_seq_nb"})
     )
 
@@ -418,8 +418,8 @@ def clean_enhanced_trace(cusips,
   ## Record reversals
   trace_pre_R = (trace_pre_T
     .filter(pl.col("asof_cd") == "R")
-    .sort(["cusip_id", "trd_exctn_dt",
-           "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm"])
+    .sort("cusip_id", "trd_exctn_dt",
+          "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm")
   )
 
   ## Prepare final data
@@ -427,16 +427,16 @@ def clean_enhanced_trace(cusips,
     .filter(
       pl.col("asof_cd").is_null() | ~pl.col("asof_cd").is_in(["R", "X", "D"])
     )
-    .sort(["cusip_id", "trd_exctn_dt",
-           "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm"])
+    .sort("cusip_id", "trd_exctn_dt",
+          "trd_exctn_tm", "trd_rpt_dt", "trd_rpt_tm")
   )
 
   ## Add grouped row numbers
   trace_pre_R = (trace_pre_R
     .with_columns(
       seq=pl.int_range(pl.len()).over(
-        ["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
-         "rptd_pr", "rpt_side_cd", "cntra_mp_id"]
+        "cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+        "rptd_pr", "rpt_side_cd", "cntra_mp_id"
       )
     )
   )
@@ -444,16 +444,16 @@ def clean_enhanced_trace(cusips,
   trace_pre = (trace_pre
     .with_columns(
       seq=pl.int_range(pl.len()).over(
-        ["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
-         "rptd_pr", "rpt_side_cd", "cntra_mp_id"]
+        "cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+        "rptd_pr", "rpt_side_cd", "cntra_mp_id"
       )
     )
   )
 
   ## Select columns for reversal cleaning
   trace_pre_R = (trace_pre_R
-    .select(["cusip_id", "trd_exctn_dt", "entrd_vol_qt",
-             "rptd_pr", "rpt_side_cd", "cntra_mp_id", "seq"])
+    .select("cusip_id", "trd_exctn_dt", "entrd_vol_qt",
+            "rptd_pr", "rpt_side_cd", "cntra_mp_id", "seq")
     .with_columns(reversal=pl.lit(True))
   )
 
@@ -463,7 +463,7 @@ def clean_enhanced_trace(cusips,
                            "rptd_pr", "rpt_side_cd", "cntra_mp_id", "seq"],
           how="left")
     .filter(pl.col("reversal").is_null())
-    .drop(["reversal", "seq"])
+    .drop("reversal", "seq")
   )
 
   # Combine pre and post trades
@@ -476,8 +476,8 @@ def clean_enhanced_trace(cusips,
 
   # Placeholder for trace_agency_sells with relevant columns
   placeholder_trace_agency_sells = (trace_agency_sells
-    .select(["cusip_id", "trd_exctn_dt",
-             "entrd_vol_qt", "rptd_pr"])
+    .select("cusip_id", "trd_exctn_dt",
+            "entrd_vol_qt", "rptd_pr")
     .with_columns(matched=pl.lit(True))
   )
 
@@ -520,9 +520,9 @@ def clean_enhanced_trace(cusips,
 
   # Only keep necessary columns
   trace_final = (trace_add_filters
-    .sort(["cusip_id", "trd_exctn_dt", "trd_exctn_tm"])
-    .select(["cusip_id", "trd_exctn_dt", "trd_exctn_tm", "rptd_pr",
-             "entrd_vol_qt", "yld_pt", "rpt_side_cd", "cntra_mp_id"])
+    .sort("cusip_id", "trd_exctn_dt", "trd_exctn_tm")
+    .select("cusip_id", "trd_exctn_dt", "trd_exctn_tm", "rptd_pr",
+            "entrd_vol_qt", "yld_pt", "rpt_side_cd", "cntra_mp_id")
   )
 
   return trace_final

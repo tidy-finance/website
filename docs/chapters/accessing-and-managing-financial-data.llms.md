@@ -86,7 +86,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpmiMSaw\file123473a35eee.zip' (13045 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\Rtmpa6oEGw\file45d451bd4cf3.zip' (13045 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -414,7 +414,7 @@ factors_q_monthly = (
     .with_columns(
         date=pl.date(pl.col("year"), pl.col("month"), 1)
     )
-    .drop(["year", "month"])
+    .drop("year", "month")
     .rename(lambda x: x.replace("R_", "").lower())
     .rename({"f": "risk_free", "mkt": "mkt_excess"})
     .filter(
@@ -422,7 +422,7 @@ factors_q_monthly = (
         & (pl.col("date") <= pl.lit(end_date).str.to_date())
     )
     .with_columns(pl.exclude("date") / 100)
-    .select(["date", "risk_free", "mkt_excess", "me", "ia", "roe", "eg"])
+    .select("date", "risk_free", "mkt_excess", "me", "ia", "roe", "eg")
 )
 ```
 
@@ -581,23 +581,21 @@ macro_predictors = (
     )
     .rename({"b/m": "bm"})
     .select(
-        [
-            "date",
-            "rp_div",
-            "dp",
-            "dy",
-            "ep",
-            "de",
-            "svar",
-            "bm",
-            "ntis",
-            "tbl",
-            "lty",
-            "ltr",
-            "tms",
-            "dfy",
-            "infl",
-        ]
+        "date",
+        "rp_div",
+        "dp",
+        "dy",
+        "ep",
+        "de",
+        "svar",
+        "bm",
+        "ntis",
+        "tbl",
+        "lty",
+        "ltr",
+        "tms",
+        "dfy",
+        "infl",
     )
     .filter(
         (pl.col("date") >= pl.lit(start_date).str.to_date())
@@ -713,7 +711,7 @@ cpi_monthly = (
         value=pl.col(series).cast(pl.Float64, strict=False),
         series=pl.lit(series),
     )
-    .select(["date", "series", "value"])
+    .select("date", "series", "value")
     .filter(
         (pl.col("date") >= pl.lit(start_date).str.to_date())
         & (pl.col("date") <= pl.lit(end_date).str.to_date())

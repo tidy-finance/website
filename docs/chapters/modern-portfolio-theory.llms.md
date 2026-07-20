@@ -124,12 +124,12 @@ returns_monthly <- prices_daily |>
 returns_monthly = (prices_daily
     .sort("date")
     .with_columns(date=pl.col("date").dt.truncate("1mo"))
-    .group_by(["symbol", "date"])
+    .group_by("symbol", "date")
     .agg(adjusted_close=pl.col("adjusted_close").last())
-    .sort(["symbol", "date"])
+    .sort("symbol", "date")
     .with_columns(ret=pl.col("adjusted_close").pct_change().over("symbol"))
     .drop_nulls("ret")
-    .select(["symbol", "date", "ret"])
+    .select("symbol", "date", "ret")
 )
 ```
 
@@ -446,7 +446,7 @@ Formally, the optimization problem is given by
 
 The analytic solution for the efficient portfolio can be derived as:
 
-\\\omega\_{efp} = \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
+\\\omega\_{efp} = \omega\_\text{mvp} + \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
 
 where \\\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}\\, \\C = \iota'\Sigma^{-1}\iota\\, \\D=\iota'\Sigma^{-1}\mu\\, and \\E=\mu'\Sigma^{-1}\mu\\. For details, we again refer to the [Proofs](../chapters/proofs.llms.md) in the Appendix.
 

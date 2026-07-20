@@ -349,7 +349,7 @@ mktcap_lag = (crsp_monthly
         date=pl.col("date").dt.offset_by("1mo"),
         mktcap_lag=pl.col("mktcap")
     )
-    .select(["permno", "date", "mktcap_lag"])
+    .select("permno", "date", "mktcap_lag")
 )
 
 crsp_monthly = (crsp_monthly
@@ -462,7 +462,7 @@ crsp_monthly <- crsp_monthly |>
 ```{python}
 #| label: wrds-crsp-and-compustat-add-excess-returns-py
 factors_ff3_monthly = (pl.read_parquet("data/factors_ff3_monthly.parquet")
-    .select(["date", "risk_free"])
+    .select("date", "risk_free")
 )
 
 crsp_monthly = (crsp_monthly
@@ -595,9 +595,9 @@ crsp_monthly |>
 #| fig-cap: "Number of stocks in the CRSP sample listed at each of the US exchanges."
 #| fig-alt: "Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2024. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role."
 securities_per_exchange = (crsp_monthly
-    .group_by(["exchange", "date"])
+    .group_by("exchange", "date")
     .len(name="n")
-    .sort(["exchange", "date"])
+    .sort("exchange", "date")
 )
 
 securities_per_exchange_figure = (
@@ -665,9 +665,9 @@ cpi_monthly = pl.read_parquet("data/cpi_monthly.parquet")
 
 market_cap_per_exchange = (crsp_monthly
     .join(cpi_monthly, how="left", on="date")
-    .group_by(["date", "exchange"])
+    .group_by("date", "exchange")
     .agg(mktcap=pl.col("mktcap").sum()/pl.col("cpi").mean())
-    .sort(["date", "exchange"])
+    .sort("date", "exchange")
 )
 
 market_cap_per_exchange_figure = (
@@ -732,9 +732,9 @@ crsp_monthly_industry |>
 #| fig-cap: "Number of stocks in the CRSP sample associated with different industries."
 #| fig-alt: "Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2024 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2024, the segment of firms within public administration is the largest in terms of the number of listed stocks."
 securities_per_industry = (crsp_monthly
-    .group_by(["industry", "date"])
+    .group_by("industry", "date")
     .len(name="n")
-    .sort(["industry", "date"])
+    .sort("industry", "date")
 )
 
 linetypes = ["-", "--", "-.", ":"]
@@ -797,9 +797,9 @@ crsp_monthly_industry |>
 #| fig-alt: "Title: Monthly total market cap by industry in billions as of Dec 2024 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2024 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past."
 market_cap_per_industry = (crsp_monthly
     .join(cpi_monthly, how="left", on="date")
-    .group_by(["date", "industry"])
+    .group_by("date", "industry")
     .agg(mktcap=pl.col("mktcap").sum()/pl.col("cpi").mean())
-    .sort(["date", "industry"])
+    .sort("date", "industry")
 )
 
 market_cap_per_industry_figure = (
@@ -969,12 +969,12 @@ for j in range(1, batches + 1):
 
     if not crsp_daily_sub.is_empty():
         crsp_daily_sub = (crsp_daily_sub.join(
-                factors_ff3_daily.select(["date", "risk_free"]), on="date", how="left"
+                factors_ff3_daily.select("date", "risk_free"), on="date", how="left"
             )
             .with_columns(
                 ret_excess=pl.col("ret") - pl.col("risk_free")
             )
-            .select(["permno", "date", "ret_excess"])
+            .select("permno", "date", "ret_excess")
         )
 
         crsp_daily_sub.write_parquet("data/crsp_daily", partition_by="permno")
@@ -1157,7 +1157,7 @@ compustat_annual <- compustat_annual |>
 compustat_annual = (
     compustat_annual.with_columns(year=pl.col("datadate").dt.year().cast(pl.Float64))
     .sort("datadate")
-    .group_by(["gvkey", "year"], maintain_order=True)
+    .group_by("gvkey", "year", maintain_order=True)
     .tail(1)
 )
 ```
@@ -1189,7 +1189,7 @@ compustat_annual <- compustat_annual |>
 ```{python}
 #| label: wrds-crsp-and-compustat-add-investment-py
 compustat_annual_lag = (compustat_annual
-    .select(["gvkey", "year", "at"])
+    .select("gvkey", "year", "at")
     .with_columns(year=pl.col("year")+1)
     .rename({"at": "at_lag"})
 )
@@ -1365,7 +1365,7 @@ ccm_links = (crsp_monthly
         & (pl.col("date") >= pl.col("linkdt"))
         & (pl.col("date") <= pl.col("linkenddt"))
     )
-    .select(["permno", "gvkey", "date"])
+    .select("permno", "gvkey", "date")
 )
 
 crsp_monthly = (crsp_monthly
@@ -1454,17 +1454,17 @@ crsp_monthly |>
 share_with_be = (crsp_monthly
     .with_columns(year=pl.col("date").dt.year().cast(pl.Float64))
     .sort("date")
-    .group_by(["permno", "year"], maintain_order=True)
+    .group_by("permno", "year", maintain_order=True)
     .tail(1)
     .join(compustat_annual, how="left", on=["gvkey", "year"])
-    .group_by(["exchange", "year"])
+    .group_by("exchange", "year")
     .agg(
         share=(
             pl.col("permno").filter(pl.col("be").is_not_null()).n_unique()
             / pl.col("permno").n_unique()
         )
     )
-    .sort(["exchange", "year"])
+    .sort("exchange", "year")
 )
 
 share_with_be_figure = (
