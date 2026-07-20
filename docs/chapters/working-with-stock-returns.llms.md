@@ -47,21 +47,11 @@ In case this is the first time you use the package `tidyfinance`, you may be ask
 
 ``` r
 prices <- download_data(
-  domain = "stock_prices",
+  domain = "Stock Prices",
   symbols = "AAPL",
   start_date = "2000-01-01",
   end_date = "2024-12-31"
 )
-```
-
-    Warning: download_data(domain = "stock_prices") was deprecated in tidyfinance
-    0.6.1.
-    ℹ Please use download_data(domain = "Stock Prices") instead.
-    ℹ The deprecated feature was likely used in the tidyfinance package.
-      Please report the issue at
-      <https://github.com/tidy-finance/r-tidyfinance/issues>.
-
-``` r
 prices
 ```
 
@@ -81,7 +71,7 @@ Because we set the `polars` backend above, `tf.download_data()` returns a `polar
 
 ``` python
 prices = tf.download_data(
-    domain="stock_prices",
+    domain="Stock Prices",
     symbols="AAPL",
     start_date="2000-01-01",
     end_date="2024-12-31"
@@ -100,7 +90,7 @@ shape: (5, 8)
 | "AAPL" | 2000-01-06 | 767972800 | 0.947545 | 0.848214 | 0.955357 | 0.848214 | 0.710966       |
 | "AAPL" | 2000-01-07 | 460734400 | 0.861607 | 0.852679 | 0.901786 | 0.888393 | 0.744644       |
 
-`download_data(domain = "stock_prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
+`download_data(domain = "Stock Prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
 
 We visualize the time series of adjusted prices in [Figure 1](#fig-100) based on the principles of the grammar of graphics ([Wilkinson 2012](#ref-Wilkinson2012)).
 
@@ -193,14 +183,14 @@ shape: (6_288, 3)
 | "AAPL" | 2000-01-03 | null      |
 | "AAPL" | 2000-01-04 | -0.08431  |
 | "AAPL" | 2000-01-05 | 0.014633  |
-| "AAPL" | 2000-01-06 | -0.086539 |
+| "AAPL" | 2000-01-06 | -0.086538 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
 | "AAPL" | 2024-12-23 | 0.003065  |
 | "AAPL" | 2024-12-24 | 0.011478  |
 | "AAPL" | 2024-12-26 | 0.003176  |
 | "AAPL" | 2024-12-27 | -0.013242 |
-| "AAPL" | 2024-12-30 | -0.013264 |
+| "AAPL" | 2024-12-30 | -0.013263 |
 
 The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value because there is no previous price.
 
@@ -313,7 +303,7 @@ shape: (9, 2)
 | "25%"        | -0.009818 |
 | "50%"        | 0.000947  |
 | "75%"        | 0.012684  |
-| "max"        | 0.13905   |
+| "max"        | 0.139049  |
 
 We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
 
@@ -415,25 +405,15 @@ As a next step, we generalize the previous code so that all computations can han
 
 This is where the `tidyverse` magic starts: Tidy data makes it extremely easy to generalize the computations from before to as many assets or groups as you like. The following code takes any number of symbols and automates the download as well as the plot of the price time series. In the end, we create the table of summary statistics for all assets at once. For this example, we analyze data from all current constituents of the [Dow Jones Industrial Average index.](https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average)
 
-We first download a table with Dow Jones constituents again using `download_data()`, but this time with `domain = "constituents"`.
+We first download a table with Dow Jones constituents again using `download_data()`, but this time with `domain = "Index Constituents"`.
 
 ## R
 
 ``` r
 symbols <- download_data(
-  domain = "constituents",
+  domain = "Index Constituents",
   index = "Dow Jones Industrial Average"
 )
-```
-
-    Warning: download_data(domain = "constituents") was deprecated in tidyfinance
-    0.6.1.
-    ℹ Please use download_data(domain = "Index Constituents") instead.
-    ℹ The deprecated feature was likely used in the tidyfinance package.
-      Please report the issue at
-      <https://github.com/tidy-finance/r-tidyfinance/issues>.
-
-``` r
 symbols
 ```
 
@@ -444,14 +424,14 @@ symbols
     2 CAT    CATERPILLAR INC         Vereinigte Staaten New Yor… USD     
     3 UNH    UNITEDHEALTH GROUP INC  Vereinigte Staaten New Yor… USD     
     4 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
-    5 AMGN   AMGEN INC               Vereinigte Staaten NASDAQ   USD     
+    5 TRV    TRAVELERS COMPANIES INC Vereinigte Staaten New Yor… USD     
     # ℹ 25 more rows
 
 ## Python
 
 ``` python
 symbols = tf.download_data(
-    domain="constituents",
+    domain="Index Constituents",
     index="Dow Jones Industrial Average"
 )
 ```
@@ -462,7 +442,7 @@ Conveniently, `tidyfinance` provides the functionality to get all stock prices f
 
 ``` r
 prices_daily <- download_data(
-  domain = "stock_prices",
+  domain = "Stock Prices",
   symbols = symbols$symbol,
   start_date = "2000-01-01",
   end_date = "2024-12-31"
@@ -473,14 +453,14 @@ prices_daily <- download_data(
 
 ``` python
 prices_daily = tf.download_data(
-    domain="stock_prices",
+    domain="Stock Prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
     end_date="2024-12-31"
 )
 ```
 
-The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, AMGN, GOOGL, V, AXP, HD, SHW, TRV, JPM, AAPL, IBM, MCD, JNJ, AMZN, BA, HON, NVDA, CVX, CRM, MMM, PG, MRK, CSCO, WMT, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, TRV, AMGN, V, AXP, GOOGL, JPM, HD, AAPL, SHW, MCD, JNJ, AMZN, HON, BA, IBM, NVDA, CVX, CRM, MMM, PG, MRK, WMT, CSCO, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -632,7 +612,7 @@ shape: (30, 9)
 | "V"    | 4224  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
 | "WMT"  | 6287  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
 
-Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just download the constituents with `domain = "constituents", index = "S&P 500"`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
+Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just download the constituents with `domain = "Index Constituents", index = "S&P 500"`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
 ## Different Frequencies
 

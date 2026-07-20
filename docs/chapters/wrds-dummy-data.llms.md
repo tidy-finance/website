@@ -2,13 +2,13 @@
 
 In this appendix chapter, we show how readers without access to WRDS can still run the WRDS-based code chunks in this book. Instead of building these tables by hand, we rely on the pseudo data backend that ships with the `tidyfinance` package. The package mirrors the structure of the WRDS tables we use, so the same `download_data()` call that retrieves data from WRDS can also return pseudo data with an identical schema. We do not create pseudo data for tables from open-source data providers because you can freely download them from the original sources; see [Accessing and Managing Financial Data](../chapters/accessing-and-managing-financial-data.llms.md).
 
-The idea is simple: wherever the book calls `download_data()` with `domain = "wrds"`, you can switch to `domain = "pseudo"` to obtain a table with the same columns, types, and panel structure. The `tidyfinance` package is the single source of truth for the pseudo data, which keeps the pseudo data in sync with the schema returned by WRDS without us re-implementing any generators in the book.
+The idea is simple: wherever the book calls `download_data()` with `domain = "WRDS"`, you can switch to `domain = "Pseudo Data"` to obtain a table with the same columns, types, and panel structure. The `tidyfinance` package is the single source of truth for the pseudo data, which keeps the pseudo data in sync with the schema returned by WRDS without us re-implementing any generators in the book.
 
 We deliberately use the *pseudo* label because the data does not allow you to replicate any results of the book. For legal reasons, it does not contain any samples of the original data. Instead, the package draws independent random numbers for all columns. As a consequence, returns and characteristics carry no economic signal, and any factor premia or other estimates you obtain from pseudo data are pure noise and not economically interpretable.
 
 Two arguments control how the pseudo data is generated. `seed` makes the generated panels reproducible across runs, and `n_assets` sets the size of the cross-section (the package default is 1,000). We use the same `seed` and `n_assets` for all stock tables below so that the identifiers line up across CRSP and Compustat, which is what makes the joins in later chapters work.
 
-If you do have WRDS access, you do not need this chapter. Set your credentials once via `set_wrds_credentials()` (in Python, `tf.set_wrds_credentials()`), which stores them in your `.Renviron`, and every `download_data()` call with `domain = "wrds"` connects to WRDS automatically.
+If you do have WRDS access, you do not need this chapter. Set your credentials once via `set_wrds_credentials()` (in Python, `tf.set_wrds_credentials()`), which stores them in your `.Renviron`, and every `download_data()` call with `domain = "WRDS"` connects to WRDS automatically.
 
 To generate the pseudo data, we use the following packages:
 
@@ -87,7 +87,7 @@ The monthly CRSP table is the backbone of most analyses. We set `add_ccm_links =
 
 ``` r
 crsp_monthly <- download_data(
-  domain = "pseudo",
+  domain = "Pseudo Data",
   dataset = "crsp_monthly",
   start_date = start_date,
   end_date = end_date,
@@ -103,7 +103,7 @@ write_parquet(crsp_monthly, "data/crsp_monthly.parquet")
 
 ``` python
 crsp_monthly = tf.download_data(
-    domain="pseudo",
+    domain="Pseudo Data",
     dataset="crsp_monthly",
     start_date=start_date,
     end_date=end_date,
@@ -123,7 +123,7 @@ The daily CRSP table contains the daily (excess) returns that we use, for instan
 
 ``` r
 crsp_daily <- download_data(
-  domain = "pseudo",
+  domain = "Pseudo Data",
   dataset = "crsp_daily",
   start_date = start_date,
   end_date = end_date,
@@ -138,7 +138,7 @@ write_parquet(crsp_daily, "data/crsp_daily.parquet")
 
 ``` python
 crsp_daily = tf.download_data(
-    domain="pseudo",
+    domain="Pseudo Data",
     dataset="crsp_daily",
     start_date=start_date,
     end_date=end_date,
@@ -157,7 +157,7 @@ Finally, we generate the annual Compustat fundamentals. The table shares the `gv
 
 ``` r
 compustat_annual <- download_data(
-  domain = "pseudo",
+  domain = "Pseudo Data",
   dataset = "compustat_annual",
   start_date = start_date,
   end_date = end_date,
@@ -172,7 +172,7 @@ write_parquet(compustat_annual, "data/compustat_annual.parquet")
 
 ``` python
 compustat_annual = tf.download_data(
-    domain="pseudo",
+    domain="Pseudo Data",
     dataset="compustat_annual",
     start_date=start_date,
     end_date=end_date,
