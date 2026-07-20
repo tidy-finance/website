@@ -403,7 +403,7 @@ The `tidyfinance` package provides a shortcut to implement all these processing 
 
 ``` r
 crsp_monthly <- download_data(
-  domain = "wrds",
+  domain = "WRDS",
   dataset = "crsp_monthly",
   start_date = start_date,
   end_date = end_date
@@ -414,7 +414,7 @@ crsp_monthly <- download_data(
 
 ``` python
 crsp_monthly = tf.download_data(
-    domain="wrds",
+    domain="WRDS",
     dataset="crsp_monthly",
     start_date=start_date,
     end_date=end_date
@@ -874,7 +874,7 @@ To download the daily CRSP data via the `tidyfinance` package, you can call:
 
 ``` r
 crsp_daily <- download_data(
-  domain = "wrds",
+  domain = "WRDS",
   dataset = "crsp_daily",
   start_date = start_date,
   end_date = end_date
@@ -885,7 +885,7 @@ crsp_daily <- download_data(
 
 ``` python
 crsp_daily = tf.download_data(
-    domain="wrds",
+    domain="WRDS",
     dataset="crsp_daily",
     start_date=start_date,
     end_date=end_date
@@ -1078,7 +1078,7 @@ The `tidyfinance` package provides a shortcut for these processing steps as well
 
 ``` r
 compustat_annual <- download_data(
-  domain = "wrds",
+  domain = "WRDS",
   dataset = "compustat_annual",
   start_date = start_date,
   end_date = end_date
@@ -1089,7 +1089,7 @@ compustat_annual <- download_data(
 
 ``` python
 compustat_annual = tf.download_data(
-    domain="wrds",
+    domain="WRDS",
     dataset="compustat_annual",
     start_date=start_date,
     end_date=end_date
@@ -1137,13 +1137,13 @@ To fetch these links via `tidyfinance`, you can call:
 ## R
 
 ``` r
-ccm_links <- download_data(domain = "wrds", dataset = "ccm_links")
+ccm_links <- download_data(domain = "WRDS", dataset = "ccm_links")
 ```
 
 ## Python
 
 ``` python
-ccm_links = tf.download_data(domain="wrds", dataset="ccm_links")
+ccm_links = tf.download_data(domain="WRDS", dataset="ccm_links")
 ```
 
 We use these links to create a new table with a mapping between stock identifier, firm identifier, and month. We then add these links to the Compustat `gvkey` to our monthly stock data.

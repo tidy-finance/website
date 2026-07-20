@@ -86,7 +86,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpATlL3L\filea141be9247f.zip' (13045 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpmiMSaw\file123473a35eee.zip' (13045 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -272,7 +272,7 @@ The `tidyfinance` package performs the entire workflow above under the hood: you
 
 ``` r
 factors_ff3_monthly <- download_data(
-  domain = "famafrench",
+  domain = "Fama-French",
   dataset = "Fama/French 3 Factors",
   start_date = start_date,
   end_date = end_date
@@ -283,7 +283,7 @@ factors_ff3_monthly <- download_data(
 
 ``` python
 factors_ff3_monthly = tf.download_data(
-    domain="famafrench",
+    domain="Fama-French",
     dataset="Fama/French 3 Factors",
     start_date=start_date,
     end_date=end_date,
@@ -296,7 +296,7 @@ We also download the set *5 Factors (2x3)*, which additionally includes the retu
 
 ``` r
 factors_ff5_monthly <- download_data(
-  domain = "famafrench",
+  domain = "Fama-French",
   dataset = "Fama/French 5 Factors (2x3)",
   start_date = start_date,
   end_date = end_date
@@ -307,7 +307,7 @@ factors_ff5_monthly <- download_data(
 
 ``` python
 factors_ff5_monthly = tf.download_data(
-    domain="famafrench",
+    domain="Fama-French",
     dataset="Fama/French 5 Factors (2x3)",
     start_date=start_date,
     end_date=end_date,
@@ -320,7 +320,7 @@ It is straightforward to download the corresponding *daily* Fama-French factors 
 
 ``` r
 factors_ff3_daily <- download_data(
-  domain = "famafrench",
+  domain = "Fama-French",
   dataset = "Fama/French 3 Factors [Daily]",
   start_date = start_date,
   end_date = end_date
@@ -331,7 +331,7 @@ factors_ff3_daily <- download_data(
 
 ``` python
 factors_ff3_daily = tf.download_data(
-    domain="famafrench",
+    domain="Fama-French",
     dataset="Fama/French 3 Factors [Daily]",
     start_date=start_date,
     end_date=end_date,
@@ -344,7 +344,7 @@ In a subsequent chapter, we also use the monthly returns of 10 industry portfoli
 
 ``` r
 industries_ff_monthly <- download_data(
-  domain = "famafrench",
+  domain = "Fama-French",
   dataset = "10 Industry Portfolios",
   start_date = start_date,
   end_date = end_date
@@ -355,7 +355,7 @@ industries_ff_monthly <- download_data(
 
 ``` python
 industries_ff_monthly = tf.download_data(
-    domain="famafrench",
+    domain="Fama-French",
     dataset="10 Industry Portfolios",
     start_date=start_date,
     end_date=end_date,
@@ -432,7 +432,7 @@ Again, you can use the `tidyfinance` package for a shortcut:
 
 ``` r
 download_data(
-  domain = "factors_q",
+  domain = "Global Q",
   dataset = "q5_factors_monthly_2024",
   start_date = start_date,
   end_date = end_date
@@ -443,8 +443,8 @@ download_data(
 
 ``` python
 tf.download_data(
-    domain="factors_q",
-    dataset="q5_factors_monthly",
+    domain="Global Q",
+    dataset="q5_factors_monthly_2024",
     start_date=start_date,
     end_date=end_date,
 )
@@ -613,7 +613,7 @@ To get the equivalent data through `tidyfinance`, you can call:
 
 ``` r
 download_data(
-  domain = "macro_predictors",
+  domain = "Goyal-Welch",
   dataset = "monthly",
   start_date = start_date,
   end_date = end_date
@@ -624,7 +624,7 @@ download_data(
 
 ``` python
 tf.download_data(
-    domain="macro_predictors",
+    domain="Goyal-Welch",
     dataset="monthly",
     start_date=start_date,
     end_date=end_date,
@@ -730,18 +730,12 @@ The `tidyfinance` package can, of course, also fetch the same index data and man
 
 ``` r
 download_data(
-  domain = "fred",
+  domain = "FRED",
   series = "CPIAUCNS",
   start_date = start_date,
   end_date = end_date
 )
 ```
-
-    Warning: download_data(domain = "fred") was deprecated in tidyfinance 0.6.1.
-    ℹ Please use download_data(domain = "FRED") instead.
-    ℹ The deprecated feature was likely used in the tidyfinance package.
-      Please report the issue at
-      <https://github.com/tidy-finance/r-tidyfinance/issues>.
 
     # A tibble: 780 × 3
       date       value series  
@@ -757,7 +751,7 @@ download_data(
 
 ``` python
 tf.download_data(
-    domain="fred", series="CPIAUCNS", start_date=start_date, end_date=end_date
+    domain="FRED", series="CPIAUCNS", start_date=start_date, end_date=end_date
 )
 ```
 
