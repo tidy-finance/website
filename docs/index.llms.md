@@ -39,8 +39,7 @@ prices = tf.download_data(
   end_date="2024-12-31"
 )
 
-(prices
-  .pipe(ggplot, aes("date", "adjusted_close"))
+(ggplot(prices, aes("date", "adjusted_close"))
   + geom_line())
 ```
 
@@ -88,7 +87,7 @@ Portfolio sorts, factor models, fixed effects, causal inference, and modern ML g
 
 ### A free, open book
 
-Read the whole book online for free, dive into the blog, or join a workshop, all in the open.
+Read the whole book online for free or dive into the blog all in the open.
 
 ## Browse the book by topic
 
