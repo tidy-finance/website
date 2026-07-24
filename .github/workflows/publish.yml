@@ -1,0 +1,47 @@
+name: Render and Publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          # Keep in sync with the Quarto version used for local renders.
+          version: 1.9.38
+
+      # With `freeze: auto` in _quarto.yml, the render reuses the committed
+      # results in _freeze/, so no R, Python, data, or credentials are needed
+      # on the runner. If this step fails on a specific chapter, that chapter
+      # was changed without refreshing its freeze: render it locally
+      # (`quarto render chapters/<file>.qmd`) and commit the updated _freeze/
+      # entry. Rendering to _site keeps the output separate from the docs/
+      # folder tracked in git.
+      - name: Render site
+        run: quarto render --output-dir _site
+
+      # On pull requests the render above acts as a check only; the site is
+      # deployed exclusively from pushes to main.
+      - name: Deploy to gh-pages
+        if: github.event_name != 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./_site
+          cname: www.tidy-finance.org
