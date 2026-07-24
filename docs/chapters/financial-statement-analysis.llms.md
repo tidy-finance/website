@@ -72,7 +72,7 @@ Figure 1: A stylized representation of a balance sheet statement.
 The asset side of the balance sheet typically comprises three main categories, each serving different roles in the company’s operations:
 
 1.  Current assets: These are assets expected to be converted into cash or used within one operating cycle (typically one year). They include, e.g., cash and cash equivalents, short-term investments, accounts receivable (money owed by customers), and inventory (raw materials, work in progress, and finished goods).
-2.  Non-current assets: These long-term assets support the company’s operations beyond one year like, e.g., property, plant, and equipment (PP&E), long-term investments, and other long-term assets.
+2.  Non-current assets: These long-term assets support the company’s operations beyond one year, e.g., property, plant, and equipment (PP&E), long-term investments, and other long-term assets.
 3.  Intangible assets: These non-physical assets often represent significant value in modern companies, e.g., patents and intellectual property, trademarks and brands, and goodwill from acquisitions (a premium paid on the book value of the acquired assets). Intangible assets are usually also considered long-term assets, which means that they are included in the group of non-current assets.
 
 [Figure 2](#fig-401) illustrates this breakdown of assets, showing how companies classify their resources.

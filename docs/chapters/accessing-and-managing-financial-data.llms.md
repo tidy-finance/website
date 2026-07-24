@@ -86,7 +86,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\Rtmpa6oEGw\file45d451bd4cf3.zip' (13045 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpW4NgHu\file5dfc4bef100f.zip' (13045 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -380,7 +380,7 @@ You should check out the other sets by calling `tf.get_available_famafrench_data
 
 In recent years, the academic discourse experienced the rise of alternative factor models, e.g., in the form of the Hou et al. ([2014](#ref-Hou2015)) *q*-factor model. We refer to the [extended background](http://global-q.org/background.html) information provided by the original authors for further information. The *q* factors can be downloaded directly from the authors’ homepage.
 
-We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prescript using regular expressions and write all column names in lowercase. Finally, we apply the same transform of dividing by 100 to all factor returns. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html)
+We also need to adjust this data. First, we discard information we will not use in the remainder of the book. Then, we rename the columns with the “R\_”-prefix using regular expressions and write all column names in lowercase. Finally, we apply the same transform of dividing by 100 to all factor returns. You should always try sticking to a consistent style for naming objects, which we try to illustrate here - the emphasis is on *try*. You can check out style guides available online, e.g., [Hadley Wickham’s `tidyverse` style guide.](https://style.tidyverse.org/index.html)
 
 ## R
 
