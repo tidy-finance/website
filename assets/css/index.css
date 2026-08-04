@@ -535,7 +535,10 @@ p#toast-message {
     max-width: 1120px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 1.05fr .95fr;
+    /* minmax(0, …) instead of plain fr: grid items default to `min-width: auto`,
+       so the long code lines in the hero window would otherwise blow the track
+       (and the card) up past the viewport. */
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
     gap: 56px;
     align-items: center;
 }
@@ -607,6 +610,8 @@ p#toast-message {
     border-radius: 14px;
     box-shadow: var(--tf-shadow-lg);
     overflow: hidden;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .tf-window__bar {
@@ -676,6 +681,38 @@ p#toast-message {
     padding: 6px 14px 14px 14px;
 }
 
+/* Stack both panes in the same grid cell so the window keeps the height of the
+   tallest snippet. Switching R <-> Python then swaps the code in place instead
+   of resizing the card and shoving everything below it up or down. */
+.tf-window .panel-tabset>.tab-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+/* Let the shorter snippet's code box fill the shared row, so the framed area
+   looks the same in both tabs instead of leaving a gap under the code. */
+.tf-window .panel-tabset>.tab-content>.tab-pane,
+.tf-window .panel-tabset .code-copy-outer-scaffold,
+.tf-window .panel-tabset .sourceCode,
+.tf-window .panel-tabset pre {
+    height: 100%;
+}
+
+.tf-window .panel-tabset>.tab-content>.tab-pane {
+    /* Bootstrap hides inactive panes with `display: none !important`, so the
+       override has to be !important too. */
+    display: block !important;
+    grid-area: 1 / 1;
+    min-width: 0;
+    /* `visibility` (not `display: none`) keeps the pane in the layout while
+       taking it out of the tab order and the accessibility tree. */
+    visibility: hidden;
+}
+
+.tf-window .panel-tabset>.tab-content>.tab-pane.active {
+    visibility: visible;
+}
+
 .tf-window pre {
     margin: 0;
     background: #fbfdfe !important;
@@ -684,10 +721,15 @@ p#toast-message {
     border-radius: 10px;
     font-size: .82rem;
     line-height: 1.5;
+    max-width: 100%;
+    /* Long lines scroll inside the card instead of stretching it. */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
 }
 
 .tf-window .sourceCode {
     background: transparent;
+    min-width: 0;
 }
 
 /* ---------- STATS ---------- */
@@ -925,7 +967,7 @@ p#toast-message {
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
     .tf-hero__inner {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: 36px;
     }
 
@@ -964,5 +1006,24 @@ p#toast-message {
 
     .tf-section {
         padding: 56px 24px;
+    }
+
+    /* Tighter code window so most snippet lines fit a phone screen without
+       horizontal scrolling. */
+    .tf-window .panel-tabset>.nav-tabs {
+        padding: 10px 10px 0 10px;
+    }
+
+    .tf-window .panel-tabset .tab-content {
+        padding: 6px 10px 10px 10px;
+    }
+
+    /* Wrap instead of clipping long lines: the snippets stay fully readable on a
+       phone, and the window keeps the height of the tallest one either way. */
+    .tf-window pre,
+    .tf-window pre code {
+        font-size: .74rem;
+        white-space: pre-wrap;
+        overflow-wrap: break-word;
     }
 }
