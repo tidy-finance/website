@@ -16,11 +16,11 @@ options(
 
 # Data frame printing --------------------------------------------------------
 # The Python tabs show polars data frames as HTML tables, so we style R data
-# frames the same way. `df-print: kable` in _quarto.yml takes care of plain data
-# frames, but it prints *every* row, which is not an option for the tibbles in
-# this book (some have millions of rows). The knit_print() method below keeps
-# the five-row preview that print.tbl_df() gives us, reports the full
-# dimensions above the table like polars does, and only then calls kable().
+# frames the same way. `df-print: kable` in _quarto.yml switches the printing on,
+# but on its own it prints *every* row, which is not an option for the data
+# frames in this book (some have millions of rows). The knit_print() method
+# below keeps the five-row preview that print.tbl_df() gives us, reports the
+# full dimensions above the table like polars does, and only then calls kable().
 local({
 
   # Formats one column the way the tibble would print it: pillar keeps the
@@ -28,7 +28,8 @@ local({
   # and summarizes list columns as, e.g., "tibble [299 x 3]".
   format_column <- function(column) {
     if (is.list(column) && !is.data.frame(column)) {
-      return(escape_html(as.character(pillar::obj_sum(column))))
+      summaries <- vapply(column, function(cell) pillar::obj_sum(cell), character(1))
+      return(escape_html(summaries))
     }
     shaft <- pillar::pillar_shaft(column)
     width <- attr(shaft, "width")
@@ -43,10 +44,11 @@ local({
     gsub(">", "&gt;", values, fixed = TRUE)
   }
 
-  kable_tibble <- function(x, n = getOption("tibble.print_min", 5)) {
+  kable_preview <- function(x, n = getOption("tibble.print_min", 5)) {
     cells <- lapply(utils::head(x, n), format_column)
     if (nrow(x) > n) {
-      cells <- lapply(cells, function(column) c(column, "\u2026"))
+      # An HTML entity, so the ellipsis does not depend on the render locale.
+      cells <- lapply(cells, function(column) c(column, "&hellip;"))
     }
     preview <- as.data.frame(cells, stringsAsFactors = FALSE, check.names = FALSE)
     table <- knitr::kable(
@@ -56,31 +58,46 @@ local({
       align = unname(ifelse(vapply(x, is.numeric, logical(1)), "r", "l"))
     )
     shape <- sprintf("shape: (%s, %s)", format(nrow(x), big.mark = ","), ncol(x))
+    # Grouping is part of what print.grouped_df reports, so keep it visible.
+    if (inherits(x, "grouped_df") && requireNamespace("dplyr", quietly = TRUE)) {
+      shape <- sprintf(
+        "%s, groups: %s [%s]", shape,
+        paste(dplyr::group_vars(x), collapse = ", "), dplyr::n_groups(x)
+      )
+    }
     paste0("<small>", shape, "</small>\n\n", paste(table, collapse = "\n"), "\n")
   }
 
-  knit_print_tibble <- function(x, options = NULL, ...) {
+  knit_print_data_frame <- function(x, options = NULL, ...) {
     if (!knitr::is_html_output()) {
       return(knitr::normal_print(x))
     }
-    out <- try(kable_tibble(x), silent = TRUE)
+    out <- try(kable_preview(x), silent = TRUE)
     if (inherits(out, "try-error")) {
       return(knitr::normal_print(x))
     }
     knitr::asis_output(out)
   }
 
-  # rmarkdown registers knit_print.data.frame for df-print, so the method for
-  # the more specific tbl_df class wins for tibbles and grouped tibbles.
   register <- function(...) {
-    registerS3method(
-      "knit_print", "tbl_df", knit_print_tibble,
-      envir = asNamespace("knitr")
-    )
+    for (class in c("data.frame", "tbl_df", "grouped_df", "rowwise_df")) {
+      registerS3method(
+        "knit_print", class, knit_print_data_frame,
+        envir = asNamespace("knitr")
+      )
+    }
   }
-  if (isNamespaceLoaded("knitr")) {
-    register()
-  } else {
-    setHook(packageEvent("knitr", "onLoad"), register)
+  register_on_load <- function(package) {
+    if (isNamespaceLoaded(package)) {
+      register()
+    } else {
+      setHook(packageEvent(package, "onLoad"), register)
+    }
   }
+  # rmarkdown registers its own knit_print methods for df-print when it loads,
+  # for the same classes (its knit_print.tbl_sql for lazy database tables is
+  # left alone). They format with getOption("digits"), which would turn a volume
+  # of 535796800 into 5.36e+08, so we register once more after rmarkdown.
+  register_on_load("knitr")
+  register_on_load("rmarkdown")
 })
