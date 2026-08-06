@@ -450,8 +450,8 @@ import tidyfinance as tf
 
 tf.estimate_betas(
     data=crsp_monthly,
-    model="ret_excess ~ mkt_excess", 
-    lookback=60, 
+    model="ret_excess ~ mkt_excess",
+    lookback="60mo",
     min_obs=48
 )
 ```

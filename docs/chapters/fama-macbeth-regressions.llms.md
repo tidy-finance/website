@@ -299,7 +299,7 @@ Finally, let us interpret the results. Stocks with higher book-to-market ratios 
 
 ## R
 
-You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors and returns a data frame with the columns `factor`, `risk_premium`, `n` (the average number of cross-sectional observations), `standard_error`, and `t_statistic`. Note that the intercept row is labeled `intercept` (rather than `(Intercept)`):
+You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors and returns a data frame with the columns `factor`, `risk_premium`, `n` (the number of periods used), `standard_error`, and `t_statistic`. Note that the intercept row is labeled `intercept` (rather than `(Intercept)`):
 
 ``` r
 library(tidyfinance)
@@ -340,7 +340,7 @@ estimate_fama_macbeth(
 
 ## Python
 
-You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors and returns a data frame with the columns `factor`, `risk_premium`, `standard_error`, `t_statistic`, and `n` (the number of periods used). Note that the intercept row is labeled `Intercept`:
+You can also replicate the results using the `tidyfinance` package via the `estimate_fama_macbeth()` function. By default, it uses Newey-West standard errors and returns a data frame with the columns `factor`, `risk_premium`, `n` (the number of periods used), `standard_error`, and `t_statistic`. Note that the intercept row is labeled `intercept`:
 
 ``` python
 tf.estimate_fama_macbeth(
@@ -361,13 +361,13 @@ tf.estimate_fama_macbeth(
 
 shape: (4, 5)
 
-| factor       | risk_premium | standard_error | t_statistic | n     |
-|--------------|--------------|----------------|-------------|-------|
-| str          | f64          | f64            | f64         | f64   |
-| "Intercept"  | 0.011497     | 0.002864       | 4.014727    | 725.0 |
-| "beta"       | -0.000011    | 0.001087       | -0.010546   | 725.0 |
-| "bm"         | 0.001575     | 0.000512       | 3.077702    | 725.0 |
-| "log_mktcap" | -0.000934    | 0.000365       | -2.558543   | 725.0 |
+| factor       | risk_premium | n   | standard_error | t_statistic |
+|--------------|--------------|-----|----------------|-------------|
+| str          | f64          | i64 | f64            | f64         |
+| "intercept"  | 0.011497     | 725 | 0.002864       | 4.014727    |
+| "beta"       | -0.000011    | 725 | 0.001087       | -0.010546   |
+| "bm"         | 0.001575     | 725 | 0.000512       | 3.077702    |
+| "log_mktcap" | -0.000934    | 725 | 0.000365       | -2.558543   |
 
 ## Key Takeaways
 
