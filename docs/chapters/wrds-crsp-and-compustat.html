@@ -1299,7 +1299,7 @@ Figure&nbsp;4: Market capitalization is measured in billion USD, adjusted for co
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-20-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-20-1" role="tab" aria-controls="tabset-20-1" aria-selected="true" href="">R</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-20-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-20-2" role="tab" aria-controls="tabset-20-2" aria-selected="false" href="">Python</a></li></ul>
 <div class="tab-content" data-group="language">
 <div id="tabset-20-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-20-1-tab">
-<p>To keep track of the progress, we create ad-hoc progress updates using <code>message()</code>.</p>
+<p>To keep track of the progress, we create ad-hoc progress updates using <code>message()</code>. We write each batch to disk with <code>nanoparquet</code>’s <code>write_parquet()</code>, one file per <code>permno</code> in its own subfolder (<code>group_walk()</code> passes the data of each <code>permno</code> without the grouping column). Since each <code>permno</code> is processed in exactly one batch, re-running the loop overwrites each file instead of appending duplicates.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a>dsf_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.dsf_v2"</span>))</span>
 <span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>stksecurityinfohist_db <span class="ot">&lt;-</span> <span class="fu">tbl</span>(wrds, <span class="fu">I</span>(<span class="st">"crsp.stksecurityinfohist"</span>))</span>
@@ -1355,11 +1355,11 @@ Figure&nbsp;4: Market capitalization is measured in billion USD, adjusted for co
 <span id="cb40-52"><a href="#cb40-52" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb40-53"><a href="#cb40-53" aria-hidden="true" tabindex="-1"></a>    crsp_daily_sub <span class="sc">|&gt;</span></span>
 <span id="cb40-54"><a href="#cb40-54" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(permno) <span class="sc">|&gt;</span></span>
-<span id="cb40-55"><a href="#cb40-55" aria-hidden="true" tabindex="-1"></a>      arrow<span class="sc">::</span><span class="fu">write_dataset</span>(</span>
-<span id="cb40-56"><a href="#cb40-56" aria-hidden="true" tabindex="-1"></a>        <span class="at">path =</span> <span class="st">"data/crsp_daily"</span>,</span>
-<span id="cb40-57"><a href="#cb40-57" aria-hidden="true" tabindex="-1"></a>        <span class="at">format =</span> <span class="st">"parquet"</span>,</span>
-<span id="cb40-58"><a href="#cb40-58" aria-hidden="true" tabindex="-1"></a>        <span class="at">existing_data_behavior =</span> <span class="st">"overwrite"</span></span>
-<span id="cb40-59"><a href="#cb40-59" aria-hidden="true" tabindex="-1"></a>      )</span>
+<span id="cb40-55"><a href="#cb40-55" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_walk</span>(\(data, key) {</span>
+<span id="cb40-56"><a href="#cb40-56" aria-hidden="true" tabindex="-1"></a>        path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"data/crsp_daily/permno="</span>, key<span class="sc">$</span>permno)</span>
+<span id="cb40-57"><a href="#cb40-57" aria-hidden="true" tabindex="-1"></a>        <span class="fu">dir.create</span>(path, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb40-58"><a href="#cb40-58" aria-hidden="true" tabindex="-1"></a>        <span class="fu">write_parquet</span>(data, <span class="fu">file.path</span>(path, <span class="st">"part-0.parquet"</span>))</span>
+<span id="cb40-59"><a href="#cb40-59" aria-hidden="true" tabindex="-1"></a>      })</span>
 <span id="cb40-60"><a href="#cb40-60" aria-hidden="true" tabindex="-1"></a>  }</span>
 <span id="cb40-61"><a href="#cb40-61" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb40-62"><a href="#cb40-62" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(</span>
