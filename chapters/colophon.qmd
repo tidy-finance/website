@@ -24,23 +24,17 @@ This version of the book was built with R [@R-base] version `{r} paste0(version$
 #| echo: false
 #| message: false
 #| warning: false
-library(ggplot2) # Packages are not needed but loaded to show up in the colophon
 library(dplyr)
-library(tidyr)
-library(readr)
 library(purrr)
-library(tibble)
-library(stringr)
-library(forcats)
-dependencies <- renv::dependencies(progress = FALSE) |> count(Package)
-packages <- jsonlite::fromJSON("renv.lock", flatten = TRUE)
-do.call("rbind", packages$Packages) |>
-  as_tibble() |>
-  select(Package, Version) |>
-  unnest(cols = c("Package", "Version")) |>
-  inner_join(dependencies, join_by("Package")) |>
-  arrange(Package) |>
-  select(-n) |>
+# Packages declared in uvr.toml, with the versions pinned in uvr.lock
+dependencies <- names(RcppTOML::parseTOML("uvr.toml")$dependencies)
+packages <- RcppTOML::parseTOML("uvr.lock")$package
+tibble(
+  Package = map_chr(packages, "name"),
+  Version = map_chr(packages, "raw_version")
+) |>
+  filter(Package %in% dependencies) |>
+  arrange(tolower(Package)) |>
   kableExtra::kbl(booktabs = TRUE) |>
   kableExtra::kable_styling(full_width = TRUE)
 ```

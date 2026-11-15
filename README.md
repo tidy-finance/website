@@ -14,4 +14,18 @@ The code is licensed under [Creative Commons Attribution-NonCommercial-ShareAlik
   <a href="https://www.kqzyfj.com/click-101217142-14339043?url=https%3A%2F%2Fwww.routledge.com%2FTidy-Finance-with-Python%2FScheuch-Voigt-Weiss-Frey%2Fp%2Fbook%2F9781032676418" target="_top"><img src="assets/img/cover-book-python.jpg" class="book" width="214" height="280"/></a>
 </div>
 
+## Rendering locally
+
+R packages come from [uvr](https://github.com/nbafrank/uvr) (`uvr.toml`, `uvr.lock`), Python packages from [uv](https://docs.astral.sh/uv/) (`pyproject.toml`, `uv.lock`). In a terminal, in this folder:
+
+```sh
+uvr r install 4.6.1                 # once: installs R (pinned in .r-version)
+uvr sync                            # R packages into .uvr/library
+uv sync                             # Python and its packages into .venv/
+eval "$(uvr activate --emit sh)"    # puts uvr's R on the PATH (PowerShell: uvr activate --emit powershell | Invoke-Expression)
+uv run quarto render                # runs Quarto with the Python in .venv
+```
+
+Add R packages with `uvr add pkg` and commit `uvr.toml` and `uvr.lock`.
+
 To find the **R package** `tidyfinance`, please consider this [GitHub repository](https://github.com/tidy-finance/r-tidyfinance).
