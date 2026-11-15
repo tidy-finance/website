@@ -8,29 +8,35 @@ In previous chapters, we illustrate that stock characteristics such as size prov
 
 This is a book about *doing* empirical work in a tidy manner, and we refer to any of the many excellent textbook treatments of ML methods and especially penalized regressions for some deeper discussion. Excellent material is provided, for instance, by Hastie et al. ([2009](#ref-Hastie2009)), Gareth et al. ([2013](#ref-Hastie2013)), and De Prado ([2018](#ref-DePrado2018)). Instead, we briefly summarize the idea of Lasso and Ridge regressions as well as the more general Elastic Net. Then, we turn to the fascinating question on *how* to implement, tune, and use such models.
 
-To set the stage, we start with the definition of a linear model: suppose we have data \\(y_t, x_t), t = 1,\ldots, T\\, where \\x_t\\ is a \\(K \times 1)\\ vector of regressors and \\y_t\\ is the response for observation \\t\\. The linear model takes the form \\y_t = \beta' x_t + \varepsilon_t\\ with some error term \\\varepsilon_t\\ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the \\(K \times 1)\\ vector \\\beta\\ minimizes the sum of squared residuals and is then \\\hat{\beta}^\text{ols} = \left(\sum\limits\_{t=1}^T x_t'x_t\right)^{-1} \sum\limits\_{t=1}^T x_t'y_t.\\
+To set the stage, we start with the definition of a linear model: suppose we have data $(y_t, x_t), t = 1,\ldots, T$, where $x_t$ is a $(K \times 1)$ vector of regressors and $y_t$ is the response for observation $t$. The linear model takes the form $y_t = \beta' x_t + \varepsilon_t$ with some error term $\varepsilon_t$ and has been studied in abundance. The well-known ordinary-least square (OLS) estimator for the $(K \times 1)$ vector $\beta$ minimizes the sum of squared residuals and is then $$\hat{\beta}^\text{ols} = \left(\sum\limits_{t=1}^T x_t'x_t\right)^{-1} \sum\limits_{t=1}^T x_t'y_t.$$
 
-While we are often interested in the estimated coefficient vector \\\hat\beta^\text{ols}\\, ML is about the predictive performance most of the time. For a new observation \\\tilde{x}\_t\\, the linear model generates predictions such that \\\hat y_t = E\left(y\|x_t = \tilde x_t\right) = \hat\beta^\text{ols}{}' \tilde x_t.\\ Is this the best we can do? Not really: instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators \\\hat{\beta}\\ with lower variance than the estimator \\\hat\beta^\text{ols}\\. At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones, if possible. In other words, if \\K\\ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set \\\hat\beta^{\text{ols}}\_k = 0\\ for some redundant factors.
+While we are often interested in the estimated coefficient vector $\hat\beta^\text{ols}$, ML is about the predictive performance most of the time. For a new observation $\tilde{x}_t$, the linear model generates predictions such that $$\hat y_t = E\left(y|x_t = \tilde x_t\right) = \hat\beta^\text{ols}{}' \tilde x_t.$$ Is this the best we can do? Not really: instead of minimizing the sum of squared residuals, penalized linear models can improve predictive performance by choosing other estimators $\hat{\beta}$ with lower variance than the estimator $\hat\beta^\text{ols}$. At the same time, it seems appealing to restrict the set of regressors to a few meaningful ones, if possible. In other words, if $K$ is large (such as for the number of proposed factors in the asset pricing literature), it may be a desirable feature to *select* reasonable factors and set $\hat\beta^{\text{ols}}_k = 0$ for some redundant factors.
 
-It should be clear that the promised benefits of penalized regressions, i.e., reducing the mean squared error (MSE), come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that \\E\left(\hat\beta\right) \neq \beta\\. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for \\y\\: \\y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma\_\varepsilon^2)\\ We want to recover \\f(x)\\, which denotes some unknown functional which maps the relationship between \\x\\ and \\y\\. While the properties of \\\hat\beta^\text{ols}\\ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. Alternative predictors \\\hat{f}(x)\\ could be more desirable: For instance, the MSE depends on our model choice as follows: \\\begin{aligned} MSE &=E((y-\hat{f}(x))^2)=E((f(x)+\epsilon-\hat{f}(x))^2)\\ &= \underbrace{E((f(x)-\hat{f}(x))^2)}\_{\text{total quadratic error}}+\underbrace{E(\epsilon^2)}\_{\text{irreducible error}} \\ &= E\left(\hat{f}(x)^2\right)+E\left(f(x)^2\right)-2E\left(f(x)\hat{f}(x)\right)+\sigma\_\varepsilon^2\\ &=E\left(\hat{f}(x)^2\right)+f(x)^2-2f(x)E\left(\hat{f}(x)\right)+\sigma\_\varepsilon^2\\ &=\underbrace{\text{Var}\left(\hat{f}(x)\right)}\_{\text{variance of model}}+ \underbrace{\left(E(f(x)-\hat{f}(x))\right)^2}\_{\text{squared bias}} +\sigma\_\varepsilon^2. \end{aligned}\\ While no model can reduce \\\sigma\_\varepsilon^2\\, a biased estimator with small variance may have a lower MSE than an unbiased estimator.
+It should be clear that the promised benefits of penalized regressions, i.e., reducing the mean squared error (MSE), come at a cost. In most cases, reducing the variance of the estimator introduces a bias such that $E\left(\hat\beta\right) \neq \beta$. What is the effect of such a bias-variance trade-off? To understand the implications, assume the following data-generating process for $y$: $$y = f(x) + \varepsilon, \quad \varepsilon \sim (0, \sigma_\varepsilon^2)$$ We want to recover $f(x)$, which denotes some unknown functional which maps the relationship between $x$ and $y$. While the properties of $\hat\beta^\text{ols}$ as an unbiased estimator may be desirable under some circumstances, they are certainly not if we consider predictive accuracy. Alternative predictors $\hat{f}(x)$ could be more desirable: For instance, the MSE depends on our model choice as follows: $$\begin{aligned}
+MSE &=E((y-\hat{f}(x))^2)=E((f(x)+\epsilon-\hat{f}(x))^2)\\
+&= \underbrace{E((f(x)-\hat{f}(x))^2)}_{\text{total quadratic error}}+\underbrace{E(\epsilon^2)}_{\text{irreducible error}} \\
+&= E\left(\hat{f}(x)^2\right)+E\left(f(x)^2\right)-2E\left(f(x)\hat{f}(x)\right)+\sigma_\varepsilon^2\\
+&=E\left(\hat{f}(x)^2\right)+f(x)^2-2f(x)E\left(\hat{f}(x)\right)+\sigma_\varepsilon^2\\
+&=\underbrace{\text{Var}\left(\hat{f}(x)\right)}_{\text{variance of model}}+ \underbrace{\left(E(f(x)-\hat{f}(x))\right)^2}_{\text{squared bias}} +\sigma_\varepsilon^2.
+\end{aligned}$$ While no model can reduce $\sigma_\varepsilon^2$, a biased estimator with small variance may have a lower MSE than an unbiased estimator.
 
 ### Ridge regression
 
-One biased estimator is known as Ridge regression. Hoerl and Kennard ([1970](#ref-Hoerl1970)) propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the \\L_2\\ norm of the parameters* \\\hat\beta\\. Formally, this means that for a penalty factor \\\lambda\geq 0\\, the minimization problem takes the form \\\min\_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c\\. Here \\c\geq 0\\ is a constant that depends on the choice of \\\lambda\\. The larger \\\lambda\\, the smaller \\c\\ (technically speaking, there is a one-to-one relationship between \\\lambda\\, which corresponds to the Lagrangian of the minimization problem above and \\c\\). Here, \\X = \left(x_1 \ldots x_T\right)'\\ and \\y = \left(y_1, \ldots, y_T\right)'\\. A closed-form solution for the resulting regression coefficient vector \\\beta^\text{ridge}\\ exists: \\\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.\\ A couple of observations are worth noting: \\\hat\beta^\text{ridge} = \hat\beta^\text{ols}\\ for \\\lambda = 0\\ and \\\hat\beta^\text{ridge} \rightarrow 0\\ for \\\lambda\rightarrow \infty\\. Also for \\\lambda \> 0\\, \\\left(X'X + \lambda I\right)\\ is non-singular even if \\X'X\\ is not, which means that \\\hat\beta^\text{ridge}\\ exists even if \\\hat\beta\\ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter \\\lambda\\ which controls the *amount of regularization*: a larger value of \\\lambda\\ implies *shrinkage* of the regression coefficient toward 0, a smaller value of \\\lambda\\ reduces the bias of the resulting estimator.
+One biased estimator is known as Ridge regression. Hoerl and Kennard ([1970](#ref-Hoerl1970)) propose to minimize the sum of squared errors *while simultaneously imposing a penalty on the* $L_2$ norm of the parameters $\hat\beta$. Formally, this means that for a penalty factor $\lambda\geq 0$, the minimization problem takes the form $\min_\beta \left(y - X\beta\right)'\left(y - X\beta\right)\text{ s.t. } \beta'\beta \leq c$. Here $c\geq 0$ is a constant that depends on the choice of $\lambda$. The larger $\lambda$, the smaller $c$ (technically speaking, there is a one-to-one relationship between $\lambda$, which corresponds to the Lagrangian of the minimization problem above and $c$). Here, $X = \left(x_1  \ldots  x_T\right)'$ and $y = \left(y_1, \ldots, y_T\right)'$. A closed-form solution for the resulting regression coefficient vector $\beta^\text{ridge}$ exists: $$\hat{\beta}^\text{ridge} = \left(X'X + \lambda I\right)^{-1}X'y.$$ A couple of observations are worth noting: $\hat\beta^\text{ridge} = \hat\beta^\text{ols}$ for $\lambda = 0$ and $\hat\beta^\text{ridge} \rightarrow 0$ for $\lambda\rightarrow \infty$. Also for $\lambda > 0$, $\left(X'X + \lambda I\right)$ is non-singular even if $X'X$ is not, which means that $\hat\beta^\text{ridge}$ exists even if $\hat\beta$ is not defined. However, note also that the Ridge estimator requires careful choice of the hyperparameter $\lambda$ which controls the *amount of regularization*: a larger value of $\lambda$ implies *shrinkage* of the regression coefficient toward 0, a smaller value of $\lambda$ reduces the bias of the resulting estimator.
 
 > **NOTE:**
 >
-> Note that \\X\\ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that \\y\\ is simply demeaned before computing \\\hat\beta^\text{ridge}\\.
+> Note that $X$ usually contains an intercept column with ones. As a general rule, the associated intercept coefficient is not penalized. In practice, this often implies that $y$ is simply demeaned before computing $\hat\beta^\text{ridge}$.
 
-What about the statistical properties of the Ridge estimator? First, the bad news is that \\\hat\beta^\text{ridge}\\ is a biased estimator of \\\beta\\. However, the good news is that (under homoscedastic error terms) the variance of the Ridge estimator is guaranteed to be *smaller* than the variance of the OLS estimator. We encourage you to verify these two statements in the Exercises. As a result, we face a trade-off: The Ridge regression sacrifices some unbiasedness to achieve a smaller variance than the OLS estimator.
+What about the statistical properties of the Ridge estimator? First, the bad news is that $\hat\beta^\text{ridge}$ is a biased estimator of $\beta$. However, the good news is that (under homoscedastic error terms) the variance of the Ridge estimator is guaranteed to be *smaller* than the variance of the OLS estimator. We encourage you to verify these two statements in the Exercises. As a result, we face a trade-off: The Ridge regression sacrifices some unbiasedness to achieve a smaller variance than the OLS estimator.
 
 ### Lasso
 
-An alternative to Ridge regression is the Lasso (*l*east *a*bsolute *s*hrinkage and *s*election *o*perator). Similar to Ridge regression, the Lasso ([Tibshirani 1996](#ref-Tibshirani1996)) is a penalized and biased estimator. The main difference to Ridge regression is that Lasso does not only *shrink* coefficients but effectively selects variables by setting coefficients for *irrelevant* variables to zero. Lasso implements a \\L_1\\ penalization on the parameters such that: \\\hat\beta^\text{Lasso} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right)\text{ s.t. } \sum\limits\_{k=1}^K\|\beta_k\| \< c(\lambda).\\ There is no closed-form solution for \\\hat\beta^\text{Lasso}\\ in the above maximization problem, but efficient algorithms exist (e.g., the `glmnet` package for R and Python). Like for Ridge regression, the hyperparameter \\\lambda\\ has to be specified beforehand.
+An alternative to Ridge regression is the Lasso (*l*east *a*bsolute *s*hrinkage and *s*election *o*perator). Similar to Ridge regression, the Lasso ([Tibshirani 1996](#ref-Tibshirani1996)) is a penalized and biased estimator. The main difference to Ridge regression is that Lasso does not only *shrink* coefficients but effectively selects variables by setting coefficients for *irrelevant* variables to zero. Lasso implements a $L_1$ penalization on the parameters such that: $$\hat\beta^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right)\text{ s.t. } \sum\limits_{k=1}^K|\beta_k| < c(\lambda).$$ There is no closed-form solution for $\hat\beta^\text{Lasso}$ in the above maximization problem, but efficient algorithms exist (e.g., the `glmnet` package for R and Python). Like for Ridge regression, the hyperparameter $\lambda$ has to be specified beforehand.
 
 ### Elastic Net
 
-The Elastic Net ([Zou and Hastie 2005](#ref-Zou2005)) combines \\L_1\\ with \\L_2\\ penalization and encourages a grouping effect, where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: \\\hat\beta^\text{EN} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\rho\sum\limits\_{k=1}^K\|\beta_k\| +\frac{1}{2}\lambda(1-\rho)\sum\limits\_{k=1}^K\beta_k^2\\ Now, we have to choose two hyperparameters: the *shrinkage* factor \\\lambda\\ and the *weighting parameter* \\\rho\\. The Elastic Net resembles Lasso for \\\rho = 1\\ and Ridge regression for \\\rho = 0\\. While efficient algorithms exist to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use a dedicated back-end.
+The Elastic Net ([Zou and Hastie 2005](#ref-Zou2005)) combines $L_1$ with $L_2$ penalization and encourages a grouping effect, where strongly correlated predictors tend to be in or out of the model together. This more general framework considers the following optimization problem: $$\hat\beta^\text{EN} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\rho\sum\limits_{k=1}^K|\beta_k| +\frac{1}{2}\lambda(1-\rho)\sum\limits_{k=1}^K\beta_k^2$$ Now, we have to choose two hyperparameters: the *shrinkage* factor $\lambda$ and the *weighting parameter* $\rho$. The Elastic Net resembles Lasso for $\rho = 1$ and Ridge regression for $\rho = 0$. While efficient algorithms exist to compute the coefficients of penalized regressions, it is a good exercise to implement Ridge and Lasso estimation on your own before you use a dedicated back-end.
 
 ## Data Preparation
 
@@ -211,7 +217,7 @@ To illustrate penalized linear regressions, we employ a collection of packages f
 
 ## R
 
-We employ the `tidymodels` collection of packages for modeling and ML using `tidyverse` principles. You can simply use `install.packages("tidymodels")` to get access to all the related packages. We recommend checking out the work of Kuhn and Silge ([2018](#ref-Kuhn2022)): They continuously write on their great book [‘Tidy Modeling with R’](https://www.tmwr.org/) using tidy principles.
+We employ the `tidymodels` collection of packages for modeling and ML using `tidyverse` principles. You can simply use `uvr add tidymodels` to get access to all the related packages. We recommend checking out the work of Kuhn and Silge ([2018](#ref-Kuhn2022)): They continuously write on their great book [‘Tidy Modeling with R’](https://www.tmwr.org/) using tidy principles.
 
 The `tidymodels` workflow encompasses the main stages of the modeling process: pre-processing of data, model fitting, and post-processing of results. As we demonstrate below, `tidymodels` provides efficient workflows that you can update with low effort.
 
@@ -244,7 +250,7 @@ To start, we restrict our analysis to just one industry: Manufacturing. We split
 
 Recipes help you pre-process your data before training your model. Recipes are a series of pre-processing steps such as variable selection, transformation, or conversion of qualitative predictors to indicator variables. Each recipe starts with a `formula` that defines the general structure of the dataset and the role of each variable (regressor or dependent variable). For our dataset, our recipe contains the following steps before we fit any model:
 
-- Our formula defines that we want to explain excess returns with all available predictors. The regression equation thus takes the form \\r\_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t \\ where \\r_t\\ is the vector of industry excess returns at time \\t\\ and \\\tilde f_t\\ and \\\tilde z_t\\ are the (standardized) vectors of factor portfolio returns and macroeconomic variables
+- Our formula defines that we want to explain excess returns with all available predictors. The regression equation thus takes the form $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t$$ where $r_t$ is the vector of industry excess returns at time $t$ and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables
 - We exclude the column *month* from the analysis
 - We include all interaction terms between factors and macroeconomic predictors
 - We demean and scale each regressor such that the standard deviation is one
@@ -295,9 +301,9 @@ You may ask at this stage: why should I use a recipe instead of simply using the
 
 ## Python
 
-We want to explain excess returns with all available predictors. The regression equation thus takes the form \\ r\_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t \\
+We want to explain excess returns with all available predictors. The regression equation thus takes the form $$r_{t} = \alpha_0 + \left(\tilde f_t \otimes \tilde z_t\right)B + \varepsilon_t$$
 
-where \\r_t\\ is the vector of industry excess returns at time \\t\\, \\\otimes\\ denotes the Kronecker product and \\\tilde f_t\\ and \\\tilde z_t\\ are the (standardized) vectors of factor portfolio returns and macroeconomic variables.
+where $r_t$ is the vector of industry excess returns at time $t$, $\otimes$ denotes the Kronecker product and $\tilde f_t$ and $\tilde z_t$ are the (standardized) vectors of factor portfolio returns and macroeconomic variables.
 
 We hence perform the following pre-processing steps:
 
@@ -333,11 +339,11 @@ preprocessor = ColumnTransformer(
 
 ### Build a model
 
-Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get \\\begin{aligned}\hat\beta\_\lambda^\text{Lasso} = \arg\min\_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits\_{k=1}^K\|\beta_k\|.\end{aligned}\\ We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with basically the same code.
+Next, we can build an actual model based on our pre-processed data. In line with the definition above, we estimate regression coefficients of a Lasso regression such that we get $$\begin{aligned}\hat\beta_\lambda^\text{Lasso} = \arg\min_\beta \left(Y - X\beta\right)'\left(Y - X\beta\right) + \lambda\sum\limits_{k=1}^K|\beta_k|.\end{aligned}$$ We want to emphasize that the workflow for *any* model is very similar, irrespective of the specific model. As you will see further below, it is straightforward to fit Ridge regression coefficients and, later, Neural networks or Random forests with basically the same code.
 
 ## R
 
-The structure is always as follows: create a so-called `workflow()` and use the `fit()` function. A table with all available model APIs is available [here.](https://www.tidymodels.org/find/parsnip/) For now, we start with the linear regression model with a given value for the penalty factor \\\lambda\\. In the setup below, `mixture` denotes the value of \\\rho\\, hence setting `mixture = 1` implies the Lasso.
+The structure is always as follows: create a so-called `workflow()` and use the `fit()` function. A table with all available model APIs is available [here.](https://www.tidymodels.org/find/parsnip/) For now, we start with the linear regression model with a given value for the penalty factor $\lambda$. In the setup below, `mixture` denotes the value of $\rho$, hence setting `mixture = 1` implies the Lasso.
 
 ``` r
 lm_model <- linear_reg(
@@ -381,7 +387,7 @@ lm_fit
 
 ## Python
 
-In the application at hand, \\X\\ contains 130 columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor \\\lambda\\ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of \\\rho\\, hence setting `l1_ratio=1` implies the Lasso.
+In the application at hand, $X$ contains 130 columns with all possible interactions between factor returns and macroeconomic variables. We start with the linear regression model with an arbitrarily chosen value for the penalty factor $\lambda$ (denoted as `alpha=0.007` in the code below). In the setup below, `l1_ratio` denotes the value of $\rho$, hence setting `l1_ratio=1` implies the Lasso.
 
 ``` python
 lm_model = ElasticNet(
@@ -403,7 +409,7 @@ That’s it - we are done! The object `lm_pipeline` contains the definition of o
 
 ## R
 
-With the `workflow` from above, we are ready to use `fit()`. Typically, we use training data to fit the model. The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. First, we focus on the predicted values \\\hat{y}\_t = x_t\hat\beta^\text{Lasso}.\\ [Figure 2](#fig-1402) illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+With the `workflow` from above, we are ready to use `fit()`. Typically, we use training data to fit the model. The training data is pre-processed according to our recipe steps, and the Lasso regression coefficients are computed. First, we focus on the predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ [Figure 2](#fig-1402) illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 ``` r
 predicted_values <- lm_fit |>
@@ -482,7 +488,7 @@ lm_fit = lm_pipeline.fit(
 )
 ```
 
-First, we focus on the in-sample predicted values \\\hat{y}\_t = x_t\hat\beta^\text{Lasso}.\\ [Figure 2](#fig-1402) illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
+First, we focus on the in-sample predicted values $\hat{y}_t = x_t\hat\beta^\text{Lasso}.$ [Figure 2](#fig-1402) illustrates the projections for the *entire* time series of the manufacturing industry portfolio returns. The grey area indicates the out-of-sample period, which we did not use to fit the model.
 
 ``` python
 predicted_values = (
@@ -521,11 +527,11 @@ predicted_values_figure.show()
 
 The figure shows monthly realized and fitted manufacturing industry risk premium. The grey area corresponds to the out of sample period.
 
-What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients \\\hat\beta^\text{Lasso}\\ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample.
+What do the estimated coefficients look like? To analyze these values, it is worth computing the coefficients $\hat\beta^\text{Lasso}$ directly. The code below estimates the coefficients for the Lasso and Ridge regression for the processed training data sample.
 
 ## R
 
-To illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, we compute the coefficients \\\hat\beta^\text{Lasso}\\ directly. Note that `glmnet` actually takes a vector `y` and the matrix of regressors \\X\\ as input. Moreover, `glmnet` requires choosing the penalty parameter \\\alpha\\, which corresponds to \\\rho\\ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
+To illustrate the difference between the `tidymodels` workflow and the underlying `glmnet` package, we compute the coefficients $\hat\beta^\text{Lasso}$ directly. Note that `glmnet` actually takes a vector `y` and the matrix of regressors $X$ as input. Moreover, `glmnet` requires choosing the penalty parameter $\alpha$, which corresponds to $\rho$ in the notation above. When using the `tidymodels` model API, such details do not need consideration.
 
 ``` r
 x <- data_bake |>
@@ -552,7 +558,7 @@ fit_ridge <- glmnet(
 )
 ```
 
-The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor \\\lambda\\. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
+The objects `fit_lasso` and `fit_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
 
 ``` r
 bind_rows(
@@ -577,11 +583,11 @@ Figure 3: The figure shows estimated coefficient paths for different penalty fa
 
 > **NOTE:**
 >
-> One word of caution: The package `glmnet` computes estimates of the coefficients \\\hat\beta\\ based on numerical optimization procedures. As a result, the estimated coefficients for the [special case](https://parsnip.tidymodels.org/reference/glmnet-details.html) with no regularization (\\\lambda = 0\\) can deviate from the standard OLS estimates.
+> One word of caution: The package `glmnet` computes estimates of the coefficients $\hat\beta$ based on numerical optimization procedures. As a result, the estimated coefficients for the [special case](https://parsnip.tidymodels.org/reference/glmnet-details.html) with no regularization ($\lambda = 0$) can deviate from the standard OLS estimates.
 
 ## Python
 
-We estimate the coefficients \\\hat\beta^\text{Lasso}\\ directly for a grid of different \\\lambda\\’s, using the `Lasso` and `Ridge` estimators from `scikit-learn` on the pre-processed regressor matrix.
+We estimate the coefficients $\hat\beta^\text{Lasso}$ directly for a grid of different $\lambda$’s, using the `Lasso` and `Ridge` estimators from `scikit-learn` on the pre-processed regressor matrix.
 
 ``` python
 x = preprocessor.fit_transform(data_manufacturing)
@@ -612,7 +618,7 @@ coefficients_ridge = (
 )
 ```
 
-The dataframes `coefficients_lasso` and `coefficients_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor \\\lambda\\. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
+The dataframes `coefficients_lasso` and `coefficients_ridge` contain an entire sequence of estimated coefficients for multiple values of the penalty factor $\lambda$. [Figure 3](#fig-1403) illustrates the trajectories of the regression coefficients as a function of the penalty factor. Both Lasso and Ridge coefficients converge to zero as the penalty factor increases.
 
 ``` python
 coefficients_figure = (
@@ -637,23 +643,23 @@ The figure shows estimated coefficient paths for different penalty factors. The 
 
 ### Tune a model
 
-To compute \\\hat\beta\_\lambda^\text{Lasso}\\, we simply imposed a value for the penalty hyperparameter \\\lambda\\. Model tuning is the process of optimally selecting such hyperparameters through *cross-validation*. Again, we refer to any treatment of cross-validation to get a more detailed discussion of the statistical underpinnings. Here we focus on the general idea and the implementation.
+To compute $\hat\beta_\lambda^\text{Lasso}$, we simply imposed a value for the penalty hyperparameter $\lambda$. Model tuning is the process of optimally selecting such hyperparameters through *cross-validation*. Again, we refer to any treatment of cross-validation to get a more detailed discussion of the statistical underpinnings. Here we focus on the general idea and the implementation.
 
-The goal for choosing \\\lambda\\ (or any other hyperparameter, e.g., \\\rho\\ for the Elastic Net) is to find a way to produce predictors \\\hat{Y}\\ for an outcome \\Y\\ that minimizes the mean squared prediction error \\\text{MSPE} = E\left( \frac{1}{T}\sum\_{t=1}^T (\hat{y}\_t - y_t)^2 \right)\\. Unfortunately, the MSPE is not directly observable. We can only compute an estimate because our data is random and because we do not observe the entire population.
+The goal for choosing $\lambda$ (or any other hyperparameter, e.g., $\rho$ for the Elastic Net) is to find a way to produce predictors $\hat{Y}$ for an outcome $Y$ that minimizes the mean squared prediction error $\text{MSPE} = E\left( \frac{1}{T}\sum_{t=1}^T (\hat{y}_t - y_t)^2 \right)$. Unfortunately, the MSPE is not directly observable. We can only compute an estimate because our data is random and because we do not observe the entire population.
 
-Obviously, if we train an algorithm on the same data that we use to compute the error, our estimate \\\text{MSPE}\\ would indicate way better predictive accuracy than what we can expect in real out-of-sample data. The result is called overfitting.
+Obviously, if we train an algorithm on the same data that we use to compute the error, our estimate $\text{MSPE}$ would indicate way better predictive accuracy than what we can expect in real out-of-sample data. The result is called overfitting.
 
-Cross-validation is a technique that allows us to alleviate this problem. We approximate the true MSPE as the average of many MSPE obtained by creating predictions for \\K\\ new random samples of the data, none of them used to train the algorithm \\\frac{1}{K} \sum\_{k=1}^K \frac{1}{T}\sum\_{t=1}^T \left(\hat{y}\_t^k - y_t^k\right)^2\\. In practice, this is done by carving out a piece of our data and pretending it is an independent sample. We again divide the data into a training set and a test set. The MSPE on the test set is our measure for actual predictive ability, while we use the training set to fit models with the aim to find the *optimal* hyperparameter values. To do so, we further divide our training sample into (several) subsets, fit our model for a grid of potential hyperparameter values (e.g., \\\lambda\\), and evaluate the predictive accuracy on an *independent* sample. This works as follows:
+Cross-validation is a technique that allows us to alleviate this problem. We approximate the true MSPE as the average of many MSPE obtained by creating predictions for $K$ new random samples of the data, none of them used to train the algorithm $\frac{1}{K} \sum_{k=1}^K \frac{1}{T}\sum_{t=1}^T \left(\hat{y}_t^k - y_t^k\right)^2$. In practice, this is done by carving out a piece of our data and pretending it is an independent sample. We again divide the data into a training set and a test set. The MSPE on the test set is our measure for actual predictive ability, while we use the training set to fit models with the aim to find the *optimal* hyperparameter values. To do so, we further divide our training sample into (several) subsets, fit our model for a grid of potential hyperparameter values (e.g., $\lambda$), and evaluate the predictive accuracy on an *independent* sample. This works as follows:
 
 1.  Specify a grid of hyperparameters
-2.  Obtain predictors \\\hat{y}\_i(\lambda)\\ to denote the predictors for the used parameters \\\lambda\\
-3.  Compute \\ \text{MSPE}(\lambda) = \frac{1}{K} \sum\_{k=1}^K \frac{1}{T}\sum\_{t=1}^T \left(\hat{y}\_t^k(\lambda) - y_t^k\right)^2 \\ With K-fold cross-validation, we do this computation \\K\\ times. Simply pick a validation set with \\M=T/K\\ observations at random and think of these as random samples \\y_1^k, \dots, y\_{\tilde{T}}^k\\, with \\k=1\\
+2.  Obtain predictors $\hat{y}_i(\lambda)$ to denote the predictors for the used parameters $\lambda$
+3.  Compute $$\text{MSPE}(\lambda) = \frac{1}{K} \sum_{k=1}^K \frac{1}{T}\sum_{t=1}^T \left(\hat{y}_t^k(\lambda) - y_t^k\right)^2$$ With K-fold cross-validation, we do this computation $K$ times. Simply pick a validation set with $M=T/K$ observations at random and think of these as random samples $y_1^k, \dots, y_{\tilde{T}}^k$, with $k=1$
 
-How should you pick \\K\\? Large values of \\K\\ are preferable because the training data better imitates the original data. However, larger values of \\K\\ will have much higher computation time.
+How should you pick $K$? Large values of $K$ are preferable because the training data better imitates the original data. However, larger values of $K$ will have much higher computation time.
 
 ## R
 
-`tidymodels` provides all required tools to conduct \\K\\-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor \\\lambda\\ as well as the mixing factor \\\rho\\ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model()`.
+`tidymodels` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification and let `tidymodels` know which parameters to tune. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters. Note that it is simple to change an existing `workflow` with `update_model()`.
 
 ``` r
 lm_model <- linear_reg(
@@ -666,7 +672,7 @@ lm_fit <- lm_fit |>
   update_model(lm_model)
 ```
 
-For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate \\\hat{\text{MSPE}}\\ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
+For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set. First, we define the cross-validation folds based on our training data only.
 
 ``` r
 # Shared rolling-origin folds: a five-year (60-month) training window and a
@@ -701,7 +707,7 @@ data_folds
     5 <split [60/48]> Slice5
     # ℹ 5 more rows
 
-Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a \\20 \times 3\\ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
+Then, we evaluate the performance for a grid of different penalty values. `tidymodels` provides functionalities to construct a suitable grid of hyperparameters with `grid_regular`. The code chunk below creates a $20 \times 3$ hyperparameters grid. Then, the function `tune_grid()` evaluates all the models for each fold.
 
 ``` r
 lm_tune <- lm_fit |>
@@ -712,7 +718,7 @@ lm_tune <- lm_fit |>
   )
 ```
 
-After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. [Figure 4](#fig-1404) illustrates the average validation set’s root mean-squared error for each value of \\\lambda\\ and \\\rho\\.
+After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. [Figure 4](#fig-1404) illustrates the average validation set’s root mean-squared error for each value of $\lambda$ and $\rho$.
 
 ``` r
 autoplot(lm_tune) +
@@ -737,11 +743,11 @@ Figure 4: The figure shows root MSPE for different penalty factors. Evaluation 
 
 ## Python
 
-`scikit-learn` provides all required tools to conduct \\K\\-fold cross-validation. We just have to update our model specification. In our case, we specify the penalty factor \\\lambda\\ as well as the mixing factor \\\rho\\ as *free* parameters.
+`scikit-learn` provides all required tools to conduct $K$-fold cross-validation. We just have to update our model specification. In our case, we specify the penalty factor $\lambda$ as well as the mixing factor $\rho$ as *free* parameters.
 
-For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate \\\hat{\text{MSPE}}\\ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set.
+For our sample, we consider a time-series cross-validation sample. This means that we tune our models with rolling-origin cross-validation, where each fold trains on a five-year window and validates on the subsequent, non-overlapping four-year window. For a grid of possible hyperparameters, we then fit the model for each fold and evaluate $\hat{\text{MSPE}}$ in the corresponding validation set. Finally, we select the model specification with the lowest MSPE in the validation set.
 
-`scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a \\100 \times 3\\ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
+`scikit-learn` provides functionalities to construct a suitable grid of hyperparameters with `GridSearchCV()`. The code chunk below creates a $100 \times 3$ hyperparameters grid. Then, the method `fit()` evaluates all the models for each fold.
 
 ``` python
 alphas = np.logspace(-6, 2, 100)
@@ -776,7 +782,7 @@ finder = finder.fit(
 )
 ```
 
-After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. [Figure 4](#fig-1404) illustrates the average validation set’s root mean-squared error for each value of \\\lambda\\ and \\\rho\\.
+After the tuning process, we collect the evaluation metrics (the root mean-squared error in our example) to identify the *optimal* model. [Figure 4](#fig-1404) illustrates the average validation set’s root mean-squared error for each value of $\lambda$ and $\rho$.
 
 ``` python
 validation = (
@@ -823,11 +829,11 @@ validation_figure.show()
 
 The figure shows root MSPE for different penalty factors. Evaluation of manufacturing excess returns for different penalty factors (lambda) and proportions of Lasso penalty (rho). 1.0 indicates Lasso, 0.5 indicates Elastic Net, and 0.0 indicates Ridge.
 
-[Figure 4](#fig-1404) shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of 0.005 and a mixture factor (\\\rho\\) of 0.5.
+[Figure 4](#fig-1404) shows that the MSPE drops faster for Lasso and Elastic Net compared to Ridge regressions as penalty factor increases. However, for higher penalty factors, the MSPE for Ridge regressions dips below the others, which both slightly increase again above a certain threshold. Recall that the larger the regularization, the more restricted the model becomes. The best performing model yields a penalty parameter (`alpha`) of 0.005 and a mixture factor ($\rho$) of 0.5.
 
 ### Parallelized workflow
 
-Our starting point was the question: Which factors determine industry returns? While Avramov et al. ([2023](#ref-Avramov2022b)) provide a Bayesian analysis related to the research question above, we choose a simplified approach: To illustrate the entire workflow, we now run the penalized regressions for all ten industries. We want to identify relevant variables by fitting Lasso models for each industry returns time series. More specifically, we perform cross-validation for each industry to identify the optimal penalty factor \\\lambda\\.
+Our starting point was the question: Which factors determine industry returns? While Avramov et al. ([2023](#ref-Avramov2022b)) provide a Bayesian analysis related to the research question above, we choose a simplified approach: To illustrate the entire workflow, we now run the penalized regressions for all ten industries. We want to identify relevant variables by fitting Lasso models for each industry returns time series. More specifically, we perform cross-validation for each industry to identify the optimal penalty factor $\lambda$.
 
 First, we define the Lasso model with one tuning parameter.
 
@@ -1023,9 +1029,9 @@ The heat map in [Figure 5](#fig-1405) conveys two main insights. First, we see 
 
 ## Exercises
 
-1.  Write a function that requires three inputs, namely, `y` (a \\T\\ vector), `X` (a \\(T \times K)\\ matrix), and `lambda` and then returns the Ridge estimator (a \\K\\ vector) for a given penalization parameter \\\lambda\\. Recall that the intercept should not be penalized. Therefore, your function should indicate whether \\X\\ contains a vector of ones as the first column, which should be exempt from the \\L_2\\ penalty.
-2.  Compute the \\L_2\\ norm (\\\beta'\beta\\) for the regression coefficients based on the predictive regression from the previous exercise for a range of \\\lambda\\’s and illustrate the effect of penalization in a suitable figure.
-3.  Now, write a function that requires three inputs, namely, `y` (a \\T\\ vector), `X` (a \\(T \times K)\\ matrix), and `lambda` and then returns the Lasso estimator (a \\K\\ vector) for a given penalization parameter \\\lambda\\. Recall that the intercept should not be penalized. Therefore, your function should indicate whether \\X\\ contains a vector of ones as the first column, which should be exempt from the \\L_1\\ penalty.
+1.  Write a function that requires three inputs, namely, `y` (a $T$ vector), `X` (a $(T \times K)$ matrix), and `lambda` and then returns the Ridge estimator (a $K$ vector) for a given penalization parameter $\lambda$. Recall that the intercept should not be penalized. Therefore, your function should indicate whether $X$ contains a vector of ones as the first column, which should be exempt from the $L_2$ penalty.
+2.  Compute the $L_2$ norm ($\beta'\beta$) for the regression coefficients based on the predictive regression from the previous exercise for a range of $\lambda$’s and illustrate the effect of penalization in a suitable figure.
+3.  Now, write a function that requires three inputs, namely, `y` (a $T$ vector), `X` (a $(T \times K)$ matrix), and `lambda` and then returns the Lasso estimator (a $K$ vector) for a given penalization parameter $\lambda$. Recall that the intercept should not be penalized. Therefore, your function should indicate whether $X$ contains a vector of ones as the first column, which should be exempt from the $L_1$ penalty.
 4.  After you understand what Ridge and Lasso regressions are doing, familiarize yourself with the `glmnet` package’s documentation. It is a thoroughly tested and well-established package that provides efficient code to compute the penalized regression coefficients for Ridge and Lasso and for combinations, commonly called *Elastic Nets*.
 
 ## References
@@ -1050,7 +1056,7 @@ Fama, Eugene F., and Kenneth R. French. 1993. “Common risk factors in the retu
 
 Gareth, James, Witten Daniela, Hastie Trevor, and Tibshirani Robert. 2013. *An introduction to statistical learning: With applications in R*. Springer.
 
-Harvey, Campbell R., Yan Liu, and Heqing Zhu. 2016. “\\\ldots\\ and the cross-section of expected returns.” *Review of Financial Studies* 29 (1): 5–68. <https://doi.org/10.1093/rfs/hhv059>.
+Harvey, Campbell R., Yan Liu, and Heqing Zhu. 2016. “$\ldots$ and the cross-section of expected returns.” *Review of Financial Studies* 29 (1): 5–68. <https://doi.org/10.1093/rfs/hhv059>.
 
 Hastie, Trevor, Robert Tibshirani, and Jerome Friedman. 2009. *The elements of statistical learning: Data mining, inference and prediction*. 2nd ed. Springer. <https://hastie.su.domains/ElemStatLearn/>.
 

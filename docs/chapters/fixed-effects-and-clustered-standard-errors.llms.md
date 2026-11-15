@@ -256,9 +256,10 @@ shape: (3, 9)
 
 To illustrate fixed effects regressions, we use the `fixest` (R) and `pyfixest` (Python) packages, which are both computationally powerful and flexible with respect to model specifications. We start out with the basic investment regression using the simple model
 
-\\ \text{Investment}\_{i,t+1} = \alpha + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{1}\\
+$$\text{Investment}_{i,t+1} = \alpha + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
+\tag{1}$$
 
-where \\\varepsilon\_{i,t}\\ is i.i.d. normally distributed across time and firms.
+where $\varepsilon_{i,t}$ is i.i.d. normally distributed across time and firms.
 
 ## R
 
@@ -317,9 +318,10 @@ As expected, the regression output shows significant coefficients for both varia
 
 One way to tackle the issue of omitted variable bias is to get rid of as much unexplained variation as possible by including *fixed effects*; i.e., model parameters that are fixed for specific groups (e.g., [Wooldridge 2010](#ref-Wooldridge2010)). In essence, each group has its own mean in fixed effects regressions. The simplest group that we can form in the investment regression is the firm level. The firm fixed effects regression is then
 
-\\ \text{Investment}\_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{2}\\
+$$\text{Investment}_{i,t+1} = \alpha_i + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
+\tag{2}$$
 
-where \\\alpha_i\\ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms’ investments as deviations from the firms’ average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm’s average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
+where $\alpha_i$ is the firm fixed effect and captures the firm-specific mean investment across all years. In fact, you could also compute firms’ investments as deviations from the firms’ average investments and estimate the model without the fixed effects. The idea of the firm fixed effect is to remove the firm’s average investment, which might be affected by firm-specific variables that you do not observe. For example, firms in a specific industry might invest more on average. Or you observe a young firm with large investments but only small concurrent cash flows, which will only happen in a few years. This sort of variation is unwanted because it is related to unobserved variables that can bias your estimates in any direction.
 
 To include the firm fixed effect, we use `gvkey` (Compustat’s firm identifier) as follows:
 
@@ -381,9 +383,10 @@ The regression output shows a lot of unexplained variation at the firm level tha
 
 There is another source of variation that we can get rid of in our setting: average investment across firms might vary over time due to macroeconomic factors that affect all firms, such as economic crises. By including year fixed effects, we can take out the effect of unobservables that vary over time. The two-way fixed effects regression is then
 
-\\ \text{Investment}\_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}\_{i,t}+\beta_2\text{Tobin's q}\_{i,t}+\varepsilon\_{i,t}, \tag{3}\\
+$$\text{Investment}_{i,t+1} = \alpha_i + \alpha_t + \beta_1\text{Cash Flows}_{i,t}+\beta_2\text{Tobin's q}_{i,t}+\varepsilon_{i,t},
+\tag{3}$$
 
-where \\\alpha_t\\ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows.
+where $\alpha_t$ is the time fixed effect. Here you can think of higher investments during an economic expansion with simultaneously high cash flows.
 
 ## R
 
@@ -443,7 +446,7 @@ The inclusion of time fixed effects did only marginally affect the R-squared and
 
 How can we further improve the robustness of our regression results? Ideally, we want to get rid of unexplained variation at the firm-year level, which means we need to include more variables that vary across firm *and* time and are likely correlated with investment. Note that we cannot include firm-year fixed effects in our setting because then cash flows and Tobin’s q are colinear with the fixed effects, and the estimation becomes void.
 
-Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. We recommend printing \\t\\-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects ([Wasserstein and Lazar 2016](#ref-Wasserstein2016)). The \\t\\-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.
+Before we discuss the properties of our estimation errors, we want to point out that regression tables are at the heart of every empirical analysis, where you compare multiple models. We recommend printing $t$-statistics rather than standard errors in regression tables because the latter are typically very hard to interpret across coefficients that vary in size. We also do not print p-values because they are sometimes misinterpreted to signal the importance of observed effects ([Wasserstein and Lazar 2016](#ref-Wasserstein2016)). The $t$-statistics provide a consistent way to interpret changes in estimation uncertainty across different model specifications.
 
 ## R
 
@@ -547,7 +550,7 @@ model_cluster_firmyear = pf.feols(
 )
 ```
 
-The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin’s q. By clustering the standard errors on the firm level, the \\t\\-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin’s q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the \\t\\-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
+The table below shows the comparison of the different assumptions behind the standard errors. In the first column, we can see highly significant coefficients on both cash flows and Tobin’s q. By clustering the standard errors on the firm level, the $t$-statistics of both coefficients drop in half, indicating a high correlation of residuals within firms. If we additionally cluster by year, we see a drop, particularly for Tobin’s q, again. Even after relaxing the assumptions behind our standard errors, both coefficients are still comfortably significant as the $t$-statistics are well above the usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 ## R
 
@@ -606,7 +609,7 @@ Inspired by Abadie et al. ([2017](#ref-AbadieEtAl2017)), we want to close this c
 
 - Fixed effects regressions control for unobserved firm and time-specific factors, reducing omitted variable bias in panel data models.
 - The `fixest` (R) and `pyfixest` (Python) packages streamline the estimation of fixed effects and support clustering standard errors for robust inference.
-- Clustered standard errors adjust for residual dependence across firms or years, leading to more accurate \\t\\-statistics and confidence in significance tests.
+- Clustered standard errors adjust for residual dependence across firms or years, leading to more accurate $t$-statistics and confidence in significance tests.
 - Two-way clustering by firm and year is commonly used in finance to address both time-series and cross-sectional correlation in residuals.
 - Careful model specification, including winsorization and proper clustering choices, enhances the credibility and reliability of empirical finance results.
 

@@ -1,3 +1,5 @@
+[Skip to main content](#quarto-content)
+
 ★ Open-source · R & Python · Reproducible
 
 # Empirical finance, reproducible in R and Python

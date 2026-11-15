@@ -40,7 +40,7 @@ We introduce the `adjustText` package for adding text labels to the figures in t
 
 ## The Asset Universe
 
-Suppose that \\N\\ different risky assets are available to the investor. Each asset \\i\\ delivers expected returns \\\mu_i\\, representing the anticipated profit from holding the asset for one period. The investor can allocate their wealth across these assets by choosing the portfolio weights \\\omega_i\\ for each asset \\i\\. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option, such as keeping your money under a mattress. The overarching question of this chapter is: How should the investor allocate their wealth across these assets to optimize their portfolio’s performance?
+Suppose that $N$ different risky assets are available to the investor. Each asset $i$ delivers expected returns $\mu_i$, representing the anticipated profit from holding the asset for one period. The investor can allocate their wealth across these assets by choosing the portfolio weights $\omega_i$ for each asset $i$. We impose that the portfolio weights sum up to one to ensure that the investor is fully invested. There is no outside option, such as keeping your money under a mattress. The overarching question of this chapter is: How should the investor allocate their wealth across these assets to optimize their portfolio’s performance?
 
 According to Markowitz ([1952](#ref-Markowitz1952)), portfolio selection involves two stages: First, forming expectations about future security performance based on observations and experience. Second, using these expectations to choose a portfolio. In practice, these two steps cannot be separated. You need historical data or other considerations to generate estimates of the distribution of future returns. Only then can one proceed to optimal decision-making *conditional* on your estimation.
 
@@ -104,7 +104,7 @@ prices_daily = (prices_daily
 )
 ```
 
-We compute the sample average returns as \\\frac{1}{T} \sum\_{t=1}^{T} r\_{i,t},\\ where \\r\_{i,t}\\ is the return of asset \\i\\ in period \\t\\, and \\T\\ is the total number of periods. As noted above, we treat the vector of sample averages as the true expected returns of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
+We compute the sample average returns as $\frac{1}{T} \sum_{t=1}^{T} r_{i,t},$ where $r_{i,t}$ is the return of asset $i$ in period $t$, and $T$ is the total number of periods. As noted above, we treat the vector of sample averages as the true expected returns of the assets. For simplicity and easier interpretation, we focus on monthly returns going forward.
 
 ## R
 
@@ -133,7 +133,7 @@ returns_monthly = (prices_daily
 )
 ```
 
-Individual asset risk in MPT is typically quantified using variance (i.e., \\\sigma^2_i\\) or volatilities (i.e., \\\sigma_i\\).[^1] We suppose that the true volatilities of the assets are also given by the sample standard deviation.
+Individual asset risk in MPT is typically quantified using variance (i.e., $\sigma^2_i$) or volatilities (i.e., $\sigma_i$).[^1] We suppose that the true volatilities of the assets are also given by the sample standard deviation.
 
 We compute the sample standard deviation for each asset:
 
@@ -207,13 +207,13 @@ assets_figure.show()
 
 Expected returns and volatilities based on monthly returns adjusted for dividend payments and stock splits.
 
-As highlighted above, a key innovation of MPT is to consider interactions between assets. The *variance-covariance matrix* collects this information. Again, we proxy the true variance-covariance matrix \\\Sigma\\ of the returns by the sample covariance.
+As highlighted above, a key innovation of MPT is to consider interactions between assets. The *variance-covariance matrix* collects this information. Again, we proxy the true variance-covariance matrix $\Sigma$ of the returns by the sample covariance.
 
 The interpretation of the covariance is straightforward: While a positive covariance between assets indicates that these assets tend to move in the same direction, a negative covariance indicates that the assets move in opposite directions.
 
 ## R
 
-We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a \\(T \times N)\\ matrix with one column for each of the \\N\\ symbols and one row for each of the \\T\\ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
+We can use the `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot_wider()` with the new column names from the `symbol`-column and setting the values to `ret`.
 
 ``` r
 returns_wide <- returns_monthly |>
@@ -226,7 +226,7 @@ sigma <- returns_wide |>
 
 ## Python
 
-We can use `numpy`’s `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a \\(T \times N)\\ matrix with one column for each of the \\N\\ symbols and one row for each of the \\T\\ trading days. We achieve this by using `pivot()` with the new column names from the `symbol`-column and setting the values to `ret`. We sort the columns by symbol so that the order matches `assets`, drop the rows with missing returns, and hand the resulting matrix to `numpy` at the boundary.
+We can use `numpy`’s `cov()` function that takes a matrix of returns as inputs. We thus need to transform the returns from a data frame into a $(T \times N)$ matrix with one column for each of the $N$ symbols and one row for each of the $T$ trading days. We achieve this by using `pivot()` with the new column names from the `symbol`-column and setting the values to `ret`. We sort the columns by symbol so that the order matches `assets`, drop the rows with missing returns, and hand the resulting matrix to `numpy` at the boundary.
 
 ``` python
 symbol_order = assets["symbol"].to_list()
@@ -298,17 +298,17 @@ Variances and covariances based on monthly returns adjusted for dividend payment
 
 ## The Minimum-Variance Framework
 
-Suppose now the investor allocates their wealth in a portfolio given by the weight vector \\\omega\\. The resulting portfolio returns \\\omega^\prime r\\ have an expected return \\\mu\_\omega = \omega^{\prime}\mu = \sum\_{i=1}^N \omega_i \mu_i\\. The variance of the portfolio returns is \\\sigma^2\_\omega = \omega^{\prime}\Sigma\omega = \sum\_{i=1}^{N} \sum\_{j=1}^{N} \omega_i \omega_j \sigma\_{ij}\\ where \\\omega_i\\ and \\\omega_j\\ are the weights of assets \\i\\ and \\j\\ in the portfolio, respectively, and \\\sigma\_{ij}\\ is the covariance between returns of assets \\i\\ and \\j\\.
+Suppose now the investor allocates their wealth in a portfolio given by the weight vector $\omega$. The resulting portfolio returns $\omega^\prime r$ have an expected return $\mu_\omega = \omega^{\prime}\mu = \sum_{i=1}^N \omega_i \mu_i$. The variance of the portfolio returns is $\sigma^2_\omega = \omega^{\prime}\Sigma\omega = \sum_{i=1}^{N} \sum_{j=1}^{N} \omega_i \omega_j \sigma_{ij}$ where $\omega_i$ and $\omega_j$ are the weights of assets $i$ and $j$ in the portfolio, respectively, and $\sigma_{ij}$ is the covariance between returns of assets $i$ and $j$.
 
 We first consider an investor who wants to invest in a portfolio that delivers the lowest possible variance as a reference point. Thus, the optimization problem of the minimum-variance investor is given by
 
-\\\min\_{\omega_1, ... \omega_n} \sum\_{i=1}^{n} \sum\_{j=1}^{n} \omega_i \omega_j \sigma\_{ij} = \min\_\omega \omega^{\prime}\Sigma\omega.\\
+$$\min_{\omega_1, ... \omega_n} \sum_{i=1}^{n} \sum_{j=1}^{n} \omega_i \omega_j \sigma_{ij} = \min_\omega \omega^{\prime}\Sigma\omega.$$
 
-While staying fully invested across all available assets \\N\\, \\\sum\_{i=1}^{N} \omega_i = 1\\. The analytical solution for the minimum-variance portfolio is
+While staying fully invested across all available assets $N$, $\sum_{i=1}^{N} \omega_i = 1$. The analytical solution for the minimum-variance portfolio is
 
-\\\omega\_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},\\
+$$\omega_\text{mvp} = \frac{\Sigma^{-1}\iota}{\iota^{\prime}\Sigma^{-1}\iota},$$
 
-where \\\iota\\ is a vector of 1’s and \\\Sigma^{-1}\\ is the inverse of the variance-covariance matrix \\\Sigma\\. See [Proofs](../chapters/proofs.llms.md) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:
+where $\iota$ is a vector of 1’s and $\Sigma^{-1}$ is the inverse of the variance-covariance matrix $\Sigma$. See [Proofs](../chapters/proofs.llms.md) in the Appendix for details on the derivation. In the following code chunk, we calculate the weights of the minimum-variance portfolio:
 
 ## R
 
@@ -424,7 +424,7 @@ shape: (1, 3)
 
 ## Efficient Portfolios
 
-In many instances, earning the lowest possible variance may not be the desired outcome. Instead, we generalize the concept of efficient portfolios, where, in addition to minimizing portfolio variance, the investor aims to earn a **minimum expected return** \\\omega^{\prime}\mu \geq \bar{\mu}.\\ In other words, when \\\bar\mu\geq \omega\_\text{mvp}^{\prime}\mu\\, the investor is willing to accept a higher portfolio variance in return for earning a higher expected return.
+In many instances, earning the lowest possible variance may not be the desired outcome. Instead, we generalize the concept of efficient portfolios, where, in addition to minimizing portfolio variance, the investor aims to earn a **minimum expected return** $\omega^{\prime}\mu \geq \bar{\mu}.$ In other words, when $\bar\mu\geq \omega_\text{mvp}^{\prime}\mu$, the investor is willing to accept a higher portfolio variance in return for earning a higher expected return.
 
 Suppose, for instance, the investor wants to earn at least the historical average return of the asset that delivered the highest average returns in the past:
 
@@ -442,13 +442,13 @@ mu_bar = assets["mu"].max()
 
 Formally, the optimization problem is given by
 
-\\\min\_\omega \omega^{\prime}\Sigma\omega \text{ s.t. } \omega^{\prime}\iota = 1 \text{ and } \omega^{\prime}\mu\geq\bar\mu.\\
+$$\min_\omega \omega^{\prime}\Sigma\omega \text{ s.t. } \omega^{\prime}\iota = 1 \text{ and } \omega^{\prime}\mu\geq\bar\mu.$$
 
 The analytic solution for the efficient portfolio can be derived as:
 
-\\\omega\_{efp} = \omega\_\text{mvp} + \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
+$$\omega_{efp} = \omega_\text{mvp} + \frac{\tilde\lambda}{2}\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
 
-where \\\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}\\, \\C = \iota'\Sigma^{-1}\iota\\, \\D=\iota'\Sigma^{-1}\mu\\, and \\E=\mu'\Sigma^{-1}\mu\\. For details, we again refer to the [Proofs](../chapters/proofs.llms.md) in the Appendix.
+where $\tilde\lambda = 2\frac{\bar\mu - D/C}{E-D^2/C}$, $C = \iota'\Sigma^{-1}\iota$, $D=\iota'\Sigma^{-1}\mu$, and $E=\mu'\Sigma^{-1}\mu$. For details, we again refer to the [Proofs](../chapters/proofs.llms.md) in the Appendix.
 
 The code below implements the analytic solution to this optimization problem and collects the resulting portfolio return and risk in a data frame.
 
@@ -557,19 +557,19 @@ The big dots indicate the location of the minimum-variance and the efficient por
 
 The figure illustrates the substantial diversification benefits: Instead of allocating all wealth into one asset that delivered a high average return in the past (at a substantial volatility), the efficient portfolio promises exactly the same expected returns but at a much lower volatility.
 
-It should be noted that the level of desired returns \\\bar\mu\\ reflects the risk-aversion of the investor. Less risk-averse investors may require a higher level of desired returns. In contrast, more risk-averse investors may only choose \\\bar\mu\\ closer to the expected return of the minimum-variance portfolio. Very often, the mean-variance framework is instead derived as the optimal decision framework of an investor with a mean-variance utility function with a coefficient of relative risk aversion \\\gamma\\. In the [Proofs](../chapters/proofs.llms.md) in the Appendix, we show that there is a one-to-one mapping from \\\gamma\\ to the desired level of expected returns \\\bar\mu\\, which implies that the resulting efficient portfolios are equivalent and do not depend on the way the optimization problem is formulated.
+It should be noted that the level of desired returns $\bar\mu$ reflects the risk-aversion of the investor. Less risk-averse investors may require a higher level of desired returns. In contrast, more risk-averse investors may only choose $\bar\mu$ closer to the expected return of the minimum-variance portfolio. Very often, the mean-variance framework is instead derived as the optimal decision framework of an investor with a mean-variance utility function with a coefficient of relative risk aversion $\gamma$. In the [Proofs](../chapters/proofs.llms.md) in the Appendix, we show that there is a one-to-one mapping from $\gamma$ to the desired level of expected returns $\bar\mu$, which implies that the resulting efficient portfolios are equivalent and do not depend on the way the optimization problem is formulated.
 
 ## The Efficient Frontier
 
-The set of portfolios that satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility is called the *efficient frontier*, see, e.g., Merton ([1972](#ref-Merton1972)). . To derive the portfolios that span the efficient frontier, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) proves very helpful. In short, the theorem states that as soon as we have two efficient portfolios (such as the minimum-variance portfolio \\\omega\_\text{mvp}\\ and the efficient portfolio for a higher required level of expected returns \\\omega\_\bar\mu\\, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. In other words, the efficient frontier can be characterized by the following equation:
+The set of portfolios that satisfies the condition that no other portfolio exists with a higher expected return for a given level of volatility is called the *efficient frontier*, see, e.g., Merton ([1972](#ref-Merton1972)). . To derive the portfolios that span the efficient frontier, the [mutual fund separation theorem](https://en.wikipedia.org/wiki/Mutual_fund_separation_theorem) proves very helpful. In short, the theorem states that as soon as we have two efficient portfolios (such as the minimum-variance portfolio $\omega_\text{mvp}$ and the efficient portfolio for a higher required level of expected returns $\omega_\bar\mu$, we can characterize the entire efficient frontier by combining these two portfolios. That is, any linear combination of the two portfolio weights will again represent an efficient portfolio. In other words, the efficient frontier can be characterized by the following equation:
 
-\\\omega\_{a\mu_1 + (1-a)\mu_2} = a \cdot \omega\_{\mu_1} + (1-a) \cdot\omega\_{\mu_2},\\
+$$\omega_{a\mu_1 + (1-a)\mu_2} = a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2},$$
 
-where \\a\\ is a scalar between 0 and 1, \\\omega\_{\mu_i}\\ is an efficient portfolio that delivers the expected return \\\mu_i\\. It is straightforward to prove the theorem. Consider the analytical solution for the efficient portfolio, which delivers expected returns \\\mu_i\\, implying:
+where $a$ is a scalar between 0 and 1, $\omega_{\mu_i}$ is an efficient portfolio that delivers the expected return $\mu_i$. It is straightforward to prove the theorem. Consider the analytical solution for the efficient portfolio, which delivers expected returns $\mu_i$, implying:
 
-\\a \cdot \omega\_{\mu_1} + (1-a) \cdot\omega\_{\mu_2} = \left(\frac{a\mu_1 + (1-a)\mu_2- D/C }{E-D^2/C}\right)\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),\\
+$$a \cdot \omega_{\mu_1} + (1-a) \cdot\omega_{\mu_2} = \left(\frac{a\mu_1 + (1-a)\mu_2- D/C }{E-D^2/C}\right)\left(\Sigma^{-1}\mu -\frac{D}{C}\Sigma^{-1}\iota \right),$$
 
-which corresponds to the efficient portfolio earning \\a\mu_1 + (1-a)\mu_2\\ in expectation.
+which corresponds to the efficient portfolio earning $a\mu_1 + (1-a)\mu_2$ in expectation.
 
 The code below implements the construction of this efficient frontier, which characterizes the highest expected return achievable at each level of risk.
 

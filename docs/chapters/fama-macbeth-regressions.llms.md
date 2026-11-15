@@ -4,15 +4,16 @@ In this chapter, we present a simple implementation of Fama and MacBeth ([1973](
 
 Researchers use the two-stage regression approach to estimate risk premiums in various markets, but predominately in the stock market. Essentially, the two-step Fama-MacBeth regressions exploit a linear relationship between expected returns and exposure to (priced) risk factors. The basic idea of the regression approach is to project asset returns on factor exposures or characteristics that resemble exposure to a risk factor in the cross-section in each time period. Then, in the second step, the estimates are aggregated across time to test if a risk factor is priced. In principle, Fama-MacBeth regressions can be used in the same way as portfolio sorts introduced in previous chapters.
 
-The Fama-MacBeth procedure is a simple two-step approach: The first step uses the exposures (characteristics) as explanatory variables in \\T\\ cross-sectional regressions. For example, if \\r\_{i,t+1}\\ denote the excess returns of asset \\i\\ in month \\t+1\\, then the famous Fama-French three-factor model implies the following return generating process (see also [Campbell et al. 1998](#ref-Campbell1998)):
+The Fama-MacBeth procedure is a simple two-step approach: The first step uses the exposures (characteristics) as explanatory variables in $T$ cross-sectional regressions. For example, if $r_{i,t+1}$ denote the excess returns of asset $i$ in month $t+1$, then the famous Fama-French three-factor model implies the following return generating process (see also [Campbell et al. 1998](#ref-Campbell1998)):
 
-\\\begin{aligned}r\_{i,t+1} = \alpha_t + \lambda^{M}\_t \beta^M\_{i,t} + \lambda^{SMB}\_t \beta^{SMB}\_{i,t} + \lambda^{HML}\_t \beta^{HML}\_{i,t} + \epsilon\_{i,t+1}.\end{aligned} \tag{1}\\
+$$\begin{aligned}r_{i,t+1} = \alpha_t + \lambda^{M}_t \beta^M_{i,t} + \lambda^{SMB}_t \beta^{SMB}_{i,t} + \lambda^{HML}_t \beta^{HML}_{i,t} + \epsilon_{i,t+1}.\end{aligned}
+\tag{1}$$
 
-Here, we are interested in the compensation \\\lambda^{f}\_t\\ for the exposure to each risk factor \\\beta^{f}\_{i,t}\\ at each time point, i.e., the risk premium. Note the terminology: \\\beta^{f}\_{i,t}\\ is an asset-specific characteristic, e.g., a factor exposure or an accounting variable. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., \\\lambda_t^{f}\neq0\\.
+Here, we are interested in the compensation $\lambda^{f}_t$ for the exposure to each risk factor $\beta^{f}_{i,t}$ at each time point, i.e., the risk premium. Note the terminology: $\beta^{f}_{i,t}$ is an asset-specific characteristic, e.g., a factor exposure or an accounting variable. *If* there is a linear relationship between expected returns and the characteristic in a given month, we expect the regression coefficient to reflect the relationship, i.e., $\lambda_t^{f}\neq0$.
 
-In the second step, the time-series average \\\frac{1}{T}\sum\_{t=1}^T \hat\lambda^{f}\_t\\ of the estimates \\\hat\lambda^{f}\_t\\ can then be interpreted as the risk premium for the specific risk factor \\f\\. We follow Zaffaroni and Zhou ([2022](#ref-Zaffaroni2022)) and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time \\t+1\\ variables, then the regression approach captures risk attributes rather than risk premiums.
+In the second step, the time-series average $\frac{1}{T}\sum_{t=1}^T \hat\lambda^{f}_t$ of the estimates $\hat\lambda^{f}_t$ can then be interpreted as the risk premium for the specific risk factor $f$. We follow Zaffaroni and Zhou ([2022](#ref-Zaffaroni2022)) and consider the standard cross-sectional regression to predict future returns. If the characteristics are replaced with time $t+1$ variables, then the regression approach captures risk attributes rather than risk premiums.
 
-Before we move to the implementation, we want to highlight that the characteristics, e.g., \\\hat\beta^{f}\_{i}\\, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of \\\hat\beta^{f}\_{i}\\ impact the risk premiums’ standard errors. Measurement error in \\\hat\beta^{f}\_{i}\\ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias (see, e.g., [Shanken 1992](#ref-Shanken1992); [Kim 1995](#ref-Kim1995); [Chen et al. 2015](#ref-Chen2015), among others) but also shows that the bias goes to zero as \\T \to \infty\\. We refer to Gagliardini et al. ([2016](#ref-Gagliardini2016)) for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks, Hou et al. ([2020](#ref-Hou2020)) advocates using weighted-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
+Before we move to the implementation, we want to highlight that the characteristics, e.g., $\hat\beta^{f}_{i}$, are often estimated in a separate step before applying the actual Fama-MacBeth methodology. You can think of this as a *step 0*. You might thus worry that the errors of $\hat\beta^{f}_{i}$ impact the risk premiums’ standard errors. Measurement error in $\hat\beta^{f}_{i}$ indeed affects the risk premium estimates, i.e., they lead to biased estimates. The literature provides adjustments for this bias (see, e.g., [Shanken 1992](#ref-Shanken1992); [Kim 1995](#ref-Kim1995); [Chen et al. 2015](#ref-Chen2015), among others) but also shows that the bias goes to zero as $T \to \infty$. We refer to Gagliardini et al. ([2016](#ref-Gagliardini2016)) for an in-depth discussion also covering the case of time-varying betas. Moreover, if you plan to use Fama-MacBeth regressions with individual stocks, Hou et al. ([2020](#ref-Hou2020)) advocates using weighted-least squares to estimate the coefficients such that they are not biased toward small firms. Without this adjustment, the high number of small firms would drive the coefficient estimates.
 
 We use the following packages throughout this chapter:
 
@@ -151,7 +152,7 @@ data_fama_macbeth = (data_fama_macbeth
 
 ## Cross-Sectional Regression
 
-Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums \\\hat\lambda^{f}\_t\\ for each point in time.
+Next, we run the cross-sectional regressions with the characteristics as explanatory variables for each month. We regress the returns of the test assets at a particular time point on the characteristics of each asset. By doing so, we get an estimate of the risk premiums $\hat\lambda^{f}_t$ for each point in time.
 
 ## R
 
@@ -187,7 +188,7 @@ risk_premiums = pl.concat([
 
 ## Time-Series Aggregation
 
-Now that we have the risk premiums’ estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the \\t\\-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests.
+Now that we have the risk premiums’ estimates for each period, we can average across the time-series dimension to get the expected risk premium for each characteristic. Similarly, we manually create the $t$-test statistics for each regressor, which we can then compare to usual critical values of 1.96 or 2.576 for two-tailed significance tests.
 
 ## R
 
@@ -257,7 +258,7 @@ left_join(
 
 ## Python
 
-We compute the Newey-West \\t\\-statistics by fitting a constant-only model for each factor with a HAC covariance estimator using six lags.
+We compute the Newey-West $t$-statistics by fitting a constant-only model for each factor with a HAC covariance estimator using six lags.
 
 ``` python
 def estimate_newey_west(group):

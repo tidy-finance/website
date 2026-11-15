@@ -28,4 +28,6 @@ uv run quarto render                # runs Quarto with the Python in .venv
 
 Add R packages with `uvr add pkg` and commit `uvr.toml` and `uvr.lock`.
 
+The site is rendered with Quarto 1.11.9; `_quarto.yml` requires at least that version (`quarto --version`). Commit `docs/` and `_freeze/` after rendering.
+
 To find the **R package** `tidyfinance`, please consider this [GitHub repository](https://github.com/tidy-finance/r-tidyfinance).

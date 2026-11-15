@@ -14,28 +14,31 @@ The Python package lives in the [py-tidyfinance repository.](https://github.com/
 
 ## R
 
-You can install the released version of `tidyfinance` [from CRAN](https://cran.r-project.org/package=tidyfinance) via:
+You can add the released version of `tidyfinance` [from CRAN](https://cran.r-project.org/package=tidyfinance) to your project with [`uvr`](https://github.com/nbafrank/uvr), in the terminal:
 
-``` r
-install.packages("tidyfinance")
+``` bash
+uvr add tidyfinance
 ```
 
 You can install the development version of `tidyfinance` from [GitHub](https://github.com/tidy-finance/r-tidyfinance) (which might not be fully tested) via:
 
-``` r
-# install.packages("pak")
-pak::pak("tidy-finance/r-tidyfinance")
+``` bash
+uvr add tidy-finance/r-tidyfinance
 ```
 
 ## Python
 
-You can install the released version of `tidyfinance` [from PyPI](https://pypi.org/project/tidyfinance/) via:
+You can add the released version of `tidyfinance` [from PyPI](https://pypi.org/project/tidyfinance/) to your project with [`uv`](https://docs.astral.sh/uv/), in the terminal:
 
-    pip install tidyfinance
+``` bash
+uv add tidyfinance
+```
 
 You can install the development version of `tidyfinance` from [GitHub](https://github.com/tidy-finance/py-tidyfinance) (which might not be fully tested) via:
 
-    pip install "git+https://github.com/tidy-finance/py-tidyfinance"
+``` bash
+uv add "git+https://github.com/tidy-finance/py-tidyfinance"
+```
 
 ## Usage
 

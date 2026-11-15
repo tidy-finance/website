@@ -738,7 +738,7 @@ The figure shows the distribution of size premiums for various sorting choices. 
 
 Fama, Eugene F., and Kenneth R. French. 1993. “Common risk factors in the returns on stocks and bonds.” *Journal of Financial Economics* 33 (1): 3–56. <https://doi.org/10.1016/0304-405X(93)90023-5>.
 
-Harvey, Campbell R., Yan Liu, and Heqing Zhu. 2016. “\\\ldots\\ and the cross-section of expected returns.” *Review of Financial Studies* 29 (1): 5–68. <https://doi.org/10.1093/rfs/hhv059>.
+Harvey, Campbell R., Yan Liu, and Heqing Zhu. 2016. “$\ldots$ and the cross-section of expected returns.” *Review of Financial Studies* 29 (1): 5–68. <https://doi.org/10.1093/rfs/hhv059>.
 
 Hasler, Mathias. 2021. “Is the Value Premium Smaller Than We Thought?” *Working Paper*. <https://ssrn.com/abstract=3886984>.
 
