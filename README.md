@@ -22,9 +22,12 @@ R packages come from [uvr](https://github.com/nbafrank/uvr) (`uvr.toml`, `uvr.lo
 uvr r install 4.6.1                 # once: installs R (pinned in .r-version)
 uvr sync                            # R packages into .uvr/library
 uv sync                             # Python and its packages into .venv/
-eval "$(uvr activate --emit sh)"    # puts uvr's R on the PATH (PowerShell: uvr activate --emit powershell | Invoke-Expression)
+eval "$(uvr activate --emit sh)"    # puts uvr's R on the PATH
+unset R_ENVIRON_USER                # activation blanks it, which hides the project .Renviron (credentials)
 uv run quarto render                # runs Quarto with the Python in .venv
 ```
+
+On Windows (PowerShell), activate with `uvr activate --emit powershell | Out-String | Invoke-Expression; Remove-Item Env:R_ENVIRON_USER` instead of the `eval` and `unset` lines. If `uvr r install` fails with "Access is denied", close Positron and R, delete the leftover folders in `$HOME\.uvr\r-versions`, and try again; if endpoint protection keeps blocking it, set the user environment variable `UVR_R_INSTALL_DIR` to a folder outside your user profile.
 
 Add R packages with `uvr add pkg` and commit `uvr.toml` and `uvr.lock`.
 

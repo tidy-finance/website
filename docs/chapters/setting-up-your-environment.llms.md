@@ -78,13 +78,7 @@ Some chapters require credentials, for example, a WRDS username and password to 
 
 ## R
 
-R reads environment variables from a `.Renviron` file in your project directory. Create one with:
-
-``` r
-usethis::edit_r_environ(scope = "project")
-```
-
-Add your credentials as `KEY=value` pairs:
+R reads environment variables from a `.Renviron` file in your project directory. Create a plain-text file with this name in the project folder (for example, via `File > New File` in Positron) and add your credentials as `KEY=value` pairs:
 
     WRDS_USER=your_username
     WRDS_PASSWORD=your_password

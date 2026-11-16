@@ -44,7 +44,7 @@ To get started, we load the required packages and data.
 
 ## R
 
-The main focus is on the workflow behind the `tidymodels` package collection ([Kuhn and Wickham 2020](#ref-tidymodels)), a collection of packages for modeling and ML using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. Kuhn and Silge ([2018](#ref-Kuhn2022)) provide a thorough introduction into all `tidymodels` components. `glmnet` ([Simon et al. 2011](#ref-glmnet)) was developed and released in sync with Tibshirani ([1996](#ref-Tibshirani1996)) and provides an R implementation of Elastic Net estimation. The package `timetk` ([Dancho and Vaughan 2022](#ref-timetk)) provides useful tools for time series data wrangling.
+The main focus is on the workflow behind the `tidymodels` package collection ([Kuhn and Wickham 2020](#ref-tidymodels)), a collection of packages for modeling and ML using `tidyverse` principles. `tidymodels` comes with a handy workflow for all sorts of typical prediction tasks. Kuhn and Silge ([2018](#ref-Kuhn2022)) provide a thorough introduction into all `tidymodels` components. `glmnet` ([Simon et al. 2011](#ref-glmnet)) was developed and released in sync with Tibshirani ([1996](#ref-Tibshirani1996)) and provides an R implementation of Elastic Net estimation.
 
 ``` r
 library(nanoparquet)
@@ -53,7 +53,6 @@ library(tidymodels)
 library(scales)
 library(furrr)
 library(glmnet)
-library(timetk)
 
 theme_set(theme_minimal())
 ```
@@ -1041,8 +1040,6 @@ Avramov, Doron, Si Cheng, Lior Metzker, and Stefan Voigt. 2023. “Integrating f
 Cochrane, John H. 2009. *Asset pricing (revised edition)*. Princeton University Press.
 
 Cochrane, John H. 2011. “Presidential address: Discount rates.” *The Journal of Finance* 66 (4): 1047–108. <https://doi.org/10.1111/j.1540-6261.2011.01671.x>.
-
-Dancho, Matt, and Davis Vaughan. 2022. *timetk: A tool kit for working with time series in R*. <https://CRAN.R-project.org/package=timetk>.
 
 De Prado, Marcos Lopez. 2018. *Advances in financial machine learning*. John Wiley & Sons. <https://doi.org/10.5555/3217448>.
 

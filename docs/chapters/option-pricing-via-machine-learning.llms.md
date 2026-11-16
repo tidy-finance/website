@@ -19,7 +19,7 @@ library(glmnet)
 theme_set(theme_minimal())
 ```
 
-The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
+The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The first time you use `torch`, run `torch::install_torch()` once; it downloads the `libtorch` libraries that `torch` needs. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
 
 ## Python
 
