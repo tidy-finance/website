@@ -96,7 +96,7 @@ file_name <- "F-F_Research_Data_Factors_CSV.zip"
 url <- paste0(base_url, file_name)
 ```
 
-Next, we replace the browser download with an HTTP request using the `httr2` [@httr2] package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French's server rejects requests that do not provide one.\index{httr2}
+Next, we replace the browser download with an HTTP request using the `httr2` [@httr2] package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French's server rejects requests that do not provide one, and we request HTTP/1.1 (`http_version = 2` is libcurl's code for it) because the server answers HTTP/2 requests from R with an error.\index{httr2}
 
 ```{r}
 #| label: accessing-and-managing-financial-data-download-ff-zip
@@ -106,9 +106,11 @@ library(httr2)
 tmp_zip <- tempfile(fileext = ".zip")
 
 request(url) |>
-  req_user_agent(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-  ) |>
+  req_user_agent(paste(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+  )) |>
+  req_options(http_version = 2) |>
   req_perform(path = tmp_zip)
 ```
 
@@ -182,7 +184,7 @@ Next, we replace the browser download with an HTTP request and extract the ZIP i
 
 ```{python}
 #| label: accessing-and-managing-financial-data-download-ff-zip-py
-resp = requests.get(url)
+resp = requests.get(url, impersonate="chrome")
 resp.raise_for_status()
 
 with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
@@ -190,7 +192,7 @@ with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
     raw_text = zf.read(file_name).decode("latin1")
 ```
 
-The most important part of this chunk is the `requests.get()` call. This is the moment where we replace all the manual browser work (open the website, click download, save the file) with a single, reproducible line of code. Then, calling `raise_for_status()` ensures we stop immediately if the server returns an error (e.g., HTTP 404 or 500) instead of quietly handling a broken file. Once this succeeds, `resp.content` is guaranteed to contain valid ZIP bytes that we can open in memory.
+The most important part of this chunk is the `requests.get()` call. This is the moment where we replace all the manual browser work (open the website, click download, save the file) with a single, reproducible line of code. We pass `impersonate="chrome"` so that the request looks like it comes from a regular browser, which Kenneth French's server expects. Then, calling `raise_for_status()` ensures we stop immediately if the server returns an error (e.g., HTTP 404 or 500) instead of quietly handling a broken file. Once this succeeds, `resp.content` is guaranteed to contain valid ZIP bytes that we can open in memory.
 
 The raw file contains documentation text followed by the actual data table(s). To emulate *scrolling down until the numbers start*, we split the file into blocks and keep the long one that contains the table.
 
