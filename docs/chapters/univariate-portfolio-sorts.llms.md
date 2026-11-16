@@ -2,7 +2,7 @@
 
 In this chapter, we dive into portfolio sorts, one of the most widely used statistical methodologies in empirical asset pricing (e.g., [Bali et al. 2016](#ref-BaliEngleMurray2016)). The key application of portfolio sorts is to examine whether one or more variables can predict future excess returns. In general, the idea is to sort individual stocks into portfolios, where the stocks within each portfolio are similar with respect to a sorting variable, such as firm size. The different portfolios then represent well-diversified investments that differ in the level of the sorting variable. You can then attribute the differences in the return distribution to the impact of the sorting variable. We start by introducing univariate portfolio sorts (which sort based on only one characteristic) and tackle bivariate sorting in [Value and Bivariate Sorts](../chapters/value-and-bivariate-sorts.llms.md).
 
-A univariate portfolio sort considers only one sorting variable \\x\_{i,t-1}\\. Here, \\i\\ denotes the stock and \\t-1\\ indicates that the characteristic is observable by investors at time \\t\\. The objective is to assess the cross-sectional relation between \\x\_{i,t-1}\\ and, typically, stock excess returns \\r\_{i,t}\\ at time \\t\\ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
+A univariate portfolio sort considers only one sorting variable $x_{i,t-1}$. Here, $i$ denotes the stock and $t-1$ indicates that the characteristic is observable by investors at time $t$. The objective is to assess the cross-sectional relation between $x_{i,t-1}$ and, typically, stock excess returns $r_{i,t}$ at time $t$ as the outcome variable. To illustrate how portfolio sorts work, we use estimates for market betas from the previous chapter as our sorting variable.
 
 We use the following packages throughout this chapter:
 
@@ -73,7 +73,7 @@ beta = (
 
 ## Sorting by Market Beta
 
-Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month \\t\\ information is available in month \\t+1\\.
+Next, we merge our sorting variable with the return data. We use the one-month *lagged* betas as a sorting variable to ensure that the sorts rely only on information available when we create the portfolios. To lag stock beta by one month, we add one month to the current date and join the resulting information with our return data. This procedure ensures that month $t$ information is available in month $t+1$.
 
 ## R
 
@@ -167,7 +167,7 @@ beta_longshort = (beta_portfolios
 )
 ```
 
-We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using Newey and West ([1987](#ref-Newey1987)) \\t\\-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation.
+We compute the average return and the corresponding standard error to test whether the long-short portfolio yields on average positive or negative excess returns. In the asset pricing literature, one typically adjusts for autocorrelation by using Newey and West ([1987](#ref-Newey1987)) $t$-statistics to test the null hypothesis that average portfolio excess returns are equal to zero. One necessary input for Newey-West standard errors is a chosen bandwidth based on the number of lags employed for the estimation.
 
 ## R
 
@@ -177,7 +177,6 @@ Researchers often default to a pre-specified lag length of six months. A data-dr
 model_fit <- lm(long_short ~ 1, data = beta_longshort)
 coeftest(model_fit, vcov = NeweyWest, lag = 6, prewhite = FALSE)
 ```
-
 
     t test of coefficients:
 
@@ -544,7 +543,6 @@ coeftest(
 )
 ```
 
-
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
@@ -587,7 +585,6 @@ coeftest(
   vcov = NeweyWest, lag = 6, prewhite = FALSE
 )
 ```
-
 
     t test of coefficients:
 

@@ -66,13 +66,14 @@ crsp_monthly = (crsp_monthly
 
 To estimate the CAPM regression coefficients
 
-\\ r\_{i, t} - r\_{f, t} = \alpha_i + \beta_i(r\_{m, t}-r\_{f,t})+\varepsilon\_{i, t} \tag{1}\\
+$$r_{i, t} - r_{f, t} = \alpha_i + \beta_i(r_{m, t}-r_{f,t})+\varepsilon_{i, t}
+\tag{1}$$
 
 we regress stock excess returns `ret_excess` on excess returns of the market portfolio `mkt_excess`.
 
 ## R
 
-R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute \\\hat\alpha_i\\ as well as \\\hat\beta_i\\.
+R provides a simple solution to estimate (linear) models with the function `lm()`. `lm()` requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `lm()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.
 
 ``` r
 model_fit <- lm(
@@ -88,11 +89,11 @@ coefficients
     (Intercept)  0.00992    0.00488    2.03 4.27e-02
     mkt_excess   1.37560    0.10761   12.78 8.89e-33
 
-`lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated \\\hat\beta_i\\ is above one (\\\hat\beta_i \approx 1.4\\).
+`lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
 
 ## Python
 
-Python provides a simple solution to estimate (linear) models with the function `pf.feols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `pf.feols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute \\\hat\alpha_i\\ as well as \\\hat\beta_i\\.
+Python provides a simple solution to estimate (linear) models with the function `pf.feols()`. The function requires a formula as input that is specified in a compact symbolic form. An expression of the form `y ~ model` is interpreted as a specification that the response `y` is modeled by a linear predictor specified symbolically by `model`. Such a model consists of a series of terms separated by `+` operators. In addition to standard linear models, `pf.feols()` provides a lot of flexibility. You should check out the documentation for more information. To start, we restrict the data only to the time series of observations in CRSP that correspond to Apple’s stock (i.e., to `permno` 14593 for Apple) and compute $\hat\alpha_i$ as well as $\hat\beta_i$.
 
 ``` python
 model_fit = pf.feols(
@@ -108,15 +109,16 @@ coefficients
     Intercept    0.009919    0.004884   2.031102  0.042747  0.000325  0.019513
     mkt_excess   1.375598    0.107606  12.783617  0.000000  1.164207  1.586989
 
-`pf.feols()` returns an object of class `Feols`, which contains all the information we usually care about with linear models. The `tidy()` method returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated \\\hat\beta_i\\ is above one (\\\hat\beta_i \approx 1.4\\).
+`pf.feols()` returns an object of class `Feols`, which contains all the information we usually care about with linear models. The `tidy()` method returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
 
 ## Rolling-Window Estimation
 
-After we estimated the regression coefficients on an example, we scale the estimation of \\\beta_i\\ to the entire CRSP sample and perform rolling-window estimations for every stock. Fitting millions of individual regressions—one for each stock and month—would be prohibitively slow. Fortunately, for a single-regressor model such as the CAPM, the rolling OLS coefficients have a closed-form solution that we can compute from rolling sums. Writing \\x\\ for the market excess return and \\y\\ for the stock excess return, the slope and intercept over a window read
+After we estimated the regression coefficients on an example, we scale the estimation of $\beta_i$ to the entire CRSP sample and perform rolling-window estimations for every stock. Fitting millions of individual regressions—one for each stock and month—would be prohibitively slow. Fortunately, for a single-regressor model such as the CAPM, the rolling OLS coefficients have a closed-form solution that we can compute from rolling sums. Writing $x$ for the market excess return and $y$ for the stock excess return, the slope and intercept over a window read
 
-\\ \hat\beta_i = \frac{S\_{xy}}{S\_{xx}}, \qquad \hat\alpha_i = \bar y - \hat\beta_i \bar x, \tag{2}\\
+$$\hat\beta_i = \frac{S_{xy}}{S_{xx}}, \qquad \hat\alpha_i = \bar y - \hat\beta_i \bar x,
+\tag{2}$$
 
-where \\S\_{xy} = \sum_t x_t y_t - \frac{1}{n}\sum_t x_t \sum_t y_t\\ and \\S\_{xx} = \sum_t x_t^2 - \frac{1}{n}\left(\sum_t x_t\right)^2\\. Because these quantities only require the rolling sums \\\sum_t x_t\\, \\\sum_t y_t\\, \\\sum_t x_t^2\\, \\\sum_t y_t^2\\, and \\\sum_t x_t y_t\\, we can compute the rolling betas—together with their \\t\\-statistics—for all stocks at once using vectorized rolling aggregations, without fitting a single regression. We refer to our blog post [Fast, Vectorized Beta Estimation](https://blog.tidy-finance.org/posts/fast-beta-estimation/) for a detailed derivation.
+where $S_{xy} = \sum_t x_t y_t - \frac{1}{n}\sum_t x_t \sum_t y_t$ and $S_{xx} = \sum_t x_t^2 - \frac{1}{n}\left(\sum_t x_t\right)^2$. Because these quantities only require the rolling sums $\sum_t x_t$, $\sum_t y_t$, $\sum_t x_t^2$, $\sum_t y_t^2$, and $\sum_t x_t y_t$, we can compute the rolling betas—together with their $t$-statistics—for all stocks at once using vectorized rolling aggregations, without fitting a single regression. We refer to our blog post [Fast, Vectorized Beta Estimation](https://blog.tidy-finance.org/posts/fast-beta-estimation/) for a detailed derivation.
 
 The following function implements this approach in three steps: (i) it computes the per-period cumulants for each stock, (ii) it rolls the sums over the requested `look_back` window, and (iii) it maps the aggregated sums into the closed-form estimates. We only keep windows with at least `min_obs` observations to avoid huge fluctuations if the time series is too short. As we demonstrate further below, we can apply the same function to daily returns data.
 
@@ -563,7 +565,7 @@ beta_monthly = (capm_monthly
 )
 ```
 
-To get some feeling, we illustrate the dispersion of the estimated \\\hat\beta_i\\ across different industries and across time below. [Figure 2](#fig-602) shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.
+To get some feeling, we illustrate the dispersion of the estimated $\hat\beta_i$ across different industries and across time below. [Figure 2](#fig-602) shows that typical business models across industries imply different exposure to the general market economy. However, there are barely any firms that exhibit a negative exposure to the market factor.
 
 ## R
 
@@ -967,7 +969,8 @@ Indeed, we find a positive correlation between our beta estimates. In the subseq
 2.  Compute beta estimates based on monthly data using five years of data and impose different numbers of minimum observations. How does the share of `permno`-`date` observations with successful beta estimates vary across the different requirements? Do you find a high correlation across the estimated betas?
 3.  Instead of using the closed-form estimation, estimate the rolling betas for a subset of 100 permnos of your choice by fitting individual regressions with `lm()` (R) or `pf.feols()` (Python) in a rolling window. Verify that you get the same results as with the vectorized code from above.
 4.  Filter out the stocks with negative betas. Do these stocks frequently exhibit negative betas, or do they resemble estimation errors?
-5.  Compute beta estimates for multi-factor models such as the Fama-French three-factor model by writing a rolling estimation that fits the model per stock with `lm()` (R) or `pf.feols()` (Python). In particular, your regression should support the model \\ r\_{i, t} - r\_{f, t} = \alpha_i + \sum\limits\_{j=1}^k\beta\_{i,j}(r\_{j, t}-r\_{f,t})+\varepsilon\_{i, t} \tag{3}\\ where \\r\_{j, t}\\ are the \\k\\ factor returns. Thus, for the three-factor model, you estimate four parameters (\\\alpha_i\\ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors.
+5.  Compute beta estimates for multi-factor models such as the Fama-French three-factor model by writing a rolling estimation that fits the model per stock with `lm()` (R) or `pf.feols()` (Python). In particular, your regression should support the model $$r_{i, t} - r_{f, t} = \alpha_i + \sum\limits_{j=1}^k\beta_{i,j}(r_{j, t}-r_{f,t})+\varepsilon_{i, t}
+    \tag{3}$$ where $r_{j, t}$ are the $k$ factor returns. Thus, for the three-factor model, you estimate four parameters ($\alpha_i$ and the slope coefficients). Provide some summary statistics of the cross-section of firms and their exposure to the different factors.
 
 ## References
 

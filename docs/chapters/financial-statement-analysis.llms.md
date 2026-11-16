@@ -59,7 +59,7 @@ By default, `fmp_get()` returns a `polars` data frame, so we can work with the r
 
 The balance sheet is one of the three primary financial statements capturing a company’s financial position at a specific moment in time. The statement lists all uses (assets) and sources (liabilities and equity) of funds, which result in the fundamental accounting equation:
 
-\\\text{Assets} = \text{Liabilities} + \text{Equity}\\
+$$\text{Assets} = \text{Liabilities} + \text{Equity}$$
 
 This equation reflects a core principle of accounting: a company’s resources (assets) must equal its sources of funding, whether from creditors (liabilities) or investors (shareholders’ equity). Assets represent resources that the company controls and expects to generate future economic benefits, such as cash, inventory, or equipment. Liabilities encompass all obligations to external parties, from short-term payables to long-term debt. Shareholders’ equity represents the residual claim on assets after accounting for all liabilities.
 
@@ -392,19 +392,19 @@ Liquidity ratios assess a company’s ability to meet its short-term obligations
 
 The Current Ratio is the most basic measure of liquidity, comparing all current assets to current liabilities:
 
-\\\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}\\
+$$\text{Current Ratio} = \frac{\text{Current Assets}}{\text{Current Liabilities}}$$
 
 A ratio above one indicates that the company has enough current assets to cover its current liabilities, which are due within one year as discussed above.
 
 However, not all current assets are equally liquid, i.e., can be easily sold to meet a company’s obligations. This aspect is reflected in the Quick Ratio:
 
-\\\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}\\
+$$\text{Quick Ratio} = \frac{\text{Current Assets - Inventory}}{\text{Current Liabilities}}$$
 
 The Quick Ratio provides a more stringent measure of liquidity by excluding inventory, which is typically the least liquid current asset. Furthermore, a company without inventory for production or sale will have a difficult operating position. A ratio above one suggests strong short-term solvency without relying on selling off inventory.
 
 The most conservative liquidity measure is the Cash Ratio:
 
-\\\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}\\
+$$\text{Cash Ratio} = \frac{\text{Cash and Cash Equivalents}}{\text{Current Liabilities}}$$
 
 This ratio focuses solely on the most liquid assets - cash and cash equivalents. While a ratio of one indicates robust liquidity, most companies maintain lower cash ratios to avoid holding excessive non-productive assets. After all, all that cash could also be distributed to equity or pay down costly debt.
 
@@ -507,15 +507,15 @@ Leverage ratios assess a company’s capital structure, in particular, its mix b
 
 The debt-to-equity ratio indicates how much a company is financing its operations through debt versus shareholders’ equity:
 
-\\\text{Debt-to-Equity} = \frac{\text{Total Debt}}{\text{Total Equity}}\\
+$$\text{Debt-to-Equity} = \frac{\text{Total Debt}}{\text{Total Equity}}$$
 
 The debt-to-asset ratio shows the percentage of assets financed through debt:
 
-\\\text{Debt-to-Asset} = \frac{\text{Total Debt}}{\text{Total Assets}}\\
+$$\text{Debt-to-Asset} = \frac{\text{Total Debt}}{\text{Total Assets}}$$
 
 Interest coverage measures a company’s ability to meet interest payments:
 
-\\\text{Interest Coverage} = \frac{\text{EBIT}}{\text{Interest Expense}}\\
+$$\text{Interest Coverage} = \frac{\text{EBIT}}{\text{Interest Expense}}$$
 
 Let’s calculate these ratios for our sample of companies:
 
@@ -726,19 +726,19 @@ Efficiency ratios measure how a company utilizes its assets and manages its oper
 
 Asset Turnover measures how efficiently a company uses its total assets to generate revenue:
 
-\\\text{Asset Turnover} = \frac{\text{Revenue}}{\text{Total Assets}}\\
+$$\text{Asset Turnover} = \frac{\text{Revenue}}{\text{Total Assets}}$$
 
 A higher ratio indicates more efficient use of assets in generating sales. However, this ratio typically varies significantly across industries - retail companies often have higher turnover ratios due to lower asset requirements, while manufacturing companies might show lower ratios due to substantial fixed asset investments. Such industry-specifics show the importance of cross-sectional comparisons, when making decisions based on data.
 
 Inventory turnover indicates how many times a company’s inventory is sold and replaced over a period:
 
-\\\text{Inventory Turnover} = \frac{\text{COGS}}{\text{Inventory}}\\
+$$\text{Inventory Turnover} = \frac{\text{COGS}}{\text{Inventory}}$$
 
 Higher inventory turnover suggests more efficient inventory management and working capital utilization. However, extremely high ratios might indicate potential stockouts, while very low ratios could suggest obsolete inventory or overinvestment in working capital.
 
 Receivables turnover measures how effectively a company collects payments from customers:
 
-\\\text{Receivables Turnover} = \frac{\text{Revenue}}{\text{Accounts Receivable}}\\ A higher ratio indicates more efficient credit and collection processes, though this must be balanced against the potential impact on sales from overly restrictive credit policies.
+$$\text{Receivables Turnover} = \frac{\text{Revenue}}{\text{Accounts Receivable}}$$ A higher ratio indicates more efficient credit and collection processes, though this must be balanced against the potential impact on sales from overly restrictive credit policies.
 
 Here is how we can calculate these efficiency metrics across our sample of companies:
 
@@ -833,17 +833,17 @@ Profitability ratios evaluate a company’s ability to generate earnings relativ
 
 The gross margin measures what percentage of revenue remains after accounting for the direct costs of producing goods or services:
 
-\\\text{Gross Margin} = \frac{\text{Gross Profit}}{\text{Revenue}}\\
+$$\text{Gross Margin} = \frac{\text{Gross Profit}}{\text{Revenue}}$$
 
 A higher gross margin indicates stronger pricing power or more efficient production processes. This metric is particularly useful for comparing companies within the same industry, as it reveals their relative efficiency in core operations before accounting for operating expenses and other costs.
 
 The profit margin reveals what percentage of revenue ultimately becomes net income:
 
-\\\text{Profit Margin} = \frac{\text{Net Income}}{\text{Revenue}}\\ This comprehensive profitability measure accounts for all costs, expenses, interest, and taxes. A higher profit margin suggests more effective overall cost management and stronger competitive position, though optimal margins vary significantly across industries.
+$$\text{Profit Margin} = \frac{\text{Net Income}}{\text{Revenue}}$$ This comprehensive profitability measure accounts for all costs, expenses, interest, and taxes. A higher profit margin suggests more effective overall cost management and stronger competitive position, though optimal margins vary significantly across industries.
 
 Return on Equity (ROE) measures how efficiently a company uses shareholders’ investments to generate profits:
 
-\\\text{After-Tax ROE} = \frac{\text{Net Income}}{\text{Total Equity}}\\ This metric is particularly important for investors as it directly measures the return on their invested capital (at least in terms of book value of equity). A higher ROE indicates more effective use of shareholders’ equity, though it must be considered alongside leverage ratios since high debt levels can artificially inflate ROE.
+$$\text{After-Tax ROE} = \frac{\text{Net Income}}{\text{Total Equity}}$$ This metric is particularly important for investors as it directly measures the return on their invested capital (at least in terms of book value of equity). A higher ROE indicates more effective use of shareholders’ equity, though it must be considered alongside leverage ratios since high debt levels can artificially inflate ROE.
 
 The next code chunk calculates these profitability metrics for our sample of companies, allowing us to analyze how different firms convert their revenue into various levels of profit and return on investment.
 

@@ -719,7 +719,7 @@ There is a solution to this challenge. As with many *big data* problems, you can
 
 ## R
 
-To keep track of the progress, we create ad-hoc progress updates using `message()`.
+To keep track of the progress, we create ad-hoc progress updates using `message()`. We write each batch to disk with `nanoparquet`’s `write_parquet()`, one file per `permno` in its own subfolder (`group_walk()` passes the data of each `permno` without the grouping column). Since each `permno` is processed in exactly one batch, re-running the loop overwrites each file instead of appending duplicates.
 
 ``` r
 dsf_db <- tbl(wrds, I("crsp.dsf_v2"))
@@ -776,11 +776,11 @@ for (j in 1:batches) {
 
     crsp_daily_sub |>
       group_by(permno) |>
-      arrow::write_dataset(
-        path = "data/crsp_daily",
-        format = "parquet",
-        existing_data_behavior = "overwrite"
-      )
+      group_walk(\(data, key) {
+        path <- paste0("data/crsp_daily/permno=", key$permno)
+        dir.create(path, recursive = TRUE, showWarnings = FALSE)
+        write_parquet(data, file.path(path, "part-0.parquet"))
+      })
   }
 
   message(

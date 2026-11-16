@@ -1,6 +1,5 @@
-if (Sys.info()["machine"] != "arm64") {
-  Sys.setlocale("LC_TIME", "English")
-}
+# English month and day names in dates (the locale is called "English" on Windows)
+Sys.setlocale("LC_TIME", if (.Platform$OS.type == "windows") "English" else "C")
 Sys.setenv(LANG = "en")
 
 options(

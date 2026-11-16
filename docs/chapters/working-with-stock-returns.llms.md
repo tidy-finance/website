@@ -10,7 +10,7 @@ We use the following packages throughout this chapter:
 
 Throughout the entire book, we always use the `tidyverse` ([Wickham et al. 2019](#ref-Wickham2019)) package. We also load the `tidyfinance` package to download stock price data and the `scales` ([Wickham and Seidel 2022](#ref-scales)) package, which provides nice formatting for axis labels in visualizations.
 
-You typically have to install a package once before you can load it into your active R session. In case you have not done this yet, call, for instance, `install.packages("tidyfinance")`.
+You typically have to install a package once before you can load it into your active R session. The Tidy Finance project environment already contains all packages of the book (see [Setting Up Tidy Finance](../chapters/setting-up-your-environment.llms.md)); in your own project, add a package in the terminal with, for instance, `uvr add tidyfinance`.
 
 ``` r
 library(tidyverse)
@@ -24,7 +24,7 @@ theme_set(theme_minimal())
 
 Throughout the entire book, we use the `polars` package ([Vink and Polars contributors 2024](#ref-polars)) as our core data frame library. `polars` is a modern, high-performance alternative to `pandas` with an expressive, expression-based API and excellent handling of large datasets. We also load the `tidyfinance` package to download stock price data.
 
-You typically have to install a package once before you can load it into your active Python session. In case you have not done this yet, call, for instance, `pip install polars tidyfinance` in your terminal.
+You typically have to install a package once before you can load it into your active Python session. The Tidy Finance project environment already contains all packages of the book (see [Setting Up Tidy Finance](../chapters/setting-up-your-environment.llms.md)); in your own project, add packages in the terminal with, for instance, `uv add polars tidyfinance`.
 
 ``` python
 import polars as pl
@@ -55,15 +55,15 @@ prices <- download_data(
 prices
 ```
 
-    # A tibble: 6,288 × 8
+    # A tibble: 6,289 × 8
       symbol date          volume  open   low  high close adjusted_close
       <chr>  <date>         <dbl> <dbl> <dbl> <dbl> <dbl>          <dbl>
-    1 AAPL   2000-01-03 535796800 0.936 0.908 1.00  0.999          0.838
-    2 AAPL   2000-01-04 512377600 0.967 0.903 0.988 0.915          0.767
-    3 AAPL   2000-01-05 778321600 0.926 0.920 0.987 0.929          0.778
-    4 AAPL   2000-01-06 767972800 0.948 0.848 0.955 0.848          0.711
-    5 AAPL   2000-01-07 460734400 0.862 0.853 0.902 0.888          0.745
-    # ℹ 6,283 more rows
+    1 AAPL   2000-01-03 535796800 0.936 0.908 1.00  0.999          0.836
+    2 AAPL   2000-01-04 512377600 0.967 0.903 0.988 0.915          0.766
+    3 AAPL   2000-01-05 778321600 0.926 0.920 0.987 0.929          0.777
+    4 AAPL   2000-01-06 767972800 0.948 0.848 0.955 0.848          0.710
+    5 AAPL   2000-01-07 460734400 0.862 0.853 0.902 0.888          0.743
+    # ℹ 6,284 more rows
 
 ## Python
 
@@ -84,11 +84,11 @@ shape: (5, 8)
 | symbol | date       | volume    | open     | low      | high     | close    | adjusted_close |
 |--------|------------|-----------|----------|----------|----------|----------|----------------|
 | str    | date       | i64       | f64      | f64      | f64      | f64      | f64            |
-| "AAPL" | 2000-01-03 | 535796800 | 0.936384 | 0.907924 | 1.004464 | 0.999442 | 0.837724       |
-| "AAPL" | 2000-01-04 | 512377600 | 0.966518 | 0.90346  | 0.987723 | 0.915179 | 0.767096       |
-| "AAPL" | 2000-01-05 | 778321600 | 0.926339 | 0.919643 | 0.987165 | 0.928571 | 0.778321       |
-| "AAPL" | 2000-01-06 | 767972800 | 0.947545 | 0.848214 | 0.955357 | 0.848214 | 0.710966       |
-| "AAPL" | 2000-01-07 | 460734400 | 0.861607 | 0.852679 | 0.901786 | 0.888393 | 0.744644       |
+| "AAPL" | 2000-01-03 | 535796800 | 0.936384 | 0.907924 | 1.004464 | 0.999442 | 0.836367       |
+| "AAPL" | 2000-01-04 | 512377600 | 0.966518 | 0.90346  | 0.987723 | 0.915179 | 0.765853       |
+| "AAPL" | 2000-01-05 | 778321600 | 0.926339 | 0.919643 | 0.987165 | 0.928571 | 0.777059       |
+| "AAPL" | 2000-01-06 | 767972800 | 0.947545 | 0.848214 | 0.955357 | 0.848214 | 0.709814       |
+| "AAPL" | 2000-01-07 | 460734400 | 0.861607 | 0.852679 | 0.901786 | 0.888393 | 0.743437       |
 
 `download_data(domain = "Stock Prices")` downloads stock market data from Yahoo Finance. The function returns a data frame with eight self-explanatory columns: `symbol`, `date`, the daily `volume` (in the number of traded shares), the market prices at the `open`, `low`, `high`, `close`, and the `adjusted_close` price in USD. The adjusted prices are corrected for anything that might affect the stock price after the market closes, e.g., stock splits and dividends. These actions affect the quoted prices, but they have no direct impact on the investors who hold the stock. Therefore, we often rely on adjusted prices when it comes to analyzing the returns an investor would have earned by holding the stock continuously.
 
@@ -140,7 +140,7 @@ Prices are in USD, adjusted for dividend payments and stock splits.
 
 ## Computing Returns
 
-Instead of analyzing prices, we compute daily returns defined as \\r_t = p_t / p\_{t-1} - 1\\, where \\p_t\\ is the adjusted price at the end of day \\t\\. In that context, computing the previous value (the lag) is helpful.
+Instead of analyzing prices, we compute daily returns defined as $r_t = p_t / p_{t-1} - 1$, where $p_t$ is the adjusted price at the end of day $t$. In that context, computing the previous value (the lag) is helpful.
 
 ## R
 
@@ -154,7 +154,7 @@ returns <- prices |>
 returns
 ```
 
-    # A tibble: 6,288 × 3
+    # A tibble: 6,289 × 3
       symbol date           ret
       <chr>  <date>       <dbl>
     1 AAPL   2000-01-03 NA     
@@ -162,7 +162,7 @@ returns
     3 AAPL   2000-01-05  0.0146
     4 AAPL   2000-01-06 -0.0865
     5 AAPL   2000-01-07  0.0474
-    # ℹ 6,283 more rows
+    # ℹ 6,284 more rows
 
 ## Python
 
@@ -175,7 +175,7 @@ returns = (prices
 returns
 ```
 
-shape: (6_288, 3)
+shape: (6_289, 3)
 
 | symbol | date       | ret       |
 |--------|------------|-----------|
@@ -183,14 +183,14 @@ shape: (6_288, 3)
 | "AAPL" | 2000-01-03 | null      |
 | "AAPL" | 2000-01-04 | -0.08431  |
 | "AAPL" | 2000-01-05 | 0.014633  |
-| "AAPL" | 2000-01-06 | -0.086539 |
+| "AAPL" | 2000-01-06 | -0.086538 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
-| "AAPL" | 2024-12-23 | 0.003065  |
 | "AAPL" | 2024-12-24 | 0.011478  |
 | "AAPL" | 2024-12-26 | 0.003176  |
 | "AAPL" | 2024-12-27 | -0.013242 |
 | "AAPL" | 2024-12-30 | -0.013263 |
+| "AAPL" | 2024-12-31 | -0.007058 |
 
 The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value because there is no previous price.
 
@@ -295,14 +295,14 @@ shape: (9, 2)
 | statistic    | ret       |
 |--------------|-----------|
 | str          | f64       |
-| "count"      | 6287.0    |
+| "count"      | 6288.0    |
 | "null_count" | 0.0       |
-| "mean"       | 0.001217  |
-| "std"        | 0.024404  |
+| "mean"       | 0.001216  |
+| "std"        | 0.024402  |
 | "min"        | -0.518692 |
-| "25%"        | -0.009819 |
+| "25%"        | -0.009818 |
 | "50%"        | 0.000948  |
-| "75%"        | 0.012684  |
+| "75%"        | 0.012675  |
 | "max"        | 0.13905   |
 
 We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
@@ -356,7 +356,7 @@ returns |>
     22  2021  0.00131     0.0158   -0.0417    0.0539
     23  2022 -0.000970    0.0225   -0.0587    0.0890
     24  2023  0.00168     0.0128   -0.0480    0.0469
-    25  2024  0.00120     0.0143   -0.0482    0.0726
+    25  2024  0.00116     0.0143   -0.0482    0.0726
 
 In case you wonder, the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. It acts as a placeholder that gets replaced by the name of the function being applied (e.g., mean, sd, min, max) when creating new column names. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The `print()` function controls the R console’s output options.
 
@@ -397,7 +397,7 @@ shape: (25, 9)
 | 2021 | 252   | 0.001  | 0.016 | -0.042 | -0.008 | 0.001  | 0.012 | 0.054 |
 | 2022 | 251   | -0.001 | 0.022 | -0.059 | -0.016 | -0.001 | 0.014 | 0.089 |
 | 2023 | 250   | 0.002  | 0.013 | -0.048 | -0.006 | 0.002  | 0.009 | 0.047 |
-| 2024 | 251   | 0.001  | 0.014 | -0.048 | -0.007 | 0.002  | 0.009 | 0.073 |
+| 2024 | 252   | 0.001  | 0.014 | -0.048 | -0.007 | 0.002  | 0.009 | 0.073 |
 
 ## Scaling Up the Analysis
 
@@ -418,13 +418,13 @@ symbols
 ```
 
     # A tibble: 30 × 5
-      symbol name                    location           exchange currency
-      <chr>  <chr>                   <chr>              <chr>    <chr>   
-    1 GS     GOLDMAN SACHS GROUP INC Vereinigte Staaten New Yor… USD     
-    2 CAT    CATERPILLAR INC         Vereinigte Staaten New Yor… USD     
-    3 UNH    UNITEDHEALTH GROUP INC  Vereinigte Staaten New Yor… USD     
-    4 MSFT   MICROSOFT CORP          Vereinigte Staaten NASDAQ   USD     
-    5 TRV    TRAVELERS COMPANIES INC Vereinigte Staaten New Yor… USD     
+      symbol name                location           exchange     currency
+      <chr>  <chr>               <chr>              <chr>        <chr>   
+    1 GS     GOLDMAN SACHS GROUP Vereinigte Staaten New York St… USD     
+    2 CAT    CATERPILLAR INC     Vereinigte Staaten New York St… USD     
+    3 MSFT   MICROSOFT           Vereinigte Staaten NASDAQ       USD     
+    4 AMGN   AMGEN INC           Vereinigte Staaten NASDAQ       USD     
+    5 V      VISA CLASS A        Vereinigte Staaten New York St… USD     
     # ℹ 25 more rows
 
 ## Python
@@ -460,7 +460,7 @@ prices_daily = tf.download_data(
 )
 ```
 
-The resulting data frame contains 184293 daily observations for GS, CAT, UNH, MSFT, TRV, AMGN, V, AXP, GOOGL, JPM, HD, AAPL, SHW, MCD, JNJ, AMZN, HON, BA, IBM, NVDA, CVX, CRM, MMM, PG, MRK, WMT, CSCO, DIS, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 184323 daily observations for GS, CAT, MSFT, AMGN, V, UNH, TRV, AAPL, SHW, HD, JPM, AXP, GOOGL, JNJ, MCD, AMZN, IBM, HON, CRM, CVX, MMM, BA, PG, NVDA, MRK, WMT, DIS, CSCO, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -537,32 +537,32 @@ returns_daily |>
        <chr>       <dbl>    <dbl>     <dbl>     <dbl>
      1 AAPL     0.00122    0.0244    -0.519     0.139
      2 AMGN     0.000467   0.0193    -0.134     0.151
-     3 AMZN     0.00110    0.0311    -0.248     0.345
+     3 AMZN     0.00109    0.0311    -0.248     0.345
      4 AXP      0.000602   0.0225    -0.176     0.219
-     5 BA       0.000551   0.0222    -0.238     0.243
+     5 BA       0.000551   0.0221    -0.238     0.243
      6 CAT      0.000736   0.0202    -0.145     0.147
      7 CRM      0.00119    0.0264    -0.271     0.260
      8 CSCO     0.000342   0.0230    -0.162     0.244
-     9 CVX      0.000493   0.0173    -0.221     0.227
-    10 DIS      0.000436   0.0193    -0.184     0.160
+     9 CVX      0.000495   0.0173    -0.221     0.227
+    10 DIS      0.000437   0.0193    -0.184     0.160
     11 GOOGL    0.00103    0.0193    -0.116     0.200
-    12 GS       0.000607   0.0226    -0.190     0.265
+    12 GS       0.000606   0.0226    -0.190     0.265
     13 HD       0.000548   0.0189    -0.287     0.141
     14 HON      0.000495   0.0189    -0.174     0.282
     15 IBM      0.000342   0.0163    -0.155     0.120
-    16 JNJ      0.000356   0.0120    -0.158     0.122
+    16 JNJ      0.000358   0.0120    -0.158     0.122
     17 JPM      0.000644   0.0236    -0.207     0.251
     18 KO       0.000320   0.0129    -0.101     0.139
     19 MCD      0.000517   0.0144    -0.159     0.181
-    20 MMM      0.000418   0.0154    -0.129     0.230
-    21 MRK      0.000348   0.0165    -0.268     0.130
-    22 MSFT     0.000574   0.0190    -0.156     0.196
-    23 NKE      0.000632   0.0193    -0.200     0.155
+    20 MMM      0.000417   0.0154    -0.129     0.230
+    21 MRK      0.000350   0.0165    -0.268     0.130
+    22 MSFT     0.000573   0.0190    -0.156     0.196
+    23 NKE      0.000634   0.0193    -0.200     0.155
     24 NVDA     0.00186    0.0374    -0.352     0.424
     25 PG       0.000374   0.0131    -0.302     0.120
     26 SHW      0.000844   0.0178    -0.208     0.153
-    27 TRV      0.000577   0.0180    -0.208     0.256
-    28 UNH      0.000913   0.0195    -0.186     0.348
+    27 TRV      0.000578   0.0180    -0.208     0.256
+    28 UNH      0.000912   0.0195    -0.186     0.348
     29 V        0.000928   0.0182    -0.136     0.150
     30 WMT      0.000401   0.0147    -0.114     0.117
 
@@ -600,17 +600,17 @@ shape: (30, 9)
 | symbol | count | mean  | std   | min    | q25    | median | q75   | max   |
 |--------|-------|-------|-------|--------|--------|--------|-------|-------|
 | str    | u32   | f64   | f64   | f64    | f64    | f64    | f64   | f64   |
-| "AAPL" | 6287  | 0.001 | 0.024 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
-| "AMGN" | 6287  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
-| "AMZN" | 6287  | 0.001 | 0.031 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
-| "AXP"  | 6287  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
-| "BA"   | 6287  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
+| "AAPL" | 6288  | 0.001 | 0.024 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
+| "AMGN" | 6288  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
+| "AMZN" | 6288  | 0.001 | 0.031 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
+| "AXP"  | 6288  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
+| "BA"   | 6288  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
 | …      | …     | …     | …     | …      | …      | …      | …     | …     |
-| "SHW"  | 6287  | 0.001 | 0.018 | -0.208 | -0.008 | 0.001  | 0.009 | 0.153 |
-| "TRV"  | 6287  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
-| "UNH"  | 6287  | 0.001 | 0.019 | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
-| "V"    | 4224  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
-| "WMT"  | 6287  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
+| "SHW"  | 6288  | 0.001 | 0.018 | -0.208 | -0.008 | 0.001  | 0.009 | 0.153 |
+| "TRV"  | 6288  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
+| "UNH"  | 6288  | 0.001 | 0.019 | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
+| "V"    | 4225  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
+| "WMT"  | 6288  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
 
 Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just download the constituents with `domain = "Index Constituents", index = "S&P 500"`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
@@ -643,7 +643,7 @@ returns_monthly = (returns_daily
 )
 ```
 
-In this code, we first group the data by symbol and month and then compute monthly returns by compounding the daily returns: \\(1+r_1)(1+r_2)\ldots(1+r_n)-1\\. To visualize how return characteristics change across different frequencies, we can compare histograms as in [Figure 4](#fig-103):
+In this code, we first group the data by symbol and month and then compute monthly returns by compounding the daily returns: $(1+r_1)(1+r_2)\ldots(1+r_n)-1$. To visualize how return characteristics change across different frequencies, we can compare histograms as in [Figure 4](#fig-103):
 
 ## R
 
@@ -761,7 +761,7 @@ trading_volume_figure.show()
 
 Total daily trading volume in billion USD.
 
-[Figure 5](#fig-104) indicates a clear upward trend in aggregated daily trading volume. In particular, since the outbreak of the COVID-19 pandemic, markets have processed substantial trading volumes, as analyzed, for instance, by Goldstein et al. ([2021](#ref-Goldstein2021)). One way to illustrate the persistence of trading volume would be to plot volume on day \\t\\ against volume on day \\t-1\\ as in the example below. In [Figure 6](#fig-105), we add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline()`, addressing potential differences in the axes’ scales.
+[Figure 5](#fig-104) indicates a clear upward trend in aggregated daily trading volume. In particular, since the outbreak of the COVID-19 pandemic, markets have processed substantial trading volumes, as analyzed, for instance, by Goldstein et al. ([2021](#ref-Goldstein2021)). One way to illustrate the persistence of trading volume would be to plot volume on day $t$ against volume on day $t-1$ as in the example below. In [Figure 6](#fig-105), we add a dotted 45°-line to indicate a hypothetical one-to-one relation by `geom_abline()`, addressing potential differences in the axes’ scales.
 
 ## R
 

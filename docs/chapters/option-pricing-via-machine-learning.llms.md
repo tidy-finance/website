@@ -19,7 +19,7 @@ library(glmnet)
 theme_set(theme_minimal())
 ```
 
-The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
+The package `torch` ([Falbel et al. 2023](#ref-torch)) provides functionality to define and train neural networks and is based on `PyTorch` ([Paszke et al. 2019](#ref-PyTorch2019)), while `brulee` ([Kuhn and Falbel 2023](#ref-brulee)) provides several basic modeling functions that use the `torch` infrastructure. The first time you use `torch`, run `torch::install_torch()` once; it downloads the `libtorch` libraries that `torch` needs. The package `ranger` ([Wright and Ziegler 2017](#ref-ranger)) provides a fast implementation for random forests.
 
 ## Python
 
@@ -46,27 +46,30 @@ We rely on `scikit-learn` to implement random forests and neural networks with t
 
 ## Regression Trees and Random Forests
 
-Regression trees are a popular ML approach for incorporating multiway predictor interactions. In Finance, regression trees are gaining popularity, also in the context of asset pricing (see, e.g., [Bryzgalova et al. 2022](#ref-Bryzgalova2022)). Trees possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each other. A tree *grows* in a sequence of steps. At each step, a new *branch* sorts the data leftover from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into partitions and approximates the unknown function \\f(x)\\ which yields the relation between the predictors \\x\\ and the outcome variable \\y\\ with the average value of the outcome variable within each partition. For a more thorough treatment of regression trees, we refer to Coqueret and Guida ([2020](#ref-Coqueret2020)).
+Regression trees are a popular ML approach for incorporating multiway predictor interactions. In Finance, regression trees are gaining popularity, also in the context of asset pricing (see, e.g., [Bryzgalova et al. 2022](#ref-Bryzgalova2022)). Trees possess a logic that departs markedly from traditional regressions. Trees are designed to find groups of observations that behave similarly to each other. A tree *grows* in a sequence of steps. At each step, a new *branch* sorts the data leftover from the preceding step into bins based on one of the predictor variables. This sequential branching slices the space of predictors into partitions and approximates the unknown function $f(x)$ which yields the relation between the predictors $x$ and the outcome variable $y$ with the average value of the outcome variable within each partition. For a more thorough treatment of regression trees, we refer to Coqueret and Guida ([2020](#ref-Coqueret2020)).
 
-Formally, we partition the predictor space into \\J\\ non-overlapping regions, \\R_1, R_2, \ldots, R_J\\. For any predictor \\x\\ that falls within region \\R_j\\, we estimate \\f(x)\\ with the average of the training observations, \\\hat y_i\\, for which the associated predictor \\x_i\\ is also in \\R_j\\. Once we select a partition \\x\\ to split in order to create the new partitions, we find a predictor \\j\\ and value \\s\\ that define two new partitions, called \\R_1(j,s)\\ and \\R_2(j,s)\\, which split our observations in the current partition by asking if \\x_j\\ is bigger than \\s\\:
+Formally, we partition the predictor space into $J$ non-overlapping regions, $R_1, R_2, \ldots, R_J$. For any predictor $x$ that falls within region $R_j$, we estimate $f(x)$ with the average of the training observations, $\hat y_i$, for which the associated predictor $x_i$ is also in $R_j$. Once we select a partition $x$ to split in order to create the new partitions, we find a predictor $j$ and value $s$ that define two new partitions, called $R_1(j,s)$ and $R_2(j,s)$, which split our observations in the current partition by asking if $x_j$ is bigger than $s$:
 
-\\ R_1(j,s) = \\x \mid x_j \< s\\ \mbox{ and } R_2(j,s) = \\x \mid x_j \geq s\\. \tag{1}\\
+$$R_1(j,s) = \{x \mid x_j < s\} \mbox{  and  } R_2(j,s) = \{x \mid x_j \geq s\}.
+\tag{1}$$
 
-To pick \\j\\ and \\s\\, we find the pair that minimizes the residual sum of squares (RSS):
+To pick $j$ and $s$, we find the pair that minimizes the residual sum of squares (RSS):
 
-\\ \sum\_{i:\\ x_i \in R_1(j,s)} (y_i - \hat{y}\_{R_1})^2 + \sum\_{i:\\ x_i \in R_2(j,s)} (y_i - \hat{y}\_{R_2})^2 \tag{2}\\
+$$\sum_{i:\, x_i \in R_1(j,s)} (y_i - \hat{y}_{R_1})^2 + \sum_{i:\, x_i \in R_2(j,s)} (y_i - \hat{y}_{R_2})^2
+\tag{2}$$
 
 As in [Factor Selection via Machine Learning](../chapters/factor-selection-via-machine-learning.llms.md) in the context of penalized regressions, the first relevant question is: what are the hyperparameter decisions? Instead of a regularization parameter, trees are fully determined by the number of branches used to generate a partition (sometimes one specifies the minimum number of observations in each final branch instead of the maximum number of branches).
 
-Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build \\B\\ decision trees \\T_1, \ldots, T_B\\ using the training sample. In addition, only a random subset of the features is considered as split candidates at each node of each tree. For each observation in the test set, we then form a prediction \\\hat{y} = \frac{1}{B}\sum\limits\_{i=1}^B\hat{y}\_{T_i}\\.
+Models with a single tree may suffer from high predictive variance. Random forests address these shortcomings of decision trees. The goal is to improve the predictive performance and reduce instability by averaging multiple regression trees. A forest basically implies creating many regression trees and averaging their predictions. To assure that the individual trees are not the same, we use a bootstrap to induce randomness. More specifically, we build $B$ decision trees $T_1, \ldots, T_B$ using the training sample. In addition, only a random subset of the features is considered as split candidates at each node of each tree. For each observation in the test set, we then form a prediction $\hat{y} = \frac{1}{B}\sum\limits_{i=1}^B\hat{y}_{T_i}$.
 
 ## Neural Networks
 
 Roughly speaking, neural networks propagate information from an input layer, through one or multiple hidden layers, to an output layer. While the number of units (neurons) in the input layer is equal to the dimension of the predictors, the output layer usually consists of one neuron (for regression) or multiple neurons for classification. The output layer predicts the future data, similar to the fitted value in a regression analysis. Neural networks have theoretical underpinnings as *universal approximators* for any smooth predictive association ([Hornik 1991](#ref-Hornik1991)). Their complexity, however, ranks neural networks among the least transparent, least interpretable, and most highly parameterized ML tools. In finance, applications of neural networks can be found in many different contexts, e.g., Avramov et al. ([2022](#ref-Avramov2022)), Chen et al. ([2023](#ref-Chen2019)), and Gu et al. ([2020](#ref-Gu2020)).
 
-Each neuron applies a non-linear *activation function* \\f\\ to its aggregated signal before sending its output to the next layer \\ x_k^l = f\left(\theta\_{k,0}^l + \sum\limits\_{j = 1}^{N^{l-1}}z_j\theta\_{k,j}^l\right) \tag{3}\\
+Each neuron applies a non-linear *activation function* $f$ to its aggregated signal before sending its output to the next layer $$x_k^l = f\left(\theta_{k,0}^l + \sum\limits_{j = 1}^{N^{l-1}}z_j\theta_{k,j}^l\right)
+\tag{3}$$
 
-Here, \\\theta\\ are the parameters to fit, \\N^l\\ denotes the number of units (a hyperparameter to tune), and \\z_j\\ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layer \\z_j = x_j^{l-1}\\. While the easiest case with \\f(x) = \alpha + \beta x\\ resembles linear regression, typical activation functions are sigmoid (i.e., \\f(x) = (1+e^{-x})^{-1}\\) or ReLU (i.e., \\f(x) = \max(x, 0)\\).
+Here, $\theta$ are the parameters to fit, $N^l$ denotes the number of units (a hyperparameter to tune), and $z_j$ are the input variables which can be either the raw data or, in the case of multiple chained layers, the outcome from a previous layer $z_j = x_j^{l-1}$. While the easiest case with $f(x) = \alpha + \beta x$ resembles linear regression, typical activation functions are sigmoid (i.e., $f(x) = (1+e^{-x})^{-1}$) or ReLU (i.e., $f(x) = \max(x, 0)$).
 
 Neural networks gain their flexibility from chaining multiple layers together. Naturally, this imposes many degrees of freedom on the network architecture for which no clear theoretical guidance exists. The specification of a neural network requires, at a minimum, a stance on depth (number of hidden layers), the activation function, the number of neurons, the connection structure of the units (dense or sparse), and the application of regularization techniques to avoid overfitting. Finally, *learning* means to choose optimal parameters relying on numerical optimization, which often requires specifying an appropriate learning rate.
 
@@ -80,11 +83,16 @@ Despite these computational challenges, implementation in Python is not tedious 
 
 ## Option Pricing
 
-To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price \\K\\) at a specific date (the exercise date \\T\\). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by \\ \begin{aligned} C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r_f T} \\ d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r_f + \frac{\sigma^2}{2}\right)T\right) \\ d_2 &= d_1 - \sigma\sqrt{T} \end{aligned} \tag{4}\\
+To apply ML methods in a relevant field of finance, we focus on option pricing. The application in its core is taken from Hull ([2020](#ref-Hull2020)). In its most basic form, call options give the owner the right but not the obligation to buy a specific stock (the underlying) at a specific price (the strike price $K$) at a specific date (the exercise date $T$). The Black-Scholes price ([Black and Scholes 1973](#ref-Black1976)) of a call option for a non-dividend-paying underlying stock is given by $$\begin{aligned}
+  C(S, T) &= \Phi(d_1)S - \Phi(d_2)Ke^{-r_f T} \\
+     d_1 &= \frac{1}{\sigma\sqrt{T}}\left(\ln\left(\frac{S}{K}\right) + \left(r_f + \frac{\sigma^2}{2}\right)T\right) \\
+     d_2 &= d_1 - \sigma\sqrt{T}
+\end{aligned}
+\tag{4}$$
 
-where \\C(S, T)\\ is the price of the option as a function of today’s stock price of the underlying, \\S\\, with time to maturity \\T\\, \\r\\ is the risk-free interest rate, and \\\sigma\\ is the volatility of the underlying stock return. \\\Phi\\ is the cumulative distribution function of a standard normal random variable.
+where $C(S, T)$ is the price of the option as a function of today’s stock price of the underlying, $S$, with time to maturity $T$, $r$ is the risk-free interest rate, and $\sigma$ is the volatility of the underlying stock return. $\Phi$ is the cumulative distribution function of a standard normal random variable.
 
-The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters \\S, K, r, T\\, and \\\sigma\\ are specified (arguably, in a realistic context, all parameters are easy to specify except for \\\sigma\\ which has to be estimated). A simple function allows computing the price as we do below.
+The Black-Scholes equation provides a way to compute the arbitrage-free price of a call option once the parameters $S, K, r, T$, and $\sigma$ are specified (arguably, in a realistic context, all parameters are easy to specify except for $\sigma$ which has to be estimated). A simple function allows computing the price as we do below.
 
 ## R
 
@@ -393,7 +401,7 @@ Before we evaluate the results, we implement one more model. In principle, any n
 
 ## R
 
-We first define a new recipe, `rec_linear`, which processes the training data even further: We include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between \\r^2\\ and \\r^3\\ is the same as the term \\r^5\\).
+We first define a new recipe, `rec_linear`, which processes the training data even further: We include polynomials up to the fifth degree of each predictor and then add all possible pairwise interaction terms. The final recipe step, `step_lincomb()`, removes potentially redundant variables (for instance, the interaction between $r^2$ and $r^3$ is the same as the term $r^5$).
 
 ``` r
 rec_linear <- rec |>
@@ -582,7 +590,7 @@ The results can be summarized as follows.
 4.  Make use of a training and a test set to choose the optimal depth (number of sample splits) of the tree.
 5.  Use `brulee` (R) or `scikit-learn` (Python) to initialize a neural network that takes the predictors from the training dataset as input, contains at least one hidden layer, and generates continuous predictions. How many parameters does the neural network you aim to fit have?
 6.  Fit the network from the previous exercise. Pay special attention to the loss function used for training. Illustrate the difference in predictive accuracy for different architecture choices, e.g., regarding the depth of the network or the number of hidden units.
-7.  The test data in this chapter is sampled from the same parameter grid as the training data, so the models only have to *interpolate*. Design an experiment that evaluates *extrapolation* instead: For instance, train the models only on options with volatilities \\\sigma \leq 0.5\\ and evaluate the pricing errors for options with \\\sigma \> 0.5\\. Which of the methods deteriorates most, and why are regression trees particularly ill-suited for extrapolation?
+7.  The test data in this chapter is sampled from the same parameter grid as the training data, so the models only have to *interpolate*. Design an experiment that evaluates *extrapolation* instead: For instance, train the models only on options with volatilities $\sigma \leq 0.5$ and evaluate the pricing errors for options with $\sigma > 0.5$. Which of the methods deteriorates most, and why are regression trees particularly ill-suited for extrapolation?
 
 ## References
 

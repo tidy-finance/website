@@ -104,39 +104,40 @@ Company-specific events might affect individual stock prices, e.g., CEO resignat
 
 While we covered efficient portfolio choice in detail in the previous chapter, CAPM relies on the introduction of a crucial new element: a risk-free asset. This additional asset fundamentally changes the investment opportunity set and leads to powerful conclusions about efficient portfolio choice.
 
-To recap, we considered a portfolio weight vector \\\omega\in\mathbb{R}^N\\ which denotes investments into the available \\N\\ risky assets. So far we assumed \\\sum_i^N \omega_i=1\\, indicating that all available wealth is invested across the asset universe without any outside option. Now, we relax this assumption and instead assume that all the remaining wealth, \\1-\iota'\omega\\, is invested in a risk-free asset which pays a constant interest \\r_f\\. The expected portfolio return for the portfolio of risky assets \\\omega\\ is then
+To recap, we considered a portfolio weight vector $\omega\in\mathbb{R}^N$ which denotes investments into the available $N$ risky assets. So far we assumed $\sum_i^N \omega_i=1$, indicating that all available wealth is invested across the asset universe without any outside option. Now, we relax this assumption and instead assume that all the remaining wealth, $1-\iota'\omega$, is invested in a risk-free asset which pays a constant interest $r_f$. The expected portfolio return for the portfolio of risky assets $\omega$ is then
 
-\\\mu\_\omega = \omega^{\prime}\mu + (1-\iota^{\prime}\omega)r_f = r_f + \omega^{\prime}\underbrace{(\mu-r_f)}\_{\tilde\mu}.\\
+$$\mu_\omega = \omega^{\prime}\mu + (1-\iota^{\prime}\omega)r_f = r_f + \omega^{\prime}\underbrace{(\mu-r_f)}_{\tilde\mu}.$$
 
-where \\\mu\\ is the vector of expected return of assets and \\r_f\\ is the risk-free rate. In what follows, we refer to \\\tilde\mu\\ as the vector of expected *excess* returns.
+where $\mu$ is the vector of expected return of assets and $r_f$ is the risk-free rate. In what follows, we refer to $\tilde\mu$ as the vector of expected *excess* returns.
 
 By assumption, the risk-free asset has zero volatility. Therefore, the volatility of the portfolio is given by
 
-\\\sigma\_\omega = \sqrt{\omega^{\prime}\Sigma\omega}\\
+$$\sigma_\omega = \sqrt{\omega^{\prime}\Sigma\omega}$$
 
-where \\\Sigma\\ is the variance-covariance matrix of the returns. Restating the optimal decision problem of an investor who wants to earn a desired level of expected portfolio (excess) returns (\\\bar\mu-r_f\\) with the lowest possible variance leads to the optimization problem
+where $\Sigma$ is the variance-covariance matrix of the returns. Restating the optimal decision problem of an investor who wants to earn a desired level of expected portfolio (excess) returns ($\bar\mu-r_f$) with the lowest possible variance leads to the optimization problem
 
-\\\min\_\omega Z(\omega) = \min\_\omega \omega^{\prime}\Sigma\omega - \lambda \left(\omega^{\prime}\tilde\mu-\bar\mu\right).\\
+$$\min_\omega Z(\omega) = \min_\omega \omega^{\prime}\Sigma\omega - \lambda \left(\omega^{\prime}\tilde\mu-\bar\mu\right).$$
 
 The first-order conditions for this optimization problem yield:
 
-\\\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu = 0 \\\Leftrightarrow \omega^\* = \frac{\lambda}{2}\Sigma^{-1}\tilde\mu\\
+$$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu = 0 \\\Leftrightarrow \omega^* = \frac{\lambda}{2}\Sigma^{-1}\tilde\mu$$
 
-The constraint \\\omega^{\prime}\tilde\mu\geq \bar\mu\\ delivers
+The constraint $\omega^{\prime}\tilde\mu\geq \bar\mu$ delivers
 
-\\ \bar\mu = \tilde\mu^{\prime}\omega^\* = \frac{\lambda}{2}\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu \\ \Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}. \\
+$$\bar\mu = \tilde\mu^{\prime}\omega^* = \frac{\lambda}{2}\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu \\
+\Rightarrow \lambda = \frac{2\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}.$$
 
-Thus, the optimal portfolio weights are given by \\ \omega^\* = \frac{\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}\Sigma^{-1}\tilde\mu. \\
+Thus, the optimal portfolio weights are given by $$\omega^* = \frac{\bar\mu}{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}\Sigma^{-1}\tilde\mu.$$
 
-Note that \\\omega^\*\\ does not necessarily sum up to one as, mechanically, the remainder \\1-\iota^{\prime}\omega^\*\\ is invested in the risk-free asset. However, scaling \\\omega^\*\\ delivers the portfolio of risky assets \\\omega\_\text{tan}\\ such that
+Note that $\omega^*$ does not necessarily sum up to one as, mechanically, the remainder $1-\iota^{\prime}\omega^*$ is invested in the risk-free asset. However, scaling $\omega^*$ delivers the portfolio of risky assets $\omega_\text{tan}$ such that
 
-\\ \omega\_\text{tan} := \frac{\omega^\*}{\iota'\omega^\*}= \frac{\Sigma^{-1}(\mu-r_f)}{\iota^{\prime}\Sigma^{-1}(\mu-r_f)}. \\
+$$\omega_\text{tan} := \frac{\omega^*}{\iota'\omega^*}= \frac{\Sigma^{-1}(\mu-r_f)}{\iota^{\prime}\Sigma^{-1}(\mu-r_f)}.$$
 
-Importantly, \\\omega\_\text{tan}\\ is independent from \\\bar\mu\\! Thus, irrespective of the desired level of expected returns (or the investors’ risk aversion), everybody chooses the same portfolio of risky assets. The only variation arises from the amount of wealth invested into the risk-free asset. Some investors may even choose to lever their risky position by borrowing at the risk-free rate and investing more than their actual wealth into the portfolio \\\omega\_\text{tan}\\.
+Importantly, $\omega_\text{tan}$ is independent from $\bar\mu$! Thus, irrespective of the desired level of expected returns (or the investors’ risk aversion), everybody chooses the same portfolio of risky assets. The only variation arises from the amount of wealth invested into the risk-free asset. Some investors may even choose to lever their risky position by borrowing at the risk-free rate and investing more than their actual wealth into the portfolio $\omega_\text{tan}$.
 
 The portfolio
 
-\\\omega\_{tan}=\frac{\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}\\
+$$\omega_{tan}=\frac{\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}$$
 
 is central to the CAPM and is typically called the efficient tangency portfolio.
 
@@ -173,7 +174,7 @@ risk_free_monthly = (
 rf = risk_free_monthly["risk_free"].mean()
 ```
 
-Next, we define the core parameters governing the distribution of asset returns, \\\Sigma\\ and \\\tilde\mu\\.
+Next, we define the core parameters governing the distribution of asset returns, $\Sigma$ and $\tilde\mu$.
 
 ## R
 
@@ -221,11 +222,11 @@ sigma = np.cov(
 mu = assets["mu"].to_numpy()
 ```
 
-We are ready to illustrate the resulting efficient frontier. Every investor chooses to allocate a fraction of her wealth in the efficient tangency portfolio \\\omega\_\text{tan}\\ and the remainder in the risk-free asset. The optimal allocation depends on the investor’s risk aversion. As the risk-free asset, by definition, has a zero volatility, the efficient frontier is a straight line connecting the risk-free asset with the tangency portfolio. The slope of the line connecting the risk-free asset and the tangency portfolio is
+We are ready to illustrate the resulting efficient frontier. Every investor chooses to allocate a fraction of her wealth in the efficient tangency portfolio $\omega_\text{tan}$ and the remainder in the risk-free asset. The optimal allocation depends on the investor’s risk aversion. As the risk-free asset, by definition, has a zero volatility, the efficient frontier is a straight line connecting the risk-free asset with the tangency portfolio. The slope of the line connecting the risk-free asset and the tangency portfolio is
 
-\\ \frac{\omega^{\prime}\_\text{tan}\mu-r_f}{\omega\_\text{tan}^{\prime}\Sigma\omega\_\text{tan}^{\prime}}. \\
+$$\frac{\omega^{\prime}_\text{tan}\mu-r_f}{\omega_\text{tan}^{\prime}\Sigma\omega_\text{tan}^{\prime}}.$$
 
-Typically, the excess return of an asset scaled by its volatility, \\\frac{\tilde\mu_i}{\sigma_i}\\, is called the Sharpe ratio of the asset. Thus, the slope of the efficient frontier corresponds to the Sharpe ratio of the tangency portfolio returns. By construction, the tangency portfolio is the maximum Sharpe ratio portfolio.[^1]
+Typically, the excess return of an asset scaled by its volatility, $\frac{\tilde\mu_i}{\sigma_i}$, is called the Sharpe ratio of the asset. Thus, the slope of the efficient frontier corresponds to the Sharpe ratio of the tangency portfolio returns. By construction, the tangency portfolio is the maximum Sharpe ratio portfolio.[^1]
 
 ## R
 
@@ -319,23 +320,23 @@ Expected returns and volatilities based on monthly returns adjusted for dividend
 
 ## The Capital Market Line
 
-Taking another look at the efficient tangency portfolio \\\omega\_\text{tan}\\ reveals that expected asset excess returns \\\tilde\mu\\ cannot be arbitrarily large or small. From the first order condition of the optimization problem above we get, via simple rearranging,
+Taking another look at the efficient tangency portfolio $\omega_\text{tan}$ reveals that expected asset excess returns $\tilde\mu$ cannot be arbitrarily large or small. From the first order condition of the optimization problem above we get, via simple rearranging,
 
-\\\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu =0 \\\Leftrightarrow \tilde\mu = \frac{2}{\lambda}\Sigma\omega^\* = \frac{2}{\lambda}\underbrace{\iota'\omega^\*}\_{=\frac{\lambda}{2}\iota^{\prime}\Sigma^{-1}\tilde\mu}\Sigma\omega\_\text{tan} \\ = \iota^{\prime}\Sigma^{-1}\tilde\mu\Sigma\omega\_\text{tan}\\
+$$\frac{\partial Z}{\partial \omega} = 2\Sigma\omega - \lambda \tilde\mu =0 \\\Leftrightarrow \tilde\mu = \frac{2}{\lambda}\Sigma\omega^* = \frac{2}{\lambda}\underbrace{\iota'\omega^*}_{=\frac{\lambda}{2}\iota^{\prime}\Sigma^{-1}\tilde\mu}\Sigma\omega_\text{tan} \\ = \iota^{\prime}\Sigma^{-1}\tilde\mu\Sigma\omega_\text{tan}$$
 
 Now, note the following three simple derivations:
 
-1.  The expected excess return of the efficient tangency portfolio, \\\tilde\mu\_\text{tan}\\ is given by \\E(\omega\_\text{tan}^{\prime} r - r_f) = \omega\_\text{tan} \tilde\mu = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}\\.
-2.  The variance of the returns of the efficient tangency portfolio \\\sigma\_\text{tan}^2\\ is given by \\\text{Var}(\omega\_\text{tan}^{\prime} r) = \omega\_\text{tan}^{\prime} \Sigma \omega\_\text{tan}^{\prime} = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{(\iota^{\prime}\Sigma^{-1}\tilde\mu)^2}\\. It follows that \\\frac{\tilde\mu\_\text{tan}}{\sigma\_\text{tan}^2} = \iota^{\prime}\Sigma^{-1}\tilde\mu\\
-3.  The \\i\\-th element of the vector \\\Sigma\omega\_\text{tan}\\ is \\\sum\limits\_{j=1}^N \sigma\_{ij}\omega\_{j,\text{tan}}= \text{Cov}\left(r_i, \sum\limits\_{j=1}^N r_i'\omega\_{j,\text{tan}}\right) = \text{Cov}\left(r_i, r\_\text{tan}\right)\\, which is the covariance of asset \\i\\’s returns with the returns of the efficient tangency portfolio.
+1.  The expected excess return of the efficient tangency portfolio, $\tilde\mu_\text{tan}$ is given by $E(\omega_\text{tan}^{\prime} r - r_f) = \omega_\text{tan} \tilde\mu = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{\iota^{\prime}\Sigma^{-1}\tilde\mu}$.
+2.  The variance of the returns of the efficient tangency portfolio $\sigma_\text{tan}^2$ is given by $\text{Var}(\omega_\text{tan}^{\prime} r) = \omega_\text{tan}^{\prime} \Sigma \omega_\text{tan}^{\prime} = \frac{\tilde\mu^{\prime}\Sigma^{-1}\tilde\mu}{(\iota^{\prime}\Sigma^{-1}\tilde\mu)^2}$. It follows that $\frac{\tilde\mu_\text{tan}}{\sigma_\text{tan}^2} = \iota^{\prime}\Sigma^{-1}\tilde\mu$
+3.  The $i$-th element of the vector $\Sigma\omega_\text{tan}$ is $\sum\limits_{j=1}^N \sigma_{ij}\omega_{j,\text{tan}}= \text{Cov}\left(r_i, \sum\limits_{j=1}^N r_i'\omega_{j,\text{tan}}\right) = \text{Cov}\left(r_i, r_\text{tan}\right)$, which is the covariance of asset $i$’s returns with the returns of the efficient tangency portfolio.
 
-Putting everything together yields for the expected excess return of asset \\i\\:
+Putting everything together yields for the expected excess return of asset $i$:
 
-\\\tilde{\mu}\_i = \frac{E(\omega\_\text{tan}^{\prime}r - r_f)}{\sigma\_{\text{tan}}^2} \text{Cov}\left(r_i,r\_\text{tan}\right) = \beta_i \tilde{\mu}\_\text{tan}.\\
+$$\tilde{\mu}_i = \frac{E(\omega_\text{tan}^{\prime}r - r_f)}{\sigma_{\text{tan}}^2} \text{Cov}\left(r_i,r_\text{tan}\right) = \beta_i \tilde{\mu}_\text{tan}.$$
 
-The equation above is the famous CAPM equation and central to asset pricing. It states that an asset’s expected excess return is proportional to the asset’s return covariance with the efficient portfolio excess returns. The price of risk is the excess return of the efficient tangency portfolio. An asset with 0 beta has the same expected return as the risk-free rate. An asset with a beta of 1 has the same expected return as the efficient tangency portfolio. An asset with a negative beta has expected returns lower than the risk-free asset - the very definition of an insurance. Therefore, the CAPM equation explains why some assets may have the same volatility but different returns: Because their systematic risk (\\\beta_i\\) is different.
+The equation above is the famous CAPM equation and central to asset pricing. It states that an asset’s expected excess return is proportional to the asset’s return covariance with the efficient portfolio excess returns. The price of risk is the excess return of the efficient tangency portfolio. An asset with 0 beta has the same expected return as the risk-free rate. An asset with a beta of 1 has the same expected return as the efficient tangency portfolio. An asset with a negative beta has expected returns lower than the risk-free asset - the very definition of an insurance. Therefore, the CAPM equation explains why some assets may have the same volatility but different returns: Because their systematic risk ($\beta_i$) is different.
 
-We derived the CAPM equation as a consequence of efficient wealth allocation. Suppose an asset delivers high expected returns. The investor will increase her holdings of the assets in order to benefit from the high promised returns. As a consequence, the covariance of the asset with the efficient tangency portfolio will increase (mechanically, as the asset gradually becomes a larger part of the efficient tangency portfolio). At some point, the weight of the asset is so high that gain of \\\tilde\mu_i\\ of marginally increasing the holding does not offset the implied increase in systematic risk. The investor will stop increasing her holdings and the asset’s expected return will be proportional to its systematic risk.
+We derived the CAPM equation as a consequence of efficient wealth allocation. Suppose an asset delivers high expected returns. The investor will increase her holdings of the assets in order to benefit from the high promised returns. As a consequence, the covariance of the asset with the efficient tangency portfolio will increase (mechanically, as the asset gradually becomes a larger part of the efficient tangency portfolio). At some point, the weight of the asset is so high that gain of $\tilde\mu_i$ of marginally increasing the holding does not offset the implied increase in systematic risk. The investor will stop increasing her holdings and the asset’s expected return will be proportional to its systematic risk.
 
 We can illustrate the relationship between systematic risk and expected returns in the so-called security market line.
 
@@ -383,7 +384,7 @@ assets_figure.show()
 
 [![](capital-asset-pricing-model_files/figure-html/capital-asset-pricing-model-security-market-line-py-1.png)](capital-asset-pricing-model_files/figure-html/capital-asset-pricing-model-security-market-line-py-1.png)
 
-The security market line shows the relationship between systematic risk (\\\beta_i\\) and the expected return of an asset. The slope of the line is the price of risk, which is the expected return of the efficient tangency portfolio. The risk-free asset is represented by the intercept with the vertical axis. The CAPM equation states that an asset’s expected return is proportional to its beta, with the efficient tangency portfolio’s expected return as the price of risk.
+The security market line shows the relationship between systematic risk ($\beta_i$) and the expected return of an asset. The slope of the line is the price of risk, which is the expected return of the efficient tangency portfolio. The risk-free asset is represented by the intercept with the vertical axis. The CAPM equation states that an asset’s expected return is proportional to its beta, with the efficient tangency portfolio’s expected return as the price of risk.
 
 ## Asset Pricing and the Market Portfolio
 
@@ -392,13 +393,13 @@ So far, we focused on the optimal decision problem of an individual investor. Th
 Based on the previous derivations, it should be clear that
 
 1.  All rational investors prefer efficient portfolios to individual assets or any other portfolios.
-2.  The tangency portfolio \\\omega\_\text{tan}\\ serves as the optimal risky portfolio for all investors.
+2.  The tangency portfolio $\omega_\text{tan}$ serves as the optimal risky portfolio for all investors.
 
 This leads to a powerful conclusion: In equilibrium, all investors hold some combination of the risk-free asset and the tangency portfolio, regardless of their risk preferences. Their only choice is how much to allocate to each of the two funds. Aggregating all capital allocated to risky assets yields the total market capitalization of all risky assets. Given that everybody holds the same portfolio of risky assets, the market capitalization of each asset is proportional to its weight in the efficient tangency portfolio. The market portfolio is the sum of all risky assets weighted by their market capitalization. For practical purposes the insight that the market portfolio is the efficient tangency portfolio, has substantial value: Instead of having to derive the vector of expected asset returns and the variance-covariance matrix, we can use the market portfolio as a proxy for the efficient tangency portfolio. Market capitalization is readily observable and the market portfolio is easy to replicate.[^2]
 
 Empirically, the CAPM-equation boils down to a linear regression:
 
-\\r\_{i,t}-r_f = \beta_i (r\_{m,t} - r_f) + \varepsilon\_{i,t}.\\
+$$r_{i,t}-r_f =  \beta_i (r_{m,t} - r_f) + \varepsilon_{i,t}.$$
 
 Thus, a naive, but straightforward way of ‘estimating’ the CAPM is to run a linear regression of asset excess returns on market excess returns. The slope of the regression line is then the asset’s beta.
 
@@ -406,7 +407,7 @@ The potential intercept is the asset’s alpha, which measures the asset’s ris
 
 In practice, we hence estimate both alpha and beta using regression analysis. The empirical model is:
 
-\\r\_{i,t} - r\_{f,t} = \alpha_i + \beta_i \cdot (r\_{m,t} - r\_{f,t} ) + \varepsilon\_{i,t}, \\ where \\r\_{i,t}\\ and \\r\_{m,t}\\ are the realized returns of the asset and market portfolio on day \\t\\, respectively. The error term \\\varepsilon\_{i,t}\\ captures the asset’s idiosyncratic risk.
+$$r_{i,t}  - r_{f,t}  = \alpha_i + \beta_i \cdot (r_{m,t} - r_{f,t} ) + \varepsilon_{i,t},$$ where $r_{i,t}$ and $r_{m,t}$ are the realized returns of the asset and market portfolio on day $t$, respectively. The error term $\varepsilon_{i,t}$ captures the asset’s idiosyncratic risk.
 
 Let’s turn to estimating CAPM parameters using real market data. Instead of using our previously constructed tangency portfolio, we employ the Fama-French market excess returns, which provide a widely accepted proxy for the market portfolio. These returns are already adjusted to represent excess returns over the risk-free rate, simplifying our analysis.
 
@@ -623,6 +624,6 @@ Sharpe, William F. 1964. “Capital asset prices: A theory of market equilibrium
 
 ## Footnotes
 
-[^1]: We prove in the Appendix [Proofs](../chapters/proofs.llms.md) that the efficient tangency portfolio \\\omega\_\text{tan}\\ can also be derived as a solution to the optimization problem \\\max\_{\omega} \frac{\omega^{\prime}\tilde\mu}{\sqrt{\omega^{\prime}\Sigma\omega}} \text{ s.t. } \omega^{\prime}\iota=1.\\
+[^1]: We prove in the Appendix [Proofs](../chapters/proofs.llms.md) that the efficient tangency portfolio $\omega_\text{tan}$ can also be derived as a solution to the optimization problem $\max_{\omega} \frac{\omega^{\prime}\tilde\mu}{\sqrt{\omega^{\prime}\Sigma\omega}} \text{ s.t. } \omega^{\prime}\iota=1.$
 
 [^2]: Obviously, the market portfolio is the efficient tangency portfolio *only* if the strict assumptions of the CAPM hold: The model describes equilibrium in a single-period economy, markets are frictionless, with no transaction costs or taxes, all investors can borrow and lend at the risk-free rate, investors share the same expectations about returns and risks, investors are rational, seeking to maximize returns for a given level of risk.

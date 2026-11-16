@@ -78,9 +78,9 @@ factors_ff5_monthly = (
 )
 ```
 
-Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](../chapters/value-and-bivariate-sorts.llms.md). First, Fama and French form their portfolios in June of year \\t\\, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year \\t+1\\.
+Yet when we start merging our dataset for computing the premiums, there are a few differences to [Value and Bivariate Sorts](../chapters/value-and-bivariate-sorts.llms.md). First, Fama and French form their portfolios in June of year $t$, whereby the returns of July are the first monthly return for the respective portfolio. For firm size, they consequently use the market capitalization recorded for June. It is then held constant until June of year $t+1$.
 
-Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year \\t - 1\\ and the book equity reported in year \\t-1\\, i.e., the `datadate` is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year \\t-1\\.
+Second, Fama and French also have a different protocol for computing the book-to-market ratio. They use market equity as of the end of year $t - 1$ and the book equity reported in year $t-1$, i.e., the `datadate` is within the last year. Hence, the book-to-market ratio can be based on accounting information that is up to 18 months old. Market equity also does not necessarily reflect the same time point as book equity. The other sorting variables are analogously to book equity taken from year $t-1$.
 
 To implement all these time lags, we again employ the temporary `sorting_date`-column. Notice that when we combine the information, we want to have a single observation per year and stock since we are only interested in computing the breakpoints held constant for the entire year.
 
@@ -251,7 +251,7 @@ portfolios = (sorting_variables
 
 Alternatively, you can implement the same portfolio sorts using the `assign_portfolio()` function from the `tidyfinance` package, which we omit to avoid repeating almost the same code chunk as above.
 
-Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of \\t-1\\ if the month is June (of year \\t\\) or earlier or to July of year \\t\\ if the month is July or later.
+Next, we merge the portfolios to the return data for the rest of the year. To implement this step, we create a new column `sorting_date` in our return data by setting the date to sort on to July of $t-1$ if the month is June (of year $t$) or earlier or to July of year $t$ if the month is July or later.
 
 ## R
 
@@ -356,7 +356,6 @@ model_smb <- lm(smb ~ smb_replicated, data = test)
 summary(model_smb)
 ```
 
-
     Call:
     lm(formula = smb ~ smb_replicated, data = test)
 
@@ -410,7 +409,6 @@ The results for the SMB factor are really convincing, as all three criteria outl
 model_hml <- lm(hml ~ hml_replicated, data = test)
 summary(model_hml)
 ```
-
 
     Call:
     lm(formula = hml ~ hml_replicated, data = test)
@@ -770,7 +768,6 @@ model_smb <- lm(smb ~ smb_replicated, data = test)
 summary(model_smb)
 ```
 
-
     Call:
     lm(formula = smb ~ smb_replicated, data = test)
 
@@ -824,7 +821,6 @@ The results for the SMB factor are quite convincing, as all three criteria outli
 model_hml <- lm(hml ~ hml_replicated, data = test)
 summary(model_hml)
 ```
-
 
     Call:
     lm(formula = hml ~ hml_replicated, data = test)
@@ -880,7 +876,6 @@ model_rmw <- lm(rmw ~ rmw_replicated, data = test)
 summary(model_rmw)
 ```
 
-
     Call:
     lm(formula = rmw ~ rmw_replicated, data = test)
 
@@ -934,7 +929,6 @@ We are also able to replicate the RMW factor quite well with a coefficient of 0.
 model_cma <- lm(cma ~ cma_replicated, data = test)
 summary(model_cma)
 ```
-
 
     Call:
     lm(formula = cma ~ cma_replicated, data = test)

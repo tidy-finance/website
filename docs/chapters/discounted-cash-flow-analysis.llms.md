@@ -95,7 +95,7 @@ cash_flow_statements = fmp_get(
 
 Our analysis centers on Free Cash Flow (FCF), which represents the cash available to all investors after the company has covered its operational needs and capital investments. We calculate FCF using the following formula:
 
-\\\text{FCF} = \text{EBIT} + \text{Depreciation \\ Amortization} - \text{Taxes} + \Delta \text{Working Capital} - \text{CAPEX}\\
+$$\text{FCF} = \text{EBIT} + \text{Depreciation \& Amortization} - \text{Taxes} + \Delta \text{Working Capital} - \text{CAPEX}$$
 
 Each component of this formula serves a specific purpose in capturing the company’s cash-generating ability:
 
@@ -606,11 +606,11 @@ A key component of DCF analysis is the continuation value (or terminal value), r
 
 The most common approach is the Perpetuity Growth Model (or Gordon Growth Model), which assumes FCF grows at a constant rate indefinitely. The formula for this model is:
 
-\\TV\_{T} = \frac{FCF\_{T+1}}{r - g},\\
+$$TV_{T} = \frac{FCF_{T+1}}{r - g},$$
 
-where \\TV\_{T}\\ is the terminal value at time \\T\\, \\FCF\_{T+1}\\ is the free cash flow in the first year after our forecast period, \\r\\ is the discount rate (typically WACC, see below), and \\g\\ is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute \\FCF\_{T+1}\\, which is equal to \\FCF\_{T}\cdot(1+g)\\.
+where $TV_{T}$ is the terminal value at time $T$, $FCF_{T+1}$ is the free cash flow in the first year after our forecast period, $r$ is the discount rate (typically WACC, see below), and $g$ is the perpetual growth rate. A common mistake is to ignore the time shift in the model. You must compute $FCF_{T+1}$, which is equal to $FCF_{T}\cdot(1+g)$.
 
-The perpetual growth rate \\g\\ should reflect the long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely. Exceeding GDP growth indefinitely also implies that the whole economy eventually consists of one company. For example, the last 20 years of GDP growth is a sensible assumption (the nominal growth rate is 4% for the US).
+The perpetual growth rate $g$ should reflect the long-term economic growth potential. A common benchmark is the long-term GDP growth rate, as few companies can sustainably grow faster than the overall economy indefinitely. Exceeding GDP growth indefinitely also implies that the whole economy eventually consists of one company. For example, the last 20 years of GDP growth is a sensible assumption (the nominal growth rate is 4% for the US).
 
 Let us implement the Perpetuity Growth Model:
 
@@ -652,16 +652,16 @@ The final component of our DCF analysis involves discounting future cash flows t
 
 The WACC formula combines the costs of equity and debt financing:
 
-\\WACC = \frac{E}{D+E} \cdot r^E + \frac{D}{D+E} \cdot r^D \cdot (1 - \tau),\\
+$$WACC = \frac{E}{D+E} \cdot r^E + \frac{D}{D+E} \cdot r^D \cdot (1 - \tau),$$
 
-where \\E\\ is the market value of the company’s equity with required return \\r^E\\, \\D\\ is the market value of the company’s debt with pre-tax return \\r^D\\, and \\\tau\\ is the tax rate.
+where $E$ is the market value of the company’s equity with required return $r^E$, $D$ is the market value of the company’s debt with pre-tax return $r^D$, and $\tau$ is the tax rate.
 
 While you can often find estimates of WACC from financial databases or analysts’ reports, you may need to calculate it yourself. Let us walk through the practical steps to estimate WACC using real-world data:
 
-- \\E\\ is typically measured as the market value of the company’s equity. One common approach is to use market capitalization from the stock exchange.
-- \\D\\ is often measured using the book value of the company’s debt. While this might not perfectly reflect market conditions, it is a practical starting point when market data is unavailable. Moreover, it is close to correct without default.
-- The Capital Asset Pricing Model (CAPM) is a popular method to estimate the cost of equity \\r^E\\. It considers the risk-free rate, the equity risk premium, and the company’s risk exposure (i.e., beta). For a detailed guide estimating the CAPM, we refer to Chapter [Capital Asset Pricing Model](../chapters/capital-asset-pricing-model.llms.md).
-- The return on debt \\r^D\\ can also be estimated in different ways. For instance, effective interest rates can be calculated as the ratio of interest expense to total debt from financial statements. This gives you a real-world measure of what the company is currently paying. Alternatively, you can look up corporate bond spreads for companies in the same rating group.
+- $E$ is typically measured as the market value of the company’s equity. One common approach is to use market capitalization from the stock exchange.
+- $D$ is often measured using the book value of the company’s debt. While this might not perfectly reflect market conditions, it is a practical starting point when market data is unavailable. Moreover, it is close to correct without default.
+- The Capital Asset Pricing Model (CAPM) is a popular method to estimate the cost of equity $r^E$. It considers the risk-free rate, the equity risk premium, and the company’s risk exposure (i.e., beta). For a detailed guide estimating the CAPM, we refer to Chapter [Capital Asset Pricing Model](../chapters/capital-asset-pricing-model.llms.md).
+- The return on debt $r^D$ can also be estimated in different ways. For instance, effective interest rates can be calculated as the ratio of interest expense to total debt from financial statements. This gives you a real-world measure of what the company is currently paying. Alternatively, you can look up corporate bond spreads for companies in the same rating group.
 
 If you would rather not estimate WACC manually, resources are available to help you find industry-specific discount rates. One of the most widely used sources is Aswath Damodaran’s [database](https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html). He maintains an extensive database that provides a wealth of financial data, including estimated discount rates, cash flows, growth rates, multiples, and more. For example, if you are analyzing a company in the Computer Services sector, as we do here, you can look up the industry’s average WACC and use it as a benchmark for your analysis. The following code chunk downloads the WACC data and extracts the value for this industry:
 
@@ -710,7 +710,7 @@ wacc = wacc_raw.filter(
 )["Cost of Capital"][0]
 ```
 
-You need the `fastexcel` package to use `pl.read_excel()`, so make sure to install it via, e.g., `pip install fastexcel`.
+You need the `fastexcel` package to use `pl.read_excel()`. It is part of the Tidy Finance project environment; in your own project, add it with `uv add fastexcel`.
 
 ## Computing Enterprise Value
 
@@ -721,9 +721,9 @@ Having established all components, we can now compute the total company value (g
 
 This is expressed mathematically as:
 
-\\ \text{Total DCF Value} = \sum\_{t=1}^{T} \frac{\text{FCF}t}{(1 + \text{WACC})^t} + \frac{\text{TV}\_{T}}{(1 + \text{WACC})^T}, \\
+$$\text{Total DCF Value} = \sum_{t=1}^{T} \frac{\text{FCF}t}{(1 + \text{WACC})^t} + \frac{\text{TV}_{T}}{(1 + \text{WACC})^T},$$
 
-where \\T\\ is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.
+where $T$ is the length of our forecast period. Let us implement this calculation in a simple function that takes the WACC and growth rate as input. Then, we present an example at the values discussed above.
 
 ## R
 
@@ -864,7 +864,7 @@ Second, we want to discuss equity value. As you saw in the computation of the WA
 
 Combining these adjustments, we can compute the equity value that belongs to shareholders as:
 
-\\\text{Equity Value} = \text{DCF Value} + \text{Non-Operating Assets} - \text{Value of Debt}\\
+$$\text{Equity Value} = \text{DCF Value} + \text{Non-Operating Assets} - \text{Value of Debt}$$
 
 We leave it as an exercise to calculate the equity value using the DCF value from above.
 
