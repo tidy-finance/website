@@ -524,15 +524,15 @@ evaluate_portfolio(weights_crsp) |>
        measure                            benchmark     tilt
        <chr>                                  <dbl>    <dbl>
      1 Expected utility                  -0.249     -0.260  
-     2 Average return                     7.04       0.830  
-     3 SD return                         15.4       21.2    
-     4 Sharpe ratio                       0.457      0.0393 
-     5 CAPM alpha                         0.000104  -0.00480
-     6 Market beta                        0.994      0.947  
-     7 Absolute weight                    0.0249     0.0638 
-     8 Max. weight                        3.67       3.80   
-     9 Min. weight                        0.0000266 -0.144  
-    10 Avg. sum of negative weights       0         77.9    
+     2 Average return                     7.13       0.961  
+     3 SD return                         15.4       21.0    
+     4 Sharpe ratio                       0.464      0.0457 
+     5 CAPM alpha                         0.000104  -0.00473
+     6 Market beta                        0.994      0.942  
+     7 Absolute weight                    0.0250     0.0638 
+     8 Max. weight                        3.71       3.84   
+     9 Min. weight                        0.0000262 -0.144  
+    10 Avg. sum of negative weights       0         77.8    
     11 Avg. fraction of negative weights  0         49.5    
 
 ## Python
@@ -550,16 +550,16 @@ shape: (11, 3)
 |----------------------------------|-----------|-------|
 | str                              | f64       | f64   |
 | "Expected utility"               | -0.25     | -0.26 |
-| "Average return"                 | 7.04      | 0.83  |
-| "SD return"                      | 15.41     | 21.15 |
-| "Sharpe ratio"                   | 0.46      | 0.04  |
+| "Average return"                 | 7.13      | 0.96  |
+| "SD return"                      | 15.36     | 21.02 |
+| "Sharpe ratio"                   | 0.46      | 0.05  |
 | "CAPM alpha"                     | 0.0       | -0.0  |
 | …                                | …         | …     |
 | "Absolute weight"                | 0.02      | 0.06  |
-| "Max. weight"                    | 3.67      | 3.8   |
+| "Max. weight"                    | 3.71      | 3.84  |
 | "Min. weight"                    | 0.0       | -0.14 |
-| "Avg. sum of negative weights"   | 0.0       | 77.94 |
-| "Avg. fraction of negative weig… | 0.0       | 49.46 |
+| "Avg. sum of negative weights"   | 0.0       | 77.77 |
+| "Avg. fraction of negative weig… | 0.0       | 49.45 |
 
 The value-weighted portfolio delivers an annualized return of more than six percent and clearly outperforms the tilted portfolio, irrespective of whether we evaluate expected utility, the Sharpe ratio, or the CAPM alpha. We can conclude the market beta is close to one for both strategies (naturally almost identically one for the value-weighted benchmark portfolio). When it comes to the distribution of the portfolio weights, we see that the benchmark portfolio weight takes less extreme positions (lower average absolute weights and lower maximum weight). By definition, the value-weighted benchmark does not take any negative positions, while the tilted portfolio also takes short positions.
 
@@ -644,7 +644,7 @@ optimal_theta$par
 ```
 
     momentum_lag     size_lag 
-           0.273       -1.660 
+           0.143       -1.530 
 
 ## Python
 
@@ -671,7 +671,7 @@ shape: (1, 3)
 | measure         | momentum_lag | size_lag |
 |-----------------|--------------|----------|
 | str             | f64          | f64      |
-| "Optimal theta" | 0.267        | -1.662   |
+| "Optimal theta" | 0.143        | -1.53    |
 
 The resulting values of $\hat\theta$ are easy to interpret: intuitively, expected utility increases by tilting weights from the value-weighted portfolio toward smaller stocks (negative coefficient for size) and toward past winners (positive value for momentum). Both findings are in line with the well-documented size effect ([Banz 1981](#ref-Banz1981)) and the momentum anomaly ([Jegadeesh and Titman 1993](#ref-Jegadeesh1993)).
 
@@ -808,17 +808,17 @@ performance_table |>
     # A tibble: 11 × 7
        measure     `EW    ` `VW    ` `VW  Optimal ` `VW (no s.) Optimal `
        <chr>          <dbl>    <dbl>          <dbl>                 <dbl>
-     1 Expected u… -0.251   -2.49e-1       -0.247                -0.247  
-     2 Average re…  9.96     7.04e+0       12.7                  11.9    
-     3 SD return   20.4      1.54e+1       19.2                  18.5    
-     4 Sharpe rat…  0.487    4.57e-1        0.662                 0.639  
-     5 CAPM alpha   0.00175  1.04e-4        0.00479               0.00392
+     1 Expected u… -0.251   -2.49e-1       -0.247                -0.248  
+     2 Average re…  9.89     7.13e+0       12.3                  11.5    
+     3 SD return   20.4      1.54e+1       18.9                  18.2    
+     4 Sharpe rat…  0.486    4.64e-1        0.650                 0.632  
+     5 CAPM alpha   0.00160  1.04e-4        0.00428               0.00357
      6 Market beta  1.13     9.94e-1        1.01                  1.03   
-     7 Absolute w…  0.0249   2.49e-2        0.0340                0.0249 
-     8 Max. weight  0.0249   3.67e+0        3.52                  3.08   
-     9 Min. weight  0.0249   2.66e-5       -0.0263                0      
-    10 Avg. sum o…  0        0             19.0                   0      
-    11 Avg. fract…  0        0             36.5                   0      
+     7 Absolute w…  0.0250   2.50e-2        0.0325                0.0250 
+     8 Max. weight  0.0250   3.71e+0        3.57                  3.19   
+     9 Min. weight  0.0250   2.62e-5       -0.0201                0      
+    10 Avg. sum o…  0        0             15.8                   0      
+    11 Avg. fract…  0        0             35.7                   0      
     # ℹ 2 more variables: `EW  Optimal ` <dbl>,
     #   `EW (no s.) Optimal ` <dbl>
 
@@ -856,13 +856,13 @@ shape: (11, 3)
 |----------------------------------|--------|--------|
 | str                              | f64    | f64    |
 | "Expected utility"               | -0.251 | -0.249 |
-| "Average return"                 | 9.959  | 7.041  |
-| "SD return"                      | 20.431 | 15.413 |
-| "Sharpe ratio"                   | 0.487  | 0.457  |
+| "Average return"                 | 9.894  | 7.13   |
+| "SD return"                      | 20.371 | 15.358 |
+| "Sharpe ratio"                   | 0.486  | 0.464  |
 | "CAPM alpha"                     | 0.002  | 0.0    |
 | …                                | …      | …      |
 | "Absolute weight"                | 0.025  | 0.025  |
-| "Max. weight"                    | 0.025  | 3.668  |
+| "Max. weight"                    | 0.025  | 3.707  |
 | "Min. weight"                    | 0.025  | 0.0    |
 | "Avg. sum of negative weights"   | 0.0    | 0.0    |
 | "Avg. fraction of negative weig… | 0.0    | 0.0    |
@@ -877,16 +877,16 @@ shape: (11, 3)
 |----------------------------------|------------|------------|
 | str                              | f64        | f64        |
 | "Expected utility"               | -0.251     | -0.247     |
-| "Average return"                 | 11.06      | 12.743     |
-| "SD return"                      | 21.466     | 19.246     |
-| "Sharpe ratio"                   | 0.515      | 0.662      |
-| "CAPM alpha"                     | 0.003      | 0.005      |
+| "Average return"                 | 10.682     | 12.273     |
+| "SD return"                      | 21.163     | 18.883     |
+| "Sharpe ratio"                   | 0.505      | 0.65       |
+| "CAPM alpha"                     | 0.002      | 0.004      |
 | …                                | …          | …          |
-| "Absolute weight"                | 0.025      | 0.034      |
-| "Max. weight"                    | 0.127      | 3.519      |
-| "Min. weight"                    | -0.006     | -0.026     |
-| "Avg. sum of negative weights"   | 0.028      | 19.063     |
-| "Avg. fraction of negative weig… | 0.285      | 36.543     |
+| "Absolute weight"                | 0.025      | 0.032      |
+| "Max. weight"                    | 0.053      | 3.57       |
+| "Min. weight"                    | 0.004      | -0.02      |
+| "Avg. sum of negative weights"   | 0.0        | 15.86      |
+| "Avg. fraction of negative weig… | 0.0        | 35.667     |
 
 ``` python
 performance_table.select("measure", "EW Optimal (no s.)", "VW Optimal (no s.)")
@@ -897,14 +897,14 @@ shape: (11, 3)
 | measure                          | EW Optimal (no s.) | VW Optimal (no s.) |
 |----------------------------------|--------------------|--------------------|
 | str                              | f64                | f64                |
-| "Expected utility"               | -0.249             | -0.247             |
-| "Average return"                 | 16.568             | 11.852             |
-| "SD return"                      | 25.524             | 18.536             |
-| "Sharpe ratio"                   | 0.649              | 0.639              |
+| "Expected utility"               | -0.249             | -0.248             |
+| "Average return"                 | 16.3               | 11.534             |
+| "SD return"                      | 25.552             | 18.246             |
+| "Sharpe ratio"                   | 0.638              | 0.632              |
 | "CAPM alpha"                     | 0.007              | 0.004              |
 | …                                | …                  | …                  |
 | "Absolute weight"                | 0.025              | 0.025              |
-| "Max. weight"                    | 0.17               | 3.085              |
+| "Max. weight"                    | 0.17               | 3.189              |
 | "Min. weight"                    | 0.0                | 0.0                |
 | "Avg. sum of negative weights"   | 0.0                | 0.0                |
 | "Avg. fraction of negative weig… | 0.0                | 0.0                |

@@ -87,7 +87,7 @@ In this analysis, we use four different data sources that we load from our Parqu
 
 Next, we include macroeconomic predictors which may predict the general stock market economy. Macroeconomic variables effectively serve as conditioning information such that their inclusion hints at the relevance of conditional models instead of unconditional asset pricing. We refer the interested reader to Cochrane ([2009](#ref-Cochrane2009)) on the role of conditioning information.
 
-- Our set of macroeconomic predictors comes from Welch and Goyal ([2008](#ref-Goyal2008)). The data has been updated by the authors until 2021 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the dividend price ratio, earnings price ratio, stock variance, net equity expansion, treasury bill rate, and inflation
+- Our set of macroeconomic predictors comes from Welch and Goyal ([2008](#ref-Goyal2008)). The data has been updated by the authors until the end of 2023 and contains monthly variables that have been suggested as good predictors for the equity premium. Some of the variables are the dividend price ratio, earnings price ratio, stock variance, net equity expansion, treasury bill rate, and inflation
 
 Finally, we need a set of *test assets*. The aim is to understand which of the plenty factors and macroeconomic variable combinations prove helpful in explaining our test assets’ cross-section of returns. In line with many existing papers, we use monthly portfolio returns from 10 different industries according to the definition from [Kenneth French’s homepage](https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/Data_Library/det_10_ind_port.html) as test assets.
 
@@ -282,10 +282,10 @@ data_bake
       factor_ff_mkt_excess factor_ff_smb factor_ff_hml
                      <dbl>         <dbl>         <dbl>
     1               0.0709       -0.940         -0.150
-    2               0.448         0.0896         0.296
-    3               0.489         0.0738         0.430
-    4              -0.478        -0.412          1.09 
-    5               0.0688        0.121         -0.426
+    2               0.448         0.0831         0.303
+    3               0.489         0.0736         0.434
+    4              -0.478        -0.416          1.09 
+    5               0.0688        0.121         -0.430
     # ℹ 132 more rows
     # ℹ 151 more variables: factor_ff_risk_free <dbl>,
     #   factor_q_risk_free <dbl>, factor_q_mkt_excess <dbl>,

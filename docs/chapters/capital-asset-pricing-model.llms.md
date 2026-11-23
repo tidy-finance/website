@@ -45,7 +45,7 @@ symbols <- download_data(
 
 prices_daily <- download_data(
     domain = "Stock Prices", symbols = symbols$symbol,
-    start_date = "2000-01-01", end_date = "2024-12-31"
+    start_date = "2000-01-01", end_date = "2025-12-31"
 ) |>
   select(symbol, date, adjusted_close)
 
@@ -76,7 +76,7 @@ prices_daily = tf.download_data(
     domain="Stock Prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2024-12-31",
+    end_date="2025-12-31",
 ).select("symbol", "date", "adjusted_close")
 
 prices_daily = prices_daily.with_columns(
@@ -148,7 +148,7 @@ For illustrative purposes, we compute the efficient tangency portfolio for our h
 ``` r
 risk_free_monthly <- download_data(
   domain = "Stock Prices", symbols = "^IRX",
-  start_date = "2019-10-01", end_date = "2024-09-30"
+  start_date = "2021-01-01", end_date = "2025-12-31"
 ) |>
   mutate(
     risk_free = (1 + adjusted_close / 100)^(1 / 12) - 1
@@ -163,7 +163,7 @@ rf <- mean(risk_free_monthly$risk_free)
 
 ``` python
 risk_free_monthly = (
-  tf.download_data(domain="Stock Prices", symbols="^IRX", start_date="2019-10-01", end_date="2024-09-30")
+  tf.download_data(domain="Stock Prices", symbols="^IRX", start_date="2021-01-01", end_date="2025-12-31")
   .with_columns(
     risk_free=(1 + pl.col("adjusted_close") / 100)**(1/12) - 1
   )
@@ -416,7 +416,7 @@ Let’s turn to estimating CAPM parameters using real market data. Instead of us
 ``` r
 factors <- download_data(
   domain = "Fama-French", dataset = "Fama/French 5 Factors (2x3)",
-  start_date = "2000-01-01", end_date = "2024-09-30"
+  start_date = "2000-01-01", end_date = "2025-12-31"
 ) |>
   select(date, mkt_excess, risk_free)
 ```
@@ -428,7 +428,7 @@ factors = tf.download_data(
     domain="Fama-French",
     dataset="Fama/French 5 Factors (2x3)",
     start_date="2000-01-01",
-    end_date="2024-09-30",
+    end_date="2025-12-31",
 ).select("date", "mkt_excess", "risk_free")
 ```
 
@@ -475,11 +475,11 @@ returns_excess_monthly |>
     # Groups:   symbol [27]
       symbol data               capm            
       <chr>  <list>             <list>          
-    1 AAPL   <tibble [299 × 3]> <named list [2]>
-    2 AMGN   <tibble [299 × 3]> <named list [2]>
-    3 AMZN   <tibble [299 × 3]> <named list [2]>
-    4 AXP    <tibble [299 × 3]> <named list [2]>
-    5 BA     <tibble [299 × 3]> <named list [2]>
+    1 AAPL   <tibble [311 × 3]> <named list [2]>
+    2 AMGN   <tibble [311 × 3]> <named list [2]>
+    3 AMZN   <tibble [311 × 3]> <named list [2]>
+    4 AXP    <tibble [311 × 3]> <named list [2]>
+    5 BA     <tibble [311 × 3]> <named list [2]>
     # ℹ 22 more rows
 
 ## Python

@@ -181,7 +181,7 @@ coeftest(model_fit, vcov = NeweyWest, lag = 6, prewhite = FALSE)
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept) 0.000395   0.001250    0.32     0.75
+    (Intercept) 0.000424   0.001239    0.34     0.73
 
 ## Python
 
@@ -202,13 +202,13 @@ model_fit.summary()
     Dep. var.: long_short
     sample: None = all
     Inference:  NW
-    Observations:  731
+    Observations:  743
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.000 |        0.001 |     0.316 |      0.752 | -0.002 |   0.003 |
+    | Intercept     |      0.000 |        0.001 |     0.342 |      0.733 | -0.002 |   0.003 |
     ---
-    RMSE: 0.032 R2: 0.0 
+    RMSE: 0.033 R2: 0.0 
 
 The results indicate that we cannot reject the null hypothesis of average returns being equal to zero. Our portfolio strategy using the median as a breakpoint hence does not yield any abnormal returns. Is this finding surprising if you reconsider the CAPM? It certainly is. The CAPM yields that the high-beta stocks should yield higher expected returns. Our portfolio sort implicitly mimics an investment strategy that finances high-beta stocks by shorting low-beta stocks. Therefore, one should expect that the average excess returns yield a return that is above the risk-free rate.
 
@@ -546,7 +546,7 @@ coeftest(
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept)  0.00251    0.00313     0.8     0.42
+    (Intercept)  0.00279    0.00310     0.9     0.37
 
 ## Python
 
@@ -565,13 +565,13 @@ model_fit.summary()
     Dep. var.: long_short
     sample: None = all
     Inference:  NW
-    Observations:  731
+    Observations:  743
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.003 |        0.003 |     0.798 |      0.425 | -0.004 |   0.009 |
+    | Intercept     |      0.003 |        0.003 |     0.894 |      0.372 | -0.003 |   0.009 |
     ---
-    RMSE: 0.08 R2: 0.0 
+    RMSE: 0.081 R2: 0.0 
 
 However, controlling for the effect of beta, the long-short portfolio yields a statistically significant negative CAPM-adjusted alpha, although the average excess stock returns should be zero according to the CAPM. The results thus provide no evidence in support of the CAPM. The negative value has been documented as the so-called betting-against-beta factor ([Frazzini and Pedersen 2014](#ref-Frazzini2014)). Betting-against-beta corresponds to a strategy that shorts high-beta stocks and takes a (levered) long position in low-beta stocks. If borrowing constraints prevent investors from taking positions on the security market line they are instead incentivized to buy high-beta stocks, which leads to a relatively higher price (and therefore lower expected returns than implied by the CAPM) for such high-beta stocks. As a result, the betting-against-beta strategy earns from providing liquidity to capital-constrained investors with lower risk aversion.
 
@@ -589,8 +589,8 @@ coeftest(
     t test of coefficients:
 
                 Estimate Std. Error t value Pr(>|t|)    
-    (Intercept) -0.00424    0.00244   -1.74    0.083 .  
-    mkt_excess   1.16353    0.08323   13.98   <2e-16 ***
+    (Intercept) -0.00413    0.00241   -1.71    0.087 .  
+    mkt_excess   1.17564    0.08337   14.10   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -611,14 +611,14 @@ model_fit.summary()
     Dep. var.: long_short
     sample: None = all
     Inference:  NW
-    Observations:  731
+    Observations:  743
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |     -0.004 |        0.002 |    -1.739 |      0.082 | -0.009 |   0.001 |
-    | mkt_excess    |      1.163 |        0.083 |    13.960 |      0.000 |  1.000 |   1.327 |
+    | Intercept     |     -0.004 |        0.002 |    -1.714 |      0.087 | -0.009 |   0.001 |
+    | mkt_excess    |      1.176 |        0.083 |    14.081 |      0.000 |  1.012 |   1.339 |
     ---
-    RMSE: 0.061 R2: 0.427 
+    RMSE: 0.062 R2: 0.421 
 
 [Figure 3](#fig-703) shows the annual returns of the extreme beta portfolios we are mainly interested in. The figure illustrates no consistent striking patterns over the last years; each portfolio exhibits periods with positive and negative annual returns.
 

@@ -40,7 +40,7 @@ We use the same date range as in the previous chapter to ensure consistency.
 
 ``` r
 start_date <- ymd("1960-01-01")
-end_date <- ymd("2024-12-31")
+end_date <- ymd("2025-12-31")
 ```
 
 ## Python
@@ -49,7 +49,7 @@ We have to use the date format that the WRDS database expects.
 
 ``` python
 start_date = "01/01/1960"
-end_date = "12/31/2024"
+end_date = "12/31/2025"
 ```
 
 ## Accessing WRDS
@@ -456,7 +456,7 @@ crsp_monthly.write_parquet("data/crsp_monthly.parquet")
 
 Before we move on to other data sources, let us look at some descriptive statistics of the CRSP sample, which is our main source for stock returns.
 
-[Figure 1](#fig-211) shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerably large number of stocks. The number of stocks listed on AMEX decreased steadily over the last couple of decades. By the end of 2024, there were 2379 stocks with a primary listing on NASDAQ, 1256 on NYSE, and 154 on AMEX.
+[Figure 1](#fig-211) shows the monthly number of securities by listing exchange over time. NYSE has the longest history in the data, but NASDAQ lists a considerably large number of stocks. The number of stocks listed on AMEX decreased steadily over the last couple of decades. By the end of 2025, there were 2265 stocks with a primary listing on NASDAQ, 1232 on NYSE, and 143 on AMEX.
 
 ## R
 
@@ -476,7 +476,7 @@ crsp_monthly |>
   scale_y_continuous(labels = scales::comma)
 ```
 
-[![Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2024. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role.](wrds-crsp-and-compustat_files/figure-html/fig-211-1.png)](wrds-crsp-and-compustat_files/figure-html/fig-211-1.png "Figure 1: Number of stocks in the CRSP sample listed at each of the US exchanges.")
+[![Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2025. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role.](wrds-crsp-and-compustat_files/figure-html/fig-211-1.png)](wrds-crsp-and-compustat_files/figure-html/fig-211-1.png "Figure 1: Number of stocks in the CRSP sample listed at each of the US exchanges.")
 
 Figure 1: Number of stocks in the CRSP sample listed at each of the US exchanges.
 
@@ -505,11 +505,11 @@ securities_per_exchange_figure = (
 securities_per_exchange_figure.show()
 ```
 
-[![Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2024. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-211-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-211-py-1.png "Number of stocks in the CRSP sample listed at each of the US exchanges.")
+[![Title: Monthly number of securities by listing exchange. The figure shows a line chart with the number of securities by listing exchange from 1960 to 2025. In the earlier period, NYSE dominated as a listing exchange. There is a strong upwards trend for NASDAQ. Other listing exchanges do only play a minor role.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-211-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-211-py-1.png "Number of stocks in the CRSP sample listed at each of the US exchanges.")
 
 Number of stocks in the CRSP sample listed at each of the US exchanges.
 
-Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in [Figure 2](#fig-212). To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. All values in [Figure 2](#fig-212) are at the end of 2024 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.
+Next, we look at the aggregate market capitalization grouped by the respective listing exchanges in [Figure 2](#fig-212). To ensure that we look at meaningful data which is comparable over time, we adjust the nominal values for inflation. All values in [Figure 2](#fig-212) are at the end of 2025 USD to ensure intertemporal comparability. NYSE-listed stocks have by far the largest market capitalization, followed by NASDAQ-listed stocks.
 
 ## R
 
@@ -536,15 +536,15 @@ crsp_monthly |>
     y = NULL,
     color = NULL,
     linetype = NULL,
-    title = "Monthly market cap by listing exchange in billions of Dec 2024 USD"
+    title = "Monthly market cap by listing exchange in billions of Dec 2025 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = scales::comma)
 ```
 
-[![Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks.](wrds-crsp-and-compustat_files/figure-html/fig-212-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-212-3.png "Figure 2: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024.")
+[![Title: Monthly market cap by listing exchange in billion USD as of Dec 2025. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2025, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks.](wrds-crsp-and-compustat_files/figure-html/fig-212-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-212-3.png "Figure 2: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2025.")
 
-Figure 2: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024.
+Figure 2: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2025.
 
 ## Python
 
@@ -566,7 +566,7 @@ market_cap_per_exchange_figure = (
     + geom_line()
     + labs(
         x="", y="", color="", linetype="",
-        title="Monthly market cap by listing exchange in billions of Dec 2024 USD"
+        title="Monthly market cap by listing exchange in billions of Dec 2025 USD"
         )
     + scale_x_date(date_breaks="10 years", date_labels="%Y")
     + scale_y_continuous(labels=comma_format())
@@ -574,9 +574,9 @@ market_cap_per_exchange_figure = (
 market_cap_per_exchange_figure.show()
 ```
 
-[![Title: Monthly market cap by listing exchange in billion USD as of Dec 2024. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2024, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-212-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-212-py-1.png "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024.")
+[![Title: Monthly market cap by listing exchange in billion USD as of Dec 2025. The figure shows a line chart of the total market capitalization of all stocks aggregated by the listing exchange from 1960 to 2025, with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Historically, NYSE listed stocks had the highest market capitalization. In the more recent past, the valuation of NASDAQ listed stocks exceeded that of NYSE listed stocks.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-212-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-212-py-1.png "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2025.")
 
-Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2024.
+Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the horizontal axis reflect the buying power of billion USD in December 2025.
 
 Next, we look at the same descriptive statistics by industry. [Figure 3](#fig-213) plots the number of stocks in the sample for each of the SIC industry classifiers. For most of the sample period, the largest share of stocks is in manufacturing, albeit the number peaked somewhere in the 90s. The number of firms associated with public administration seems to be the only category on the rise in recent years, even surpassing manufacturing at the end of our sample period.
 
@@ -611,7 +611,7 @@ crsp_monthly_industry |>
   scale_y_continuous(labels = scales::comma)
 ```
 
-[![Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2024 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2024, the segment of firms within public administration is the largest in terms of the number of listed stocks.](wrds-crsp-and-compustat_files/figure-html/fig-213-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-213-3.png "Figure 3: Number of stocks in the CRSP sample associated with different industries.")
+[![Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2025 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2025, the segment of firms within public administration is the largest in terms of the number of listed stocks.](wrds-crsp-and-compustat_files/figure-html/fig-213-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-213-3.png "Figure 3: Number of stocks in the CRSP sample associated with different industries.")
 
 Figure 3: Number of stocks in the CRSP sample associated with different industries.
 
@@ -646,11 +646,11 @@ securities_per_industry_figure = (
 securities_per_industry_figure.show()
 ```
 
-[![Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2024 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2024, the segment of firms within public administration is the largest in terms of the number of listed stocks.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-213-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-213-py-1.png "Number of stocks in the CRSP sample associated with different industries.")
+[![Title: Monthly number of securities by industry. The figure shows a line chart of the number of securities by industry from 1960 to 2025 with years on the horizontal axis and the corresponding number on the vertical axis. Except for stocks that are assigned to the industry public administration, the number of listed stocks decreased steadily at least since 1996. As of 2025, the segment of firms within public administration is the largest in terms of the number of listed stocks.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-213-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-213-py-1.png "Number of stocks in the CRSP sample associated with different industries.")
 
 Number of stocks in the CRSP sample associated with different industries.
 
-We also compute the market cap of all stocks belonging to the respective industries and show the evolution over time in [Figure 4](#fig-214). All values are again in terms of billions of end of 2024 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Toward the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
+We also compute the market cap of all stocks belonging to the respective industries and show the evolution over time in [Figure 4](#fig-214). All values are again in terms of billions of end of 2025 USD. At all points in time, manufacturing firms comprise of the largest portion of market capitalization. Toward the end of the sample, however, financial firms and services begin to make up a substantial portion of the market cap.
 
 ## R
 
@@ -668,15 +668,15 @@ crsp_monthly_industry |>
     y = NULL,
     color = NULL,
     linetype = NULL,
-    title = "Monthly total market cap by industry in billions as of Dec 2024 USD"
+    title = "Monthly total market cap by industry in billions as of Dec 2025 USD"
   ) +
   scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
   scale_y_continuous(labels = scales::comma)
 ```
 
-[![Title: Monthly total market cap by industry in billions as of Dec 2024 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2024 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. ](wrds-crsp-and-compustat_files/figure-html/fig-214-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-214-3.png "Figure 4: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2024.")
+[![Title: Monthly total market cap by industry in billions as of Dec 2025 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2025 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past. ](wrds-crsp-and-compustat_files/figure-html/fig-214-3.png)](wrds-crsp-and-compustat_files/figure-html/fig-214-3.png "Figure 4: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2025.")
 
-Figure 4: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2024.
+Figure 4: Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2025.
 
 ## Python
 
@@ -696,7 +696,7 @@ market_cap_per_industry_figure = (
     + geom_line()
     + labs(
         x="", y="", color="", linetype="",
-        title="Monthly total market cap by industry in billions as of Dec 2024 USD"
+        title="Monthly total market cap by industry in billions as of Dec 2025 USD"
         )
     + scale_x_date(date_breaks="10 years", date_labels="%Y")
     + scale_y_continuous(labels=comma_format())
@@ -707,9 +707,9 @@ market_cap_per_industry_figure = (
 market_cap_per_industry_figure.show()
 ```
 
-[![Title: Monthly total market cap by industry in billions as of Dec 2024 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2024 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-214-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-214-py-1.png "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2024.")
+[![Title: Monthly total market cap by industry in billions as of Dec 2025 USD. The figure shows a line chart of total market capitalization of all stocks in the CRSP sample aggregated by industry from 1960 to 2025 with years on the horizontal axis and the corresponding market capitalization on the vertical axis. Stocks in the manufacturing sector have always had the highest market valuation. The figure shows a general upwards trend during the most recent past.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-214-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-214-py-1.png "Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2025.")
 
-Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2024.
+Market capitalization is measured in billion USD, adjusted for consumer price index changes such that the values on the y-axis reflect the buying power of billion USD in December 2025.
 
 ## Daily CRSP Data
 
@@ -866,7 +866,7 @@ for j in range(1, batches + 1):
 
 The choice of partitioning strategy depends on your intended analysis. Partitioning by `permno` as above is efficient when you need to parallelize computations at the firm level or frequently query data for specific stocks, since only the relevant partition files are read. However, this creates many small files, which introduces overhead when reading the entire dataset. If your analysis primarily involves cross-sectional operations on specific dates, partitioning by `date` or `year` would be more efficient. Alternatively, you can skip partitioning entirely and store the data as fewer large files, which minimizes file-open overhead for full scans while still allowing filtering on any column—though without the benefit of partition pruning.
 
-Eventually, we end up with more than 72 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local folder contains only the data that we actually use.
+Eventually, we end up with more than 73 million rows of daily return data. Note that we only store the identifying information that we actually need, namely `permno` and `date` alongside the excess returns. We thus ensure that our local folder contains only the data that we actually use.
 
 To download the daily CRSP data via the `tidyfinance` package, you can call:
 
@@ -903,6 +903,16 @@ To access Compustat data, we can again tap WRDS, which hosts the `funda` table t
 ## R
 
 ``` r
+wrds <- dbConnect(
+  Postgres(),
+  host = "wrds-pgdata.wharton.upenn.edu",
+  dbname = "wrds",
+  port = 9737,
+  sslmode = "require",
+  user = Sys.getenv("WRDS_USER"),
+  password = Sys.getenv("WRDS_PASSWORD")
+)
+
 funda_db <- tbl(wrds, I("comp.funda"))
 
 compustat_annual <- funda_db |>
@@ -1232,7 +1242,7 @@ crsp_monthly |>
   coord_cartesian(ylim = c(0, 1))
 ```
 
-[![Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat.](wrds-crsp-and-compustat_files/figure-html/fig-215-1.png)](wrds-crsp-and-compustat_files/figure-html/fig-215-1.png "Figure 5: End-of-year share of securities with book equity values by listing exchange.")
+[![Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2025 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat.](wrds-crsp-and-compustat_files/figure-html/fig-215-1.png)](wrds-crsp-and-compustat_files/figure-html/fig-215-1.png "Figure 5: End-of-year share of securities with book equity values by listing exchange.")
 
 Figure 5: End-of-year share of securities with book equity values by listing exchange.
 
@@ -1273,7 +1283,7 @@ share_with_be_figure = (
 share_with_be_figure.show()
 ```
 
-[![Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2024 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-215-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-215-py-1.png "End-of-year share of securities with book equity values by listing exchange.")
+[![Title: Share of securities with book equity values by exchange. The figure shows a line chart of end-of-year shares of securities with book equity values by exchange from 1960 to 2025 with years on the horizontal axis and the corresponding share on the vertical axis. After an initial period with lower coverage in the early 1960s, typically, more than 80 percent of the entries in the CRSP sample have information about book equity values from Compustat.](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-215-py-1.png)](wrds-crsp-and-compustat_files/figure-html/wrds-crsp-and-compustat-fig-215-py-1.png "End-of-year share of securities with book equity values by listing exchange.")
 
 End-of-year share of securities with book equity values by listing exchange.
 

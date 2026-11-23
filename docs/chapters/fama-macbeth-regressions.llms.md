@@ -251,10 +251,10 @@ left_join(
     # A tibble: 4 × 4
       factor      risk_premium t_statistic t_statistic_newey_west
       <chr>              <dbl>       <dbl>                  <dbl>
-    1 (Intercept)    0.0115         4.62                   3.91  
-    2 beta          -0.0000115     -0.0114                -0.0103
-    3 bm             0.00157        3.52                   3.01  
-    4 log_mktcap    -0.000934      -2.74                  -2.40  
+    1 (Intercept)    0.0113         4.58                   3.87  
+    2 beta           0.0000242      0.0244                 0.0220
+    3 bm             0.00153        3.46                   2.96  
+    4 log_mktcap    -0.000904      -2.68                  -2.37  
 
 ## Python
 
@@ -291,10 +291,10 @@ shape: (4, 4)
 | factor       | risk_premium | t_statistic | t_statistic_newey_west |
 |--------------|--------------|-------------|------------------------|
 | str          | f64          | f64         | f64                    |
-| "Intercept"  | 0.011        | 4.625       | 4.012                  |
-| "beta"       | -0.0         | -0.011      | -0.011                 |
-| "log_mktcap" | -0.001       | -2.738      | -2.557                 |
-| "bm"         | 0.002        | 3.521       | 3.076                  |
+| "Intercept"  | 0.011        | 4.581       | 3.982                  |
+| "beta"       | 0.0          | 0.024       | 0.023                  |
+| "log_mktcap" | -0.001       | -2.683      | -2.509                 |
+| "bm"         | 0.002        | 3.464       | 3.024                  |
 
 Finally, let us interpret the results. Stocks with higher book-to-market ratios earn higher expected future returns, which is in line with the value premium. The negative value for log market capitalization reflects the size premium for smaller stocks. Consistent with results from earlier chapters, we detect no relation between beta and future stock returns.
 
@@ -328,16 +328,16 @@ estimate_fama_macbeth(
     # A tibble: 4 × 5
       factor     risk_premium     n standard_error t_statistic
       <chr>             <dbl> <dbl>          <dbl>       <dbl>
-    1 intercept     0.0115      725       0.00286       4.01  
-    2 beta         -0.0000115   725       0.00109      -0.0105
-    3 bm            0.00157     725       0.000512      3.08  
-    4 log_mktcap   -0.000934    725       0.000365     -2.56  
+    1 intercept     0.0113      737       0.00283       3.98  
+    2 beta          0.0000242   737       0.00108       0.0225
+    3 bm            0.00153     737       0.000505      3.03  
+    4 log_mktcap   -0.000904    737       0.000360     -2.51  
 
     $summary_statistics
     # A tibble: 1 × 3
       r_squared adj_r_squared n_obs
           <dbl>         <dbl> <dbl>
-    1    0.0317        0.0296 2798.
+    1    0.0315        0.0294 2796.
 
 ## Python
 
@@ -365,10 +365,10 @@ shape: (4, 5)
 | factor       | risk_premium | n   | standard_error | t_statistic |
 |--------------|--------------|-----|----------------|-------------|
 | str          | f64          | i64 | f64            | f64         |
-| "intercept"  | 0.011497     | 725 | 0.002864       | 4.014727    |
-| "beta"       | -0.000011    | 725 | 0.001087       | -0.010546   |
-| "bm"         | 0.001575     | 725 | 0.000512       | 3.077702    |
-| "log_mktcap" | -0.000934    | 725 | 0.000365       | -2.558543   |
+| "intercept"  | 0.011277     | 737 | 0.00283        | 3.984974    |
+| "beta"       | 0.000024     | 737 | 0.001076       | 0.022532    |
+| "bm"         | 0.001528     | 737 | 0.000505       | 3.025828    |
+| "log_mktcap" | -0.000904    | 737 | 0.00036        | -2.51098    |
 
 ## Key Takeaways
 

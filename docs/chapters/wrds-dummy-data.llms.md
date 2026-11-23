@@ -60,7 +60,7 @@ set.seed(seed)
 n_assets <- 100
 
 start_date <- "1960-01-01"
-end_date <- "2024-12-31"
+end_date <- "2025-12-31"
 ```
 
 ## Python
@@ -72,7 +72,7 @@ np.random.seed(seed)
 n_assets = 100
 
 start_date = "1960-01-01"
-end_date = "2024-12-31"
+end_date = "2025-12-31"
 ```
 
 ## Stock Pseudo Data

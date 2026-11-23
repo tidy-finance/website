@@ -60,7 +60,7 @@ prices_daily <- download_data(
   domain = "Stock Prices",
   symbols = symbols$symbol,
   start_date = "2000-01-01",
-  end_date = "2024-12-31"
+  end_date = "2025-12-31"
 )
 ```
 
@@ -75,7 +75,7 @@ prices_daily = tf.download_data(
     domain="Stock Prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2024-12-31",
+    end_date="2025-12-31",
 )
 ```
 
@@ -397,7 +397,7 @@ summary_mvp
     # A tibble: 1 × 3
            mu  sigma type                      
         <dbl>  <dbl> <chr>                     
-    1 0.00896 0.0325 Minimum-Variance Portfolio
+    1 0.00901 0.0323 Minimum-Variance Portfolio
 
 ## Python
 
@@ -420,7 +420,7 @@ shape: (1, 3)
 | mu       | sigma    | type                         |
 |----------|----------|------------------------------|
 | f64      | f64      | str                          |
-| 0.008958 | 0.032492 | "Minimum-Variance Portfolio" |
+| 0.009009 | 0.032314 | "Minimum-Variance Portfolio" |
 
 ## Efficient Portfolios
 

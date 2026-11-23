@@ -583,11 +583,11 @@ fisd |>
 ```
 
     # A tibble: 3 × 8
-      measure        mean     sd    min   q05    q50    q95    max
-      <chr>         <dbl>  <dbl>  <dbl> <dbl>  <dbl>  <dbl>  <dbl>
-    1 coupon         5.96   2.63  0     2       5.98   10      39 
-    2 maturity       9.48   8.99 -6.24  1.03    7.04   30.0   101.
-    3 offering_amt 362.   557.    0.001 0.608 150    1250   15000 
+      measure        mean     sd   min   q05    q50    q95    max
+      <chr>         <dbl>  <dbl> <dbl> <dbl>  <dbl>  <dbl>  <dbl>
+    1 coupon         5.96   2.65 0     2       5.85   10      39 
+    2 maturity       9.44   8.92 0.164 1.03    7.03   30.0   101.
+    3 offering_amt 358.   567.   0.001 0.592 150    1250   15000 
 
 ## Python
 
@@ -618,14 +618,14 @@ average_characteristics.with_columns(pl.col(pl.Float64).round(2))
 
 shape: (3, 8)
 
-| measure        | mean  | std    | min   | q05  | median | q95   | max     |
-|----------------|-------|--------|-------|------|--------|-------|---------|
-| str            | f64   | f64    | f64   | f64  | f64    | f64   | f64     |
-| "maturity"     | 5.47  | 6.55   | -6.24 | 1.04 | 3.52   | 20.01 | 100.74  |
-| "coupon"       | 2.34  | 3.43   | 0.0   | 0.0  | 0.0    | 8.67  | 39.0    |
-| "offering_amt" | 121.2 | 353.41 | 0.0   | 0.22 | 2.64   | 750.0 | 15000.0 |
+| measure        | mean   | std    | min  | q05  | median | q95   | max     |
+|----------------|--------|--------|------|------|--------|-------|---------|
+| str            | f64    | f64    | f64  | f64  | f64    | f64   | f64     |
+| "coupon"       | 2.18   | 3.36   | 0.0  | 0.0  | 0.0    | 8.5   | 39.0    |
+| "offering_amt" | 112.87 | 347.74 | 0.0  | 0.22 | 2.4    | 700.0 | 15000.0 |
+| "maturity"     | 5.33   | 6.32   | 0.01 | 1.05 | 3.5    | 15.07 | 100.74  |
 
-We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 120 million USD and roughly five and a half years, respectively, by a tail of large, long-dated issues.
+We see that the sample is dominated by zero-coupon bonds: the median coupon is zero, and even the average coupon is only around 2 percent. The distributions of offering amount and maturity are strongly right-skewed. The median bond is small and short-dated, with an offering amount below 3 million USD and a maturity of around three and a half years, while the averages are pulled up to over 110 million USD and more than five years, respectively, by a tail of large, long-dated issues.
 
 Finally, let us compute some summary statistics for the trades in this market. To this end, we show a summary based on aggregate information daily. In particular, we consider the trade size (in million USD) and the number of trades.
 

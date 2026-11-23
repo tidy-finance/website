@@ -407,7 +407,7 @@ value_premium <- value_portfolios |>
   )
 ```
 
-The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.3 percent per year.
+The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.2 percent per year.
 
 ## Python
 
@@ -461,7 +461,7 @@ value_premium = (
 )
 ```
 
-The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.3 percent per year.
+The monthly value premium from dependent sorts is 0.35 percent, which translates to an annualized premium of 4.2 percent per year.
 
 Overall, we show how to conduct bivariate portfolio sorts in this chapter. In one case, we sort the portfolios independently of each other. Yet we also discuss how to create dependent portfolio sorts. Along the lines of [Size Sorts and P-Hacking](../chapters/size-sorts-and-p-hacking.llms.md), we see how many choices a researcher has to make to implement portfolio sorts, and bivariate sorts increase the number of choices.
 

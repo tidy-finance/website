@@ -195,7 +195,7 @@ crsp_monthly |>
   )
 ```
 
-[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png)](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png "Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
+[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2025, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png)](size-sorts-and-p-hacking_files/figure-html/fig-802-3.png "Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
 
 Figure 2: The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
 
@@ -224,13 +224,13 @@ plot_market_cap_share = (
 plot_market_cap_share.show()
 ```
 
-[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2023, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png)](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png "The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
+[![Title: Share of total market capitalization per listing exchange. The figure shows stacked area plots with a steady decline in the market capitalization of NYSE listed stocks since 1970. As of 2025, NYSE-listed stocks comprise around 50 percent of the entire CRSP market capitalization. The remainder is essentially listed on NASDAQ. Other exchanges are negligible.](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png)](size-sorts-and-p-hacking_files/figure-html/size-sorts-and-p-hacking-fig-802-py-1.png "The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.")
 
 The figure shows the share of total market capitalization per listing exchange. Years are on the horizontal axis and the corresponding share of total market capitalization per listing exchange on the vertical axis.
 
 Finally, we consider the distribution of firm size across listing exchanges and create summary statistics. We apply the summary computation to the most current month of our CRSP data on each listing exchange and add a row with the overall summary statistics.
 
-The resulting table shows that firms listed on NYSE in December 2023 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
+The resulting table shows that firms listed on NYSE in December 2025 are significantly larger on average than firms listed on the other exchanges. Moreover, NASDAQ lists the largest number of firms. This discrepancy between firm sizes across listing exchanges motivated researchers to form breakpoints exclusively on the NYSE sample and apply those breakpoints to all stocks. In the following, we use this distinction to update our portfolio sort procedure.
 
 ## R
 
@@ -265,12 +265,12 @@ crsp_monthly |>
 ```
 
     # A tibble: 4 × 9
-      exchange count  mean    std   min  `5%` `50%` `95%`     max
-      <chr>    <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl> <dbl>   <dbl>
-    1 AMEX       154   195    512     2     4    46   870    3921
-    2 NASDAQ    2379 12558 141814     0     6   318 20095 3766500
-    3 NYSE      1256 21862  63583    15   179  4048 90119  732872
-    4 Overall   3789 15139 118291     0     8   730 47134 3766500
+      exchange count  mean    std   min  `5%` `50%`  `95%`     max
+      <chr>    <dbl> <dbl>  <dbl> <dbl> <dbl> <dbl>  <dbl>   <dbl>
+    1 AMEX       143   310   1162     2     4    52    710   11562
+    2 NASDAQ    2265 16355 176753     0     5   365  26255 4532882
+    3 NYSE      1232 23767  70941    10   202  4347 107627 1015985
+    4 Overall   3640 18233 145481     0     8   839  54625 4532882
 
 ## Python
 
@@ -322,13 +322,13 @@ compute_summary(
 
 shape: (4, 9)
 
-| exchange  | count | mean    | std      | min  | 5%    | 50%    | 95%     | max      |
-|-----------|-------|---------|----------|------|-------|--------|---------|----------|
-| str       | u32   | f64     | f64      | f64  | f64   | f64    | f64     | f64      |
-| "AMEX"    | 154   | 195.0   | 512.0    | 2.0  | 4.0   | 46.0   | 870.0   | 3921.0   |
-| "NASDAQ"  | 2379  | 12558.0 | 141814.0 | 0.0  | 6.0   | 318.0  | 20095.0 | 3.7665e6 |
-| "NYSE"    | 1256  | 21862.0 | 63583.0  | 15.0 | 179.0 | 4048.0 | 90119.0 | 732872.0 |
-| "Overall" | 3789  | 15139.0 | 118291.0 | 0.0  | 8.0   | 730.0  | 47134.0 | 3.7665e6 |
+| exchange  | count | mean    | std      | min  | 5%    | 50%    | 95%      | max        |
+|-----------|-------|---------|----------|------|-------|--------|----------|------------|
+| str       | u32   | f64     | f64      | f64  | f64   | f64    | f64      | f64        |
+| "AMEX"    | 143   | 310.0   | 1162.0   | 2.0  | 4.0   | 52.0   | 710.0    | 11562.0    |
+| "NASDAQ"  | 2265  | 16355.0 | 176753.0 | 0.0  | 5.0   | 365.0  | 26255.0  | 4.532882e6 |
+| "NYSE"    | 1232  | 23767.0 | 70941.0  | 10.0 | 202.0 | 4347.0 | 107627.0 | 1.015985e6 |
+| "Overall" | 3640  | 18233.0 | 145481.0 | 0.0  | 8.0   | 839.0  | 54625.0  | 4.532882e6 |
 
 ## Univariate Size Portfolios with Flexible Breakpoints
 
@@ -528,8 +528,8 @@ tibble(
     # A tibble: 2 × 2
       Exchanges           Premium
       <chr>                 <dbl>
-    1 NYSE, NASDAQ & AMEX  0.0408
-    2 NYSE                 0.129 
+    1 NYSE, NASDAQ & AMEX  0.0348
+    2 NYSE                 0.118 
 
 ## Python
 
@@ -560,8 +560,8 @@ shape: (2, 2)
 | Exchanges             | Premium  |
 |-----------------------|----------|
 | str                   | f64      |
-| "NYSE, NASDAQ & AMEX" | 0.04083  |
-| "NYSE"                | 0.128926 |
+| "NYSE, NASDAQ & AMEX" | 0.034797 |
+| "NYSE"                | 0.118313 |
 
 The table shows that the size premium is more than three times as large if we consider only stocks from NYSE to form the breakpoint each month. The NYSE-specific breakpoints are larger, and there are more than 50 percent of the stocks in the entire universe in the resulting small portfolio because NYSE firms are larger on average. The impact of this choice is not negligible.
 
@@ -648,9 +648,9 @@ p_hacking_results
     # A tibble: 48 × 5
       n_portfolios exchanges value_weighted data             size_premium
              <dbl> <list>    <lgl>          <chr>                   <dbl>
-    1           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0164
-    2           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0151
-    3           10 <chr [3]> FALSE          "crsp_monthly"         0.0146
+    1           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0158
+    2           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0141
+    3           10 <chr [3]> FALSE          "crsp_monthly"         0.0141
     4           10 <chr [3]> FALSE          "filter(crsp_mo…       0.0141
     5           10 <chr [3]> TRUE           "filter(crsp_mo…       0.0110
     # ℹ 43 more rows

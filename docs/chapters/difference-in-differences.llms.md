@@ -335,7 +335,7 @@ etable(
                                                       
     Constant            10.7*** (57.0)                
     treatedTRUE        0.462*** (9.31) 0.983*** (29.5)
-    post_periodTRUE  -0.174*** (-5.92)                
+    post_periodTRUE  -0.174*** (-5.93)                
     polluterTRUE       0.481*** (15.3)                
     log_offering_amt -0.551*** (-39.0)                
     time_to_maturity   0.058*** (41.6)                
@@ -372,15 +372,15 @@ pf.etable([model_without_fe, model_with_fe], coef_fmt = "b (t)")
 |----|----|----|
 |  | \(1\) | \(2\) |
 | coef |  |  |
-| treated | 0.462 (9.308) | 0.983 (29.534) |
-| post_period | -0.174 (-5.923) |  |
-| polluter | 0.481 (15.280) |  |
-| log_offering_amt | -0.551 (-38.976) |  |
-| time_to_maturity | 0.058 (41.556) |  |
-| Intercept | 10.734 (57.015) |  |
+| treated | 0.462 (9.314) | 0.983 (29.534) |
+| post_period | -0.174 (-5.932) |  |
+| polluter | 0.481 (15.281) |  |
+| log_offering_amt | -0.551 (-38.982) |  |
+| time_to_maturity | 0.058 (41.553) |  |
+| Intercept | 10.735 (57.021) |  |
 | fe |  |  |
-| date | \- | x |
 | cusip_id | \- | x |
+| date | \- | x |
 | stats |  |  |
 | Observations | 127,530 | 127,179 |
 | R² | 0.032 | 0.647 |
