@@ -626,7 +626,7 @@ terminal_value <- compute_terminal_value(last_fcf, 0.04, 0.08)
 terminal_value / 1e9
 ```
 
-    [1] 10607
+    [1] 11952
 
 ## Python
 
@@ -642,7 +642,7 @@ terminal_value = compute_terminal_value(
 print(np.round(terminal_value / 1e9))
 ```
 
-    10607.0
+    11952.0
 
 Note that while we use the Perpetuity Growth Model here, practitioners often cross-check their estimates with alternative methods like the exit multiple approach, which bases the terminal value on comparable company valuations.[^1]
 
@@ -743,7 +743,7 @@ compute_dcf <- function(wacc, growth_rate) {
 compute_dcf(wacc, 0.04) / 1e9
 ```
 
-    [1] 6550
+    [1] 7472
 
 ## Python
 
@@ -764,7 +764,7 @@ dcf_value = compute_dcf(wacc, 0.04)
 print(np.round(dcf_value / 1e9))
 ```
 
-    6550.0
+    7472.0
 
 Note that this valuation represents an enterprise value - the total value of the company’s operations. To arrive at the equity value, we need to subtract net debt (total debt minus cash and equivalents).
 

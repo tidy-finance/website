@@ -50,12 +50,12 @@ prices <- download_data(
   domain = "Stock Prices",
   symbols = "AAPL",
   start_date = "2000-01-01",
-  end_date = "2024-12-31"
+  end_date = "2025-12-31"
 )
 prices
 ```
 
-    # A tibble: 6,289 × 8
+    # A tibble: 6,539 × 8
       symbol date          volume  open   low  high close adjusted_close
       <chr>  <date>         <dbl> <dbl> <dbl> <dbl> <dbl>          <dbl>
     1 AAPL   2000-01-03 535796800 0.936 0.908 1.00  0.999          0.836
@@ -63,7 +63,7 @@ prices
     3 AAPL   2000-01-05 778321600 0.926 0.920 0.987 0.929          0.777
     4 AAPL   2000-01-06 767972800 0.948 0.848 0.955 0.848          0.710
     5 AAPL   2000-01-07 460734400 0.862 0.853 0.902 0.888          0.743
-    # ℹ 6,284 more rows
+    # ℹ 6,534 more rows
 
 ## Python
 
@@ -74,7 +74,7 @@ prices = tf.download_data(
     domain="Stock Prices",
     symbols="AAPL",
     start_date="2000-01-01",
-    end_date="2024-12-31"
+    end_date="2025-12-31"
 )
 prices.head()
 ```
@@ -105,11 +105,11 @@ prices |>
   labs(
     x = NULL,
     y = NULL,
-    title = "Apple stock prices between beginning of 2000 and end of 2024"
+    title = "Apple stock prices between beginning of 2000 and end of 2025"
   )
 ```
 
-[![Title: Apple stock prices between beginning of 2000 and end of 2024. The figure shows that the stock price of Apple increased from about 1 USD to around 250 USD.](working-with-stock-returns_files/figure-html/fig-100-1.png)](working-with-stock-returns_files/figure-html/fig-100-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
+[![Title: Apple stock prices between beginning of 2000 and end of 2025. The figure shows that the stock price of Apple increased from about 1 USD to around 270 USD.](working-with-stock-returns_files/figure-html/fig-100-1.png)](working-with-stock-returns_files/figure-html/fig-100-1.png "Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.")
 
 Figure 1: Prices are in USD, adjusted for dividend payments and stock splits.
 
@@ -129,12 +129,12 @@ Creating figures becomes very intuitive with the Grammar of Graphics, as the fol
 apple_prices_figure = (
     ggplot(prices, aes(y="adjusted_close", x="date"))
     + geom_line()
-    + labs(x="", y="", title="Apple stock prices between beginning of 2000 and end of 2024")
+    + labs(x="", y="", title="Apple stock prices between beginning of 2000 and end of 2025")
 )
 apple_prices_figure.show()
 ```
 
-[![Title: Apple stock prices between beginning of 2000 and end of 2024. The figure shows that the stock price of Apple increased from about 1 USD to around 250 USD.](working-with-stock-returns_files/figure-html/wsr-fig-100-py-1.png)](working-with-stock-returns_files/figure-html/wsr-fig-100-py-1.png "Prices are in USD, adjusted for dividend payments and stock splits.")
+[![Title: Apple stock prices between beginning of 2000 and end of 2025. The figure shows that the stock price of Apple increased from about 1 USD to around 270 USD.](working-with-stock-returns_files/figure-html/wsr-fig-100-py-1.png)](working-with-stock-returns_files/figure-html/wsr-fig-100-py-1.png "Prices are in USD, adjusted for dividend payments and stock splits.")
 
 Prices are in USD, adjusted for dividend payments and stock splits.
 
@@ -154,7 +154,7 @@ returns <- prices |>
 returns
 ```
 
-    # A tibble: 6,289 × 3
+    # A tibble: 6,539 × 3
       symbol date           ret
       <chr>  <date>       <dbl>
     1 AAPL   2000-01-03 NA     
@@ -162,7 +162,7 @@ returns
     3 AAPL   2000-01-05  0.0146
     4 AAPL   2000-01-06 -0.0865
     5 AAPL   2000-01-07  0.0474
-    # ℹ 6,284 more rows
+    # ℹ 6,534 more rows
 
 ## Python
 
@@ -175,7 +175,7 @@ returns = (prices
 returns
 ```
 
-shape: (6_289, 3)
+shape: (6_539, 3)
 
 | symbol | date       | ret       |
 |--------|------------|-----------|
@@ -186,11 +186,11 @@ shape: (6_289, 3)
 | "AAPL" | 2000-01-06 | -0.086538 |
 | "AAPL" | 2000-01-07 | 0.047369  |
 | …      | …          | …         |
-| "AAPL" | 2024-12-24 | 0.011478  |
-| "AAPL" | 2024-12-26 | 0.003176  |
-| "AAPL" | 2024-12-27 | -0.013242 |
-| "AAPL" | 2024-12-30 | -0.013263 |
-| "AAPL" | 2024-12-31 | -0.007058 |
+| "AAPL" | 2025-12-24 | 0.005324  |
+| "AAPL" | 2025-12-26 | -0.001497 |
+| "AAPL" | 2025-12-29 | 0.001317  |
+| "AAPL" | 2025-12-30 | -0.002484 |
+| "AAPL" | 2025-12-31 | -0.004468 |
 
 The resulting data frame has three columns, the last of which contains the daily returns (`ret`). Note that the first entry naturally contains a missing value because there is no previous price.
 
@@ -282,7 +282,7 @@ returns |>
     # A tibble: 1 × 4
       ret_daily_mean ret_daily_sd ret_daily_min ret_daily_max
                <dbl>        <dbl>         <dbl>         <dbl>
-    1        0.00122       0.0244        -0.519         0.139
+    1        0.00119       0.0243        -0.519         0.153
 
 ## Python
 
@@ -295,17 +295,17 @@ shape: (9, 2)
 | statistic    | ret       |
 |--------------|-----------|
 | str          | f64       |
-| "count"      | 6288.0    |
+| "count"      | 6538.0    |
 | "null_count" | 0.0       |
-| "mean"       | 0.001216  |
-| "std"        | 0.024402  |
+| "mean"       | 0.001191  |
+| "std"        | 0.024263  |
 | "min"        | -0.518692 |
-| "25%"        | -0.009818 |
-| "50%"        | 0.000948  |
-| "75%"        | 0.012675  |
-| "max"        | 0.13905   |
+| "25%"        | -0.009743 |
+| "50%"        | 0.000941  |
+| "75%"        | 0.01251   |
+| "max"        | 0.153288  |
 
-We see that the maximum *daily* return was 13.905 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
+We see that the maximum *daily* return was 15.329 percent. Perhaps not surprisingly, the average daily return is close to but slightly above 0. In line with the illustration above, the large losses on the day with the minimum returns indicate a strong asymmetry in the distribution of returns.
 
 You can also compute these summary statistics for each year individually by grouping the data by year. More specifically, the few lines of code below compute the summary statistics from above for individual groups of data defined by the values of the column year. The summary statistics, therefore, allow an eyeball analysis of the time-series dynamics of the daily return distribution.
 
@@ -329,7 +329,7 @@ returns |>
   print(n = Inf)
 ```
 
-    # A tibble: 25 × 5
+    # A tibble: 26 × 5
         year daily_mean daily_sd daily_min daily_max
        <dbl>      <dbl>    <dbl>     <dbl>     <dbl>
      1  2000 -0.00346     0.0549   -0.519     0.137 
@@ -357,6 +357,7 @@ returns |>
     23  2022 -0.000970    0.0225   -0.0587    0.0890
     24  2023  0.00168     0.0128   -0.0480    0.0469
     25  2024  0.00116     0.0143   -0.0482    0.0726
+    26  2025  0.000553    0.0205   -0.0925    0.153 
 
 In case you wonder, the additional argument `.names = "{.fn}"` in `across()` determines how to name the output columns. It acts as a placeholder that gets replaced by the name of the function being applied (e.g., mean, sd, min, max) when creating new column names. The specification is rather flexible and allows almost arbitrary column names, which can be useful for reporting. The `print()` function controls the R console’s output options.
 
@@ -382,7 +383,7 @@ We group with `group_by(pl.col("date").dt.year())`, where the call `dt.year()` e
 )
 ```
 
-shape: (25, 9)
+shape: (26, 9)
 
 | year | count | mean   | std   | min    | q25    | median | q75   | max   |
 |------|-------|--------|-------|--------|--------|--------|-------|-------|
@@ -393,11 +394,11 @@ shape: (25, 9)
 | 2003 | 252   | 0.002  | 0.023 | -0.081 | -0.012 | 0.002  | 0.014 | 0.113 |
 | 2004 | 252   | 0.005  | 0.025 | -0.056 | -0.009 | 0.003  | 0.015 | 0.132 |
 | …    | …     | …      | …     | …      | …      | …      | …     | …     |
-| 2020 | 253   | 0.003  | 0.029 | -0.129 | -0.01  | 0.002  | 0.017 | 0.12  |
 | 2021 | 252   | 0.001  | 0.016 | -0.042 | -0.008 | 0.001  | 0.012 | 0.054 |
 | 2022 | 251   | -0.001 | 0.022 | -0.059 | -0.016 | -0.001 | 0.014 | 0.089 |
 | 2023 | 250   | 0.002  | 0.013 | -0.048 | -0.006 | 0.002  | 0.009 | 0.047 |
 | 2024 | 252   | 0.001  | 0.014 | -0.048 | -0.007 | 0.002  | 0.009 | 0.073 |
+| 2025 | 250   | 0.001  | 0.02  | -0.092 | -0.007 | 0.001  | 0.007 | 0.153 |
 
 ## Scaling Up the Analysis
 
@@ -445,7 +446,7 @@ prices_daily <- download_data(
   domain = "Stock Prices",
   symbols = symbols$symbol,
   start_date = "2000-01-01",
-  end_date = "2024-12-31"
+  end_date = "2025-12-31"
 )
 ```
 
@@ -456,11 +457,11 @@ prices_daily = tf.download_data(
     domain="Stock Prices",
     symbols=symbols["symbol"].to_list(),
     start_date="2000-01-01",
-    end_date="2024-12-31"
+    end_date="2025-12-31"
 )
 ```
 
-The resulting data frame contains 184323 daily observations for GS, CAT, MSFT, AMGN, V, UNH, TRV, AAPL, SHW, HD, JPM, AXP, GOOGL, JNJ, MCD, AMZN, IBM, HON, CRM, CVX, MMM, BA, PG, NVDA, MRK, WMT, DIS, CSCO, KO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
+The resulting data frame contains 191823 daily observations for GS, CAT, MSFT, AMGN, V, TRV, AAPL, UNH, SHW, HD, JPM, AXP, MCD, JNJ, GOOGL, AMZN, IBM, HON, CVX, CRM, MMM, PG, BA, MRK, WMT, NVDA, DIS, KO, CSCO, NKE different stocks. [Figure 3](#fig-102) illustrates the time series of the downloaded *adjusted* prices for each of the constituents of the Dow index. Make sure you understand every single line of code! What are the arguments of `aes()`? Which alternative `geoms` could you use to visualize the time series? Hint: if you do not know the answers try to change the code to see what difference your intervention causes.
 
 ## R
 
@@ -535,36 +536,36 @@ returns_daily |>
     # A tibble: 30 × 5
        symbol daily_mean daily_sd daily_min daily_max
        <chr>       <dbl>    <dbl>     <dbl>     <dbl>
-     1 AAPL     0.00122    0.0244    -0.519     0.139
-     2 AMGN     0.000467   0.0193    -0.134     0.151
-     3 AMZN     0.00109    0.0311    -0.248     0.345
-     4 AXP      0.000602   0.0225    -0.176     0.219
-     5 BA       0.000551   0.0221    -0.238     0.243
-     6 CAT      0.000736   0.0202    -0.145     0.147
-     7 CRM      0.00119    0.0264    -0.271     0.260
-     8 CSCO     0.000342   0.0230    -0.162     0.244
+     1 AAPL     0.00119    0.0243    -0.519     0.153
+     2 AMGN     0.000495   0.0192    -0.134     0.151
+     3 AMZN     0.00107    0.0308    -0.248     0.345
+     4 AXP      0.000621   0.0224    -0.176     0.219
+     5 BA       0.000572   0.0222    -0.238     0.243
+     6 CAT      0.000787   0.0202    -0.145     0.147
+     7 CRM      0.00110    0.0262    -0.271     0.260
+     8 CSCO     0.000378   0.0227    -0.162     0.244
      9 CVX      0.000495   0.0173    -0.221     0.227
-    10 DIS      0.000437   0.0193    -0.184     0.160
-    11 GOOGL    0.00103    0.0193    -0.116     0.200
-    12 GS       0.000606   0.0226    -0.190     0.265
-    13 HD       0.000548   0.0189    -0.287     0.141
-    14 HON      0.000495   0.0189    -0.174     0.282
-    15 IBM      0.000342   0.0163    -0.155     0.120
-    16 JNJ      0.000358   0.0120    -0.158     0.122
-    17 JPM      0.000644   0.0236    -0.207     0.251
-    18 KO       0.000320   0.0129    -0.101     0.139
-    19 MCD      0.000517   0.0144    -0.159     0.181
-    20 MMM      0.000417   0.0154    -0.129     0.230
-    21 MRK      0.000350   0.0165    -0.268     0.130
-    22 MSFT     0.000573   0.0190    -0.156     0.196
-    23 NKE      0.000634   0.0193    -0.200     0.155
-    24 NVDA     0.00186    0.0374    -0.352     0.424
-    25 PG       0.000374   0.0131    -0.302     0.120
-    26 SHW      0.000844   0.0178    -0.208     0.153
-    27 TRV      0.000578   0.0180    -0.208     0.256
-    28 UNH      0.000912   0.0195    -0.186     0.348
-    29 V        0.000928   0.0182    -0.136     0.150
-    30 WMT      0.000401   0.0147    -0.114     0.117
+    10 DIS      0.000432   0.0192    -0.184     0.160
+    11 GOOGL    0.00108    0.0193    -0.116     0.200
+    12 GS       0.000659   0.0225    -0.190     0.265
+    13 HD       0.000516   0.0188    -0.287     0.141
+    14 HON      0.000470   0.0187    -0.174     0.282
+    15 IBM      0.000385   0.0164    -0.155     0.130
+    16 JNJ      0.000406   0.0121    -0.158     0.122
+    17 JPM      0.000673   0.0233    -0.207     0.251
+    18 KO       0.000333   0.0128    -0.101     0.139
+    19 MCD      0.000512   0.0143    -0.159     0.181
+    20 MMM      0.000444   0.0156    -0.129     0.230
+    21 MRK      0.000358   0.0166    -0.268     0.130
+    22 MSFT     0.000578   0.0189    -0.156     0.196
+    23 NKE      0.000600   0.0197    -0.200     0.155
+    24 NVDA     0.00186    0.0372    -0.352     0.424
+    25 PG       0.000343   0.0131    -0.302     0.120
+    26 SHW      0.000811   0.0177    -0.208     0.153
+    27 TRV      0.000590   0.0179    -0.208     0.256
+    28 UNH      0.000834   0.0200    -0.224     0.348
+    29 V        0.000907   0.0180    -0.136     0.150
+    30 WMT      0.000424   0.0147    -0.114     0.117
 
 ## Python
 
@@ -600,17 +601,17 @@ shape: (30, 9)
 | symbol | count | mean  | std   | min    | q25    | median | q75   | max   |
 |--------|-------|-------|-------|--------|--------|--------|-------|-------|
 | str    | u32   | f64   | f64   | f64    | f64    | f64    | f64   | f64   |
-| "AAPL" | 6288  | 0.001 | 0.024 | -0.519 | -0.01  | 0.001  | 0.013 | 0.139 |
-| "AMGN" | 6288  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
-| "AMZN" | 6288  | 0.001 | 0.031 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
-| "AXP"  | 6288  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
-| "BA"   | 6288  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
+| "AAPL" | 6538  | 0.001 | 0.024 | -0.519 | -0.01  | 0.001  | 0.013 | 0.153 |
+| "AMGN" | 6538  | 0.0   | 0.019 | -0.134 | -0.009 | 0.0    | 0.009 | 0.151 |
+| "AMZN" | 6538  | 0.001 | 0.031 | -0.248 | -0.012 | 0.0    | 0.014 | 0.345 |
+| "AXP"  | 6538  | 0.001 | 0.022 | -0.176 | -0.008 | 0.0    | 0.01  | 0.219 |
+| "BA"   | 6538  | 0.001 | 0.022 | -0.238 | -0.01  | 0.001  | 0.011 | 0.243 |
 | …      | …     | …     | …     | …      | …      | …      | …     | …     |
-| "SHW"  | 6288  | 0.001 | 0.018 | -0.208 | -0.008 | 0.001  | 0.009 | 0.153 |
-| "TRV"  | 6288  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
-| "UNH"  | 6288  | 0.001 | 0.019 | -0.186 | -0.008 | 0.001  | 0.01  | 0.348 |
-| "V"    | 4225  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
-| "WMT"  | 6288  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
+| "SHW"  | 6538  | 0.001 | 0.018 | -0.208 | -0.008 | 0.001  | 0.009 | 0.153 |
+| "TRV"  | 6538  | 0.001 | 0.018 | -0.208 | -0.007 | 0.001  | 0.008 | 0.256 |
+| "UNH"  | 6538  | 0.001 | 0.02  | -0.224 | -0.008 | 0.001  | 0.01  | 0.348 |
+| "V"    | 4475  | 0.001 | 0.018 | -0.136 | -0.007 | 0.001  | 0.009 | 0.15  |
+| "WMT"  | 6538  | 0.0   | 0.015 | -0.114 | -0.006 | 0.0    | 0.007 | 0.117 |
 
 Note that you are now also equipped with all tools to download price data for *each* symbol listed in the S&P 500 index with the same number of lines of code. Just download the constituents with `domain = "Index Constituents", index = "S&P 500"`, which provides you with a data frame that contains each symbol that is (currently) part of the S&P 500. However, don’t try this if you are not prepared to wait for a couple of minutes because this is quite some data to download!
 
@@ -730,7 +731,7 @@ trading_volume |>
   scale_y_continuous(labels = unit_format(unit = "B", scale = 1e-9))
 ```
 
-[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 90 in 2024, with a maximum of more than 200.](working-with-stock-returns_files/figure-html/fig-104-3.png)](working-with-stock-returns_files/figure-html/fig-104-3.png "Figure 5: Total daily trading volume in billion USD.")
+[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 105 in 2025, with a maximum of more than 250.](working-with-stock-returns_files/figure-html/fig-104-3.png)](working-with-stock-returns_files/figure-html/fig-104-3.png "Figure 5: Total daily trading volume in billion USD.")
 
 Figure 5: Total daily trading volume in billion USD.
 
@@ -757,7 +758,7 @@ trading_volume_figure = (
 trading_volume_figure.show()
 ```
 
-[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 90 in 2024, with a maximum of more than 200.](working-with-stock-returns_files/figure-html/wsr-fig-104-py-1.png)](working-with-stock-returns_files/figure-html/wsr-fig-104-py-1.png "Total daily trading volume in billion USD.")
+[![Title: Aggregate daily trading volume of Dow Jones index constitutens. The figure shows a volatile time series of daily trading volume, ranging from about 8 in 2000 to around 105 in 2025, with a maximum of more than 250.](working-with-stock-returns_files/figure-html/wsr-fig-104-py-1.png)](working-with-stock-returns_files/figure-html/wsr-fig-104-py-1.png "Total daily trading volume in billion USD.")
 
 Total daily trading volume in billion USD.
 

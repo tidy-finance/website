@@ -33,14 +33,14 @@ Moreover, we initially define the date range for which we fetch and store the fi
 
 ``` r
 start_date <- ymd("1960-01-01")
-end_date <- ymd("2024-12-31")
+end_date <- ymd("2025-12-31")
 ```
 
 ## Python
 
 ``` python
 start_date = "1960-01-01"
-end_date = "2024-12-31"
+end_date = "2025-12-31"
 ```
 
 ## Fama-French Data
@@ -68,7 +68,7 @@ file_name <- "F-F_Research_Data_Factors_CSV.zip"
 url <- paste0(base_url, file_name)
 ```
 
-Next, we replace the browser download with an HTTP request using the `httr2` ([Wickham 2024](#ref-httr2)) package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French’s server rejects requests that do not provide one.
+Next, we replace the browser download with an HTTP request using the `httr2` ([Wickham 2024](#ref-httr2)) package and store the archive in a temporary file. We attach a browser-like user agent because Kenneth French’s server rejects requests that do not provide one, and we request HTTP/1.1 (`http_version = 2` is libcurl’s code for it) because the server answers HTTP/2 requests from R with an error.
 
 ``` r
 library(httr2)
@@ -76,9 +76,11 @@ library(httr2)
 tmp_zip <- tempfile(fileext = ".zip")
 
 request(url) |>
-  req_user_agent(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-  ) |>
+  req_user_agent(paste(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+  )) |>
+  req_options(http_version = 2) |>
   req_perform(path = tmp_zip)
 ```
 
@@ -86,7 +88,7 @@ request(url) |>
     GET https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip
     Status: 200 OK
     Content-Type: application/x-zip-compressed
-    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpW4NgHu\file5dfc4bef100f.zip' (13045 bytes)
+    Body: On disk 'C:\Users\ncj140\AppData\Local\Temp\RtmpKGokCK\file564c7d6a5cec.zip' (13078 bytes)
 
 The archive contains a single CSV file, which we extract into a temporary directory and read line by line.
 
@@ -118,15 +120,15 @@ factors_ff3_monthly_raw <- as_tibble(factors_ff3_monthly_raw)
 factors_ff3_monthly_raw
 ```
 
-    # A tibble: 1,199 × 5
+    # A tibble: 1,203 × 5
         date `Mkt-RF`   SMB   HML    RF
        <int>    <dbl> <dbl> <dbl> <dbl>
-    1 192607     2.89 -2.55 -2.39  0.22
-    2 192608     2.64 -1.14  3.81  0.25
+    1 192607     2.89 -2.42 -2.75  0.22
+    2 192608     2.64 -1.44  4.13  0.25
     3 192609     0.38 -1.36  0.05  0.23
-    4 192610    -3.27 -0.14  0.82  0.32
-    5 192611     2.54 -0.11 -0.61  0.31
-    # ℹ 1,194 more rows
+    4 192610    -3.27 -0.18  0.78  0.32
+    5 192611     2.54 -0.17 -0.48  0.31
+    # ℹ 1,198 more rows
 
 Finally, we still have to clean the data. The set *Fama/French 3 Factors* contains the return time series of the market `mkt_excess`, size `smb`, and value `hml` factors alongside the risk-free rate `risk_free`. Cleaning involves a handful of steps:
 
@@ -151,7 +153,7 @@ factors_ff3_monthly <- factors_ff3_monthly_raw |>
 factors_ff3_monthly
 ```
 
-    # A tibble: 780 × 5
+    # A tibble: 792 × 5
       date       mkt_excess     smb     hml risk_free
       <date>          <dbl>   <dbl>   <dbl>     <dbl>
     1 1960-01-01    -0.0698  0.0212  0.0265    0.0033
@@ -159,7 +161,7 @@ factors_ff3_monthly
     3 1960-03-01    -0.0163 -0.0055 -0.0275    0.0035
     4 1960-04-01    -0.0171  0.0022 -0.0214    0.0019
     5 1960-05-01     0.0312  0.0129 -0.0373    0.0027
-    # ℹ 775 more rows
+    # ℹ 787 more rows
 
 ## Python
 
@@ -172,7 +174,7 @@ url = f"{base_url}{dataset}_CSV.zip"
 Next, we replace the browser download with an HTTP request and extract the ZIP in memory.
 
 ``` python
-resp = requests.get(url)
+resp = requests.get(url, impersonate="chrome")
 resp.raise_for_status()
 
 with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
@@ -180,7 +182,7 @@ with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
     raw_text = zf.read(file_name).decode("latin1")
 ```
 
-The most important part of this chunk is the `requests.get()` call. This is the moment where we replace all the manual browser work (open the website, click download, save the file) with a single, reproducible line of code. Then, calling `raise_for_status()` ensures we stop immediately if the server returns an error (e.g., HTTP 404 or 500) instead of quietly handling a broken file. Once this succeeds, `resp.content` is guaranteed to contain valid ZIP bytes that we can open in memory.
+The most important part of this chunk is the `requests.get()` call. This is the moment where we replace all the manual browser work (open the website, click download, save the file) with a single, reproducible line of code. We pass `impersonate="chrome"` so that the request looks like it comes from a regular browser, which Kenneth French’s server expects. Then, calling `raise_for_status()` ensures we stop immediately if the server returns an error (e.g., HTTP 404 or 500) instead of quietly handling a broken file. Once this succeeds, `resp.content` is guaranteed to contain valid ZIP bytes that we can open in memory.
 
 The raw file contains documentation text followed by the actual data table(s). To emulate *scrolling down until the numbers start*, we split the file into blocks and keep the long one that contains the table.
 
@@ -245,7 +247,7 @@ factors_ff3_monthly = (
 factors_ff3_monthly
 ```
 
-shape: (780, 5)
+shape: (792, 5)
 
 | date       | mkt_excess | smb     | hml     | risk_free |
 |------------|------------|---------|---------|-----------|
@@ -256,11 +258,11 @@ shape: (780, 5)
 | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
 | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
 | …          | …          | …       | …       | …         |
-| 2024-08-01 | 0.016      | -0.0349 | -0.0113 | 0.0048    |
-| 2024-09-01 | 0.0172     | -0.0013 | -0.0273 | 0.004     |
-| 2024-10-01 | -0.01      | -0.0095 | 0.0091  | 0.0039    |
-| 2024-11-01 | 0.0649     | 0.0449  | 0.0038  | 0.004     |
-| 2024-12-01 | -0.0317    | -0.027  | -0.0297 | 0.0037    |
+| 2025-08-01 | 0.0184     | 0.038   | 0.0437  | 0.0038    |
+| 2025-09-01 | 0.0339     | -0.0183 | -0.0105 | 0.0033    |
+| 2025-10-01 | 0.0196     | -0.0057 | -0.0318 | 0.0037    |
+| 2025-11-01 | -0.0013    | 0.004   | 0.0376  | 0.003     |
+| 2025-12-01 | -0.0036    | -0.0104 | 0.024   | 0.0034    |
 
 All of these steps are doable, but none of them are really about finance—they are just the technical scaffolding required before you can work with the actual factor returns. That is where a dedicated package becomes invaluable.
 
@@ -634,17 +636,17 @@ shape: (767, 15)
 | date | rp_div | dp | dy | ep | de | svar | bm | ntis | tbl | lty | ltr | tms | dfy | infl |
 |----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
 | date | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 | f64 |
-| 1960-01-01 | 0.006165 | -3.394191 | -3.468337 | -2.797533 | -0.596658 | 0.000919 | 0.499502 | 0.022116 | 0.0435 | 0.0441 | 0.0112 | 0.0006 | 0.0073 | -0.003401 |
-| 1960-02-01 | -0.015793 | -3.383903 | -3.374774 | -2.806662 | -0.577241 | 0.00115 | 0.493557 | 0.024037 | 0.0396 | 0.0429 | 0.0204 | 0.0033 | 0.0078 | 0.003413 |
-| 1960-03-01 | -0.020521 | -3.350808 | -3.364804 | -2.792666 | -0.558142 | 0.000969 | 0.549798 | 0.025593 | 0.0331 | 0.0411 | 0.0282 | 0.008 | 0.0076 | 0.0 |
-| 1960-04-01 | 0.023755 | -3.331425 | -3.349108 | -2.787838 | -0.543587 | 0.000645 | 0.563404 | 0.025577 | 0.0323 | 0.0426 | -0.017 | 0.0103 | 0.0075 | 0.003401 |
-| 1960-05-01 | 0.016046 | -3.356176 | -3.329677 | -2.827389 | -0.528786 | 0.000424 | 0.541966 | 0.024414 | 0.0329 | 0.0417 | 0.0152 | 0.0088 | 0.0082 | 0.0 |
+| 1960-01-01 | 0.006569 | -3.394191 | -3.468337 | -2.797533 | -0.596658 | 0.000919 | 0.499502 | 0.022116 | 0.0435 | 0.0441 | 0.0112 | 0.0006 | 0.0073 | -0.003401 |
+| 1960-02-01 | -0.016387 | -3.383903 | -3.374774 | -2.806662 | -0.577241 | 0.00115 | 0.493557 | 0.024037 | 0.0396 | 0.0429 | 0.0204 | 0.0033 | 0.0078 | 0.003413 |
+| 1960-03-01 | -0.018919 | -3.350808 | -3.364804 | -2.792666 | -0.558142 | 0.000969 | 0.549798 | 0.025593 | 0.0331 | 0.0411 | 0.0282 | 0.008 | 0.0076 | 0.0 |
+| 1960-04-01 | 0.022958 | -3.331425 | -3.349108 | -2.787838 | -0.543587 | 0.000645 | 0.563404 | 0.025577 | 0.0323 | 0.0426 | -0.017 | 0.0103 | 0.0075 | 0.003401 |
+| 1960-05-01 | 0.016349 | -3.356176 | -3.329677 | -2.827389 | -0.528786 | 0.000424 | 0.541966 | 0.024414 | 0.0329 | 0.0417 | 0.0152 | 0.0088 | 0.0082 | 0.0 |
 | … | … | … | … | … | … | … | … | … | … | … | … | … | … | … |
-| 2023-07-01 | -0.022065 | -4.198545 | -4.167881 | -3.226908 | -0.971637 | 0.000537 | 0.205917 | -0.016677 | 0.0525 | 0.039 | -0.0035 | -0.0135 | 0.0108 | 0.001908 |
-| 2023-08-01 | -0.053627 | -4.17778 | -4.195656 | -3.203119 | -0.974662 | 0.001337 | 0.210885 | -0.016514 | 0.053 | 0.0417 | -0.0052 | -0.0113 | 0.0107 | 0.004367 |
-| 2023-09-01 | -0.02609 | -4.124953 | -4.1749 | -3.147294 | -0.97766 | 0.001023 | 0.218528 | -0.017989 | 0.0532 | 0.0438 | -0.0221 | -0.0094 | 0.0103 | 0.002485 |
-| 2023-10-01 | 0.079457 | -4.097976 | -4.120201 | -3.110379 | -0.987598 | 0.001678 | 0.221534 | -0.014711 | 0.0534 | 0.048 | -0.0121 | -0.0054 | 0.0102 | -0.000383 |
-| 2023-11-01 | 0.038308 | -4.17867 | -4.093246 | -3.181326 | -0.997345 | 0.001341 | 0.203676 | -0.020618 | 0.0527 | 0.045 | 0.0347 | -0.0077 | 0.0101 | -0.002015 |
+| 2023-07-01 | -0.022055 | -4.198545 | -4.167881 | -3.226908 | -0.971637 | 0.000537 | 0.205917 | -0.016677 | 0.0525 | 0.039 | -0.0035 | -0.0135 | 0.0108 | 0.001908 |
+| 2023-08-01 | -0.053418 | -4.17778 | -4.195656 | -3.203119 | -0.974662 | 0.001337 | 0.210885 | -0.016514 | 0.053 | 0.0417 | -0.0052 | -0.0113 | 0.0107 | 0.004367 |
+| 2023-09-01 | -0.026479 | -4.124953 | -4.1749 | -3.147294 | -0.97766 | 0.001023 | 0.218528 | -0.017989 | 0.0532 | 0.0438 | -0.0221 | -0.0094 | 0.0103 | 0.002485 |
+| 2023-10-01 | 0.079767 | -4.097976 | -4.120201 | -3.110379 | -0.987598 | 0.001678 | 0.221534 | -0.014711 | 0.0534 | 0.048 | -0.0121 | -0.0054 | 0.0102 | -0.000383 |
+| 2023-11-01 | 0.038417 | -4.17867 | -4.093246 | -3.181326 | -0.997345 | 0.001341 | 0.203676 | -0.020618 | 0.0527 | 0.045 | 0.0347 | -0.0077 | 0.0101 | -0.002015 |
 
 ## Other Macroeconomic Data
 
@@ -735,15 +737,15 @@ download_data(
 )
 ```
 
-    # A tibble: 780 × 3
-      date       value series  
-      <date>     <dbl> <chr>   
-    1 1960-01-01  29.3 CPIAUCNS
-    2 1960-02-01  29.4 CPIAUCNS
-    3 1960-03-01  29.4 CPIAUCNS
-    4 1960-04-01  29.5 CPIAUCNS
-    5 1960-05-01  29.5 CPIAUCNS
-    # ℹ 775 more rows
+    # A tibble: 792 × 3
+      date       series   value
+      <date>     <chr>    <dbl>
+    1 1960-01-01 CPIAUCNS  29.3
+    2 1960-02-01 CPIAUCNS  29.4
+    3 1960-03-01 CPIAUCNS  29.4
+    4 1960-04-01 CPIAUCNS  29.5
+    5 1960-05-01 CPIAUCNS  29.5
+    # ℹ 787 more rows
 
 ## Python
 
@@ -753,7 +755,7 @@ tf.download_data(
 )
 ```
 
-shape: (780, 3)
+shape: (792, 3)
 
 | date       | series     | value   |
 |------------|------------|---------|
@@ -764,11 +766,11 @@ shape: (780, 3)
 | 1960-04-01 | "CPIAUCNS" | 29.5    |
 | 1960-05-01 | "CPIAUCNS" | 29.5    |
 | …          | …          | …       |
-| 2024-08-01 | "CPIAUCNS" | 314.796 |
-| 2024-09-01 | "CPIAUCNS" | 315.301 |
-| 2024-10-01 | "CPIAUCNS" | 315.664 |
-| 2024-11-01 | "CPIAUCNS" | 315.493 |
-| 2024-12-01 | "CPIAUCNS" | 315.605 |
+| 2025-08-01 | "CPIAUCNS" | 323.976 |
+| 2025-09-01 | "CPIAUCNS" | 324.8   |
+| 2025-10-01 | "CPIAUCNS" | null    |
+| 2025-11-01 | "CPIAUCNS" | 324.122 |
+| 2025-12-01 | "CPIAUCNS" | 324.054 |
 
 To download other time series, we just have to look it up on the FRED website and extract the corresponding key from the address. For instance, the producer price index for gold ores can be found under the [PCU2122212122210](https://fred.stlouisfed.org/series/PCU2122212122210) key.
 
@@ -851,7 +853,7 @@ read_parquet("data/factors_ff3_monthly.parquet") |>
 pl.read_parquet("data/factors_ff3_monthly.parquet")
 ```
 
-shape: (780, 5)
+shape: (792, 5)
 
 | date       | mkt_excess | smb     | hml     | risk_free |
 |------------|------------|---------|---------|-----------|
@@ -862,11 +864,11 @@ shape: (780, 5)
 | 1960-04-01 | -0.0171    | 0.0022  | -0.0214 | 0.0019    |
 | 1960-05-01 | 0.0312     | 0.0129  | -0.0373 | 0.0027    |
 | …          | …          | …       | …       | …         |
-| 2024-08-01 | 0.016      | -0.0349 | -0.0113 | 0.0048    |
-| 2024-09-01 | 0.0172     | -0.0013 | -0.0273 | 0.004     |
-| 2024-10-01 | -0.01      | -0.0095 | 0.0091  | 0.0039    |
-| 2024-11-01 | 0.0649     | 0.0449  | 0.0038  | 0.004     |
-| 2024-12-01 | -0.0317    | -0.027  | -0.0297 | 0.0037    |
+| 2025-08-01 | 0.0184     | 0.038   | 0.0437  | 0.0038    |
+| 2025-09-01 | 0.0339     | -0.0183 | -0.0105 | 0.0033    |
+| 2025-10-01 | 0.0196     | -0.0057 | -0.0318 | 0.0037    |
+| 2025-11-01 | -0.0013    | 0.004   | 0.0376  | 0.003     |
+| 2025-12-01 | -0.0036    | -0.0104 | 0.024   | 0.0034    |
 
 The last couple of code chunks are really all there is to organizing a simple database! You can also share the parquet files across devices and programming languages.
 

@@ -215,9 +215,9 @@ data_investment |>
     # A tibble: 3 × 9
       measure      mean     sd    min      q05    q50   q95    max      n
       <chr>       <dbl>  <dbl>  <dbl>    <dbl>  <dbl> <dbl>  <dbl>  <int>
-    1 cash_fl… -4.86e-4 0.292  -1.66  -5.23e-1 0.0601 0.270  0.478 139861
-    2 investm…  5.61e-2 0.0762  0      5.40e-4 0.0313 0.202  0.460 139861
-    3 tobins_q  2.06e+0 1.81    0.568  7.96e-1 1.41   5.61  11.6   139861
+    1 cash_fl… -0.00282 0.297  -1.70  -5.32e-1 0.0596 0.270  0.475 143066
+    2 investm…  0.0555  0.0757  0      4.88e-4 0.0309 0.200  0.458 143066
+    3 tobins_q  2.06    1.81    0.566  7.96e-1 1.41   5.63  11.6   143066
 
 ## Python
 
@@ -245,12 +245,12 @@ data_investment_summary
 
 shape: (3, 9)
 
-| measure           | count  | mean | std  | min   | q05   | median | q95  | max   |
-|-------------------|--------|------|------|-------|-------|--------|------|-------|
-| str               | u32    | f64  | f64  | f64   | f64   | f64    | f64  | f64   |
-| "cash_flows"      | 139861 | -0.0 | 0.29 | -1.66 | -0.52 | 0.06   | 0.27 | 0.48  |
-| "investment_lead" | 139861 | 0.06 | 0.08 | 0.0   | 0.0   | 0.03   | 0.2  | 0.46  |
-| "tobins_q"        | 139861 | 2.06 | 1.81 | 0.57  | 0.8   | 1.41   | 5.61 | 11.62 |
+| measure           | count  | mean | std  | min  | q05   | median | q95  | max   |
+|-------------------|--------|------|------|------|-------|--------|------|-------|
+| str               | u32    | f64  | f64  | f64  | f64   | f64    | f64  | f64   |
+| "cash_flows"      | 143066 | -0.0 | 0.3  | -1.7 | -0.53 | 0.06   | 0.27 | 0.48  |
+| "investment_lead" | 143066 | 0.06 | 0.08 | 0.0  | 0.0   | 0.03   | 0.2  | 0.46  |
+| "tobins_q"        | 143066 | 2.06 | 1.81 | 0.57 | 0.8   | 1.41   | 5.63 | 11.64 |
 
 ## Fixed Effects
 
@@ -275,15 +275,15 @@ model_ols
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 139,861
+    Observations: 143,066
     Standard-errors: IID 
                 Estimate Std. Error t value  Pr(>|t|)    
-    (Intercept)   0.0425   0.000309   137.5 < 2.2e-16 ***
-    cash_flows    0.0448   0.000710    63.2 < 2.2e-16 ***
-    tobins_q      0.0066   0.000115    57.5 < 2.2e-16 ***
+    (Intercept)  0.04232   0.000303   139.7 < 2.2e-16 ***
+    cash_flows   0.04359   0.000685    63.7 < 2.2e-16 ***
+    tobins_q     0.00643   0.000112    57.3 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.07469   Adj. R2: 0.03963
+    RMSE: 0.074212   Adj. R2: 0.039042
 
 ## Python
 
@@ -304,15 +304,15 @@ model_ols.summary()
     Dep. var.: investment_lead
     sample: None = all
     Inference:  iid
-    Observations:  139861
+    Observations:  143066
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept     |      0.043 |        0.000 |   137.514 |      0.000 |  0.042 |   0.043 |
-    | cash_flows    |      0.045 |        0.001 |    63.162 |      0.000 |  0.043 |   0.046 |
-    | tobins_q      |      0.007 |        0.000 |    57.539 |      0.000 |  0.006 |   0.007 |
+    | Intercept     |      0.042 |        0.000 |   139.699 |      0.000 |  0.042 |   0.043 |
+    | cash_flows    |      0.044 |        0.001 |    63.651 |      0.000 |  0.042 |   0.045 |
+    | tobins_q      |      0.006 |        0.000 |    57.274 |      0.000 |  0.006 |   0.007 |
     ---
-    RMSE: 0.075 R2: 0.04 
+    RMSE: 0.074 R2: 0.039 
 
 As expected, the regression output shows significant coefficients for both variables. Higher cash flows and investment opportunities are associated with higher investment. However, the simple model actually may have a lot of omitted variables, so our coefficients are most likely biased. As there is a lot of unexplained variation in our simple model (indicated by the rather low adjusted R-squared), the bias in our coefficients is potentially severe, and the true values could be above or below zero. Note that there are no clear cutoffs to decide when an R-squared is high or low, but it depends on the context of your application and on the comparison of different models for the same data.
 
@@ -335,23 +335,23 @@ model_fe_firm <- feols(
 )
 ```
 
-    NOTE: 1,656 fixed-effect singletons were removed (1,656 observations).
+    NOTE: 1,669 fixed-effect singletons were removed (1,669 observations).
 
 ``` r
 model_fe_firm
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 138,205
-    Fixed-effects: gvkey: 13,313
+    Observations: 141,397
+    Fixed-effects: gvkey: 13,450
     Standard-errors: IID 
                Estimate Std. Error t value  Pr(>|t|)    
-    cash_flows  0.01132   0.000824    13.7 < 2.2e-16 ***
-    tobins_q    0.00964   0.000118    81.8 < 2.2e-16 ***
+    cash_flows  0.01074   0.000798    13.5 < 2.2e-16 ***
+    tobins_q    0.00943   0.000115    82.0 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.050177     Adj. R2: 0.516082
-                     Within R2: 0.051363
+    RMSE: 0.049829     Adj. R2: 0.516969
+                     Within R2: 0.050359
 
 ## Python
 
@@ -370,14 +370,14 @@ model_fe_firm.summary()
     Dep. var.: investment_lead, Fixed effects: gvkey
     sample: None = all
     Inference:  iid
-    Observations:  138205
+    Observations:  141397
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.011 |        0.001 |    13.730 |      0.000 |  0.010 |   0.013 |
-    | tobins_q      |      0.010 |        0.000 |    81.822 |      0.000 |  0.009 |   0.010 |
+    | cash_flows    |      0.011 |        0.001 |    13.458 |      0.000 |  0.009 |   0.012 |
+    | tobins_q      |      0.009 |        0.000 |    81.973 |      0.000 |  0.009 |   0.010 |
     ---
-    RMSE: 0.05 R2: 0.563 R2 Within: 0.051 
+    RMSE: 0.05 R2: 0.563 R2 Within: 0.05 
 
 The regression output shows a lot of unexplained variation at the firm level that is taken care of by including the firm fixed effect as the adjusted R-squared rises above 50 percent. In fact, it is more interesting to look at the within R-squared that shows the explanatory power of a firm’s cash flow and Tobin’s q *on top* of the average investment of each firm. We can also see that the coefficients changed slightly in magnitude but not in sign.
 
@@ -398,23 +398,23 @@ model_fe_firmyear <- feols(
 )
 ```
 
-    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+    NOTE: 1,669/0 fixed-effect singletons were removed (1,669 observations).
 
 ``` r
 model_fe_firmyear
 ```
 
     OLS estimation, Dep. Var.: investment_lead
-    Observations: 138,205
-    Fixed-effects: gvkey: 13,313,  year: 37
+    Observations: 141,397
+    Fixed-effects: gvkey: 13,450,  year: 38
     Standard-errors: IID 
                Estimate Std. Error t value  Pr(>|t|)    
-    cash_flows  0.01409   0.000805    17.5 < 2.2e-16 ***
-    tobins_q    0.00883   0.000116    75.9 < 2.2e-16 ***
+    cash_flows  0.01345   0.000779    17.3 < 2.2e-16 ***
+    tobins_q    0.00864   0.000113    76.2 < 2.2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    RMSE: 0.048849     Adj. R2: 0.541223
-                     Within R2: 0.045387
+    RMSE: 0.048494     Adj. R2: 0.542385
+                     Within R2: 0.0446  
 
 ## Python
 
@@ -430,17 +430,17 @@ model_fe_firmyear.summary()
     ###
 
     Estimation:  OLS
-    Dep. var.: investment_lead, Fixed effects: gvkey + year
+    Dep. var.: investment_lead, Fixed effects: gvkey+year
     sample: None = all
     Inference:  iid
-    Observations:  138205
+    Observations:  141397
 
     | Coefficient   |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:--------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | cash_flows    |      0.014 |        0.001 |    17.498 |      0.000 |  0.013 |   0.016 |
-    | tobins_q      |      0.009 |        0.000 |    75.943 |      0.000 |  0.009 |   0.009 |
+    | cash_flows    |      0.013 |        0.001 |    17.263 |      0.000 |  0.012 |   0.015 |
+    | tobins_q      |      0.009 |        0.000 |    76.194 |      0.000 |  0.008 |   0.009 |
     ---
-    RMSE: 0.049 R2: 0.586 R2 Within: 0.045 
+    RMSE: 0.048 R2: 0.586 R2 Within: 0.045 
 
 The inclusion of time fixed effects did only marginally affect the R-squared and the coefficients, which we can interpret as a good thing as it indicates that the coefficients are not driven by an omitted variable that varies over time.
 
@@ -466,17 +466,17 @@ etable(
                            model_ols   model_fe_firm model_fe_firm..
     Dependent Var.:  investment_lead investment_lead investment_lead
                                                                     
-    Constant        0.042*** (137.5)                                
-    cash_flows       0.045*** (63.2) 0.011*** (13.7) 0.014*** (17.5)
-    tobins_q         0.007*** (57.5) 0.010*** (81.8) 0.009*** (75.9)
+    Constant        0.042*** (139.7)                                
+    cash_flows       0.044*** (63.7) 0.011*** (13.5) 0.013*** (17.3)
+    tobins_q         0.006*** (57.3) 0.009*** (82.0) 0.009*** (76.2)
     Fixed-Effects:  ---------------- --------------- ---------------
     gvkey                         No             Yes             Yes
     year                          No              No             Yes
     _______________ ________________ _______________ _______________
     VCOV type                    IID             IID             IID
-    Observations             139,861         138,205         138,205
-    R2                         0.040           0.563           0.586
-    Within R2                     --           0.051           0.045
+    Observations             143,066         141,397         141,397
+    R2                         0.039           0.563           0.586
+    Within R2                     --           0.050           0.045
     ---
     Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -492,16 +492,15 @@ pf.etable([model_ols, model_fe_firm, model_fe_firmyear], coef_fmt="b (t)")
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.045 (63.162) | 0.011 (13.730) | 0.014 (17.498) |
-| tobins_q | 0.007 (57.539) | 0.01 (81.822) | 0.009 (75.943) |
-| Intercept | 0.043 (137.514) |  |  |
+| cash_flows | 0.044 (63.651) | 0.011 (13.458) | 0.013 (17.263) |
+| tobins_q | 0.006 (57.274) | 0.009 (81.973) | 0.009 (76.194) |
+| Intercept | 0.042 (139.699) |  |  |
 | fe |  |  |  |
+| gvkey | \- | x | x |
 | year | \- | \- | x |
-| gvkey | \- | x | \- |
-| gvkey | \- | \- | x |
 | stats |  |  |  |
-| Observations | 139,861 | 138,205 | 138,205 |
-| R² | 0.04 | 0.563 | 0.586 |
+| Observations | 143,066 | 141,397 | 141,397 |
+| R² | 0.039 | 0.563 | 0.586 |
 | Format of coefficient cell: Coefficient (t-stats) |  |  |  |
 
 ## Clustering Standard Errors
@@ -522,7 +521,7 @@ model_cluster_firm <- feols(
 )
 ```
 
-    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+    NOTE: 1,669/0 fixed-effect singletons were removed (1,669 observations).
 
 ``` r
 model_cluster_firmyear <- feols(
@@ -532,7 +531,7 @@ model_cluster_firmyear <- feols(
 )
 ```
 
-    NOTE: 1,656/0 fixed-effect singletons were removed (1,656 observations).
+    NOTE: 1,669/0 fixed-effect singletons were removed (1,669 observations).
 
 ## Python
 
@@ -568,14 +567,14 @@ etable(
                     model_fe_firm.. model_cluster.. model_cluster...1
     Dependent Var.: investment_lead investment_lead   investment_lead
                                                                      
-    cash_flows      0.014*** (17.5) 0.014*** (10.1)   0.014*** (8.30)
-    tobins_q        0.009*** (75.9) 0.009*** (35.6)   0.009*** (14.3)
+    cash_flows      0.013*** (17.3) 0.013*** (10.0)   0.013*** (8.13)
+    tobins_q        0.009*** (76.2) 0.009*** (35.7)   0.009*** (14.0)
     Fixed-Effects:  --------------- ---------------   ---------------
     gvkey                       Yes             Yes               Yes
     year                        Yes             Yes               Yes
     _______________ _______________ _______________   _______________
     VCOV type                   IID       by: gvkey  by: gvkey & year
-    Observations            138,205         138,205           138,205
+    Observations            141,397         141,397           141,397
     R2                        0.586           0.586             0.586
     Within R2                 0.045           0.045             0.045
     ---
@@ -593,13 +592,13 @@ pf.etable(
 |----|----|----|----|
 |  | \(1\) | \(2\) | \(3\) |
 | coef |  |  |  |
-| cash_flows | 0.014 (17.498) | 0.014 (10.122) | 0.014 (8.297) |
-| tobins_q | 0.009 (75.943) | 0.009 (35.632) | 0.009 (14.303) |
+| cash_flows | 0.013 (17.263) | 0.013 (10.017) | 0.013 (8.126) |
+| tobins_q | 0.009 (76.194) | 0.009 (35.696) | 0.009 (14.047) |
 | fe |  |  |  |
-| year | x | x | x |
 | gvkey | x | x | x |
+| year | x | x | x |
 | stats |  |  |  |
-| Observations | 138,205 | 138,205 | 138,205 |
+| Observations | 141,397 | 141,397 | 141,397 |
 | R² | 0.586 | 0.586 | 0.586 |
 | Format of coefficient cell: Coefficient (t-stats) |  |  |  |
 

@@ -361,18 +361,18 @@ summary(model_smb)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.020196 -0.001380  0.000007  0.001438  0.015446 
+    -0.020186 -0.001357 -0.000015  0.001433  0.015469 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    -0.000171   0.000125   -1.37     0.17    
-    smb_replicated  0.979135   0.004107  238.38   <2e-16 ***
+    (Intercept)    -0.000176   0.000124   -1.42     0.16    
+    smb_replicated  0.979420   0.004082  239.96   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00345 on 760 degrees of freedom
+    Residual standard error: 0.00345 on 772 degrees of freedom
     Multiple R-squared:  0.987, Adjusted R-squared:  0.987 
-    F-statistic: 5.68e+04 on 1 and 760 DF,  p-value: <2e-16
+    F-statistic: 5.76e+04 on 1 and 772 DF,  p-value: <2e-16
 
 The results for the SMB factor are really convincing, as all three criteria outlined above are met and the coefficient is 0.98 and the R-squared is at 99 percent.
 
@@ -392,12 +392,12 @@ model_smb.summary()
     Dep. var.: smb
     sample: None = all
     Inference:  iid
-    Observations:  762
+    Observations:  774
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |     -0.000 |        0.000 |    -1.368 |      0.172 | -0.000 |   0.000 |
-    | smb_replicated |      0.979 |        0.004 |   238.380 |      0.000 |  0.971 |   0.987 |
+    | Intercept      |     -0.000 |        0.000 |    -1.419 |      0.156 | -0.000 |   0.000 |
+    | smb_replicated |      0.979 |        0.004 |   239.964 |      0.000 |  0.971 |   0.987 |
     ---
     RMSE: 0.003 R2: 0.987 
 
@@ -415,20 +415,20 @@ summary(model_hml)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.023588 -0.002530 -0.000178  0.002022  0.031115 
+    -0.023151 -0.002549 -0.000213  0.002016  0.031246 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000407   0.000209    1.94    0.052 .  
-    hml_replicated 0.955073   0.006908  138.26   <2e-16 ***
+    (Intercept)    0.000443   0.000208    2.12    0.034 *  
+    hml_replicated 0.953353   0.006863  138.91   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00576 on 760 degrees of freedom
-    Multiple R-squared:  0.962, Adjusted R-squared:  0.962 
-    F-statistic: 1.91e+04 on 1 and 760 DF,  p-value: <2e-16
+    Residual standard error: 0.00577 on 772 degrees of freedom
+    Multiple R-squared:  0.962, Adjusted R-squared:  0.961 
+    F-statistic: 1.93e+04 on 1 and 772 DF,  p-value: <2e-16
 
-The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.96 and an R-squared around 96 percent.
+The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.95 and an R-squared around 96 percent.
 
 ## Python
 
@@ -446,16 +446,16 @@ model_hml.summary()
     Dep. var.: hml
     sample: None = all
     Inference:  iid
-    Observations:  762
+    Observations:  774
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.000 |        0.000 |     1.942 |      0.052 | -0.000 |   0.001 |
-    | hml_replicated |      0.955 |        0.007 |   138.261 |      0.000 |  0.942 |   0.969 |
+    | Intercept      |      0.000 |        0.000 |     2.124 |      0.034 |  0.000 |   0.001 |
+    | hml_replicated |      0.953 |        0.007 |   138.909 |      0.000 |  0.940 |   0.967 |
     ---
     RMSE: 0.006 R2: 0.962 
 
-The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.96 and an R-squared around 96 percent.
+The replication of the HML factor is also a success, although at a slightly lower coefficient of 0.95 and an R-squared around 96 percent.
 
 The evidence hence allows us to conclude that we did a relatively good job in replicating the original Fama-French size and value premiums, although we do not know their underlying code. From our perspective, a perfect match is only possible with additional information from the maintainers of the original data.
 
@@ -773,18 +773,18 @@ summary(model_smb)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.019387 -0.001871  0.000153  0.001938  0.013449 
+    -0.019133 -0.001868  0.000181  0.001928  0.013662 
 
     Coefficients:
                     Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    -0.000232   0.000129    -1.8    0.073 .  
-    smb_replicated  0.959262   0.004104   233.8   <2e-16 ***
+    (Intercept)    -0.000256   0.000129   -1.99    0.047 *  
+    smb_replicated  0.959894   0.004106  233.79   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.0035 on 736 degrees of freedom
-    Multiple R-squared:  0.987, Adjusted R-squared:  0.987 
-    F-statistic: 5.46e+04 on 1 and 736 DF,  p-value: <2e-16
+    Residual standard error: 0.00352 on 748 degrees of freedom
+    Multiple R-squared:  0.986, Adjusted R-squared:  0.986 
+    F-statistic: 5.47e+04 on 1 and 748 DF,  p-value: <2e-16
 
 The results for the SMB factor are quite convincing as all three criteria outlined above are met and the coefficient is 0.96 and the R-squared is at 99 percent.
 
@@ -804,14 +804,14 @@ model_smb.summary()
     Dep. var.: smb
     sample: None = all
     Inference:  iid
-    Observations:  738
+    Observations:  750
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |     -0.000 |        0.000 |    -1.796 |      0.073 | -0.000 |   0.000 |
-    | smb_replicated |      0.959 |        0.004 |   233.761 |      0.000 |  0.951 |   0.967 |
+    | Intercept      |     -0.000 |        0.000 |    -1.990 |      0.047 | -0.001 |  -0.000 |
+    | smb_replicated |      0.960 |        0.004 |   233.790 |      0.000 |  0.952 |   0.968 |
     ---
-    RMSE: 0.003 R2: 0.987 
+    RMSE: 0.004 R2: 0.986 
 
 The results for the SMB factor are quite convincing, as all three criteria outlined above are met and the coefficient is 0.96 and the R-squared is at 99 percent.
 
@@ -827,18 +827,18 @@ summary(model_hml)
 
     Residuals:
          Min       1Q   Median       3Q      Max 
-    -0.04314 -0.00407 -0.00033  0.00386  0.03455 
+    -0.04314 -0.00416 -0.00036  0.00390  0.03461 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000606   0.000287    2.11    0.035 *  
-    hml_replicated 0.979502   0.009794  100.01   <2e-16 ***
+    (Intercept)    0.000649   0.000286    2.27    0.023 *  
+    hml_replicated 0.978927   0.009739  100.52   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00778 on 736 degrees of freedom
+    Residual standard error: 0.00781 on 748 degrees of freedom
     Multiple R-squared:  0.931, Adjusted R-squared:  0.931 
-    F-statistic: 1e+04 on 1 and 736 DF,  p-value: <2e-16
+    F-statistic: 1.01e+04 on 1 and 748 DF,  p-value: <2e-16
 
 The replication of the HML factor is also a success, although at a slightly higher coefficient of 0.98 and an R-squared around 93 percent.
 
@@ -858,12 +858,12 @@ model_hml.summary()
     Dep. var.: hml
     sample: None = all
     Inference:  iid
-    Observations:  738
+    Observations:  750
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.001 |        0.000 |     2.108 |      0.035 |  0.000 |   0.001 |
-    | hml_replicated |      0.980 |        0.010 |   100.008 |      0.000 |  0.960 |   0.999 |
+    | Intercept      |      0.001 |        0.000 |     2.270 |      0.023 |  0.000 |   0.001 |
+    | hml_replicated |      0.979 |        0.010 |   100.518 |      0.000 |  0.960 |   0.998 |
     ---
     RMSE: 0.008 R2: 0.931 
 
@@ -881,20 +881,20 @@ summary(model_rmw)
 
     Residuals:
           Min        1Q    Median        3Q       Max 
-    -0.018492 -0.003071 -0.000012  0.003300  0.018495 
+    -0.018640 -0.003069 -0.000077  0.003243  0.021721 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    2.74e-05   1.99e-04    0.14     0.89    
-    rmw_replicated 9.49e-01   8.72e-03  108.80   <2e-16 ***
+    (Intercept)    6.41e-05   2.01e-04    0.32     0.75    
+    rmw_replicated 9.43e-01   8.76e-03  107.64   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00537 on 736 degrees of freedom
-    Multiple R-squared:  0.941, Adjusted R-squared:  0.941 
-    F-statistic: 1.18e+04 on 1 and 736 DF,  p-value: <2e-16
+    Residual standard error: 0.00547 on 748 degrees of freedom
+    Multiple R-squared:  0.939, Adjusted R-squared:  0.939 
+    F-statistic: 1.16e+04 on 1 and 748 DF,  p-value: <2e-16
 
-We are also able to replicate the RMW factor quite well with a coefficient of 0.95 and an R-squared around 94 percent.
+We are also able to replicate the RMW factor quite well with a coefficient of 0.94 and an R-squared around 94 percent.
 
 ## Python
 
@@ -912,16 +912,16 @@ model_rmw.summary()
     Dep. var.: rmw
     sample: None = all
     Inference:  iid
-    Observations:  738
+    Observations:  750
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.000 |        0.000 |     0.137 |      0.891 | -0.000 |   0.000 |
-    | rmw_replicated |      0.949 |        0.009 |   108.804 |      0.000 |  0.932 |   0.966 |
+    | Intercept      |      0.000 |        0.000 |     0.318 |      0.750 | -0.000 |   0.000 |
+    | rmw_replicated |      0.943 |        0.009 |   107.638 |      0.000 |  0.926 |   0.961 |
     ---
-    RMSE: 0.005 R2: 0.941 
+    RMSE: 0.005 R2: 0.939 
 
-We are also able to replicate the RMW factor quite well with a coefficient of 0.95 and an R-squared around 94 percent.
+We are also able to replicate the RMW factor quite well with a coefficient of 0.94 and an R-squared around 94 percent.
 
 ## R
 
@@ -934,21 +934,21 @@ summary(model_cma)
     lm(formula = cma ~ cma_replicated, data = test)
 
     Residuals:
-         Min       1Q   Median       3Q      Max 
-    -0.02874 -0.00273  0.00002  0.00262  0.02122 
+          Min        1Q    Median        3Q       Max 
+    -0.028743 -0.002700  0.000012  0.002687  0.021230 
 
     Coefficients:
                    Estimate Std. Error t value Pr(>|t|)    
-    (Intercept)    0.000520   0.000172    3.02   0.0026 ** 
-    cma_replicated 0.953961   0.008162  116.88   <2e-16 ***
+    (Intercept)    0.000496   0.000175    2.82   0.0049 ** 
+    cma_replicated 0.955755   0.008324  114.81   <2e-16 ***
     ---
     Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-    Residual standard error: 0.00465 on 736 degrees of freedom
-    Multiple R-squared:  0.949, Adjusted R-squared:  0.949 
-    F-statistic: 1.37e+04 on 1 and 736 DF,  p-value: <2e-16
+    Residual standard error: 0.00478 on 748 degrees of freedom
+    Multiple R-squared:  0.946, Adjusted R-squared:  0.946 
+    F-statistic: 1.32e+04 on 1 and 748 DF,  p-value: <2e-16
 
-Finally, the CMA factor also replicates well with a coefficient of 0.95 and an R-squared around 95 percent.
+Finally, the CMA factor also replicates well with a coefficient of 0.96 and an R-squared around 95 percent.
 
 ## Python
 
@@ -966,16 +966,16 @@ model_cma.summary()
     Dep. var.: cma
     sample: None = all
     Inference:  iid
-    Observations:  738
+    Observations:  750
 
     | Coefficient    |   Estimate |   Std. Error |   t value |   Pr(>|t|) |   2.5% |   97.5% |
     |:---------------|-----------:|-------------:|----------:|-----------:|-------:|--------:|
-    | Intercept      |      0.001 |        0.000 |     3.020 |      0.003 |  0.000 |   0.001 |
-    | cma_replicated |      0.954 |        0.008 |   116.881 |      0.000 |  0.938 |   0.970 |
+    | Intercept      |      0.000 |        0.000 |     2.825 |      0.005 |  0.000 |   0.001 |
+    | cma_replicated |      0.956 |        0.008 |   114.814 |      0.000 |  0.939 |   0.972 |
     ---
-    RMSE: 0.005 R2: 0.949 
+    RMSE: 0.005 R2: 0.946 
 
-Finally, the CMA factor also replicates well with a coefficient of 0.95 and an R-squared around 95 percent.
+Finally, the CMA factor also replicates well with a coefficient of 0.96 and an R-squared around 95 percent.
 
 Overall, our approach seems to replicate the Fama-French five-factor model just as well as the three factors.
 

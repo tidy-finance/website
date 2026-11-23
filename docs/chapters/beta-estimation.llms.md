@@ -86,8 +86,8 @@ coefficients
 ```
 
                 Estimate Std. Error t value Pr(>|t|)
-    (Intercept)  0.00992    0.00488    2.03 4.27e-02
-    mkt_excess   1.37560    0.10761   12.78 8.89e-33
+    (Intercept)  0.00957     0.0048     2.0 4.65e-02
+    mkt_excess   1.36529     0.1062    12.9 3.58e-33
 
 `lm()` returns an object of class `lm` which contains all information we usually care about with linear models. `summary()` returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
 
@@ -106,8 +106,8 @@ coefficients
 
                  Estimate  Std. Error    t value  Pr(>|t|)      2.5%     97.5%
     Coefficient                                                               
-    Intercept    0.009919    0.004884   2.031102  0.042747  0.000325  0.019513
-    mkt_excess   1.375598    0.107606  12.783617  0.000000  1.164207  1.586989
+    Intercept    0.009572    0.004796   1.995633  0.046478  0.000150  0.018993
+    mkt_excess   1.365291    0.106204  12.855421  0.000000  1.156667  1.573916
 
 `pf.feols()` returns an object of class `Feols`, which contains all the information we usually care about with linear models. The `tidy()` method returns information about the estimated parameters. The output above indicates that Apple moves excessively with the market as the estimated $\hat\beta_i$ is above one ($\hat\beta_i \approx 1.4$).
 
@@ -292,7 +292,7 @@ capm_examples <- crsp_monthly |>
 capm_examples
 ```
 
-    # A tibble: 3,114 × 5
+    # A tibble: 3,210 × 5
       permno date       coefficient estimate t_statistic
        <dbl> <date>     <chr>          <dbl>       <dbl>
     1  10107 1990-03-01 alpha         0.0417        2.31
@@ -300,7 +300,7 @@ capm_examples
     3  10107 1990-04-01 alpha         0.0427        2.41
     4  10107 1990-04-01 mkt_excess    1.39          4.20
     5  10107 1990-05-01 alpha         0.0443        2.53
-    # ℹ 3,109 more rows
+    # ℹ 3,205 more rows
 
 ## Python
 
@@ -311,7 +311,7 @@ capm_examples = roll_capm_estimation(
 capm_examples
 ```
 
-shape: (3_114, 5)
+shape: (3_210, 5)
 
 | permno  | date       | coefficient  | estimate | t_statistic |
 |---------|------------|--------------|----------|-------------|
@@ -322,11 +322,11 @@ shape: (3_114, 5)
 | 10107.0 | 1990-04-01 | "mkt_excess" | 1.385035 | 4.197367    |
 | 10107.0 | 1990-05-01 | "alpha"      | 0.044259 | 2.533768    |
 | …       | …          | …            | …        | …           |
-| 93436.0 | 2024-10-01 | "mkt_excess" | 2.380626 | 5.488947    |
-| 93436.0 | 2024-11-01 | "alpha"      | 0.038041 | 1.593754    |
-| 93436.0 | 2024-11-01 | "mkt_excess" | 2.451092 | 5.645404    |
-| 93436.0 | 2024-12-01 | "alpha"      | 0.039498 | 1.654254    |
-| 93436.0 | 2024-12-01 | "mkt_excess" | 2.385498 | 5.496126    |
+| 93436.0 | 2025-10-01 | "mkt_excess" | 2.183953 | 5.118691    |
+| 93436.0 | 2025-11-01 | "alpha"      | 0.006702 | 0.334373    |
+| 93436.0 | 2025-11-01 | "mkt_excess" | 2.011447 | 4.529588    |
+| 93436.0 | 2025-12-01 | "alpha"      | 0.005466 | 0.275681    |
+| 93436.0 | 2025-12-01 | "mkt_excess" | 1.960263 | 4.423021    |
 
 [Figure 1](#fig-601) displays the resulting beta estimates, focusing exclusively on the coefficient of `"mkt_excess"`.
 
@@ -398,7 +398,7 @@ capm_monthly <- roll_capm_estimation(crsp_monthly)
 capm_monthly
 ```
 
-    # A tibble: 4,665,538 × 5
+    # A tibble: 4,738,040 × 5
       permno date       coefficient estimate t_statistic
        <dbl> <date>     <chr>          <dbl>       <dbl>
     1  10001 1990-01-01 alpha         0.0111       1.38 
@@ -406,7 +406,7 @@ capm_monthly
     3  10001 1990-02-01 alpha         0.0106       1.34 
     4  10001 1990-02-01 mkt_excess    0.0976       0.678
     5  10001 1990-03-01 alpha         0.0105       1.35 
-    # ℹ 4,665,533 more rows
+    # ℹ 4,738,035 more rows
 
 Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
 
@@ -428,7 +428,7 @@ capm_monthly = roll_capm_estimation(crsp_monthly)
 capm_monthly
 ```
 
-shape: (4_665_538, 5)
+shape: (4_738_040, 5)
 
 | permno  | date       | coefficient  | estimate | t_statistic |
 |---------|------------|--------------|----------|-------------|
@@ -439,11 +439,11 @@ shape: (4_665_538, 5)
 | 10001.0 | 1990-02-01 | "mkt_excess" | 0.097602 | 0.677908    |
 | 10001.0 | 1990-03-01 | "alpha"      | 0.010462 | 1.353963    |
 | …       | …          | …            | …        | …           |
-| 93436.0 | 2024-10-01 | "mkt_excess" | 2.380626 | 5.488947    |
-| 93436.0 | 2024-11-01 | "alpha"      | 0.038041 | 1.593754    |
-| 93436.0 | 2024-11-01 | "mkt_excess" | 2.451092 | 5.645404    |
-| 93436.0 | 2024-12-01 | "alpha"      | 0.039498 | 1.654254    |
-| 93436.0 | 2024-12-01 | "mkt_excess" | 2.385498 | 5.496126    |
+| 93436.0 | 2025-10-01 | "mkt_excess" | 2.183953 | 5.118691    |
+| 93436.0 | 2025-11-01 | "alpha"      | 0.006702 | 0.334373    |
+| 93436.0 | 2025-11-01 | "mkt_excess" | 2.011447 | 4.529588    |
+| 93436.0 | 2025-12-01 | "alpha"      | 0.005466 | 0.275681    |
+| 93436.0 | 2025-12-01 | "mkt_excess" | 1.960263 | 4.423021    |
 
 Instead of implementing the rolling-window estimation by hand, you can also use the `estimate_betas()` function from the `tidyfinance` package, which is built precisely for this task:
 
@@ -890,8 +890,8 @@ beta |>
     # A tibble: 2 × 9
       return_type  mean    sd    min    q05   q50   q95   max       n
       <chr>       <dbl> <dbl>  <dbl>  <dbl> <dbl> <dbl> <dbl>   <int>
-    1 daily       0.794 0.495  -3.67 0.0857 0.755  1.66  4.97 2354575
-    2 monthly     1.11  0.714 -13.1  0.132  1.04   2.33 11.7  2332769
+    1 daily       0.798 0.495  -3.67 0.0873 0.760  1.67  4.97 2391103
+    2 monthly     1.11  0.715 -13.1  0.133  1.04   2.33 11.9  2369020
 
 ## Python
 
@@ -918,8 +918,8 @@ shape: (2, 9)
 | return_type | count   | mean | std  | min    | q05  | q50  | q95  | max   |
 |-------------|---------|------|------|--------|------|------|------|-------|
 | str         | u32     | f64  | f64  | f64    | f64  | f64  | f64  | f64   |
-| "daily"     | 2354575 | 0.79 | 0.49 | -3.67  | 0.09 | 0.75 | 1.66 | 4.97  |
-| "monthly"   | 2332769 | 1.11 | 0.71 | -13.05 | 0.13 | 1.04 | 2.33 | 11.72 |
+| "daily"     | 2391103 | 0.8  | 0.5  | -3.67  | 0.09 | 0.76 | 1.67 | 4.97  |
+| "monthly"   | 2369020 | 1.11 | 0.71 | -13.05 | 0.13 | 1.04 | 2.33 | 11.91 |
 
 The summary statistics indicate that estimates based on daily returns are, on average, lower and less variable than those derived from monthly returns.
 
@@ -935,8 +935,8 @@ beta |>
 ```
 
             monthly daily
-    monthly   1.000 0.618
-    daily     0.618 1.000
+    monthly   1.000 0.617
+    daily     0.617 1.000
 
 ## Python
 

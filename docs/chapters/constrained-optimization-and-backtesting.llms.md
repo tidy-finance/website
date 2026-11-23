@@ -101,16 +101,16 @@ shape: (10, 2)
 | Industry | Minimum variance |
 |----------|------------------|
 | str      | f64              |
-| "nodur"  | 0.274            |
-| "durbl"  | 0.01             |
-| "manuf"  | 0.021            |
-| "enrgy"  | 0.087            |
+| "nodur"  | 0.27             |
+| "durbl"  | 0.015            |
+| "manuf"  | 0.024            |
+| "enrgy"  | 0.084            |
 | "hitec"  | 0.022            |
-| "telcm"  | 0.231            |
-| "shops"  | 0.087            |
-| "hlth"   | 0.17             |
-| "utils"  | 0.46             |
-| "other"  | -0.363           |
+| "telcm"  | 0.229            |
+| "shops"  | 0.089            |
+| "hlth"   | 0.169            |
+| "utils"  | 0.463            |
+| "other"  | -0.364           |
 
 Next, consider an investor who aims to achieve minimum variance *given a required expected portfolio return* $\bar{\mu}$ such that she chooses
 
@@ -201,8 +201,8 @@ w_efficient <- compute_efficient_weight(Sigma, mu)
 round(w_efficient, 3)
 ```
 
-     [1]  1.185  0.237 -1.640  0.614  0.449 -0.437  0.754  0.358 -0.047
-    [10] -0.474
+     [1]  1.066  0.256 -1.570  0.585  0.482 -0.460  0.687  0.430  0.003
+    [10] -0.478
 
 ## Python
 
@@ -247,16 +247,16 @@ shape: (10, 2)
 | Industry | Efficient portfolio |
 |----------|---------------------|
 | str      | f64                 |
-| "nodur"  | 1.185               |
-| "durbl"  | 0.237               |
-| "manuf"  | -1.64               |
-| "enrgy"  | 0.614               |
-| "hitec"  | 0.449               |
-| "telcm"  | -0.437              |
-| "shops"  | 0.754               |
-| "hlth"   | 0.358               |
-| "utils"  | -0.047              |
-| "other"  | -0.474              |
+| "nodur"  | 1.066               |
+| "durbl"  | 0.256               |
+| "manuf"  | -1.57               |
+| "enrgy"  | 0.585               |
+| "hitec"  | 0.482               |
+| "telcm"  | -0.46               |
+| "shops"  | 0.687               |
+| "hlth"   | 0.43                |
+| "utils"  | 0.003               |
+| "other"  | -0.478              |
 
 The portfolio weights above indicate the efficient portfolio for an investor with risk aversion coefficient $\gamma=2$ in the absence of transaction costs. Some of the positions are negative, which implies short-selling, and most of the positions are rather extreme. For instance, a position of $-1$ implies that the investor takes a short position worth their entire wealth to lever long positions in other assets. What is the effect of transaction costs or different levels of risk aversion on the optimal portfolio choice? The following few lines of code analyze the distance between the minimum variance portfolio and the portfolio implemented by the investor for different values of the transaction cost parameter $\beta$ and risk aversion $\gamma$.
 
@@ -530,7 +530,7 @@ w_no_short_sale <- nloptr(
 round(w_no_short_sale$solution, 3)
 ```
 
-     [1] 0.280 0.000 0.000 0.198 0.000 0.000 0.339 0.182 0.000 0.000
+     [1] 0.210 0.000 0.000 0.192 0.039 0.000 0.295 0.263 0.000 0.000
 
 As expected, the resulting portfolio weights are all positive (up to numerical precision). Typically, the holdings in the presence of short-sale constraints are concentrated among way fewer assets than for the unrestricted case. You can verify that `sum(w_no_short_sale$solution)` returns 1. In other words, `nloptr()` provides the numerical solution to a portfolio choice problem for a mean-variance investor with risk aversion `gamma = 2`, where negative holdings are forbidden.
 
@@ -562,14 +562,14 @@ shape: (10, 2)
 | Industry | No short-sale |
 |----------|---------------|
 | str      | f64           |
-| "nodur"  | 0.28          |
+| "nodur"  | 0.21          |
 | "durbl"  | 0.0           |
 | "manuf"  | 0.0           |
-| "enrgy"  | 0.198         |
-| "hitec"  | 0.0           |
+| "enrgy"  | 0.192         |
+| "hitec"  | 0.039         |
 | "telcm"  | 0.0           |
-| "shops"  | 0.339         |
-| "hlth"   | 0.182         |
+| "shops"  | 0.295         |
+| "hlth"   | 0.263         |
 | "utils"  | 0.0           |
 | "other"  | 0.0           |
 
@@ -613,7 +613,7 @@ w_reg_t <- nloptr(
 round(w_reg_t$solution, 3)
 ```
 
-     [1]  0.358  0.000 -0.250  0.245  0.051  0.000  0.400  0.195  0.000
+     [1]  0.292  0.000 -0.220  0.237  0.097 -0.030  0.350  0.274  0.000
     [10]  0.000
 
 ## Python
@@ -664,14 +664,14 @@ shape: (10, 2)
 | Industry | Regulation-T |
 |----------|--------------|
 | str      | f64          |
-| "nodur"  | 0.358        |
+| "nodur"  | 0.295        |
 | "durbl"  | 0.0          |
-| "manuf"  | -0.25        |
-| "enrgy"  | 0.245        |
-| "hitec"  | 0.051        |
-| "telcm"  | -0.0         |
-| "shops"  | 0.4          |
-| "hlth"   | 0.195        |
+| "manuf"  | -0.22        |
+| "enrgy"  | 0.237        |
+| "hitec"  | 0.097        |
+| "telcm"  | -0.03        |
+| "shops"  | 0.349        |
+| "hlth"   | 0.273        |
 | "utils"  | 0.0          |
 | "other"  | -0.0         |
 
@@ -1031,9 +1031,9 @@ performance_table |>
     # A tibble: 3 × 5
       Strategy  Mean    SD `Sharpe ratio` Turnover
       <chr>    <dbl> <dbl>          <dbl>    <dbl>
-    1 MV        10.5  12.6          0.836    16.6 
-    2 MV (TC)   11.4  14.4          0.789     0   
-    3 Naive     11.9  15.1          0.788     2.34
+    1 MV        10.5  12.6          0.838    16.5 
+    2 MV (TC)   11.4  14.4          0.795     0   
+    3 Naive     12.0  15.0          0.795     2.36
 
 ## Python
 
@@ -1073,9 +1073,9 @@ shape: (3, 5)
 | strategy  | mean   | sd     | sharpe_ratio | turnover |
 |-----------|--------|--------|--------------|----------|
 | str       | f64    | f64    | f64          | f64      |
-| "MV"      | 10.531 | 12.601 | 0.836        | 16.566   |
-| "MV (TC)" | 11.401 | 14.446 | 0.789        | 0.0      |
-| "Naive"   | 11.927 | 15.133 | 0.788        | 2.345    |
+| "MV"      | 10.534 | 12.569 | 0.838        | 16.503   |
+| "MV (TC)" | 11.414 | 14.351 | 0.795        | 0.0      |
+| "Naive"   | 11.959 | 15.038 | 0.795        | 2.365    |
 
 The results clearly speak against mean-variance optimization. Turnover is huge when the investor only considers their portfolio’s expected return and variance. Effectively, the mean-variance portfolio generates a *negative* annualized return after adjusting for transaction costs. At the same time, the naive portfolio turns out to perform very well. In fact, the performance gains of the transaction-cost adjusted mean-variance portfolio are small. The out-of-sample Sharpe ratio is slightly higher than for the naive portfolio. Note the extreme effect of turnover penalization on turnover: *MV (TC)* effectively resembles a buy-and-hold strategy which only updates the portfolio once the estimated parameters $\hat\mu_t$ and $\hat\Sigma_t$ indicate that the current allocation is too far away from the optimal theoretical portfolio.
 
