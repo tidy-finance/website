@@ -207,7 +207,7 @@ LinkedIn →
 
 ### Stefan Voigt
 
-Assistant Professor of Finance at University of Copenhagen
+Associate Professor of Finance at University of Copenhagen
 
 Website →
 
@@ -215,7 +215,7 @@ Website →
 
 ### Patrick Weiss
 
-Assistant Professor of Finance at Reykjavik University
+Associate Professor of Finance at Reykjavik University
 
 Website →
 
